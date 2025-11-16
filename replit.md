@@ -25,6 +25,17 @@ The system is built as a full-stack TypeScript application using React for the f
    - **Data Validation**: Zod schemas with coordinate and NIF validation
    - **Frontend Status**: ⚠️ **Pending Migration** - Forms, lists, and navigation still use old Gabinetes model
 
+**Multi-Agent System with Role-Based Access Control (November 16, 2025):**
+7. ✅ **Backend Implementation Complete** - Full role-based access control system:
+   - **User Roles**: Admin (sees all data) and Agent (sees only their created/assigned data)
+   - **Ownership Fields**: createdByUserId and assignedUserId on entidades, contactos, and visitas
+   - **Security**: All UPDATE/DELETE operations enforce ownership checks for agent users
+   - **Legacy Support**: Visitas queries include fallback to legacy userId field for historical data access
+   - **Storage Layer**: Role-based filtering in all GET methods (admin sees all, agents see owned/assigned)
+   - **Odoo Sync Preparation**: Added needsSync, syncStatus, syncError fields with placeholder endpoints
+   - **API Endpoints**: POST /api/sync/odoo (manual sync), POST /api/odoo/webhook (incoming updates)
+   - **Frontend Status**: ⚠️ **Pending** - Forms need assignedUserId field, offline IndexedDB needs ownership field support
+
 **Offline Capabilities (November 16, 2025):**
 - **IndexedDB Storage**: Local database for visits, entidades, gabinetes (deprecated), contactos, and pending sync queue
 - **Offline Creation**: Create entidades and contactos while offline → saved locally with temp IDs → appear in lists immediately
