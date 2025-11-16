@@ -1,11 +1,14 @@
 import {
   users,
+  entidades,
   gabinetes,
   contactos,
   visitas,
   marcas,
   type User,
   type UpsertUser,
+  type Entidade,
+  type InsertEntidade,
   type Gabinete,
   type InsertGabinete,
   type Contacto,
@@ -14,6 +17,7 @@ import {
   type InsertVisita,
   type Marca,
   type InsertMarca,
+  type EntidadeWithRelations,
   type GabineteWithRelations,
   type ContactoWithRelations,
   type VisitaWithRelations,
@@ -26,7 +30,15 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   
-  // Gabinetes
+  // Entidades (Universal Entities)
+  getEntidades(): Promise<Entidade[]>;
+  getEntidade(id: string): Promise<EntidadeWithRelations | undefined>;
+  createEntidade(entidade: InsertEntidade): Promise<Entidade>;
+  updateEntidade(id: string, entidade: Partial<InsertEntidade>): Promise<Entidade | undefined>;
+  deleteEntidade(id: string): Promise<void>;
+  checkEntidadeHasRelations(id: string): Promise<boolean>;
+  
+  // Gabinetes (DEPRECATED - use Entidades)
   getGabinetes(): Promise<Gabinete[]>;
   getGabinete(id: string): Promise<GabineteWithRelations | undefined>;
   createGabinete(gabinete: InsertGabinete): Promise<Gabinete>;
@@ -85,7 +97,63 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  // Gabinetes
+  // Entidades (Universal Entities)
+  async getEntidades(): Promise<Entidade[]> {
+    return db.select().from(entidades).orderBy(desc(entidades.createdAt));
+  }
+
+  async getEntidade(id: string): Promise<EntidadeWithRelations | undefined> {
+    const [entidade] = await db.query.entidades.findMany({
+      where: eq(entidades.id, id),
+      with: {
+        contactos: true,
+        visitas: {
+          orderBy: desc(visitas.dataVisita),
+          limit: 10,
+        },
+      },
+    });
+    return entidade;
+  }
+
+  async createEntidade(entidadeData: InsertEntidade): Promise<Entidade> {
+    const [entidade] = await db
+      .insert(entidades)
+      .values({ ...entidadeData, updatedAt: new Date() })
+      .returning();
+    return entidade;
+  }
+
+  async updateEntidade(id: string, entidadeData: Partial<InsertEntidade>): Promise<Entidade | undefined> {
+    const [entidade] = await db
+      .update(entidades)
+      .set({ ...entidadeData, updatedAt: new Date() })
+      .where(eq(entidades.id, id))
+      .returning();
+    return entidade;
+  }
+
+  async checkEntidadeHasRelations(id: string): Promise<boolean> {
+    const relatedContactos = await db
+      .select()
+      .from(contactos)
+      .where(eq(contactos.entidadeId, id))
+      .limit(1);
+    
+    const relatedVisitas = await db
+      .select()
+      .from(visitas)
+      .where(eq(visitas.entidadeId, id))
+      .limit(1);
+    
+    return relatedContactos.length > 0 || relatedVisitas.length > 0;
+  }
+
+  async deleteEntidade(id: string): Promise<void> {
+    await db.delete(entidades).where(eq(entidades.id, id));
+  }
+
+  // Gabinetes (DEPRECATED - use Entidades)
   async getGabinetes(): Promise<Gabinete[]> {
     return db.select().from(gabinetes).orderBy(desc(gabinetes.createdAt));
   }

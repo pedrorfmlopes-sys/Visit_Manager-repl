@@ -8,7 +8,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { randomUUID } from "crypto";
-import { insertGabineteSchema, insertContactoSchema, insertVisitaSchema } from "@shared/schema";
+import { insertEntidadeSchema, insertGabineteSchema, insertContactoSchema, insertVisitaSchema } from "@shared/schema";
 import express from "express";
 
 // Ensure upload directory exists
@@ -82,7 +82,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Gabinetes endpoints
+  // Entidades endpoints (Universal Entities)
+  app.get('/api/entidades', isAuthenticated, async (req, res) => {
+    try {
+      const entidades = await storage.getEntidades();
+      res.json(entidades);
+    } catch (error) {
+      console.error("Error fetching entidades:", error);
+      res.status(500).json({ message: "Failed to fetch entidades" });
+    }
+  });
+
+  app.get('/api/entidades/:id', isAuthenticated, async (req, res) => {
+    try {
+      const entidade = await storage.getEntidade(req.params.id);
+      if (!entidade) {
+        return res.status(404).json({ message: "Entidade not found" });
+      }
+      res.json(entidade);
+    } catch (error) {
+      console.error("Error fetching entidade:", error);
+      res.status(500).json({ message: "Failed to fetch entidade" });
+    }
+  });
+
+  app.post('/api/entidades', isAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertEntidadeSchema.parse(req.body);
+      const entidade = await storage.createEntidade(validatedData);
+      res.json(entidade);
+    } catch (error) {
+      console.error("Error creating entidade:", error);
+      res.status(400).json({ message: "Failed to create entidade" });
+    }
+  });
+
+  app.patch('/api/entidades/:id', isAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertEntidadeSchema.partial().parse(req.body);
+      const entidade = await storage.updateEntidade(req.params.id, validatedData);
+      if (!entidade) {
+        return res.status(404).json({ message: "Entidade not found" });
+      }
+      res.json(entidade);
+    } catch (error) {
+      console.error("Error updating entidade:", error);
+      res.status(400).json({ message: "Failed to update entidade" });
+    }
+  });
+
+  app.delete('/api/entidades/:id', isAuthenticated, async (req, res) => {
+    try {
+      // Check if entidade has related contacts or visits
+      const hasRelations = await storage.checkEntidadeHasRelations(req.params.id);
+      if (hasRelations) {
+        return res.status(400).json({ 
+          message: "Não é possível eliminar. Esta entidade tem contactos ou visitas associadas." 
+        });
+      }
+      
+      await storage.deleteEntidade(req.params.id);
+      res.json({ message: "Entidade deleted" });
+    } catch (error) {
+      console.error("Error deleting entidade:", error);
+      res.status(500).json({ message: "Failed to delete entidade" });
+    }
+  });
+
+  // Gabinetes endpoints (DEPRECATED - use /api/entidades)
   app.get('/api/gabinetes', isAuthenticated, async (req, res) => {
     try {
       const gabinetes = await storage.getGabinetes();
