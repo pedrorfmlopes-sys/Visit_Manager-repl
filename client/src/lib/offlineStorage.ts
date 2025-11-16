@@ -57,6 +57,11 @@ class OfflineStorage {
         if (oldVersion < 2 && !db.objectStoreNames.contains('entidades')) {
           db.createObjectStore('entidades', { keyPath: 'id' });
         }
+        
+        // Add tarefas store
+        if (!db.objectStoreNames.contains('tarefas')) {
+          db.createObjectStore('tarefas', { keyPath: 'id' });
+        }
       };
     });
   }
