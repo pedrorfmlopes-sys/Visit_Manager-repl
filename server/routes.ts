@@ -132,12 +132,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/entidades/:id', isAuthenticated, async (req, res) => {
+  app.patch('/api/entidades/:id', isAuthenticated, async (req: any, res) => {
     try {
+      const { userId, userRole } = await getUserContext(req);
       const validatedData = insertEntidadeSchema.partial().parse(req.body);
-      const entidade = await storage.updateEntidade(req.params.id, validatedData);
+      const entidade = await storage.updateEntidade(req.params.id, validatedData, userId, userRole);
       if (!entidade) {
-        return res.status(404).json({ message: "Entidade not found" });
+        return res.status(404).json({ message: "Entidade not found or unauthorized" });
       }
       res.json(entidade);
     } catch (error) {
@@ -146,8 +147,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/entidades/:id', isAuthenticated, async (req, res) => {
+  app.delete('/api/entidades/:id', isAuthenticated, async (req: any, res) => {
     try {
+      const { userId, userRole } = await getUserContext(req);
+      
       // Check if entidade has related contacts or visits
       const hasRelations = await storage.checkEntidadeHasRelations(req.params.id);
       if (hasRelations) {
@@ -156,7 +159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      await storage.deleteEntidade(req.params.id);
+      await storage.deleteEntidade(req.params.id, userId, userRole);
       res.json({ message: "Entidade deleted" });
     } catch (error) {
       console.error("Error deleting entidade:", error);
@@ -262,10 +265,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/contactos/:id', isAuthenticated, async (req, res) => {
+  app.patch('/api/contactos/:id', isAuthenticated, async (req: any, res) => {
     try {
+      const { userId, userRole } = await getUserContext(req);
       const validatedData = insertContactoSchema.partial().parse(req.body);
-      const contacto = await storage.updateContacto(req.params.id, validatedData);
+      const contacto = await storage.updateContacto(req.params.id, validatedData, userId, userRole);
+      if (!contacto) {
+        return res.status(404).json({ message: "Contacto not found or unauthorized" });
+      }
       res.json(contacto);
     } catch (error) {
       console.error("Error updating contacto:", error);
@@ -273,9 +280,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/contactos/:id', isAuthenticated, async (req, res) => {
+  app.delete('/api/contactos/:id', isAuthenticated, async (req: any, res) => {
     try {
-      await storage.deleteContacto(req.params.id);
+      const { userId, userRole } = await getUserContext(req);
+      await storage.deleteContacto(req.params.id, userId, userRole);
       res.json({ message: "Contacto deleted" });
     } catch (error) {
       console.error("Error deleting contacto:", error);
@@ -429,9 +437,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/visitas/:id', isAuthenticated, async (req, res) => {
+  app.delete('/api/visitas/:id', isAuthenticated, async (req: any, res) => {
     try {
-      await storage.deleteVisita(req.params.id);
+      const { userId, userRole } = await getUserContext(req);
+      await storage.deleteVisita(req.params.id, userId, userRole);
       res.json({ message: "Visita deleted" });
     } catch (error) {
       console.error("Error deleting visita:", error);
@@ -457,6 +466,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating marca:", error);
       res.status(400).json({ message: "Failed to create marca" });
+    }
+  });
+
+  // Odoo Integration Placeholder Endpoints
+  // POST /api/sync/odoo - Manual sync trigger
+  app.post('/api/sync/odoo', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole } = await getUserContext(req);
+      
+      // TODO: Implement actual Odoo sync logic
+      // - Query entities/contacts/visits with needsSync=true
+      // - Push changes to Odoo API
+      // - Update syncStatus and lastSyncAt
+      // - Handle errors and update syncError
+      
+      console.log(`[Odoo Sync] Manual sync triggered by user ${userId} (role: ${userRole})`);
+      
+      res.json({ 
+        success: true, 
+        message: "Odoo sync placeholder - implementation pending",
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Error in Odoo sync:", error);
+      res.status(500).json({ message: "Odoo sync failed" });
+    }
+  });
+
+  // POST /api/odoo/webhook - Odoo webhook receiver
+  app.post('/api/odoo/webhook', async (req, res) => {
+    try {
+      // TODO: Implement Odoo webhook handler
+      // - Verify webhook signature/auth
+      // - Parse Odoo event payload
+      // - Update local entities/contacts/visits
+      // - Set needsSync=false for synchronized records
+      // - Handle conflicts and errors
+      
+      console.log('[Odoo Webhook] Received webhook from Odoo:', req.body);
+      
+      res.json({ 
+        success: true, 
+        message: "Odoo webhook placeholder - implementation pending",
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Error processing Odoo webhook:", error);
+      res.status(500).json({ message: "Webhook processing failed" });
     }
   });
 

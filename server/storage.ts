@@ -34,8 +34,8 @@ export interface IStorage {
   getEntidades(userId: string, userRole: 'admin' | 'agent'): Promise<Entidade[]>;
   getEntidade(id: string, userId: string, userRole: 'admin' | 'agent'): Promise<EntidadeWithRelations | undefined>;
   createEntidade(entidade: InsertEntidade): Promise<Entidade>;
-  updateEntidade(id: string, entidade: Partial<InsertEntidade>): Promise<Entidade | undefined>;
-  deleteEntidade(id: string): Promise<void>;
+  updateEntidade(id: string, entidade: Partial<InsertEntidade>, userId?: string, userRole?: 'admin' | 'agent'): Promise<Entidade | undefined>;
+  deleteEntidade(id: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void>;
   checkEntidadeHasRelations(id: string): Promise<boolean>;
   
   // Gabinetes (DEPRECATED - use Entidades)
@@ -49,15 +49,15 @@ export interface IStorage {
   getContactos(userId: string, userRole: 'admin' | 'agent'): Promise<ContactoWithRelations[]>;
   getContacto(id: string, userId: string, userRole: 'admin' | 'agent'): Promise<ContactoWithRelations | undefined>;
   createContacto(contacto: InsertContacto): Promise<Contacto>;
-  updateContacto(id: string, contacto: Partial<InsertContacto>): Promise<Contacto>;
-  deleteContacto(id: string): Promise<void>;
+  updateContacto(id: string, contacto: Partial<InsertContacto>, userId?: string, userRole?: 'admin' | 'agent'): Promise<Contacto | undefined>;
+  deleteContacto(id: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void>;
   
   // Visitas
   getVisitas(userId: string, userRole: 'admin' | 'agent'): Promise<VisitaWithRelations[]>;
   getVisita(id: string, userId: string, userRole: 'admin' | 'agent'): Promise<VisitaWithRelations | undefined>;
   createVisita(visita: InsertVisita): Promise<Visita>;
-  updateVisita(id: string, visita: Partial<Visita>): Promise<Visita>;
-  deleteVisita(id: string): Promise<void>;
+  updateVisita(id: string, visita: Partial<Visita>, userId?: string, userRole?: 'admin' | 'agent'): Promise<Visita | undefined>;
+  deleteVisita(id: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void>;
   
   // Marcas
   getMarcas(): Promise<Marca[]>;
@@ -151,11 +151,22 @@ export class DatabaseStorage implements IStorage {
     return entidade;
   }
 
-  async updateEntidade(id: string, entidadeData: Partial<InsertEntidade>): Promise<Entidade | undefined> {
+  async updateEntidade(id: string, entidadeData: Partial<InsertEntidade>, userId?: string, userRole?: 'admin' | 'agent'): Promise<Entidade | undefined> {
+    // Build where clause: admin or no auth = id only, agent = id + ownership
+    const whereClause = (userId && userRole === 'agent')
+      ? and(
+          eq(entidades.id, id),
+          or(
+            eq(entidades.createdByUserId, userId),
+            eq(entidades.assignedUserId, userId)
+          )
+        )
+      : eq(entidades.id, id);
+    
     const [entidade] = await db
       .update(entidades)
       .set({ ...entidadeData, updatedAt: new Date() })
-      .where(eq(entidades.id, id))
+      .where(whereClause)
       .returning();
     return entidade;
   }
@@ -176,8 +187,19 @@ export class DatabaseStorage implements IStorage {
     return relatedContactos.length > 0 || relatedVisitas.length > 0;
   }
 
-  async deleteEntidade(id: string): Promise<void> {
-    await db.delete(entidades).where(eq(entidades.id, id));
+  async deleteEntidade(id: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void> {
+    // Build where clause: admin or no auth = id only, agent = id + ownership
+    const whereClause = (userId && userRole === 'agent')
+      ? and(
+          eq(entidades.id, id),
+          or(
+            eq(entidades.createdByUserId, userId),
+            eq(entidades.assignedUserId, userId)
+          )
+        )
+      : eq(entidades.id, id);
+    
+    await db.delete(entidades).where(whereClause);
   }
 
   // Gabinetes (DEPRECATED - use Entidades)
@@ -273,17 +295,39 @@ export class DatabaseStorage implements IStorage {
     return newContacto;
   }
 
-  async updateContacto(id: string, contacto: Partial<InsertContacto>): Promise<Contacto> {
+  async updateContacto(id: string, contacto: Partial<InsertContacto>, userId?: string, userRole?: 'admin' | 'agent'): Promise<Contacto | undefined> {
+    // Build where clause: admin or no auth = id only, agent = id + ownership
+    const whereClause = (userId && userRole === 'agent')
+      ? and(
+          eq(contactos.id, id),
+          or(
+            eq(contactos.createdByUserId, userId),
+            eq(contactos.assignedUserId, userId)
+          )
+        )
+      : eq(contactos.id, id);
+    
     const [updated] = await db
       .update(contactos)
       .set(contacto)
-      .where(eq(contactos.id, id))
+      .where(whereClause)
       .returning();
     return updated;
   }
 
-  async deleteContacto(id: string): Promise<void> {
-    await db.delete(contactos).where(eq(contactos.id, id));
+  async deleteContacto(id: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void> {
+    // Build where clause: admin or no auth = id only, agent = id + ownership
+    const whereClause = (userId && userRole === 'agent')
+      ? and(
+          eq(contactos.id, id),
+          or(
+            eq(contactos.createdByUserId, userId),
+            eq(contactos.assignedUserId, userId)
+          )
+        )
+      : eq(contactos.id, id);
+    
+    await db.delete(contactos).where(whereClause);
   }
 
   // Visitas
@@ -293,7 +337,8 @@ export class DatabaseStorage implements IStorage {
     if (userRole === 'agent') {
       whereClause = or(
         eq(visitas.createdByUserId, userId),
-        eq(visitas.assignedUserId, userId)
+        eq(visitas.assignedUserId, userId),
+        eq(visitas.userId, userId) // Fallback to legacy userId field for historical data
       );
     }
     
@@ -319,7 +364,8 @@ export class DatabaseStorage implements IStorage {
         eq(visitas.id, id),
         or(
           eq(visitas.createdByUserId, userId),
-          eq(visitas.assignedUserId, userId)
+          eq(visitas.assignedUserId, userId),
+          eq(visitas.userId, userId) // Fallback to legacy userId field for historical data
         )
       );
     }
@@ -343,17 +389,41 @@ export class DatabaseStorage implements IStorage {
     return newVisita;
   }
 
-  async updateVisita(id: string, visita: Partial<Visita>): Promise<Visita> {
+  async updateVisita(id: string, visita: Partial<Visita>, userId?: string, userRole?: 'admin' | 'agent'): Promise<Visita | undefined> {
+    // Build where clause: admin or no auth = id only, agent = id + ownership (including legacy userId)
+    const whereClause = (userId && userRole === 'agent')
+      ? and(
+          eq(visitas.id, id),
+          or(
+            eq(visitas.createdByUserId, userId),
+            eq(visitas.assignedUserId, userId),
+            eq(visitas.userId, userId) // Fallback to legacy userId field
+          )
+        )
+      : eq(visitas.id, id);
+    
     const [updated] = await db
       .update(visitas)
       .set(visita)
-      .where(eq(visitas.id, id))
+      .where(whereClause)
       .returning();
     return updated;
   }
 
-  async deleteVisita(id: string): Promise<void> {
-    await db.delete(visitas).where(eq(visitas.id, id));
+  async deleteVisita(id: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void> {
+    // Build where clause: admin or no auth = id only, agent = id + ownership (including legacy userId)
+    const whereClause = (userId && userRole === 'agent')
+      ? and(
+          eq(visitas.id, id),
+          or(
+            eq(visitas.createdByUserId, userId),
+            eq(visitas.assignedUserId, userId),
+            eq(visitas.userId, userId) // Fallback to legacy userId field
+          )
+        )
+      : eq(visitas.id, id);
+    
+    await db.delete(visitas).where(whereClause);
   }
 
   // Marcas
