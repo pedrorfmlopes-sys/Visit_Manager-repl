@@ -535,6 +535,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Entity Enrichment Endpoints
+  // POST /api/enrichment/autocomplete - Clearbit company autocomplete
+  app.post('/api/enrichment/autocomplete', isAuthenticated, async (req, res) => {
+    try {
+      const { query } = req.body;
+      
+      if (!query || typeof query !== 'string') {
+        return res.status(400).json({ message: 'Query parameter required' });
+      }
+      
+      const { fetchClearbitAutocomplete } = await import('./enrichment');
+      const results = await fetchClearbitAutocomplete(query);
+      
+      res.json(results);
+    } catch (error) {
+      console.error('[Enrichment] Autocomplete error:', error);
+      res.status(500).json({ message: 'Autocomplete failed' });
+    }
+  });
+
+  // POST /api/enrichment/enrich - Enrich entity data with AI
+  app.post('/api/enrichment/enrich', isAuthenticated, async (req, res) => {
+    try {
+      const { name, domain } = req.body;
+      
+      if (!name || typeof name !== 'string') {
+        return res.status(400).json({ message: 'Name parameter required' });
+      }
+      
+      const { enrichEntity } = await import('./enrichment');
+      const enrichedData = await enrichEntity(name, domain);
+      
+      res.json(enrichedData);
+    } catch (error) {
+      console.error('[Enrichment] Enrich error:', error);
+      res.status(500).json({ message: 'Enrichment failed' });
+    }
+  });
+
+  // POST /api/enrichment/validate-nif - Validate Portuguese NIF
+  app.post('/api/enrichment/validate-nif', isAuthenticated, async (req, res) => {
+    try {
+      const { nif } = req.body;
+      
+      if (!nif || typeof nif !== 'string') {
+        return res.status(400).json({ message: 'NIF parameter required' });
+      }
+      
+      const { validateNIF } = await import('./enrichment');
+      const result = validateNIF(nif);
+      
+      res.json(result);
+    } catch (error) {
+      console.error('[Enrichment] NIF validation error:', error);
+      res.status(500).json({ message: 'NIF validation failed' });
+    }
+  });
+
   // Serve uploaded files
   app.use('/uploads', isAuthenticated, (req, res, next) => {
     const filePath = path.join('/tmp/uploads', req.path);
