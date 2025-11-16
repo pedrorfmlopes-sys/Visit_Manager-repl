@@ -11,7 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
-import { insertContactoSchema, type InsertContacto, type Contacto, type Gabinete } from "@shared/schema";
+import { insertContactoSchema, type InsertContacto, type Contacto, type Entidade } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { syncManager } from "@/lib/syncManager";
@@ -29,8 +29,8 @@ export default function ContactoForm() {
     enabled: !!isEdit,
   });
 
-  const { data: gabinetes } = useQuery<Gabinete[]>({
-    queryKey: ["/api/gabinetes"],
+  const { data: entidades } = useQuery<Entidade[]>({
+    queryKey: ["/api/entidades"],
   });
 
   const form = useForm<InsertContacto>({
@@ -40,7 +40,7 @@ export default function ContactoForm() {
       funcao: "",
       telemovel: "",
       email: "",
-      gabineteId: "",
+      entidadeId: "",
       observacoes: "",
       fotoUrl: "",
     },
@@ -208,20 +208,20 @@ export default function ContactoForm() {
 
             <FormField
               control={form.control}
-              name="gabineteId"
+              name="entidadeId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Gabinete *</FormLabel>
+                  <FormLabel>Entidade *</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger className="h-12" data-testid="select-gabinete">
-                        <SelectValue placeholder="Selecione o gabinete" />
+                      <SelectTrigger className="h-12" data-testid="select-entidade">
+                        <SelectValue placeholder="Selecione a entidade" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {gabinetes?.map((gabinete) => (
-                        <SelectItem key={gabinete.id} value={gabinete.id}>
-                          {gabinete.nome}
+                      {entidades?.map((entidade) => (
+                        <SelectItem key={entidade.id} value={entidade.id}>
+                          {entidade.nome} ({entidade.tipoEntidade})
                         </SelectItem>
                       ))}
                     </SelectContent>
