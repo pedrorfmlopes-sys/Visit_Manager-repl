@@ -3,7 +3,7 @@ import { LayoutDashboard, Building2, Users, FileText } from "lucide-react";
 
 const navItems = [
   { path: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { path: "/gabinetes", icon: Building2, label: "Gabinetes" },
+  { path: "/entidades", icon: Building2, label: "Entidades" },
   { path: "/contactos", icon: Users, label: "Contactos" },
   { path: "/visitas", icon: FileText, label: "Visitas" },
 ];

@@ -13,6 +13,9 @@ import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import Gabinetes from "@/pages/Gabinetes";
 import GabineteForm from "@/pages/GabineteForm";
+import Entidades from "@/pages/Entidades";
+import EntidadeForm from "@/pages/EntidadeForm";
+import EntidadeDetail from "@/pages/EntidadeDetail";
 import Contactos from "@/pages/Contactos";
 import ContactoForm from "@/pages/ContactoForm";
 import Visitas from "@/pages/Visitas";
@@ -40,6 +43,12 @@ function Router() {
       ) : (
         <>
           <Route path="/" component={Dashboard} />
+          {/* NEW: Entidades routes (Universal Entities) */}
+          <Route path="/entidades" component={Entidades} />
+          <Route path="/entidades/nova" component={EntidadeForm} />
+          <Route path="/entidades/:id" component={EntidadeDetail} />
+          <Route path="/entidades/:id/editar" component={EntidadeForm} />
+          {/* LEGACY: Gabinetes routes (backward compatibility) */}
           <Route path="/gabinetes" component={Gabinetes} />
           <Route path="/gabinetes/novo" component={GabineteForm} />
           <Route path="/gabinetes/:id" component={GabineteForm} />
