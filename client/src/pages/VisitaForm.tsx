@@ -14,6 +14,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { useGeolocation } from "@/hooks/useGeolocation";
+import { LocationPreview } from "@/components/LocationPreview";
 import { insertVisitaSchema, type InsertVisita, type Gabinete, type Contacto } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -32,6 +34,7 @@ export default function VisitaForm() {
   const queryClient = useQueryClient();
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
+  const { location: gpsLocation, error: gpsError, isLoading: gpsLoading, requestLocation } = useGeolocation(true);
 
   const { data: gabinetes } = useQuery<Gabinete[]>({
     queryKey: ["/api/gabinetes"],
@@ -110,6 +113,13 @@ export default function VisitaForm() {
     if (data.notas) formData.append("notas", data.notas);
     if (data.proximaVisita) formData.append("proximaVisita", data.proximaVisita.toISOString());
     if (data.marcasEntregues) formData.append("marcasEntregues", JSON.stringify(data.marcasEntregues));
+    
+    // Add GPS location if available (only send if we have valid coordinates)
+    if (gpsLocation && gpsLocation.latitude && gpsLocation.longitude) {
+      formData.append("latitude", gpsLocation.latitude);
+      formData.append("longitude", gpsLocation.longitude);
+      formData.append("locationAccuracy", gpsLocation.accuracy);
+    }
     
     if (audioFile) {
       formData.append("audio", audioFile);
@@ -348,7 +358,7 @@ export default function VisitaForm() {
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"
-                        selected={field.value}
+                        selected={field.value || undefined}
                         onSelect={field.onChange}
                         locale={pt}
                         disabled={(date) => date < new Date()}
@@ -360,6 +370,17 @@ export default function VisitaForm() {
                 </FormItem>
               )}
             />
+
+            <div className="space-y-2">
+              <FormLabel>Localização GPS</FormLabel>
+              <LocationPreview
+                location={gpsLocation}
+                error={gpsError}
+                isLoading={gpsLoading}
+                onRequestLocation={requestLocation}
+                showMap={true}
+              />
+            </div>
 
             <div className="sticky bottom-20 pt-4">
               <Button

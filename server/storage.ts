@@ -166,8 +166,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Visitas
-  async getVisitas(): Promise<VisitaWithRelations[]> {
+  async getVisitas(userId?: string): Promise<VisitaWithRelations[]> {
     return db.query.visitas.findMany({
+      where: userId ? eq(visitas.userId, userId) : undefined,
       orderBy: desc(visitas.dataVisita),
       with: {
         gabinete: true,

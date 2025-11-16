@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { Building2, Users, FileText, Package, Calendar, LogOut } from "lucide-react";
+import { useLocation } from "wouter";
+import { Building2, Users, FileText, Package, Calendar, LogOut, BarChart } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,6 +20,7 @@ interface DashboardStats {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard"],
@@ -38,14 +40,24 @@ export default function Dashboard() {
               Olá, {user?.firstName || user?.email}
             </p>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleLogout}
-            data-testid="button-logout"
-          >
-            <LogOut className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setLocation("/analytics")}
+              data-testid="button-analytics"
+            >
+              <BarChart className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleLogout}
+              data-testid="button-logout"
+            >
+              <LogOut className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
       </header>
 

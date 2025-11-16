@@ -195,9 +195,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Visitas endpoints
-  app.get('/api/visitas', isAuthenticated, async (req, res) => {
+  app.get('/api/visitas', isAuthenticated, async (req: any, res) => {
     try {
-      const visitas = await storage.getVisitas();
+      const userId = req.user.claims.sub;
+      const visitas = await storage.getVisitas(userId);
       res.json(visitas);
     } catch (error) {
       console.error("Error fetching visitas:", error);
@@ -238,6 +239,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Parse and validate GPS coordinates
+      let latitude: string | null = null;
+      let longitude: string | null = null;
+      let locationAccuracy: string | null = null;
+      
+      if (req.body.latitude && req.body.longitude) {
+        const lat = parseFloat(req.body.latitude);
+        const lng = parseFloat(req.body.longitude);
+        const acc = req.body.locationAccuracy ? parseFloat(req.body.locationAccuracy) : null;
+        
+        if (!isNaN(lat) && !isNaN(lng)) {
+          latitude = lat.toString();
+          longitude = lng.toString();
+          locationAccuracy = acc && !isNaN(acc) ? acc.toString() : null;
+        }
+      }
+
       const visitaData = {
         gabineteId: req.body.gabineteId,
         contactoId: req.body.contactoId || null,
@@ -246,6 +264,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         notas: req.body.notas || null,
         marcasEntregues,
         proximaVisita: req.body.proximaVisita ? new Date(req.body.proximaVisita) : null,
+        latitude,
+        longitude,
+        locationAccuracy,
         audioUrl: null as string | null,
         mediaUrls: [] as string[],
         linkVisita: randomUUID().substring(0, 8),

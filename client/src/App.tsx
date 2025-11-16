@@ -17,6 +17,8 @@ import Contactos from "@/pages/Contactos";
 import ContactoForm from "@/pages/ContactoForm";
 import Visitas from "@/pages/Visitas";
 import VisitaForm from "@/pages/VisitaForm";
+import VisitaDetail from "@/pages/VisitaDetail";
+import Analytics from "@/pages/Analytics";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -46,6 +48,8 @@ function Router() {
           <Route path="/contactos/:id" component={ContactoForm} />
           <Route path="/visitas" component={Visitas} />
           <Route path="/visitas/nova" component={VisitaForm} />
+          <Route path="/visitas/:id" component={VisitaDetail} />
+          <Route path="/analytics" component={Analytics} />
         </>
       )}
       <Route component={NotFound} />
