@@ -23,7 +23,7 @@ import {
   type VisitaWithRelations,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, gte, sql } from "drizzle-orm";
+import { eq, desc, gte, sql, or, and } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -31,8 +31,8 @@ export interface IStorage {
   upsertUser(user: UpsertUser): Promise<User>;
   
   // Entidades (Universal Entities)
-  getEntidades(): Promise<Entidade[]>;
-  getEntidade(id: string): Promise<EntidadeWithRelations | undefined>;
+  getEntidades(userId: string, userRole: 'admin' | 'agent'): Promise<Entidade[]>;
+  getEntidade(id: string, userId: string, userRole: 'admin' | 'agent'): Promise<EntidadeWithRelations | undefined>;
   createEntidade(entidade: InsertEntidade): Promise<Entidade>;
   updateEntidade(id: string, entidade: Partial<InsertEntidade>): Promise<Entidade | undefined>;
   deleteEntidade(id: string): Promise<void>;
@@ -46,15 +46,15 @@ export interface IStorage {
   deleteGabinete(id: string): Promise<void>;
   
   // Contactos
-  getContactos(): Promise<ContactoWithRelations[]>;
-  getContacto(id: string): Promise<ContactoWithRelations | undefined>;
+  getContactos(userId: string, userRole: 'admin' | 'agent'): Promise<ContactoWithRelations[]>;
+  getContacto(id: string, userId: string, userRole: 'admin' | 'agent'): Promise<ContactoWithRelations | undefined>;
   createContacto(contacto: InsertContacto): Promise<Contacto>;
   updateContacto(id: string, contacto: Partial<InsertContacto>): Promise<Contacto>;
   deleteContacto(id: string): Promise<void>;
   
   // Visitas
-  getVisitas(): Promise<VisitaWithRelations[]>;
-  getVisita(id: string): Promise<VisitaWithRelations | undefined>;
+  getVisitas(userId: string, userRole: 'admin' | 'agent'): Promise<VisitaWithRelations[]>;
+  getVisita(id: string, userId: string, userRole: 'admin' | 'agent'): Promise<VisitaWithRelations | undefined>;
   createVisita(visita: InsertVisita): Promise<Visita>;
   updateVisita(id: string, visita: Partial<Visita>): Promise<Visita>;
   deleteVisita(id: string): Promise<void>;
@@ -65,7 +65,7 @@ export interface IStorage {
   createMarca(marca: InsertMarca): Promise<Marca>;
   
   // Dashboard stats
-  getDashboardStats(userId: string): Promise<{
+  getDashboardStats(userId: string, userRole: 'admin' | 'agent'): Promise<{
     totalGabinetes: number;
     totalContactos: number;
     totalVisitas: number;
@@ -98,13 +98,40 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Entidades (Universal Entities)
-  async getEntidades(): Promise<Entidade[]> {
-    return db.select().from(entidades).orderBy(desc(entidades.createdAt));
+  async getEntidades(userId: string, userRole: 'admin' | 'agent'): Promise<Entidade[]> {
+    // Admin sees all entidades, agents see only their created/assigned ones
+    if (userRole === 'admin') {
+      return db.select().from(entidades).orderBy(desc(entidades.createdAt));
+    }
+    
+    // Filter for agents: created by user OR assigned to user
+    return db.select().from(entidades)
+      .where(
+        or(
+          eq(entidades.createdByUserId, userId),
+          eq(entidades.assignedUserId, userId)
+        )
+      )
+      .orderBy(desc(entidades.createdAt));
   }
 
-  async getEntidade(id: string): Promise<EntidadeWithRelations | undefined> {
+  async getEntidade(id: string, userId: string, userRole: 'admin' | 'agent'): Promise<EntidadeWithRelations | undefined> {
+    // Build the where clause based on role
+    let whereClause;
+    if (userRole === 'admin') {
+      whereClause = eq(entidades.id, id);
+    } else {
+      whereClause = and(
+        eq(entidades.id, id),
+        or(
+          eq(entidades.createdByUserId, userId),
+          eq(entidades.assignedUserId, userId)
+        )
+      );
+    }
+    
     const [entidade] = await db.query.entidades.findMany({
-      where: eq(entidades.id, id),
+      where: whereClause,
       with: {
         contactos: true,
         visitas: {
@@ -194,20 +221,46 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Contactos
-  async getContactos(): Promise<ContactoWithRelations[]> {
+  async getContactos(userId: string, userRole: 'admin' | 'agent'): Promise<ContactoWithRelations[]> {
+    // Admin sees all contactos, agents see only their created/assigned ones
+    let whereClause;
+    if (userRole === 'agent') {
+      whereClause = or(
+        eq(contactos.createdByUserId, userId),
+        eq(contactos.assignedUserId, userId)
+      );
+    }
+    
     return db.query.contactos.findMany({
+      where: whereClause,
       orderBy: desc(contactos.createdAt),
       with: {
         gabinete: true,
+        entidade: true,
       },
     });
   }
 
-  async getContacto(id: string): Promise<ContactoWithRelations | undefined> {
+  async getContacto(id: string, userId: string, userRole: 'admin' | 'agent'): Promise<ContactoWithRelations | undefined> {
+    // Build the where clause based on role
+    let whereClause;
+    if (userRole === 'admin') {
+      whereClause = eq(contactos.id, id);
+    } else {
+      whereClause = and(
+        eq(contactos.id, id),
+        or(
+          eq(contactos.createdByUserId, userId),
+          eq(contactos.assignedUserId, userId)
+        )
+      );
+    }
+    
     return db.query.contactos.findFirst({
-      where: eq(contactos.id, id),
+      where: whereClause,
       with: {
         gabinete: true,
+        entidade: true,
       },
     });
   }
@@ -234,23 +287,48 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Visitas
-  async getVisitas(userId?: string): Promise<VisitaWithRelations[]> {
+  async getVisitas(userId: string, userRole: 'admin' | 'agent'): Promise<VisitaWithRelations[]> {
+    // Admin sees all visitas, agents see only their created/assigned ones
+    let whereClause;
+    if (userRole === 'agent') {
+      whereClause = or(
+        eq(visitas.createdByUserId, userId),
+        eq(visitas.assignedUserId, userId)
+      );
+    }
+    
     return db.query.visitas.findMany({
-      where: userId ? eq(visitas.userId, userId) : undefined,
+      where: whereClause,
       orderBy: desc(visitas.dataVisita),
       with: {
         gabinete: true,
+        entidade: true,
         contacto: true,
         user: true,
       },
     });
   }
 
-  async getVisita(id: string): Promise<VisitaWithRelations | undefined> {
+  async getVisita(id: string, userId: string, userRole: 'admin' | 'agent'): Promise<VisitaWithRelations | undefined> {
+    // Build the where clause based on role
+    let whereClause;
+    if (userRole === 'admin') {
+      whereClause = eq(visitas.id, id);
+    } else {
+      whereClause = and(
+        eq(visitas.id, id),
+        or(
+          eq(visitas.createdByUserId, userId),
+          eq(visitas.assignedUserId, userId)
+        )
+      );
+    }
+    
     return db.query.visitas.findFirst({
-      where: eq(visitas.id, id),
+      where: whereClause,
       with: {
         gabinete: true,
+        entidade: true,
         contacto: true,
         user: true,
       },
@@ -297,11 +375,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Dashboard stats
-  async getDashboardStats(userId: string) {
+  async getDashboardStats(userId: string, userRole: 'admin' | 'agent') {
+    // Build where clause based on role
+    let visitasWhereClause;
+    if (userRole === 'agent') {
+      visitasWhereClause = or(
+        eq(visitas.createdByUserId, userId),
+        eq(visitas.assignedUserId, userId)
+      );
+    }
+    
     const allVisitas = await db.query.visitas.findMany({
-      where: eq(visitas.userId, userId),
+      where: visitasWhereClause,
       with: {
         gabinete: true,
+        entidade: true,
         contacto: true,
       },
     });
@@ -312,12 +400,34 @@ export class DatabaseStorage implements IStorage {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const visitasEstesMes = allVisitas.filter(v => new Date(v.dataVisita) >= startOfMonth).length;
 
-    const gabinetesCount = await db.select({ count: sql<number>`count(distinct ${gabinetes.id})` })
-      .from(gabinetes);
+    // Count gabinetes/entidades based on role
+    let gabinetesCount;
+    if (userRole === 'admin') {
+      gabinetesCount = await db.select({ count: sql<number>`count(distinct ${entidades.id})` })
+        .from(entidades);
+    } else {
+      gabinetesCount = await db.select({ count: sql<number>`count(distinct ${entidades.id})` })
+        .from(entidades)
+        .where(or(
+          eq(entidades.createdByUserId, userId),
+          eq(entidades.assignedUserId, userId)
+        ));
+    }
     const totalGabinetes = Number(gabinetesCount[0]?.count || 0);
 
-    const contactosCount = await db.select({ count: sql<number>`count(*)` })
-      .from(contactos);
+    // Count contactos based on role
+    let contactosCount;
+    if (userRole === 'admin') {
+      contactosCount = await db.select({ count: sql<number>`count(*)` })
+        .from(contactos);
+    } else {
+      contactosCount = await db.select({ count: sql<number>`count(*)` })
+        .from(contactos)
+        .where(or(
+          eq(contactos.createdByUserId, userId),
+          eq(contactos.assignedUserId, userId)
+        ));
+    }
     const totalContactos = Number(contactosCount[0]?.count || 0);
 
     // Count marca occurrences
