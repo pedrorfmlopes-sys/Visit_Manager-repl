@@ -23,6 +23,10 @@ export default function ContactoForm() {
   const queryClient = useQueryClient();
   const isOnline = useOnlineStatus();
   const isEdit = params?.id && params.id !== "novo";
+  
+  // Get entidadeId from query params
+  const searchParams = new URLSearchParams(window.location.search);
+  const entidadeIdFromQuery = searchParams.get("entidadeId") || "";
 
   const { data: contacto } = useQuery<Contacto>({
     queryKey: ["/api/contactos", params?.id],
@@ -40,7 +44,7 @@ export default function ContactoForm() {
       funcao: "",
       telemovel: "",
       email: "",
-      entidadeId: "",
+      entidadeId: entidadeIdFromQuery,
       observacoes: "",
       fotoUrl: "",
     },
@@ -53,6 +57,7 @@ export default function ContactoForm() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contactos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/entidades"] });
       toast({
         title: "Sucesso",
         description: "Contacto criado com sucesso",
@@ -102,6 +107,7 @@ export default function ContactoForm() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contactos"] });
       queryClient.invalidateQueries({ queryKey: ["/api/contactos", params?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/entidades"] });
       toast({
         title: "Sucesso",
         description: "Contacto atualizado com sucesso",

@@ -106,11 +106,11 @@ export const insertEntidadeSchema = createInsertSchema(entidades).omit({
   lastSyncAt: true,
   syncError: true,
 }).extend({
-  // Add validation for coordinates
-  latitude: z.string().regex(/^-?([0-9]{1,2}|1[0-7][0-9]|180)(\.[0-9]+)?$/).optional().nullable(),
-  longitude: z.string().regex(/^-?([0-9]{1,2}|1[0-7][0-9]|180)(\.[0-9]+)?$/).optional().nullable(),
-  // NIF validation (Portuguese tax number - 9 digits)
-  nif: z.string().regex(/^[0-9]{9}$/).optional().nullable(),
+  // Add validation for coordinates (empty string treated as null)
+  latitude: z.string().regex(/^-?([0-9]{1,2}|1[0-7][0-9]|180)(\.[0-9]+)?$/).or(z.literal("")).optional().nullable(),
+  longitude: z.string().regex(/^-?([0-9]{1,2}|1[0-7][0-9]|180)(\.[0-9]+)?$/).or(z.literal("")).optional().nullable(),
+  // NIF validation (Portuguese tax number - 9 digits, empty string treated as null)
+  nif: z.string().regex(/^[0-9]{9}$/).or(z.literal("")).optional().nullable(),
 });
 
 export type InsertEntidade = z.infer<typeof insertEntidadeSchema>;

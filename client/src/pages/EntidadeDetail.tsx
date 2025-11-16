@@ -25,7 +25,7 @@ export default function EntidadeDetail() {
   const entidadeId = params?.id;
 
   const { data: entidade, isLoading } = useQuery<EntidadeWithRelations>({
-    queryKey: ["/api/entidades", entidadeId],
+    queryKey: [`/api/entidades/${entidadeId}`],
     enabled: !!entidadeId,
   });
 

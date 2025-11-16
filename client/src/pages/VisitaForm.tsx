@@ -83,6 +83,7 @@ export default function VisitaForm() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/entidades"] });
       toast({
         title: "Sucesso",
         description: "Visita criada com sucesso! A processar IA...",

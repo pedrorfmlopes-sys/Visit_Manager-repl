@@ -92,13 +92,13 @@ export default function Entidades() {
             title="Sem entidades"
             description="Comece por criar a sua primeira entidade."
             actionLabel="Criar Entidade"
-            onAction={() => setLocation("/entidades/novo")}
+            onAction={() => setLocation("/entidades/nova")}
           />
         )}
       </main>
 
       <FAB
-        onClick={() => setLocation("/entidades/novo")}
+        onClick={() => setLocation("/entidades/nova")}
         label="Criar Entidade"
         testId="button-criar-entidade"
       />
