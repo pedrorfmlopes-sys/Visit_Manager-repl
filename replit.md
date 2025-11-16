@@ -38,7 +38,7 @@ The system is built as a full-stack TypeScript application using React for the f
 
 **Task Management System (November 16, 2025):**
 8. ✅ **Complete Task Management** - Full-featured task system with ICS export and offline support:
-   - **Database Schema**: tarefas table with status (pendente/em_progresso/concluida/cancelada), prioridade (baixa/media/alta), repeat_interval (none/daily/weekly/monthly/yearly)
+   - **Database Schema**: tarefas table with status (pending/done), repeat_interval (none/daily/weekly/monthly/yearly)
    - **RBAC Integration**: Admin sees all tasks, agents see only tasks they created or are assigned to
    - **Optional Relations**: Tasks can link to entidades and visitas (proper empty string → null handling)
    - **ICS Export**: Export tasks to .ics calendar files with sanitized content
@@ -46,6 +46,8 @@ The system is built as a full-stack TypeScript application using React for the f
    - **Frontend**: Complete CRUD with Tarefas list page (with filters), TarefaForm, TarefaDetail, TarefaCard component
    - **Navigation**: Added to BottomNav with CheckCircle2 icon
    - **API Endpoints**: GET/POST /api/tarefas, GET/PATCH/DELETE /api/tarefas/:id, GET /api/tarefas/:id/ics
+   - **Create from Visit**: "Criar Tarefa" button on visit detail page with pre-filled data
+   - **Visit Integration**: Tasks displayed on visit detail page, pre-filled with visit notes and entity info
    - **E2E Tested**: Playwright tests verify task creation, role filtering, and RBAC enforcement
 
 **Offline Capabilities (November 16, 2025):**

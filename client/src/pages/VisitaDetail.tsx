@@ -1,28 +1,132 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2 } from "lucide-react";
-import { format } from "date-fns";
+import { ArrowLeft, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2 } from "lucide-react";
+import { format, addDays } from "date-fns";
 import { pt } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import type { VisitaWithRelations } from "@shared/schema";
+import type { VisitaWithRelations, Tarefa, InsertTarefa } from "@shared/schema";
 import { downloadICS, downloadNextVisitICS } from "@/lib/calendarExport";
 import { generateVisitPDF } from "@/lib/pdfExport";
 import { LocationPreview } from "@/components/LocationPreview";
+import { TarefaCard } from "@/components/TarefaCard";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { apiRequest } from "@/lib/queryClient";
+import { syncManager } from "@/lib/syncManager";
+import { insertTarefaSchema } from "@shared/schema";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function VisitaDetail() {
   const [, params] = useRoute("/visitas/:id");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const visitaId = params?.id;
+  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const { data: currentUser } = useCurrentUser();
+  const isAdmin = useIsAdmin();
+  const isOnline = useOnlineStatus();
 
   const { data: visita, isLoading } = useQuery<VisitaWithRelations>({
     queryKey: ["/api/visitas", visitaId],
     enabled: !!visitaId,
   });
+
+  const { data: tarefas = [] } = useQuery<Tarefa[]>({
+    queryKey: ["/api/tarefas"],
+    select: (data) => data.filter((t) => t.visitaId === visitaId),
+  });
+
+  const tomorrow = addDays(new Date(), 1);
+  
+  const form = useForm<InsertTarefa>({
+    resolver: zodResolver(insertTarefaSchema),
+    defaultValues: {
+      titulo: visita ? `Follow-up visita — ${visita.gabinete?.nome || visita.entidade?.nome || ""}` : "",
+      descricao: visita?.notas || "",
+      visitaId: visitaId,
+      entidadeId: visita?.entidadeId || visita?.gabineteId || undefined,
+      assignedUserId: currentUser?.id || undefined,
+      dueDate: tomorrow,
+      repeatInterval: "none",
+      status: "pending",
+      createdByUserId: currentUser?.id || "",
+    },
+  });
+
+  const createTaskMutation = useMutation({
+    mutationFn: async (data: InsertTarefa) => {
+      const cleanedData = {
+        ...data,
+        entidadeId: data.entidadeId || undefined,
+        visitaId: data.visitaId || undefined,
+        assignedUserId: data.assignedUserId || undefined,
+        dueDate: data.dueDate || undefined,
+      };
+      await apiRequest("POST", "/api/tarefas", cleanedData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tarefas"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
+      toast({
+        title: "Sucesso",
+        description: "Tarefa criada com sucesso",
+      });
+      setIsTaskDialogOpen(false);
+      form.reset();
+    },
+    onError: async (error: Error, data) => {
+      const isNetworkError = error.message.includes('fetch') || !navigator.onLine;
+      
+      if (isNetworkError) {
+        await syncManager.queueTarefaCreation(data);
+        toast({
+          title: "Tarefa guardada",
+          description: "Será sincronizada automaticamente quando voltar online.",
+        });
+        setIsTaskDialogOpen(false);
+        form.reset();
+        return;
+      }
+      
+      toast({
+        title: "Erro",
+        description: "Falha ao criar tarefa",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreateTask = () => {
+    form.reset({
+      titulo: `Follow-up visita — ${visita?.gabinete?.nome || visita?.entidade?.nome || ""}`,
+      descricao: visita?.notas || "",
+      visitaId: visitaId,
+      entidadeId: visita?.entidadeId || visita?.gabineteId || undefined,
+      assignedUserId: isAdmin ? undefined : currentUser?.id,
+      dueDate: tomorrow,
+      repeatInterval: "none",
+      status: "pending",
+      createdByUserId: currentUser?.id || "",
+    });
+    setIsTaskDialogOpen(true);
+  };
+
+  const onSubmitTask = (data: InsertTarefa) => {
+    createTaskMutation.mutate(data);
+  };
 
   const handleExportToCalendar = () => {
     if (visita) {
@@ -269,6 +373,39 @@ export default function VisitaDetail() {
           </Card>
         )}
 
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-primary" />
+                Tarefas desta Visita
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCreateTask}
+                data-testid="button-criar-tarefa"
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Criar Tarefa
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {tarefas.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Nenhuma tarefa criada para esta visita
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {tarefas.map((tarefa) => (
+                  <TarefaCard key={tarefa.id} tarefa={tarefa} />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <Separator />
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -298,6 +435,114 @@ export default function VisitaDetail() {
           </Button>
         </div>
       </main>
+
+      <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Criar Tarefa</DialogTitle>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmitTask)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="titulo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Título *</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Título da tarefa" data-testid="input-titulo" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="descricao"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Descrição</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        value={field.value || ""}
+                        placeholder="Descrição detalhada da tarefa"
+                        rows={4}
+                        data-testid="input-descricao"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Estado *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-status">
+                          <SelectValue placeholder="Selecione o estado" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="pending">Pendente</SelectItem>
+                        <SelectItem value="done">Concluída</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="dueDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Data de Vencimento</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="datetime-local"
+                        {...field}
+                        value={field.value ? new Date(field.value).toISOString().slice(0, 16) : ""}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          field.onChange(value ? new Date(value) : undefined);
+                        }}
+                        data-testid="input-due-date"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsTaskDialogOpen(false)}
+                  data-testid="button-cancel"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createTaskMutation.isPending || (!isOnline && !navigator.onLine)}
+                  data-testid="button-save"
+                >
+                  {createTaskMutation.isPending ? "A guardar..." : "Criar Tarefa"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
