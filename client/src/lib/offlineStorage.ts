@@ -186,6 +186,22 @@ class OfflineStorage {
     });
   }
 
+  async saveTarefa(tarefa: any): Promise<void> {
+    const db = await this.ensureDB();
+    const tx = db.transaction('tarefas', 'readwrite');
+    await tx.objectStore('tarefas').put(tarefa);
+  }
+
+  async getTarefas(): Promise<any[]> {
+    const db = await this.ensureDB();
+    const tx = db.transaction('tarefas', 'readonly');
+    return new Promise((resolve, reject) => {
+      const request = tx.objectStore('tarefas').getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
   async getContacto(id: string): Promise<Contacto | null> {
     const db = await this.ensureDB();
     const tx = db.transaction('contactos', 'readonly');

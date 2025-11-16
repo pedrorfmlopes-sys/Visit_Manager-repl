@@ -502,10 +502,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = await getUserContext(req);
       const validatedData = insertTarefaSchema.parse(req.body);
-      const tarefa = await storage.createTarefa({
+      
+      const cleanedData = {
         ...validatedData,
+        entidadeId: validatedData.entidadeId || null,
+        visitaId: validatedData.visitaId || null,
+        assignedUserId: validatedData.assignedUserId || null,
+        dueDate: validatedData.dueDate || null,
         createdByUserId: userId,
-      });
+      };
+      
+      const tarefa = await storage.createTarefa(cleanedData);
       res.json(tarefa);
     } catch (error) {
       console.error("Error creating tarefa:", error);
@@ -517,7 +524,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole } = await getUserContext(req);
       const validatedData = insertTarefaSchema.partial().parse(req.body);
-      const tarefa = await storage.updateTarefa(req.params.id, validatedData, userId, userRole);
+      
+      const cleanedData = {
+        ...validatedData,
+        ...(validatedData.entidadeId !== undefined && { entidadeId: validatedData.entidadeId || null }),
+        ...(validatedData.visitaId !== undefined && { visitaId: validatedData.visitaId || null }),
+        ...(validatedData.assignedUserId !== undefined && { assignedUserId: validatedData.assignedUserId || null }),
+        ...(validatedData.dueDate !== undefined && { dueDate: validatedData.dueDate || null }),
+      };
+      
+      const tarefa = await storage.updateTarefa(req.params.id, cleanedData, userId, userRole);
       if (!tarefa) {
         return res.status(404).json({ message: "Tarefa not found or unauthorized" });
       }

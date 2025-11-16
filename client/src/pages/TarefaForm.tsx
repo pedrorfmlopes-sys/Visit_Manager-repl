@@ -44,9 +44,9 @@ export default function TarefaForm() {
     defaultValues: tarefa || {
       titulo: "",
       descricao: "",
-      visitaId: "",
-      entidadeId: "",
-      assignedUserId: currentUser?.id || "",
+      visitaId: undefined,
+      entidadeId: undefined,
+      assignedUserId: currentUser?.id || undefined,
       dueDate: undefined,
       repeatInterval: "none",
       status: "pending",
@@ -121,10 +121,18 @@ export default function TarefaForm() {
   });
 
   const onSubmit = (data: InsertTarefa) => {
+    const cleanedData = {
+      ...data,
+      entidadeId: data.entidadeId || undefined,
+      visitaId: data.visitaId || undefined,
+      assignedUserId: data.assignedUserId || undefined,
+      dueDate: data.dueDate || undefined,
+    };
+    
     if (isEdit) {
-      updateMutation.mutate(data);
+      updateMutation.mutate(cleanedData);
     } else {
-      createMutation.mutate(data);
+      createMutation.mutate(cleanedData);
     }
   };
 
@@ -200,7 +208,6 @@ export default function TarefaForm() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">Nenhuma</SelectItem>
                       {entidades.map((entidade) => (
                         <SelectItem key={entidade.id} value={entidade.id}>
                           {entidade.nome}
@@ -227,7 +234,7 @@ export default function TarefaForm() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {allUsers.map((user) => (
+                        {allUsers.map((user: User) => (
                           <SelectItem key={user.id} value={user.id}>
                             {user.firstName} {user.lastName}
                           </SelectItem>
