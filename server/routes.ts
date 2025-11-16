@@ -45,6 +45,14 @@ const upload = multer({
   },
 });
 
+// Helper function to get user ID and role from request
+async function getUserContext(req: any): Promise<{ userId: string; userRole: 'admin' | 'agent' }> {
+  const userId = req.user.claims.sub;
+  const user = await storage.getUser(userId);
+  const userRole = user?.role || 'agent'; // Default to 'agent' if not set
+  return { userId, userRole };
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Serve service worker with correct MIME type
   app.get('/sw.js', (req, res) => {
@@ -73,8 +81,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard endpoint
   app.get('/api/dashboard', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const stats = await storage.getDashboardStats(userId);
+      const { userId, userRole } = await getUserContext(req);
+      const stats = await storage.getDashboardStats(userId, userRole);
       res.json(stats);
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
@@ -83,9 +91,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Entidades endpoints (Universal Entities)
-  app.get('/api/entidades', isAuthenticated, async (req, res) => {
+  app.get('/api/entidades', isAuthenticated, async (req: any, res) => {
     try {
-      const entidades = await storage.getEntidades();
+      const { userId, userRole } = await getUserContext(req);
+      const entidades = await storage.getEntidades(userId, userRole);
       res.json(entidades);
     } catch (error) {
       console.error("Error fetching entidades:", error);
@@ -93,9 +102,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/entidades/:id', isAuthenticated, async (req, res) => {
+  app.get('/api/entidades/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const entidade = await storage.getEntidade(req.params.id);
+      const { userId, userRole } = await getUserContext(req);
+      const entidade = await storage.getEntidade(req.params.id, userId, userRole);
       if (!entidade) {
         return res.status(404).json({ message: "Entidade not found" });
       }
@@ -106,10 +116,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/entidades', isAuthenticated, async (req, res) => {
+  app.post('/api/entidades', isAuthenticated, async (req: any, res) => {
     try {
+      const { userId } = await getUserContext(req);
       const validatedData = insertEntidadeSchema.parse(req.body);
-      const entidade = await storage.createEntidade(validatedData);
+      // Set createdByUserId to current user
+      const entidade = await storage.createEntidade({
+        ...validatedData,
+        createdByUserId: userId,
+      });
       res.json(entidade);
     } catch (error) {
       console.error("Error creating entidade:", error);
@@ -206,9 +221,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Contactos endpoints
-  app.get('/api/contactos', isAuthenticated, async (req, res) => {
+  app.get('/api/contactos', isAuthenticated, async (req: any, res) => {
     try {
-      const contactos = await storage.getContactos();
+      const { userId, userRole } = await getUserContext(req);
+      const contactos = await storage.getContactos(userId, userRole);
       res.json(contactos);
     } catch (error) {
       console.error("Error fetching contactos:", error);
@@ -216,9 +232,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/contactos/:id', isAuthenticated, async (req, res) => {
+  app.get('/api/contactos/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const contacto = await storage.getContacto(req.params.id);
+      const { userId, userRole } = await getUserContext(req);
+      const contacto = await storage.getContacto(req.params.id, userId, userRole);
       if (!contacto) {
         return res.status(404).json({ message: "Contacto not found" });
       }
@@ -229,10 +246,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/contactos', isAuthenticated, async (req, res) => {
+  app.post('/api/contactos', isAuthenticated, async (req: any, res) => {
     try {
+      const { userId } = await getUserContext(req);
       const validatedData = insertContactoSchema.parse(req.body);
-      const contacto = await storage.createContacto(validatedData);
+      // Set createdByUserId to current user
+      const contacto = await storage.createContacto({
+        ...validatedData,
+        createdByUserId: userId,
+      });
       res.json(contacto);
     } catch (error) {
       console.error("Error creating contacto:", error);
@@ -264,8 +286,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Visitas endpoints
   app.get('/api/visitas', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const visitas = await storage.getVisitas(userId);
+      const { userId, userRole } = await getUserContext(req);
+      const visitas = await storage.getVisitas(userId, userRole);
       res.json(visitas);
     } catch (error) {
       console.error("Error fetching visitas:", error);
@@ -273,9 +295,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/visitas/:id', isAuthenticated, async (req, res) => {
+  app.get('/api/visitas/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const visita = await storage.getVisita(req.params.id);
+      const { userId, userRole } = await getUserContext(req);
+      const visita = await storage.getVisita(req.params.id, userId, userRole);
       if (!visita) {
         return res.status(404).json({ message: "Visita not found" });
       }
@@ -325,8 +348,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const visitaData = {
         gabineteId: req.body.gabineteId,
+        entidadeId: req.body.entidadeId || null,
         contactoId: req.body.contactoId || null,
-        userId: userId,
+        userId: userId, // Legacy field
+        createdByUserId: userId,
         dataVisita: new Date(req.body.dataVisita),
         notas: req.body.notas || null,
         marcasEntregues,
@@ -364,7 +389,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const visita = await storage.createVisita(visitaData);
 
       // Generate AI summary asynchronously
-      const visitaComplete = await storage.getVisita(visita.id);
+      const { userRole } = await getUserContext(req);
+      const visitaComplete = await storage.getVisita(visita.id, userId, userRole);
       if (visitaComplete) {
         try {
           const summary = await generateVisitSummary({
