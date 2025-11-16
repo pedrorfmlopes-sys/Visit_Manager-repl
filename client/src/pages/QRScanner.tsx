@@ -8,6 +8,7 @@ import { Flashlight, FlashlightOff, X, Copy, Search, CheckCircle2 } from "lucide
 import { parseVCard, isVCard } from "@/lib/vcardParser";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { ContactCreationDialog } from "@/components/ContactCreationDialog";
 
 export default function QRScanner() {
   const [, setLocation] = useLocation();
@@ -22,6 +23,13 @@ export default function QRScanner() {
   const [scannedResult, setScannedResult] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const lastScanTime = useRef<number>(0);
+  
+  // Contact creation dialog state
+  const [showContactDialog, setShowContactDialog] = useState(false);
+  const [pendingContact, setPendingContact] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!videoRef.current) return;
@@ -240,8 +248,20 @@ export default function QRScanner() {
         description: response.message,
       });
 
-      // Navigate to contact detail
-      setLocation(`/contactos/${response.contacto.id}`);
+      // If contact was created without entity, show dialog
+      if (!response.entidade) {
+        setPendingContact({
+          id: response.contacto.id,
+          name: parsed.name || "Contacto",
+        });
+        setShowContactDialog(true);
+        // Clear processing state so scanner can resume
+        setIsProcessing(false);
+        setIsScanning(true);
+      } else {
+        // Navigate to contact detail
+        setLocation(`/contactos/${response.contacto.id}`);
+      }
     } catch (error) {
       console.error("Error importing vCard:", error);
       toast({
@@ -327,6 +347,68 @@ export default function QRScanner() {
     }
     const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(scannedResult)}`;
     window.open(searchUrl, "_blank");
+  };
+
+  // Dialog handlers
+  const handleCreateEntity = async (entityName: string) => {
+    if (!pendingContact) return;
+
+    try {
+      // Create entity
+      const entityRes = await apiRequest("POST", "/api/entidades", {
+        nome: entityName,
+        tipoEntidade: "Outro",
+      });
+
+      if (!entityRes.ok) {
+        throw new Error("Failed to create entity");
+      }
+
+      const entity = await entityRes.json();
+
+      // Update contact to link to entity
+      const contactRes = await apiRequest("PATCH", `/api/contactos/${pendingContact.id}`, {
+        entidadeId: entity.id,
+      });
+
+      if (!contactRes.ok) {
+        throw new Error("Failed to link contact to entity");
+      }
+
+      // Invalidate caches
+      await queryClient.invalidateQueries({ queryKey: ["/api/entidades"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/contactos"] });
+
+      toast({
+        title: "Entidade criada",
+        description: `Entidade "${entityName}" criada e associada ao contacto.`,
+      });
+
+      setShowContactDialog(false);
+      setPendingContact(null);
+      setLocation(`/contactos/${pendingContact.id}`);
+    } catch (error) {
+      console.error("Error creating entity:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível criar a entidade.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAssociateLater = () => {
+    if (!pendingContact) return;
+    setShowContactDialog(false);
+    setPendingContact(null);
+    setLocation(`/contactos/${pendingContact.id}`);
+  };
+
+  const handleKeepWithoutEntity = () => {
+    if (!pendingContact) return;
+    setShowContactDialog(false);
+    setPendingContact(null);
+    setLocation(`/contactos/${pendingContact.id}`);
   };
 
   return (
@@ -444,6 +526,15 @@ export default function QRScanner() {
           </div>
         </div>
       )}
+
+      {/* Contact creation dialog */}
+      <ContactCreationDialog
+        open={showContactDialog}
+        contactName={pendingContact?.name || "Contacto"}
+        onCreateEntity={handleCreateEntity}
+        onAssociateLater={handleAssociateLater}
+        onKeepWithoutEntity={handleKeepWithoutEntity}
+      />
     </div>
   );
 }
