@@ -99,7 +99,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllUsers(): Promise<User[]> {
-    return db.select().from(users).orderBy(users.name);
+    return db.select().from(users).orderBy(users.email);
   }
 
   // Entidades (Universal Entities)

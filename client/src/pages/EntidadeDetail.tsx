@@ -103,6 +103,17 @@ export default function EntidadeDetail() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {entidade.assignedUser && (
+              <div>
+                <p className="text-sm text-muted-foreground">Atribuído a</p>
+                <p className="font-medium" data-testid="text-assigned-user">
+                  {entidade.assignedUser.firstName && entidade.assignedUser.lastName
+                    ? `${entidade.assignedUser.firstName} ${entidade.assignedUser.lastName}`
+                    : entidade.assignedUser.email}
+                </p>
+              </div>
+            )}
+            
             {entidade.nif && (
               <div>
                 <p className="text-sm text-muted-foreground">NIF</p>

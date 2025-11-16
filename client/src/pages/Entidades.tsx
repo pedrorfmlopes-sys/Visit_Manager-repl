@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocation } from "wouter";
-import type { Entidade } from "@shared/schema";
+import type { EntidadeWithRelations } from "@shared/schema";
 
 type TipoEntidade = "Todos" | "Gabinete" | "Cliente" | "Distribuidor" | "Obra" | "Parceiro" | "Outro";
 
@@ -17,7 +17,7 @@ export default function Entidades() {
   const [searchQuery, setSearchQuery] = useState("");
   const [tipoFilter, setTipoFilter] = useState<TipoEntidade>("Todos");
 
-  const { data: entidades, isLoading } = useQuery<Entidade[]>({
+  const { data: entidades, isLoading } = useQuery<EntidadeWithRelations[]>({
     queryKey: ["/api/entidades"],
   });
 
