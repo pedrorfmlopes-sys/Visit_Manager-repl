@@ -50,7 +50,6 @@ async function getUserContext(req: any): Promise<{ userId: string; userRole: 'ad
   const userId = req.user.claims.sub;
   const user = await storage.getUser(userId);
   const userRole = user?.role || 'agent'; // Default to 'agent' if not set
-  console.log('[getUserContext] userId:', userId, 'user:', user, 'userRole:', userRole);
   return { userId, userRole };
 }
 
