@@ -162,14 +162,6 @@ export const insertEntidadeSchema = createInsertSchema(entidades).omit({
   syncStatus: true,
   lastSyncAt: true,
   syncError: true,
-  logoUrl: true,
-  domain: true,
-  industry: true,
-  descricao: true,
-  linkedinUrl: true,
-  facebookUrl: true,
-  twitterUrl: true,
-  instagramUrl: true,
 }).extend({
   // Add validation for coordinates (empty string treated as null)
   latitude: z.string().regex(/^-?([0-9]{1,2}|1[0-7][0-9]|180)(\.[0-9]+)?$/).or(z.literal("")).optional().nullable(),

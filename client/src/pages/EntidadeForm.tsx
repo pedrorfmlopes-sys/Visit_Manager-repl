@@ -66,6 +66,16 @@ export default function EntidadeForm() {
       notas: "",
       latitude: "",
       longitude: "",
+      // Enrichment fields
+      logoUrl: "",
+      domain: "",
+      industry: "",
+      descricao: "",
+      linkedinUrl: "",
+      facebookUrl: "",
+      twitterUrl: "",
+      instagramUrl: "",
+      // Ownership
       createdByUserId: currentUser?.id,
       assignedUserId: currentUser?.id, // Default to current user
     },
@@ -74,6 +84,9 @@ export default function EntidadeForm() {
 
   const createMutation = useMutation({
     mutationFn: async (data: InsertEntidade) => {
+      console.log('[EntidadeForm] Creating with data:', data);
+      console.log('[EntidadeForm] logoUrl value:', data.logoUrl);
+      console.log('[EntidadeForm] domain value:', data.domain);
       await apiRequest("POST", "/api/entidades", data);
     },
     onSuccess: () => {
@@ -214,11 +227,17 @@ export default function EntidadeForm() {
 
   // Enrichment handlers
   const handleCompanySelect = async (company: { name: string; domain: string; logo: string }) => {
+    // Immediately set Clearbit data (domain, logo, website)
+    // This ensures we have basic data even if AI enrichment fails
+    // Note: Clearbit autocomplete API returns logo=null, so we construct the logo URL ourselves
+    form.setValue("domain", company.domain);
+    form.setValue("logoUrl", `https://logo.clearbit.com/${company.domain}`);
+    form.setValue("website", `https://${company.domain}`);
+    
     if (!isOnline) {
       toast({
-        title: "Modo Offline",
-        description: "Enriquecimento automático não disponível offline.",
-        variant: "destructive",
+        title: "Dados básicos preenchidos",
+        description: "Enriquecimento adicional não disponível offline.",
       });
       return;
     }
@@ -235,24 +254,36 @@ export default function EntidadeForm() {
       if (response.ok) {
         const enrichedData = await response.json();
         
-        // Auto-fill form fields with enriched data
-        if (enrichedData.website) form.setValue("website", enrichedData.website);
+        // Auto-fill additional fields from AI enrichment
+        // (website, domain, logoUrl already set from Clearbit above)
         if (enrichedData.email) form.setValue("email", enrichedData.email);
         if (enrichedData.telefone) form.setValue("telefone", enrichedData.telefone);
         if (enrichedData.morada) form.setValue("morada", enrichedData.morada);
         if (enrichedData.cidade) form.setValue("cidade", enrichedData.cidade);
+        if (enrichedData.industry) form.setValue("industry", enrichedData.industry);
+        if (enrichedData.descricao) form.setValue("descricao", enrichedData.descricao);
+        if (enrichedData.linkedinUrl) form.setValue("linkedinUrl", enrichedData.linkedinUrl);
+        if (enrichedData.facebookUrl) form.setValue("facebookUrl", enrichedData.facebookUrl);
+        if (enrichedData.twitterUrl) form.setValue("twitterUrl", enrichedData.twitterUrl);
+        if (enrichedData.instagramUrl) form.setValue("instagramUrl", enrichedData.instagramUrl);
         
         toast({
           title: "Dados enriquecidos",
           description: `Informações de ${company.name} preenchidas automaticamente.`,
         });
+      } else {
+        // Enrichment failed, but we still have basic Clearbit data
+        toast({
+          title: "Dados básicos preenchidos",
+          description: "Enriquecimento adicional falhou, mas informações básicas foram preenchidas.",
+        });
       }
     } catch (error) {
       console.error('[Enrichment] Error:', error);
+      // Still show success for basic Clearbit data
       toast({
-        title: "Erro",
-        description: "Não foi possível enriquecer os dados.",
-        variant: "destructive",
+        title: "Dados básicos preenchidos",
+        description: "Informações básicas da empresa foram preenchidas.",
       });
     } finally {
       setIsEnriching(false);

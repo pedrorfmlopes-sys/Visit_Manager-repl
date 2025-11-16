@@ -45,6 +45,10 @@ export async function fetchClearbitAutocomplete(query: string): Promise<Clearbit
     }
     
     const results = await response.json() as ClearbitCompany[];
+    console.log('[Clearbit] Autocomplete results:', JSON.stringify(results, null, 2));
+    if (results.length > 0) {
+      console.log('[Clearbit] First result logo field:', results[0].logo);
+    }
     return results;
   } catch (error) {
     console.error('[Clearbit] Autocomplete error:', error);
