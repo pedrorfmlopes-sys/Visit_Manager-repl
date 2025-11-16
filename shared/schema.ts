@@ -166,6 +166,6 @@ export type ContactoWithRelations = Contacto & {
 
 export type VisitaWithRelations = Visita & {
   gabinete?: Gabinete;
-  contacto?: Contacto;
+  contacto?: Contacto | null;
   user?: User;
 };

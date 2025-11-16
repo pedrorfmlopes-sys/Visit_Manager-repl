@@ -1,10 +1,22 @@
 import OpenAI from "openai";
 import fs from "fs";
 
+// Environment guards
+if (!process.env.OPENAI_API_KEY) {
+  console.warn("⚠️  OPENAI_API_KEY not configured. AI features will be disabled.");
+}
+
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = process.env.OPENAI_API_KEY 
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 
 export async function transcribeAudio(audioFilePath: string): Promise<{ text: string }> {
+  if (!openai) {
+    console.warn("OpenAI not configured. Skipping audio transcription.");
+    return { text: "[Transcrição automática indisponível - API key não configurada]" };
+  }
+
   try {
     const audioReadStream = fs.createReadStream(audioFilePath);
 
@@ -29,6 +41,11 @@ export async function generateVisitSummary(data: {
   gabineteNome: string;
   contactoNome?: string;
 }): Promise<string> {
+  if (!openai) {
+    console.warn("OpenAI not configured. Skipping AI summary generation.");
+    return `## Resumo da Visita\n\nVisita ao gabinete ${data.gabineteNome}${data.contactoNome ? ` - Contacto: ${data.contactoNome}` : ''}.\n\n[Resumo automático indisponível - API key não configurada]`;
+  }
+
   try {
     const prompt = `
 Analisa esta visita comercial a um gabinete de arquitetura e cria um resumo profissional em português.

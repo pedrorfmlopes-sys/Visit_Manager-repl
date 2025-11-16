@@ -44,7 +44,7 @@ export interface IStorage {
   getVisitas(): Promise<VisitaWithRelations[]>;
   getVisita(id: string): Promise<VisitaWithRelations | undefined>;
   createVisita(visita: InsertVisita): Promise<Visita>;
-  updateVisita(id: string, visita: Partial<InsertVisita>): Promise<Visita>;
+  updateVisita(id: string, visita: Partial<Visita>): Promise<Visita>;
   deleteVisita(id: string): Promise<void>;
   
   // Marcas
@@ -196,7 +196,7 @@ export class DatabaseStorage implements IStorage {
     return newVisita;
   }
 
-  async updateVisita(id: string, visita: Partial<InsertVisita>): Promise<Visita> {
+  async updateVisita(id: string, visita: Partial<Visita>): Promise<Visita> {
     const [updated] = await db
       .update(visitas)
       .set(visita)

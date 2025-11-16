@@ -9,21 +9,46 @@ import path from "path";
 import fs from "fs";
 import { randomUUID } from "crypto";
 import { insertGabineteSchema, insertContactoSchema, insertVisitaSchema } from "@shared/schema";
+import express from "express";
 
-// Configure multer for file uploads
-const upload = multer({
-  dest: "/tmp/uploads/",
-  limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB max
+// Ensure upload directory exists
+const uploadsDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Configure multer with custom storage
+const storage_config = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = `${Date.now()}-${randomUUID()}${path.extname(file.originalname)}`;
+    cb(null, uniqueName);
   },
 });
 
-// Ensure upload directory exists
-if (!fs.existsSync("/tmp/uploads")) {
-  fs.mkdirSync("/tmp/uploads", { recursive: true });
-}
+const upload = multer({
+  storage: storage_config,
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB max
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept audio, images, and videos
+    const allowedMimes = /jpeg|jpg|png|gif|mp4|mov|avi|mp3|wav|ogg|m4a/;
+    const extname = allowedMimes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedMimes.test(file.mimetype);
+    if (mimetype && extname) {
+      return cb(null, true);
+    }
+    cb(new Error('Invalid file type. Only images, videos, and audio files are allowed.'));
+  },
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Serve uploaded files statically
+  app.use('/uploads', express.static(uploadsDir));
+  
   // Auth middleware
   await setupAuth(app);
 
@@ -88,7 +113,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/gabinetes/:id', isAuthenticated, async (req, res) => {
     try {
-      const gabinete = await storage.updateGabinete(req.params.id, req.body);
+      const validatedData = insertGabineteSchema.partial().parse(req.body);
+      const gabinete = await storage.updateGabinete(req.params.id, validatedData);
       res.json(gabinete);
     } catch (error) {
       console.error("Error updating gabinete:", error);
@@ -143,7 +169,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/contactos/:id', isAuthenticated, async (req, res) => {
     try {
-      const contacto = await storage.updateContacto(req.params.id, req.body);
+      const validatedData = insertContactoSchema.partial().parse(req.body);
+      const contacto = await storage.updateContacto(req.params.id, validatedData);
       res.json(contacto);
     } catch (error) {
       console.error("Error updating contacto:", error);
@@ -193,14 +220,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const files = req.files as { audio?: Express.Multer.File[], media?: Express.Multer.File[] };
       
-      // Parse form data
+      // Parse form data with safe JSON parsing
+      let marcasEntregues: string[] = [];
+      if (req.body.marcasEntregues) {
+        try {
+          const parsed = JSON.parse(req.body.marcasEntregues);
+          marcasEntregues = Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+          console.error("Invalid marcasEntregues JSON:", error);
+          return res.status(400).json({ message: "Invalid marcasEntregues format" });
+        }
+      }
+
       const visitaData = {
         gabineteId: req.body.gabineteId,
         contactoId: req.body.contactoId || null,
         userId: userId,
         dataVisita: new Date(req.body.dataVisita),
         notas: req.body.notas || null,
-        marcasEntregues: req.body.marcasEntregues ? JSON.parse(req.body.marcasEntregues) : [],
+        marcasEntregues,
         proximaVisita: req.body.proximaVisita ? new Date(req.body.proximaVisita) : null,
         audioUrl: null as string | null,
         mediaUrls: [] as string[],
