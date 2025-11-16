@@ -15,9 +15,19 @@ The system is built as a full-stack TypeScript application using React for the f
 4. ✅ **Advanced Analytics** - User-scoped dashboard with visit trends, top offices, frequency metrics, GPS usage, and performance KPIs using Recharts
 5. ✅ **Offline Data Caching** - Complete offline support with IndexedDB storage, automatic sync when back online, and temporary ID management
 
+**Major Backend Migration (November 16, 2025):**
+6. ✅ **Universal Entidades System** - Migrated from Gabinetes-only to universal Entidades supporting multiple entity types:
+   - **Entity Types**: Gabinete, Cliente, Distribuidor, Obra, Parceiro, Outro
+   - **New Fields**: NIF (Portuguese tax number), enhanced address fields, GPS coordinates
+   - **Migration Completed**: 2 existing gabinetes migrated to entidades with tipo_entidade="Gabinete"
+   - **Backend Complete**: Full CRUD API at `/api/entidades` with validation, safe deletion, and relation checking
+   - **Offline Support**: IndexedDB v2 with entidades store, sync manager updated
+   - **Data Validation**: Zod schemas with coordinate and NIF validation
+   - **Frontend Status**: ⚠️ **Pending Migration** - Forms, lists, and navigation still use old Gabinetes model
+
 **Offline Capabilities (November 16, 2025):**
-- **IndexedDB Storage**: Local database for visits, gabinetes, contactos, and pending sync queue
-- **Offline Creation**: Create gabinetes and contactos while offline → saved locally with temp IDs → appear in lists immediately
+- **IndexedDB Storage**: Local database for visits, entidades, gabinetes (deprecated), contactos, and pending sync queue
+- **Offline Creation**: Create entidades and contactos while offline → saved locally with temp IDs → appear in lists immediately
 - **Automatic Sync**: When back online, pending items automatically sync to server with temp IDs replaced by real server IDs
 - **Query Caching**: All server responses (lists and detail fetches) cached to IndexedDB for offline access
 - **Smart Fallback**: Forms first attempt online save, automatically fallback to offline if network fails
@@ -29,6 +39,7 @@ The system is built as a full-stack TypeScript application using React for the f
 - All visit queries scoped to authenticated user (userId filtering)
 - No cross-user data leakage in analytics or visit lists
 - Input sanitization for GPS coordinates, ICS files, and PDF content
+- Safe deletion: Prevents entidade deletion when related contactos/visitas exist
 
 ## User Preferences
 
@@ -77,7 +88,8 @@ Preferred communication style: Simple, everyday language.
 **API Structure**
 - RESTful endpoints organized by resource:
   - `/api/auth/*` - Authentication and user management
-  - `/api/gabinetes` - Office CRUD operations
+  - `/api/entidades` - **NEW** Universal entity CRUD (Gabinete, Cliente, Distribuidor, Obra, Parceiro, Outro)
+  - `/api/gabinetes` - **DEPRECATED** Office CRUD operations (use /api/entidades)
   - `/api/contactos` - Contact CRUD operations
   - `/api/visitas` - Visit CRUD operations with file upload
   - `/api/dashboard` - Aggregated statistics
@@ -97,15 +109,21 @@ Preferred communication style: Simple, everyday language.
 
 **Data Model**
 - **Users** - Authentication and profile information (Replit Auth integration)
-- **Gabinetes** (Offices) - Architecture office details with address, contact info, and brand associations
-- **Contactos** (Contacts) - Individual contacts linked to offices with roles and contact details
+- **Entidades** (Universal Entities) - Universal entity system supporting multiple types:
+  - tipo_entidade: Gabinete | Cliente | Distribuidor | Obra | Parceiro | Outro
+  - Fields: nome, morada, cidade, codigo_postal, email, telefone, website, notas, latitude, longitude, nif
+  - Replaces Gabinetes as the primary entity model
+- **Gabinetes** (DEPRECATED) - Legacy architecture office table, kept for backward compatibility during migration
+- **Contactos** (Contacts) - Individual contacts linked to entidades (or legacy gabinetes) with roles and contact details
 - **Visitas** (Visits) - Visit records with dates, notes, media attachments, audio transcriptions, and AI summaries
-- **Marcas** (Brands) - Product brands that can be associated with offices and visits
+- **Marcas** (Brands) - Product brands that can be associated with entidades and visits
 - **Sessions** - Express session storage for authentication state
 
 **Relationships**
-- Gabinetes → Contactos (one-to-many)
-- Gabinetes → Visitas (one-to-many)
+- Entidades → Contactos (one-to-many via entidade_id)
+- Entidades → Visitas (one-to-many via entidade_id)
+- Gabinetes → Contactos (one-to-many via gabinete_id, legacy)
+- Gabinetes → Visitas (one-to-many via gabinete_id, legacy)
 - Contactos → Visitas (one-to-many)
 - Users → Visitas (one-to-many, tracking visit creator)
 - Many-to-many relationships for Marcas associations
