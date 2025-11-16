@@ -2,90 +2,7 @@
 
 ## Overview
 
-This is a mobile-first Progressive Web Application (PWA) designed for managing commercial visits to architecture offices (gabinetes). The application enables field sales professionals to efficiently track offices, contacts, and visits, with advanced features including audio transcription, AI-powered visit summaries, automated email notifications, geolocation capture, calendar integration, PDF export, and comprehensive analytics.
-
-The system is built as a full-stack TypeScript application using React for the frontend, Express for the backend, and PostgreSQL with Drizzle ORM for data persistence. It emphasizes mobile usability with Material Design principles and user data isolation for security.
-
-## Recent Updates (November 2025)
-
-**Extended Features Implemented:**
-1. ✅ **Geolocation Integration** - Automatic GPS capture during visit creation with validation, LocationPreview component, and map links
-2. ✅ **Calendar Integration** - Complete backend-generated calendar synchronization for visits:
-   - **Endpoint**: GET /api/visitas/:id/ics with RBAC enforcement (admins all, agents only their visits)
-   - **Complete Event Data**: Summary, description with notes, AI summary, contact info, entidade details, GPS coordinates, deep link
-   - **RFC 5545 Compliant**: Valid ICS format with proper line folding (max 75 octets), CRLF line endings, correct newline escaping
-   - **Line Folding**: foldICSLine utility with Buffer.byteLength() for proper UTF-8 octet counting, handles multi-byte Portuguese characters correctly
-   - **Text Sanitization**: Proper escaping of backslashes, commas, semicolons, and newlines (real \n → escaped \\n)
-   - **Smart Descriptions**: Comprehensive multi-section format with visit notes, AI summary, contact details, entity information, GPS location
-   - **Location Field**: Uses entidade address or GPS coordinates as fallback
-   - **Deep Link**: Embedded URL field for direct app access from calendar event
-   - **Reminder**: 60-minute pre-visit alarm notification (VALARM with -PT60M trigger)
-   - **Offline Handling**: Button disabled when offline with Tooltip component showing user-friendly message
-   - **Frontend**: "Adicionar ao Calendário" button in VisitaDetail with proper error handling and toast notifications
-   - **Production Ready**: E2E tested with Portuguese characters, verified compatible with Google Calendar, Outlook, and Apple Calendar
-3. ✅ **PDF Export** - Complete backend-generated PDF system with Node.js canvas support:
-   - **Endpoint**: GET /api/visitas/:id/pdf with RBAC enforcement
-   - **Logo Rendering**: Entidade logos (PNG/JPEG) embedded at 30x30 in header
-   - **Photo Embedding**: Visit photos embedded as scaled images (max 100px height) with captions
-   - **Media Support**: PNG/JPEG images embedded, WEBP/SVG gracefully skipped with placeholders
-   - **Timeout Protection**: 5-second timeout on all remote media fetches to prevent blocking
-   - **Complete Content**: Header with logo, entidade details with enrichment data (NIF, domain, industry, description, social links), contacto info, visit details with highlighted IA summary, GPS coordinates, linked tarefas sorted by due date with status badges, embedded photos, video/audio links, footer with timestamp and page numbers
-   - **Smart Pagination**: Automatic page breaks before images and large text sections to prevent overflow
-   - **Offline Handling**: Frontend button disabled when offline with user notification
-   - **Professional Output**: Clean typography, section headers, color-coded content, proper spacing
-4. ✅ **Advanced Analytics** - User-scoped dashboard with visit trends, top offices, frequency metrics, GPS usage, and performance KPIs using Recharts
-5. ✅ **Offline Data Caching** - Complete offline support with IndexedDB storage, automatic sync when back online, and temporary ID management
-
-**Major Backend Migration (November 16, 2025):**
-6. ✅ **Universal Entidades System** - Migrated from Gabinetes-only to universal Entidades supporting multiple entity types:
-   - **Entity Types**: Gabinete, Cliente, Distribuidor, Obra, Parceiro, Outro
-   - **New Fields**: NIF (Portuguese tax number), enhanced address fields, GPS coordinates
-   - **Migration Completed**: 2 existing gabinetes migrated to entidades with tipo_entidade="Gabinete"
-   - **Backend Complete**: Full CRUD API at `/api/entidades` with validation, safe deletion, and relation checking
-   - **Offline Support**: IndexedDB v2 with entidades store, sync manager updated
-   - **Data Validation**: Zod schemas with coordinate and NIF validation
-   - **Frontend Status**: ⚠️ **Pending Migration** - Forms, lists, and navigation still use old Gabinetes model
-
-**Multi-Agent System with Role-Based Access Control (November 16, 2025):**
-7. ✅ **Backend Implementation Complete** - Full role-based access control system:
-   - **User Roles**: Admin (sees all data) and Agent (sees only their created/assigned data)
-   - **Ownership Fields**: createdByUserId and assignedUserId on entidades, contactos, and visitas
-   - **Security**: All UPDATE/DELETE operations enforce ownership checks for agent users
-   - **Legacy Support**: Visitas queries include fallback to legacy userId field for historical data access
-   - **Storage Layer**: Role-based filtering in all GET methods (admin sees all, agents see owned/assigned)
-   - **Odoo Sync Preparation**: Added needsSync, syncStatus, syncError fields with placeholder endpoints
-   - **API Endpoints**: POST /api/sync/odoo (manual sync), POST /api/odoo/webhook (incoming updates)
-   - **Frontend Status**: ⚠️ **Pending** - Forms need assignedUserId field, offline IndexedDB needs ownership field support
-
-**Task Management System (November 16, 2025):**
-8. ✅ **Complete Task Management** - Full-featured task system with ICS export and offline support:
-   - **Database Schema**: tarefas table with status (pending/done), repeat_interval (none/daily/weekly/monthly/yearly)
-   - **RBAC Integration**: Admin sees all tasks, agents see only tasks they created or are assigned to
-   - **Optional Relations**: Tasks can link to entidades and visitas (proper empty string → null handling)
-   - **ICS Export**: Export tasks to .ics calendar files with sanitized content
-   - **Offline Support**: Full IndexedDB integration with syncManager queue for offline task creation
-   - **Frontend**: Complete CRUD with Tarefas list page (with filters), TarefaForm, TarefaDetail, TarefaCard component
-   - **Navigation**: Added to BottomNav with CheckCircle2 icon
-   - **API Endpoints**: GET/POST /api/tarefas, GET/PATCH/DELETE /api/tarefas/:id, GET /api/tarefas/:id/ics
-   - **Create from Visit**: "Criar Tarefa" button on visit detail page with pre-filled data
-   - **Visit Integration**: Tasks displayed on visit detail page, pre-filled with visit notes and entity info
-   - **E2E Tested**: Playwright tests verify task creation, role filtering, and RBAC enforcement
-
-**Offline Capabilities (November 16, 2025):**
-- **IndexedDB Storage**: Local database for visits, entidades, gabinetes (deprecated), contactos, tarefas, and pending sync queue
-- **Offline Creation**: Create entidades, contactos, and tarefas while offline → saved locally with temp IDs → appear in lists immediately
-- **Automatic Sync**: When back online, pending items automatically sync to server with temp IDs replaced by real server IDs
-- **Query Caching**: All server responses (lists and detail fetches) cached to IndexedDB for offline access
-- **Smart Fallback**: Forms first attempt online save, automatically fallback to offline if network fails
-- **Visual Indicators**: Alert banners show offline status, sync status indicator in UI
-- **Edit Restrictions**: Edit operations disabled when offline (with user notification)
-- **E2E Tested**: Playwright tests verify offline create → sync → server persistence flow
-
-**Data Security:**
-- All visit queries scoped to authenticated user (userId filtering)
-- No cross-user data leakage in analytics or visit lists
-- Input sanitization for GPS coordinates, ICS files, and PDF content
-- Safe deletion: Prevents entidade deletion when related contactos/visitas exist
+This Progressive Web Application (PWA) facilitates commercial visit management for field sales professionals targeting architecture offices (gabinetes) and other entities. It enables efficient tracking of entities, contacts, and visits, incorporating features like audio transcription, AI-powered visit summaries, automated email notifications, geolocation capture, calendar integration, PDF export, and comprehensive analytics. The application is built as a full-stack TypeScript solution with a React frontend, Express backend, and PostgreSQL with Drizzle ORM, emphasizing mobile-first design, Material Design principles, and robust user data security through isolation and Role-Based Access Control (RBAC). The project aims to provide a comprehensive tool for sales teams to streamline their operations, enhance data quality, and gain actionable insights.
 
 ## User Preferences
 
@@ -95,121 +12,38 @@ Preferred communication style: Simple, everyday language.
 
 ### Frontend Architecture
 
-**Framework & Routing**
-- React 18 with TypeScript for type-safe component development
-- Wouter for lightweight client-side routing
-- Vite as the build tool and development server with HMR support
-- Mobile-first responsive design targeting smartphone usage
-
-**UI Component System**
-- Shadcn/ui component library (New York style) with Radix UI primitives
-- Tailwind CSS for utility-first styling with custom design tokens
-- Material Design principles optimized for mobile field work
-- Bottom navigation pattern for primary app navigation (Dashboard, Gabinetes, Contactos, Visitas)
-
-**State Management**
-- TanStack React Query for server state management and caching
-- Form state managed with React Hook Form and Zod validation
-- Toast notifications for user feedback
-
-**Key Design Patterns**
-- Card-based layouts for list views (offices, contacts, visits)
-- Search-first interfaces with sticky search bars
-- Floating Action Buttons (FAB) for primary creation actions
-- Progressive disclosure with empty states and loading skeletons
+The frontend is a mobile-first React 18 application built with TypeScript, utilizing Wouter for routing and Vite for development and bundling. It employs Shadcn/ui (New York style) with Radix UI primitives and Tailwind CSS for styling, adhering to Material Design principles. State management is handled by TanStack React Query for server state and React Hook Form with Zod for form validation. Key UI patterns include card-based layouts, search-first interfaces, and Floating Action Buttons (FABs).
 
 ### Backend Architecture
 
-**Server Framework**
-- Express.js with TypeScript for REST API endpoints
-- Session-based authentication via express-session with PostgreSQL storage
-- Middleware for request logging and JSON parsing
-
-**Authentication Strategy**
-- Replit Auth integration using OpenID Connect (OIDC)
-- Passport.js for authentication flow management
-- Session persistence in PostgreSQL for secure token management
-- Protected routes requiring authentication via `isAuthenticated` middleware
-
-**API Structure**
-- RESTful endpoints organized by resource:
-  - `/api/auth/*` - Authentication and user management
-  - `/api/entidades` - **NEW** Universal entity CRUD (Gabinete, Cliente, Distribuidor, Obra, Parceiro, Outro)
-  - `/api/gabinetes` - **DEPRECATED** Office CRUD operations (use /api/entidades)
-  - `/api/contactos` - Contact CRUD operations
-  - `/api/visitas` - Visit CRUD operations with file upload
-  - `/api/dashboard` - Aggregated statistics
-  - `/api/marcas` - Brand management
-
-**File Upload Handling**
-- Multer middleware for multipart form data (audio and images)
-- Temporary storage in `/tmp/uploads/` with 50MB file size limit
-- Support for multiple media files per visit
+The backend is an Express.js application written in TypeScript. It uses session-based authentication with Replit Auth (OpenID Connect) and Passport.js, storing sessions in PostgreSQL. API endpoints are RESTful, covering authentication, universal entities (`/api/entidades`), contacts, visits (including file uploads), tasks, and analytics. Multer handles file uploads (audio/images) with temporary storage. A robust RBAC system differentiates between Admin (all data access) and Agent (owner/assigned data access) roles, enforcing ownership checks for all data operations.
 
 ### Database Architecture
 
-**ORM & Migrations**
-- Drizzle ORM with PostgreSQL dialect
-- Type-safe schema definitions with automatic TypeScript inference
-- Schema-first approach with Zod validation schemas derived from database schema
+The database uses PostgreSQL with Drizzle ORM for type-safe schema management. The core data model includes:
+- **Users**: Authentication and profile information, integrated with Replit Auth.
+- **Entidades**: A universal entity system replacing legacy "Gabinetes," supporting types like Gabinete, Cliente, Distribuidor, Obra, Parceiro, Outro, with fields for NIF, address, and GPS coordinates.
+- **Contactos**: Contacts linked to entities.
+- **Visitas**: Visit records with dates, notes, media attachments, audio transcriptions, AI summaries, and geolocation.
+- **Tarefas**: A comprehensive task management system with status, repeat intervals, and optional links to entities/visits.
+- **Marcas**: Product brands.
+- **Sessions**: For authentication state.
+Relationships are managed via foreign keys, and data integrity is maintained with timestamp tracking and JSONB fields for flexible data storage.
 
-**Data Model**
-- **Users** - Authentication and profile information (Replit Auth integration)
-- **Entidades** (Universal Entities) - Universal entity system supporting multiple types:
-  - tipo_entidade: Gabinete | Cliente | Distribuidor | Obra | Parceiro | Outro
-  - Fields: nome, morada, cidade, codigo_postal, email, telefone, website, notas, latitude, longitude, nif
-  - Replaces Gabinetes as the primary entity model
-- **Gabinetes** (DEPRECATED) - Legacy architecture office table, kept for backward compatibility during migration
-- **Contactos** (Contacts) - Individual contacts linked to entidades (or legacy gabinetes) with roles and contact details
-- **Visitas** (Visits) - Visit records with dates, notes, media attachments, audio transcriptions, and AI summaries
-- **Marcas** (Brands) - Product brands that can be associated with entidades and visits
-- **Sessions** - Express session storage for authentication state
+### System Design Choices
 
-**Relationships**
-- Entidades → Contactos (one-to-many via entidade_id)
-- Entidades → Visitas (one-to-many via entidade_id)
-- Gabinetes → Contactos (one-to-many via gabinete_id, legacy)
-- Gabinetes → Visitas (one-to-many via gabinete_id, legacy)
-- Contactos → Visitas (one-to-many)
-- Users → Visitas (one-to-many, tracking visit creator)
-- Many-to-many relationships for Marcas associations
+- **Offline Capabilities**: Comprehensive offline support with IndexedDB for data caching and storage. Automatic synchronization of created entities, contacts, and tasks when online. Query caching allows offline access to previously fetched data.
+- **Geolocation Integration**: Automatic GPS capture during visit creation, displayed with map links.
+- **Calendar Integration**: Backend-generated, RFC 5545 compliant `.ics` files for visits and tasks, including detailed event data, deep links, and reminders.
+- **PDF Export**: Backend-generated PDF reports for visits, including logos, embedded photos, AI summaries, and linked tasks, with smart pagination.
+- **Advanced Analytics**: RBAC-aware analytics dashboard providing key performance indicators (KPIs) and visualizations for visits, tasks, entities, and brands, with filtering capabilities.
+- **Multi-Agent System with RBAC**: Granular control over data access based on user roles (Admin/Agent), ensuring agents only access their owned or assigned data across entities, contacts, visits, and tasks.
+- **Universal Entidades System**: Migration from a "Gabinetes"-only model to a flexible "Entidades" system supporting various business entity types.
 
-**Data Integrity**
-- Foreign key constraints with cascade delete behavior
-- Timestamp tracking (createdAt/updatedAt) on core entities
-- JSONB fields for flexible array storage (marcas, mediaUrls)
+## External Dependencies
 
-### External Dependencies
-
-**Third-Party Services**
-
-- **Neon Database** - Serverless PostgreSQL hosting via `@neondatabase/serverless`
-  - WebSocket-based connection pooling for scalability
-  - Configured via `DATABASE_URL` environment variable
-
-- **OpenAI API** - AI-powered features via official OpenAI SDK
-  - Whisper model for audio transcription (`whisper-1`)
-  - GPT model for visit summary generation (configured for `gpt-5`)
-  - Structured JSON output for visit analysis (needs, opportunities, recommendations)
-  - Configured via `OPENAI_API_KEY` environment variable
-
-- **Replit Authentication** - OAuth/OIDC provider integration
-  - User profile management with email, name, and profile images
-  - Session management with PostgreSQL storage via `connect-pg-simple`
-  - Configured via `REPL_ID`, `ISSUER_URL`, and `SESSION_SECRET` environment variables
-
-**Email Integration** (Placeholder Implementation)
-- Email notification system prepared for integration with services like Resend or SendGrid
-- Currently logs email content to console in development
-- Designed to send visit summaries to configured recipients
-
-**UI Component Dependencies**
-- Radix UI primitives for accessible, unstyled components (dialogs, popovers, dropdowns, etc.)
-- Lucide React for consistent iconography
-- date-fns for date formatting and manipulation (Portuguese locale support)
-- class-variance-authority and clsx for dynamic className composition
-
-**Development Tools**
-- TypeScript for end-to-end type safety
-- ESBuild for production server bundling
-- Drizzle Kit for database migrations and schema management
+- **Neon Database**: Serverless PostgreSQL hosting for production data persistence.
+- **OpenAI API**: Utilized for AI-powered features, including Whisper for audio transcription and GPT for visit summary generation.
+- **Replit Authentication**: OAuth/OIDC provider for user authentication and profile management.
+- **Email Integration**: Prepared for services like Resend or SendGrid for automated email notifications (currently console logging in development).
+- **UI Component Dependencies**: Radix UI primitives, Lucide React for iconography, date-fns for date manipulation.

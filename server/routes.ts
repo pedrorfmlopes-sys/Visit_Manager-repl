@@ -108,6 +108,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Analytics endpoint
+  app.get('/api/analytics', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole } = await getUserContext(req);
+      
+      // Parse query params for filters
+      const filters: {
+        period?: number;
+        agente?: string;
+        tipoEntidade?: string;
+      } = {};
+
+      if (req.query.period) {
+        filters.period = parseInt(req.query.period as string);
+      }
+
+      if (req.query.agente && userRole === 'admin') {
+        filters.agente = req.query.agente as string;
+      }
+
+      if (req.query.tipoEntidade) {
+        filters.tipoEntidade = req.query.tipoEntidade as string;
+      }
+
+      const analytics = await storage.getAnalytics(userId, userRole, filters);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching analytics:", error);
+      res.status(500).json({ message: "Failed to fetch analytics" });
+    }
+  });
+
   // Entidades endpoints (Universal Entities)
   app.get('/api/entidades', isAuthenticated, async (req: any, res) => {
     try {

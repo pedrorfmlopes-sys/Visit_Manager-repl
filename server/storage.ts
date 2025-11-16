@@ -85,6 +85,40 @@ export interface IStorage {
     marcasMaisEntregues: { marca: string; count: number }[];
     proximasVisitas: VisitaWithRelations[];
   }>;
+
+  // Analytics
+  getAnalytics(userId: string, userRole: 'admin' | 'agent', filters?: {
+    period?: number; // days
+    agente?: string; // user id
+    tipoEntidade?: string;
+  }): Promise<{
+    visits: {
+      total_visits: number;
+      visits_last_7_days: number;
+      visits_last_30_days: number;
+      visits_by_agent: { agent: string; count: number }[];
+      visits_by_entity_type: { tipo: string; count: number }[];
+      visits_by_month: { month: string; count: number }[];
+      most_visited_entities: { id: string; nome: string; count: number }[];
+      gps_heatmap: { lat: number; lon: number; date: string }[];
+    };
+    tasks: {
+      tasks_pending: number;
+      tasks_overdue: number;
+      tasks_completed_this_week: number;
+      tasks_by_agent: { agent: string; count: number }[];
+      tasks_by_status: { status: string; count: number }[];
+      tasks_by_repeat_interval: { interval: string; count: number }[];
+    };
+    entities: {
+      entities_by_type: { tipo: string; count: number }[];
+      entities_created_last_30_days: number;
+      entities_with_visits_count: { id: string; nome: string; count: number }[];
+    };
+    brands: {
+      brand_frequency: { marca: string; count: number }[];
+    };
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -665,6 +699,290 @@ export class DatabaseStorage implements IStorage {
       visitasEstesMes,
       marcasMaisEntregues,
       proximasVisitas,
+    };
+  }
+
+  // Analytics
+  async getAnalytics(userId: string, userRole: 'admin' | 'agent', filters?: {
+    period?: number;
+    agente?: string;
+    tipoEntidade?: string;
+  }) {
+    const periodDays = filters?.period || 365;
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - periodDays);
+
+    // Build RBAC where clauses
+    let visitasWhereClause;
+    let tarefasWhereClause;
+    let entidadesWhereClause;
+
+    if (userRole === 'agent') {
+      // Agents see only their created/assigned data
+      visitasWhereClause = or(
+        eq(visitas.createdByUserId, userId),
+        eq(visitas.assignedUserId, userId)
+      );
+      tarefasWhereClause = or(
+        eq(tarefas.createdByUserId, userId),
+        eq(tarefas.assignedUserId, userId)
+      );
+      entidadesWhereClause = or(
+        eq(entidades.createdByUserId, userId),
+        eq(entidades.assignedUserId, userId)
+      );
+    }
+
+    // Apply additional filters
+    if (filters?.agente && userRole === 'admin') {
+      visitasWhereClause = or(
+        eq(visitas.createdByUserId, filters.agente),
+        eq(visitas.assignedUserId, filters.agente)
+      );
+      tarefasWhereClause = or(
+        eq(tarefas.createdByUserId, filters.agente),
+        eq(tarefas.assignedUserId, filters.agente)
+      );
+    }
+
+    // Fetch all visitas with relations
+    const allVisitas = await db.query.visitas.findMany({
+      where: visitasWhereClause,
+      with: {
+        entidade: true,
+        contacto: true,
+      },
+    });
+
+    // Filter by entity type if specified
+    let filteredVisitas = allVisitas;
+    if (filters?.tipoEntidade) {
+      filteredVisitas = allVisitas.filter(v => 
+        v.entidade?.tipoEntidade === filters.tipoEntidade
+      );
+    }
+
+    // Fetch all tarefas
+    const allTarefas = await db.query.tarefas.findMany({
+      where: tarefasWhereClause,
+      with: {
+        entidade: true,
+        visita: true,
+      },
+    });
+
+    // Fetch all entidades
+    const allEntidades = await db.query.entidades.findMany({
+      where: entidadesWhereClause,
+    });
+
+    // === VISITS ANALYTICS ===
+    const now = new Date();
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const startOfWeek = new Date();
+    startOfWeek.setDate(startOfWeek.getDate() - 7);
+
+    const total_visits = filteredVisitas.length;
+    const visits_last_7_days = filteredVisitas.filter(v => 
+      new Date(v.dataVisita) >= sevenDaysAgo
+    ).length;
+    const visits_last_30_days = filteredVisitas.filter(v => 
+      new Date(v.dataVisita) >= thirtyDaysAgo
+    ).length;
+
+    // Visits by agent
+    const visitsByAgentMap = new Map<string, number>();
+    const userCache = new Map<string, User>();
+    
+    for (const visita of filteredVisitas) {
+      const agentId = visita.createdByUserId || visita.userId || 'Desconhecido';
+      visitsByAgentMap.set(agentId, (visitsByAgentMap.get(agentId) || 0) + 1);
+      
+      if (agentId !== 'Desconhecido' && !userCache.has(agentId)) {
+        const user = await this.getUser(agentId);
+        if (user) userCache.set(agentId, user);
+      }
+    }
+
+    const visits_by_agent = Array.from(visitsByAgentMap.entries())
+      .map(([agentId, count]) => {
+        const user = userCache.get(agentId);
+        const agentName = user ? `${user.firstName} ${user.lastName}` : 'Desconhecido';
+        return { agent: agentName, count };
+      })
+      .sort((a, b) => b.count - a.count);
+
+    // Visits by entity type
+    const visitsByEntityTypeMap = new Map<string, number>();
+    filteredVisitas.forEach(v => {
+      const tipo = v.entidade?.tipoEntidade || 'Desconhecido';
+      visitsByEntityTypeMap.set(tipo, (visitsByEntityTypeMap.get(tipo) || 0) + 1);
+    });
+
+    const visits_by_entity_type = Array.from(visitsByEntityTypeMap.entries())
+      .map(([tipo, count]) => ({ tipo, count }))
+      .sort((a, b) => b.count - a.count);
+
+    // Visits by month (last 12 months)
+    const visitsByMonthMap = new Map<string, number>();
+    for (let i = 11; i >= 0; i--) {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      const key = date.toLocaleDateString('pt-PT', { year: 'numeric', month: 'short' });
+      visitsByMonthMap.set(key, 0);
+    }
+
+    filteredVisitas.forEach(v => {
+      const date = new Date(v.dataVisita);
+      const key = date.toLocaleDateString('pt-PT', { year: 'numeric', month: 'short' });
+      if (visitsByMonthMap.has(key)) {
+        visitsByMonthMap.set(key, (visitsByMonthMap.get(key) || 0) + 1);
+      }
+    });
+
+    const visits_by_month = Array.from(visitsByMonthMap.entries())
+      .map(([month, count]) => ({ month, count }));
+
+    // Most visited entities
+    const entityVisitCountMap = new Map<string, { id: string; nome: string; count: number }>();
+    filteredVisitas.forEach(v => {
+      if (v.entidade) {
+        const key = v.entidade.id.toString();
+        const existing = entityVisitCountMap.get(key);
+        if (existing) {
+          existing.count++;
+        } else {
+          entityVisitCountMap.set(key, {
+            id: v.entidade.id.toString(),
+            nome: v.entidade.nome,
+            count: 1,
+          });
+        }
+      }
+    });
+
+    const most_visited_entities = Array.from(entityVisitCountMap.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    // GPS heatmap
+    const gps_heatmap = filteredVisitas
+      .filter(v => v.latitude && v.longitude)
+      .map(v => ({
+        lat: parseFloat(v.latitude!),
+        lon: parseFloat(v.longitude!),
+        date: new Date(v.dataVisita).toISOString(),
+      }));
+
+    // === TASKS ANALYTICS ===
+    const tasks_pending = allTarefas.filter(t => t.status === 'pending').length;
+    const tasks_overdue = allTarefas.filter(t => 
+      t.status === 'pending' && t.dueDate && new Date(t.dueDate) < now
+    ).length;
+    const tasks_completed_this_week = allTarefas.filter(t => 
+      t.status === 'done' && t.updatedAt && new Date(t.updatedAt) >= startOfWeek
+    ).length;
+
+    // Tasks by agent
+    const tasksByAgentMap = new Map<string, number>();
+    for (const tarefa of allTarefas) {
+      const agentId = tarefa.createdByUserId || 'Desconhecido';
+      tasksByAgentMap.set(agentId, (tasksByAgentMap.get(agentId) || 0) + 1);
+      
+      if (agentId !== 'Desconhecido' && !userCache.has(agentId)) {
+        const user = await this.getUser(agentId);
+        if (user) userCache.set(agentId, user);
+      }
+    }
+
+    const tasks_by_agent = Array.from(tasksByAgentMap.entries())
+      .map(([agentId, count]) => {
+        const user = userCache.get(agentId);
+        const agentName = user ? `${user.firstName} ${user.lastName}` : 'Desconhecido';
+        return { agent: agentName, count };
+      })
+      .sort((a, b) => b.count - a.count);
+
+    // Tasks by status
+    const tasksByStatusMap = new Map<string, number>();
+    allTarefas.forEach(t => {
+      const status = t.status === 'pending' ? 'Pendente' : 'Concluída';
+      tasksByStatusMap.set(status, (tasksByStatusMap.get(status) || 0) + 1);
+    });
+
+    const tasks_by_status = Array.from(tasksByStatusMap.entries())
+      .map(([status, count]) => ({ status, count }));
+
+    // Tasks by repeat interval
+    const tasksByRepeatMap = new Map<string, number>();
+    allTarefas.forEach(t => {
+      const interval = t.repeatInterval === 'none' ? 'Sem repetição' : t.repeatInterval || 'Sem repetição';
+      tasksByRepeatMap.set(interval, (tasksByRepeatMap.get(interval) || 0) + 1);
+    });
+
+    const tasks_by_repeat_interval = Array.from(tasksByRepeatMap.entries())
+      .map(([interval, count]) => ({ interval, count }));
+
+    // === ENTITIES ANALYTICS ===
+    const entityTypeMap = new Map<string, number>();
+    allEntidades.forEach(e => {
+      const tipo = e.tipoEntidade || 'Desconhecido';
+      entityTypeMap.set(tipo, (entityTypeMap.get(tipo) || 0) + 1);
+    });
+
+    const entities_by_type = Array.from(entityTypeMap.entries())
+      .map(([tipo, count]) => ({ tipo, count }))
+      .sort((a, b) => b.count - a.count);
+
+    const entities_created_last_30_days = allEntidades.filter(e => 
+      e.createdAt && new Date(e.createdAt) >= thirtyDaysAgo
+    ).length;
+
+    const entities_with_visits_count = most_visited_entities;
+
+    // === BRANDS ANALYTICS ===
+    const brandFrequencyMap = new Map<string, number>();
+    filteredVisitas.forEach(v => {
+      v.marcasEntregues?.forEach(marca => {
+        brandFrequencyMap.set(marca, (brandFrequencyMap.get(marca) || 0) + 1);
+      });
+    });
+
+    const brand_frequency = Array.from(brandFrequencyMap.entries())
+      .map(([marca, count]) => ({ marca, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    return {
+      visits: {
+        total_visits,
+        visits_last_7_days,
+        visits_last_30_days,
+        visits_by_agent,
+        visits_by_entity_type,
+        visits_by_month,
+        most_visited_entities,
+        gps_heatmap,
+      },
+      tasks: {
+        tasks_pending,
+        tasks_overdue,
+        tasks_completed_this_week,
+        tasks_by_agent,
+        tasks_by_status,
+        tasks_by_repeat_interval,
+      },
+      entities: {
+        entities_by_type,
+        entities_created_last_30_days,
+        entities_with_visits_count,
+      },
+      brands: {
+        brand_frequency,
+      },
     };
   }
 }

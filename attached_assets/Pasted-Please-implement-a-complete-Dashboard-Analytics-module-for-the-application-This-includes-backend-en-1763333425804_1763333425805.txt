@@ -1,0 +1,178 @@
+Please implement a complete Dashboard Analytics module for the application.
+This includes backend endpoints, frontend pages, charts, filters, and RBAC-aware data aggregation.
+
+1. Backend — Analytics Endpoint
+
+Create a new endpoint:
+
+GET /api/analytics
+
+It must aggregate all data belonging to the authenticated user’s company context (or current multi-agent restrictions):
+
+1.1 If user is admin:
+
+Return global stats (all agents).
+
+1.2 If user is agent:
+
+Return ONLY:
+
+tasks created by them OR assigned to them
+
+visits created by them OR assigned to them
+
+entities they created OR are assigned to
+
+1.3 Data returned:
+Visits:
+
+total_visits
+
+visits_last_7_days
+
+visits_last_30_days
+
+visits_by_agent
+
+visits_by_entity_type
+
+visits_by_month (12 months)
+
+most_visited_entities (Top 10)
+
+GPS heatmap dataset (lat/lon/date)
+
+Tasks:
+
+tasks_pending
+
+tasks_overdue
+
+tasks_completed_this_week
+
+tasks_by_agent
+
+tasks_by_status
+
+tasks_by_repeat_interval
+
+Entities:
+
+entities_by_type
+
+entities_created_last_30_days
+
+entities_with_visits_count (Top 10)
+
+Brands (marcas_entregues):
+
+brand_frequency (Top 10)
+
+All queries must be optimized and RBAC-filtered.
+2. Frontend — Dashboard Page
+
+Create a new page:
+
+Dashboard.tsx
+
+2.1 Include the following visual components:
+KPI Cards:
+
+Total Visitas
+
+Visitas (últimos 7 dias)
+
+Tarefas Pendentes
+
+Tarefas Atrasadas
+
+Total Entidades
+
+Entidades Novas (30 dias)
+
+Charts:
+
+Visits by Month (bar or line chart)
+
+Visits by Agent (bar chart)
+
+Visits by Entity Type (donut/pie)
+
+Tasks by Status (pie)
+
+Tasks by Agent (bar)
+
+Brands Delivered — Top 10 (bar)
+
+Heatmap (just return the dataset for now; no map rendering required unless library available)
+
+2.2 Filters:
+
+Add a filter bar with:
+
+Período: 7 dias | 30 dias | 90 dias | 1 ano
+
+Agente (admins only)
+
+Tipo de entidade
+
+Filters must trigger refetch with query params.
+
+3. RBAC + Offline Requirements
+RBAC:
+
+Admin: sees all data
+
+Agent: sees filtered, personal data
+
+Endpoint enforces it
+
+Dashboard UI hides restricted filters
+
+Offline Mode:
+
+Dashboard requires online connection
+
+If offline → show a centered message:
+“O Dashboard requer ligação à internet.”
+Hide charts and KPIs
+
+No offline caching needed
+
+4. Navigation
+
+Add Dashboard to BottomNav with an appropriate icon (ex: BarChart3).
+
+Default home screen can stay unchanged unless simple to adjust.
+
+5. Visual Quality Requirements
+
+Clean, modern layout matching existing design system
+
+Card grid responsive on mobile
+
+Charts using a light-weight library already in project (ex: Recharts or Chart.js)
+
+Smooth loading states (skeleton loaders)
+
+Empty states handled gracefully
+
+6. Final Quality Checks
+
+Ensure:
+
+No heavy client-side computations (backend provides aggregated data)
+
+Charts update correctly when filters change
+
+Admin filters agent list correctly
+
+Mobile view scrolls smoothly
+
+No unhandled undefined/null values
+
+Fallbacks when entity or visit datasets are empty
+
+No dataset overflows or rendering issues
+
+Proceed.

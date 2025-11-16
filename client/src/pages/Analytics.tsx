@@ -1,456 +1,410 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, TrendingUp, Building2, Calendar, Target, Users, MapPin } from "lucide-react";
-import { useLocation } from "wouter";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, subMonths, isWithinInterval } from "date-fns";
-import { pt } from "date-fns/locale";
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Calendar, CheckCircle2, AlertCircle, Building2, TrendingUp, Users, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import type { VisitaWithRelations, Gabinete } from "@shared/schema";
+import { useLocation } from "wouter";
 
-interface DashboardStats {
-  totalVisitas: number;
-  totalGabinetes: number;
-  visitasEsteMes: number;
-  proximasVisitas: number;
-}
-
-const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--muted))', 'hsl(var(--destructive))'];
 
 export default function Analytics() {
+  const isOnline = useOnlineStatus();
+  const isAdmin = useIsAdmin();
   const [, setLocation] = useLocation();
+  const [period, setPeriod] = useState<string>("30");
+  const [selectedAgent, setSelectedAgent] = useState<string>("all");
+  const [selectedEntityType, setSelectedEntityType] = useState<string>("all");
 
-  const { data: stats } = useQuery<DashboardStats>({
-    queryKey: ["/api/dashboard"],
+  // Build query params
+  const params: Record<string, string> = {
+    period: period,
+  };
+
+  // Only add agent filter if admin and not "all"
+  if (isAdmin && selectedAgent && selectedAgent !== "all") {
+    params.agente = selectedAgent;
+  }
+
+  // Only add entity type filter if not "all"
+  if (selectedEntityType && selectedEntityType !== "all") {
+    params.tipoEntidade = selectedEntityType;
+  }
+
+  const queryParams = new URLSearchParams(params);
+  const analyticsUrl = `/api/analytics?${queryParams.toString()}`;
+
+  const { data: analytics, isLoading, error } = useQuery({
+    queryKey: [analyticsUrl],
+    enabled: isOnline,
   });
 
-  const { data: visitas = [] } = useQuery<VisitaWithRelations[]>({
-    queryKey: ["/api/visitas"],
+  const { data: users } = useQuery({
+    queryKey: ['/api/users'],
+    enabled: isAdmin && isOnline,
   });
 
-  const { data: gabinetes = [] } = useQuery<Gabinete[]>({
-    queryKey: ["/api/gabinetes"],
-  });
+  // Show offline message when not connected
+  if (!isOnline) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+        <Alert className="max-w-md">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            O Dashboard requer ligação à internet.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
-  // Calculate visit trends over last 6 months
-  const calculateVisitTrends = () => {
-    const months = [];
-    for (let i = 5; i >= 0; i--) {
-      const monthDate = subMonths(new Date(), i);
-      const start = startOfMonth(monthDate);
-      const end = endOfMonth(monthDate);
-      
-      const visitasNoMes = visitas.filter(v => 
-        isWithinInterval(new Date(v.dataVisita), { start, end })
-      ).length;
+  // Show loading skeletons
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <header className="sticky top-0 z-10 bg-card border-b border-card-border px-4 py-4">
+          <div className="flex items-center gap-3 max-w-7xl mx-auto">
+            <Button variant="ghost" size="icon" onClick={() => setLocation("/")}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-xl font-semibold">Analytics</h1>
+          </div>
+        </header>
+        <div className="p-4 space-y-4 max-w-7xl mx-auto">
+          <div className="flex gap-2">
+            <Skeleton className="h-10 w-32" />
+            {isAdmin && <Skeleton className="h-10 w-48" />}
+            <Skeleton className="h-10 w-48" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[...Array(6)].map((_, i) => (
+              <Skeleton key={i} className="h-32" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-80" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-      months.push({
-        mes: format(monthDate, "MMM", { locale: pt }),
-        visitas: visitasNoMes,
-      });
-    }
-    return months;
-  };
+  // Show error
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Alert variant="destructive" className="max-w-md">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Erro ao carregar analytics. Tente novamente mais tarde.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
-  // Top offices by visit count
-  const calculateTopOffices = () => {
-    const officeCounts = new Map<string, { nome: string; count: number }>();
-    
-    visitas.forEach(v => {
-      if (v.gabinete && v.gabineteId) {
-        const current = officeCounts.get(v.gabineteId) || { nome: v.gabinete.nome || 'Desconhecido', count: 0 };
-        current.count++;
-        officeCounts.set(v.gabineteId, current);
-      }
-    });
+  if (!analytics) return null;
 
-    return Array.from(officeCounts.values())
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
-  };
-
-  // Visit distribution by day of week
-  const calculateVisitsByWeekday = () => {
-    const weekdayCounts = {
-      Dom: 0,
-      Seg: 0,
-      Ter: 0,
-      Qua: 0,
-      Qui: 0,
-      Sex: 0,
-      Sáb: 0,
-    };
-
-    visitas.forEach(v => {
-      const dayName = format(new Date(v.dataVisita), "EEE", { locale: pt });
-      const shortDay = dayName.slice(0, 3);
-      if (shortDay in weekdayCounts) {
-        weekdayCounts[shortDay as keyof typeof weekdayCounts]++;
-      }
-    });
-
-    return Object.entries(weekdayCounts).map(([dia, visitas]) => ({ dia, visitas }));
-  };
-
-  // Visit frequency distribution (unique offices visited)
-  const calculateVisitFrequency = () => {
-    const officeCounts = new Map<string, number>();
-    
-    visitas.forEach(v => {
-      if (v.gabineteId) {
-        officeCounts.set(v.gabineteId, (officeCounts.get(v.gabineteId) || 0) + 1);
-      }
-    });
-
-    const onceOnly = Array.from(officeCounts.values()).filter(count => count === 1).length;
-    const multiple = Array.from(officeCounts.values()).filter(count => count > 1).length;
-    
-    return [
-      { nome: "Visita Única", valor: onceOnly },
-      { nome: "Visitas Múltiplas", valor: multiple },
-    ];
-  };
-
-  // Calculate average visits per month
-  const calculateAverageVisitsPerMonth = () => {
-    if (visitas.length === 0) return 0;
-    
-    const oldest = new Date(Math.min(...visitas.map(v => new Date(v.dataVisita).getTime())));
-    const monthsDiff = Math.max(1, (Date.now() - oldest.getTime()) / (1000 * 60 * 60 * 24 * 30));
-    
-    return (visitas.length / monthsDiff).toFixed(1);
-  };
-
-  // Calculate visits with GPS
-  const calculateGPSUsage = () => {
-    const withGPS = visitas.filter(v => v.latitude && v.longitude).length;
-    const withoutGPS = visitas.length - withGPS;
-    
-    return [
-      { nome: "Com GPS", valor: withGPS },
-      { nome: "Sem GPS", valor: withoutGPS },
-    ];
-  };
-
-  const visitTrends = calculateVisitTrends();
-  const topOffices = calculateTopOffices();
-  const visitsByWeekday = calculateVisitsByWeekday();
-  const visitFrequency = calculateVisitFrequency();
-  const averageVisits = calculateAverageVisitsPerMonth();
-  const gpsUsage = calculateGPSUsage();
-  const uniqueOfficesVisited = new Set(visitas.filter(v => v.gabineteId).map(v => v.gabineteId)).size;
+  const { visits, tasks, entities, brands } = analytics;
 
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-10 bg-card border-b border-card-border px-4 py-4">
-        <div className="flex items-center gap-3 max-w-7xl mx-auto">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setLocation("/")}
-            data-testid="button-voltar"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-xl font-semibold text-foreground">Analytics Avançado</h1>
+        <div className="flex flex-col gap-3 max-w-7xl mx-auto">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => setLocation("/")} data-testid="button-back">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-xl font-semibold">Analytics</h1>
+          </div>
+          
+          <div className="flex flex-wrap gap-2">
+            {/* Period filter */}
+            <Select value={period} onValueChange={setPeriod}>
+              <SelectTrigger className="w-[140px]" data-testid="filter-period">
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">7 dias</SelectItem>
+                <SelectItem value="30">30 dias</SelectItem>
+                <SelectItem value="90">90 dias</SelectItem>
+                <SelectItem value="365">1 ano</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Agent filter (admin only) */}
+            {isAdmin && users && (
+              <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+                <SelectTrigger className="w-[180px]" data-testid="filter-agent">
+                  <SelectValue placeholder="Todos os agentes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os agentes</SelectItem>
+                  {users.map((user: any) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.firstName} {user.lastName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {/* Entity type filter */}
+            <Select value={selectedEntityType} onValueChange={setSelectedEntityType}>
+              <SelectTrigger className="w-[180px]" data-testid="filter-entity-type">
+                <SelectValue placeholder="Tipo de entidade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os tipos</SelectItem>
+                <SelectItem value="Gabinete">Gabinete</SelectItem>
+                <SelectItem value="Cliente">Cliente</SelectItem>
+                <SelectItem value="Distribuidor">Distribuidor</SelectItem>
+                <SelectItem value="Obra">Obra</SelectItem>
+                <SelectItem value="Parceiro">Parceiro</SelectItem>
+                <SelectItem value="Outro">Outro</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+      <main className="p-4 space-y-6 max-w-7xl mx-auto">
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Card data-testid="kpi-total-visits">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total de Visitas</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Visitas</CardTitle>
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats?.totalVisitas || 0}</div>
-              <p className="text-xs text-muted-foreground">
-                Média: {averageVisits}/mês
-              </p>
+              <div className="text-2xl font-bold">{visits.total_visits}</div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card data-testid="kpi-visits-7-days">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Gabinetes Visitados</CardTitle>
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{uniqueOfficesVisited}</div>
-              <p className="text-xs text-muted-foreground">
-                gabinetes únicos
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Visitas Este Mês</CardTitle>
+              <CardTitle className="text-sm font-medium">Visitas (7 dias)</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats?.visitasEsteMes || 0}</div>
-              <p className="text-xs text-muted-foreground">
-                {visitTrends[visitTrends.length - 1]?.mes}
-              </p>
+              <div className="text-2xl font-bold">{visits.visits_last_7_days}</div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card data-testid="kpi-tasks-pending">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Próximas Visitas</CardTitle>
-              <Target className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Tarefas Pendentes</CardTitle>
+              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats?.proximasVisitas || 0}</div>
-              <p className="text-xs text-muted-foreground">
-                Agendadas
-              </p>
+              <div className="text-2xl font-bold">{tasks.tasks_pending}</div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="kpi-tasks-overdue">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Tarefas Atrasadas</CardTitle>
+              <AlertCircle className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive">{tasks.tasks_overdue}</div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="kpi-total-entities">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Entidades</CardTitle>
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{entities.entities_by_type.reduce((sum, e) => sum + e.count, 0)}</div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="kpi-new-entities-30-days">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Entidades Novas (30 dias)</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{entities.entities_created_last_30_days}</div>
             </CardContent>
           </Card>
         </div>
 
-        <Tabs defaultValue="trends" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="trends" data-testid="tab-trends">Tendências</TabsTrigger>
-            <TabsTrigger value="distribution" data-testid="tab-distribution">Distribuição</TabsTrigger>
-            <TabsTrigger value="performance" data-testid="tab-performance">Performance</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="trends" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Evolução de Visitas (Últimos 6 Meses)</CardTitle>
-                <CardDescription>
-                  Tendência do número de visitas realizadas ao longo do tempo
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+        {/* Charts Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Visits by Month */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Visitas por Mês</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {visits.visits_by_month.length > 0 ? (
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={visitTrends}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis 
-                      dataKey="mes" 
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={12}
-                    />
-                    <YAxis 
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={12}
-                    />
-                    <Tooltip 
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--popover))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '6px',
-                      }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="visitas" 
-                      stroke="hsl(var(--primary))" 
-                      strokeWidth={2}
-                      dot={{ fill: 'hsl(var(--primary))' }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Top 5 Gabinetes por Visitas</CardTitle>
-                <CardDescription>
-                  Gabinetes com maior número de visitas registadas
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={topOffices} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis 
-                      type="number" 
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={12}
-                    />
-                    <YAxis 
-                      dataKey="nome" 
-                      type="category" 
-                      width={150}
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={12}
-                    />
-                    <Tooltip 
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--popover))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '6px',
-                      }}
-                    />
-                    <Bar dataKey="count" fill="hsl(var(--chart-1))" radius={[0, 4, 4, 0]} />
+                  <BarChart data={visits.visits_by_month}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="hsl(var(--primary))" />
                   </BarChart>
                 </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </TabsContent>
+              ) : (
+                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                  Sem dados disponíveis
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-          <TabsContent value="distribution" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Visitas por Dia da Semana</CardTitle>
-                  <CardDescription>
-                    Distribuição de visitas pelos dias da semana
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={visitsByWeekday}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis 
-                        dataKey="dia" 
-                        stroke="hsl(var(--muted-foreground))"
-                        fontSize={12}
-                      />
-                      <YAxis 
-                        stroke="hsl(var(--muted-foreground))"
-                        fontSize={12}
-                      />
-                      <Tooltip 
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--popover))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '6px',
-                        }}
-                      />
-                      <Bar dataKey="visitas" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
+          {/* Visits by Agent */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Visitas por Agente</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {visits.visits_by_agent.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={visits.visits_by_agent} layout="horizontal">
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis dataKey="agent" type="category" width={100} />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="hsl(var(--secondary))" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                  Sem dados disponíveis
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Frequência de Visitas</CardTitle>
-                  <CardDescription>
-                    Gabinetes por número de visitas realizadas
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={visitFrequency}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ nome, valor, percent }) => 
-                          `${nome}: ${valor} (${(percent * 100).toFixed(0)}%)`
-                        }
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="valor"
-                      >
-                        {visitFrequency.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--popover))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '6px',
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
+          {/* Visits by Entity Type */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Visitas por Tipo de Entidade</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {visits.visits_by_entity_type.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={visits.visits_by_entity_type}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={(entry) => `${entry.tipo}: ${entry.count}`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="count"
+                    >
+                      {visits.visits_by_entity_type.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                  Sem dados disponíveis
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-          <TabsContent value="performance" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5 text-primary" />
-                    Utilização de GPS
-                  </CardTitle>
-                  <CardDescription>
-                    Visitas com localização GPS capturada
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <PieChart>
-                      <Pie
-                        data={gpsUsage}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ nome, valor, percent }) => 
-                          `${nome}: ${valor} (${(percent * 100).toFixed(0)}%)`
-                        }
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="valor"
-                      >
-                        {gpsUsage.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index + 2]} />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--popover))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '6px',
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
+          {/* Tasks by Status */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Tarefas por Estado</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {tasks.tasks_by_status.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={tasks.tasks_by_status}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={(entry) => `${entry.status}: ${entry.count}`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="count"
+                    >
+                      {tasks.tasks_by_status.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                  Sem dados disponíveis
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Métricas de Performance</CardTitle>
-                  <CardDescription>
-                    Indicadores de eficiência operacional
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Média de Visitas/Mês</span>
-                    <Badge variant="secondary" className="text-base">{averageVisits}</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Gabinetes Únicos</span>
-                    <Badge variant="secondary" className="text-base">
-                      {uniqueOfficesVisited}
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Visitas com GPS</span>
-                    <Badge variant="secondary" className="text-base">
-                      {visitas.length > 0 
-                        ? ((gpsUsage[0].valor / visitas.length) * 100).toFixed(0)
-                        : 0}%
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Próximas Agendadas</span>
-                    <Badge variant="secondary" className="text-base">{stats?.proximasVisitas || 0}</Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-        </Tabs>
+          {/* Tasks by Agent */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Tarefas por Agente</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {tasks.tasks_by_agent.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={tasks.tasks_by_agent} layout="horizontal">
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis dataKey="agent" type="category" width={100} />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="hsl(var(--accent))" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                  Sem dados disponíveis
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Brands Top 10 */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Marcas Entregues — Top 10</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {brands.brand_frequency.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={brands.brand_frequency} layout="horizontal">
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis dataKey="marca" type="category" width={80} />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="hsl(var(--primary))" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                  Sem dados disponíveis
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </main>
     </div>
   );
