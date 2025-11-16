@@ -1,0 +1,228 @@
+Implement the complete “Universal Contact Recognition Module”, which includes:
+
+Advanced QR Code Scanner
+
+vCard Reader & Importer
+
+Business Card Scanner using OpenAI Vision
+
+Universal Contact + Entity Auto-Creation Pipeline
+
+Enrichment (Clearbit + AI)
+
+Deep Link Navigation
+
+RBAC safety
+
+Offline queue support
+
+The module must integrate seamlessly with the current system (Entidades, Contactos, Visitas, Tarefas, RBAC, offline sync, React Query, PWA architecture).
+
+📌 PART 1 — Advanced QR Scanner Page (QRScanner.tsx)
+
+Implement:
+
+Camera scanning
+
+real-time scanning
+
+autofocus
+
+scan highlight
+
+max 3 scans/second
+
+UX
+
+fullscreen camera
+
+overlay scanning frame
+
+vibration on scan
+
+beep sound
+
+flashlight toggle
+
+offline safe
+
+📌 PART 2 — QR Content Pipeline
+2.1 URL
+
+Open in new tab if online.
+
+2.2 vCard (BEGIN:VCARD…END:VCARD)
+
+Implement full parser for:
+
+FN, N, ORG
+
+TITLE
+
+EMAIL
+
+TEL
+
+ADR
+
+NOTE
+
+URL
+
+Return structured object.
+
+📌 PART 3 — UNIVERSAL ENTITY + CONTACT CREATION LOGIC (MANDATORY)
+If vCard or Vision card includes ORG/company name:
+
+Check if Entidade with that ORG exists (case-insensitive)
+
+If NOT exists → create Entidade with:
+
+nome = ORG
+
+origem = "scanner"
+
+domain (extracted from email)
+
+website (if any)
+
+logoUrl (Clearbit or AI)
+
+industry, description (AI)
+
+social links
+
+Create Contacto with full data
+
+Link Contacto → Entidade
+
+Redirect to ContactDetail
+
+Toast: “Contacto criado automaticamente a partir de cartão de visita.”
+
+If vCard/Vision has no ORG/company (freelancers, independentes):
+
+Create Contacto alone
+
+Show toast:
+“Este contacto não tem entidade associada.”
+
+Show 3 options:
+
+Criar Entidade
+
+Associar mais tarde
+
+Manter sem entidade
+
+Allow later linking in ContactDetail.
+
+📌 PART 4 — Business Card AI Vision Scanner
+
+Second tab/button in QRScanner:
+
+Capture or upload business card
+
+Use OpenAI Vision to extract:
+
+name
+
+email
+
+phone
+
+website
+
+company name / org
+
+title
+
+address
+
+social links
+
+Apply the same universal auto-creation logic
+
+Offline queue support
+
+📌 PART 5 — Deep Link Routing
+
+Recognize:
+
+divitek-visit://entidade/{id} → /entidades/{id}
+
+divitek-visit://contacto/{id} → /contactos/{id}
+
+divitek-visit://visita/{id} → /visitas/{id}
+
+Secure ID validation.
+
+📌 PART 6 — Backend Endpoints
+
+Implement:
+
+POST /api/tools/vcard-import
+POST /api/tools/vision-card
+POST /api/tools/enrichment
+
+All must:
+
+enforce RBAC
+
+support offline queued requests
+
+return consistent types
+
+📌 PART 7 — Offline + RBAC Integration
+
+queue entidade+contacto creation
+
+replace temp IDs
+
+enforce ownership
+
+admin can assign to any user
+
+agent only to themselves
+
+📌 PART 8 — UI/UX Requirements
+
+consistent with design system
+
+large mobile buttons
+
+toast for every step
+
+spinners during creation
+
+error messages
+
+permission handling
+
+📌 PART 9 — Navigation
+
+Add /qr route + bottom nav item.
+
+📌 PART 10 — Final Validation
+
+Verify:
+
+iOS Safari & Android Chrome
+
+flashlight works
+
+vCard import works
+
+Vision import works
+
+deep links work
+
+enrichment pipeline works
+
+offline queue works
+
+RBAC enforced
+
+no TypeScript/ESLint errors
+
+Proceed.
