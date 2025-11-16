@@ -46,6 +46,12 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Serve service worker with correct MIME type
+  app.get('/sw.js', (req, res) => {
+    res.type('application/javascript');
+    res.sendFile(path.join(process.cwd(), 'public', 'sw.js'));
+  });
+
   // Serve uploaded files statically
   app.use('/uploads', express.static(uploadsDir));
   

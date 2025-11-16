@@ -125,6 +125,9 @@ export const visitas = pgTable("visitas", {
   linkVisita: varchar("link_visita", { length: 100 }).unique(),
   resumoIa: text("resumo_ia"),
   transcricaoAudio: text("transcricao_audio"),
+  latitude: varchar("latitude", { length: 50 }),
+  longitude: varchar("longitude", { length: 50 }),
+  locationAccuracy: varchar("location_accuracy", { length: 50 }),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -5,6 +5,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { BottomNav } from "@/components/BottomNav";
+import { SyncIndicator } from "@/components/SyncIndicator";
+import { offlineStorage } from "@/lib/offlineStorage";
+import { useEffect } from "react";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
@@ -53,10 +56,15 @@ function Router() {
 function AppContent() {
   const { isAuthenticated } = useAuth();
 
+  useEffect(() => {
+    offlineStorage.init().catch(console.error);
+  }, []);
+
   return (
     <div className="relative">
       <Router />
       {isAuthenticated && <BottomNav />}
+      {isAuthenticated && <SyncIndicator />}
     </div>
   );
 }
