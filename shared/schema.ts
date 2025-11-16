@@ -104,6 +104,15 @@ export const entidades = pgTable("entidades", {
   latitude: varchar("latitude", { length: 50 }),
   longitude: varchar("longitude", { length: 50 }),
   nif: varchar("nif", { length: 50 }),
+  // Enrichment fields (from Clearbit/AI)
+  logoUrl: varchar("logo_url", { length: 500 }),
+  domain: varchar("domain", { length: 255 }),
+  industry: varchar("industry", { length: 255 }),
+  descricao: text("descricao"),
+  linkedinUrl: varchar("linkedin_url", { length: 500 }),
+  facebookUrl: varchar("facebook_url", { length: 500 }),
+  twitterUrl: varchar("twitter_url", { length: 500 }),
+  instagramUrl: varchar("instagram_url", { length: 500 }),
   // User Ownership Fields (nullable during migration, will be made required later)
   createdByUserId: varchar("created_by_user_id", { length: 255 }),
   assignedUserId: varchar("assigned_user_id", { length: 255 }),
@@ -117,6 +126,33 @@ export const entidades = pgTable("entidades", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Portuguese NIF validation function (mod 11 algorithm)
+function validateNIF(value: string): boolean {
+  if (!value || value.length !== 9 || !/^\d{9}$/.test(value)) {
+    return false;
+  }
+  
+  // Calculate weighted sum of first 8 digits
+  let sum = 0;
+  for (let i = 0; i < 8; i++) {
+    sum += (9 - i) * parseInt(value[i]);
+  }
+  
+  // Calculate mod 11
+  const mod = sum % 11;
+  
+  // Determine expected check digit
+  let expectedCheckDigit: number;
+  if (mod === 0 || mod === 1) {
+    expectedCheckDigit = 0;
+  } else {
+    expectedCheckDigit = 11 - mod;
+  }
+  
+  // Compare with actual last digit
+  return expectedCheckDigit === parseInt(value[8]);
+}
+
 export const insertEntidadeSchema = createInsertSchema(entidades).omit({
   id: true,
   createdAt: true,
@@ -126,12 +162,25 @@ export const insertEntidadeSchema = createInsertSchema(entidades).omit({
   syncStatus: true,
   lastSyncAt: true,
   syncError: true,
+  logoUrl: true,
+  domain: true,
+  industry: true,
+  descricao: true,
+  linkedinUrl: true,
+  facebookUrl: true,
+  twitterUrl: true,
+  instagramUrl: true,
 }).extend({
   // Add validation for coordinates (empty string treated as null)
   latitude: z.string().regex(/^-?([0-9]{1,2}|1[0-7][0-9]|180)(\.[0-9]+)?$/).or(z.literal("")).optional().nullable(),
   longitude: z.string().regex(/^-?([0-9]{1,2}|1[0-7][0-9]|180)(\.[0-9]+)?$/).or(z.literal("")).optional().nullable(),
-  // NIF validation (Portuguese tax number - 9 digits, empty string treated as null)
-  nif: z.string().regex(/^[0-9]{9}$/).or(z.literal("")).optional().nullable(),
+  // NIF validation (Portuguese tax number - 9 digits with mod 11 check, empty string treated as null)
+  nif: z.string()
+    .regex(/^[0-9]{9}$/, "NIF deve ter 9 dígitos")
+    .refine((val) => validateNIF(val), "NIF inválido - dígito de controlo incorreto")
+    .or(z.literal(""))
+    .optional()
+    .nullable(),
 });
 
 export type InsertEntidade = z.infer<typeof insertEntidadeSchema>;
