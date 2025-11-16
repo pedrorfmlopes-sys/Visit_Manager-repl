@@ -8,10 +8,43 @@ import {
   varchar,
   text,
   integer,
+  boolean,
   pgEnum,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// ============================================
+// ENUMS (must be defined before tables that use them)
+// ============================================
+
+// User Role enum
+export const userRoleEnum = pgEnum('user_role', [
+  'admin',
+  'agent'
+]);
+
+// Tipo de Entidade enum
+export const tipoEntidadeEnum = pgEnum('tipo_entidade', [
+  'Gabinete',
+  'Cliente',
+  'Distribuidor',
+  'Obra',
+  'Parceiro',
+  'Outro'
+]);
+
+// Odoo Sync Status enum
+export const syncStatusEnum = pgEnum('sync_status', [
+  'pending',
+  'synced',
+  'error',
+  'never'
+]);
+
+// ============================================
+// TABLES
+// ============================================
 
 // Session storage table (required for Replit Auth)
 export const sessions = pgTable(
@@ -31,6 +64,7 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  role: userRoleEnum("role").notNull().default('agent'),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -55,24 +89,6 @@ export const insertMarcaSchema = createInsertSchema(marcas).omit({
 export type InsertMarca = z.infer<typeof insertMarcaSchema>;
 export type Marca = typeof marcas.$inferSelect;
 
-// Tipo de Entidade enum
-export const tipoEntidadeEnum = pgEnum('tipo_entidade', [
-  'Gabinete',
-  'Cliente',
-  'Distribuidor',
-  'Obra',
-  'Parceiro',
-  'Outro'
-]);
-
-// Odoo Sync Status enum
-export const syncStatusEnum = pgEnum('sync_status', [
-  'pending',
-  'synced',
-  'error',
-  'never'
-]);
-
 // Entidades (Universal Entities) table - replaces Gabinetes
 export const entidades = pgTable("entidades", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -88,8 +104,12 @@ export const entidades = pgTable("entidades", {
   latitude: varchar("latitude", { length: 50 }),
   longitude: varchar("longitude", { length: 50 }),
   nif: varchar("nif", { length: 50 }),
+  // User Ownership Fields (nullable during migration, will be made required later)
+  createdByUserId: varchar("created_by_user_id", { length: 255 }),
+  assignedUserId: varchar("assigned_user_id", { length: 255 }),
   // Odoo Integration Fields
   odooEntityId: integer("odoo_entity_id"),
+  needsSync: boolean("needs_sync").default(false).notNull(),
   syncStatus: syncStatusEnum("sync_status").default('never'),
   lastSyncAt: timestamp("last_sync_at"),
   syncError: text("sync_error"),
@@ -102,6 +122,7 @@ export const insertEntidadeSchema = createInsertSchema(entidades).omit({
   createdAt: true,
   updatedAt: true,
   odooEntityId: true,
+  needsSync: true,
   syncStatus: true,
   lastSyncAt: true,
   syncError: true,
@@ -150,8 +171,12 @@ export const contactos = pgTable("contactos", {
   gabineteId: varchar("gabinete_id").references(() => gabinetes.id, { onDelete: 'set null' }), // DEPRECATED
   observacoes: text("observacoes"),
   fotoUrl: varchar("foto_url", { length: 500 }),
+  // User Ownership Fields (nullable during migration, will be made required later)
+  createdByUserId: varchar("created_by_user_id", { length: 255 }),
+  assignedUserId: varchar("assigned_user_id", { length: 255 }),
   // Odoo Integration Fields
   odooContactId: integer("odoo_contact_id"),
+  needsSync: boolean("needs_sync").default(false).notNull(),
   syncStatus: syncStatusEnum("sync_status").default('never'),
   lastSyncAt: timestamp("last_sync_at"),
   syncError: text("sync_error"),
@@ -186,6 +211,7 @@ export const insertContactoSchema = createInsertSchema(contactos).omit({
   updatedAt: true,
   gabineteId: true, // DEPRECATED - use entidadeId
   odooContactId: true,
+  needsSync: true,
   syncStatus: true,
   lastSyncAt: true,
   syncError: true,
@@ -200,7 +226,7 @@ export const visitas = pgTable("visitas", {
   entidadeId: varchar("entidade_id").references(() => entidades.id, { onDelete: 'set null' }),
   gabineteId: varchar("gabinete_id").references(() => gabinetes.id, { onDelete: 'set null' }), // DEPRECATED
   contactoId: varchar("contacto_id").references(() => contactos.id, { onDelete: 'set null' }),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }), // Legacy field, use createdByUserId
   dataVisita: timestamp("data_visita").notNull(),
   notas: text("notas"),
   marcasEntregues: text("marcas_entregues").array(),
@@ -213,8 +239,12 @@ export const visitas = pgTable("visitas", {
   latitude: varchar("latitude", { length: 50 }),
   longitude: varchar("longitude", { length: 50 }),
   locationAccuracy: varchar("location_accuracy", { length: 50 }),
+  // User Ownership Fields (nullable during migration, will be made required later)
+  createdByUserId: varchar("created_by_user_id", { length: 255 }),
+  assignedUserId: varchar("assigned_user_id", { length: 255 }),
   // Odoo Integration Fields
   odooActivityId: integer("odoo_activity_id"),
+  needsSync: boolean("needs_sync").default(false).notNull(),
   syncStatus: syncStatusEnum("sync_status").default('never'),
   lastSyncAt: timestamp("last_sync_at"),
   syncError: text("sync_error"),
@@ -250,6 +280,7 @@ export const insertVisitaSchema = createInsertSchema(visitas).omit({
   transcricaoAudio: true,
   gabineteId: true, // DEPRECATED - use entidadeId
   odooActivityId: true,
+  needsSync: true,
   syncStatus: true,
   lastSyncAt: true,
   syncError: true,
