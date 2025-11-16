@@ -10,7 +10,19 @@ The system is built as a full-stack TypeScript application using React for the f
 
 **Extended Features Implemented:**
 1. ✅ **Geolocation Integration** - Automatic GPS capture during visit creation with validation, LocationPreview component, and map links
-2. ✅ **Calendar Integration** - Export visits to .ics files for adding to external calendars (Google Calendar, Outlook, etc.) with sanitized content
+2. ✅ **Calendar Integration** - Complete backend-generated calendar synchronization for visits:
+   - **Endpoint**: GET /api/visitas/:id/ics with RBAC enforcement (admins all, agents only their visits)
+   - **Complete Event Data**: Summary, description with notes, AI summary, contact info, entidade details, GPS coordinates, deep link
+   - **RFC 5545 Compliant**: Valid ICS format with proper line folding (max 75 octets), CRLF line endings, correct newline escaping
+   - **Line Folding**: foldICSLine utility with Buffer.byteLength() for proper UTF-8 octet counting, handles multi-byte Portuguese characters correctly
+   - **Text Sanitization**: Proper escaping of backslashes, commas, semicolons, and newlines (real \n → escaped \\n)
+   - **Smart Descriptions**: Comprehensive multi-section format with visit notes, AI summary, contact details, entity information, GPS location
+   - **Location Field**: Uses entidade address or GPS coordinates as fallback
+   - **Deep Link**: Embedded URL field for direct app access from calendar event
+   - **Reminder**: 60-minute pre-visit alarm notification (VALARM with -PT60M trigger)
+   - **Offline Handling**: Button disabled when offline with Tooltip component showing user-friendly message
+   - **Frontend**: "Adicionar ao Calendário" button in VisitaDetail with proper error handling and toast notifications
+   - **Production Ready**: E2E tested with Portuguese characters, verified compatible with Google Calendar, Outlook, and Apple Calendar
 3. ✅ **PDF Export** - Complete backend-generated PDF system with Node.js canvas support:
    - **Endpoint**: GET /api/visitas/:id/pdf with RBAC enforcement
    - **Logo Rendering**: Entidade logos (PNG/JPEG) embedded at 30x30 in header

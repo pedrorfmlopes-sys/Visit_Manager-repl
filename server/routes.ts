@@ -367,6 +367,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/visitas/:id/ics', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole } = await getUserContext(req);
+      const visita = await storage.getVisita(req.params.id, userId, userRole);
+      
+      if (!visita) {
+        return res.status(404).json({ message: "Visita not found" });
+      }
+
+      // Generate ICS file
+      const { generateVisitaICS, generateVisitaICSFilename } = await import('./icsExport.js');
+      const icsContent = generateVisitaICS(visita);
+      const fileName = generateVisitaICSFilename(visita);
+
+      // Set headers for ICS download
+      res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      res.send(icsContent);
+    } catch (error) {
+      console.error("Error generating ICS:", error);
+      res.status(500).json({ message: "Failed to generate calendar file" });
+    }
+  });
+
   app.post('/api/visitas', isAuthenticated, upload.fields([
     { name: 'audio', maxCount: 1 },
     { name: 'media', maxCount: 10 }

@@ -1,0 +1,140 @@
+Please implement a complete calendar synchronization system for VISITS, similar to the ICS export already implemented for tasks, but tailored for visits.
+
+1. Backend — New ICS Endpoint
+
+Create a new endpoint:
+
+GET /api/visitas/:id/ics
+
+This endpoint must:
+
+Enforce RBAC:
+
+Admins: allowed for all visits
+
+Agents: only allowed for visits they created OR are assigned to
+
+Otherwise: return 403
+
+Fetch full visit details, including:
+
+entidade (name, type, address, email, phone, website)
+
+contacto (if available)
+
+visit date
+
+notes
+
+IA summary
+
+GPS coordinates (lat/lon)
+
+deepLink (existing field)
+
+Generate a complete .ics event file with:
+
+SUMMARY: Visita — {entidade.nome}
+
+DESCRIPTION:
+Include
+
+Visit notes
+
+AI summary
+
+Contact info
+
+Entidade info
+
+GPS (if exists)
+
+Deep link for direct access
+
+DTSTART: visit date
+
+DTEND: +1 hour by default
+
+LOCATION: entidade address or GPS coordinates
+
+UID: visita.id
+
+URL: deepLink
+
+VALARM: reminder 60 minutes before
+
+Ensure the file is RFC 5545 compliant
+
+Return the ICS file with correct headers:
+
+Content-Type: text/calendar
+
+Content-Disposition: attachment; filename="Visita-{entidade}-{data}.ics"
+
+2. Frontend — Add Button to VisitDetail
+
+In the visit detail page, add a new action button:
+
+🗓️ Adicionar ao Calendário
+
+Requirements:
+
+Place near “Exportar PDF”
+
+Disabled when offline
+
+Disabled when visit data is not yet loaded
+
+On click:
+
+Request /api/visitas/:id/ics
+
+Trigger file download with proper filename
+
+Show toast notifications for:
+
+success
+
+permission denied
+
+network errors
+
+offline mode
+
+3. Offline Behavior
+
+If offline:
+
+Button must show a tooltip:
+“A adição ao calendário só está disponível online.”
+
+Disable the button
+
+Do NOT attempt any ICS caching
+
+4. Testing Requirements
+
+Verify:
+
+ICS opens correctly in Google Calendar, Outlook, Apple Calendar
+
+All required fields appear (title, description, location)
+
+DeepLink works inside the event description
+
+Timezones handled correctly (use UTC)
+
+Visit without:
+
+contacto
+
+GPS
+
+IA summary
+still generates a valid ICS
+
+No empty-string database errors
+
+RBAC filtering correct
+
+Proceed.

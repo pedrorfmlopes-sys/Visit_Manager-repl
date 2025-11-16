@@ -9,9 +9,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import type { VisitaWithRelations, Tarefa, InsertTarefa } from "@shared/schema";
-import { downloadICS, downloadNextVisitICS } from "@/lib/calendarExport";
+import { downloadNextVisitICS } from "@/lib/calendarExport";
 import { LocationPreview } from "@/components/LocationPreview";
 import { TarefaCard } from "@/components/TarefaCard";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -127,15 +128,6 @@ export default function VisitaDetail() {
     createTaskMutation.mutate(data);
   };
 
-  const handleExportToCalendar = () => {
-    if (visita) {
-      downloadICS(visita);
-      toast({
-        title: "Exportado",
-        description: "Ficheiro .ics descarregado. Adicione ao seu calendário!",
-      });
-    }
-  };
 
   const handleExportNextVisit = () => {
     if (visita?.gabinete && visita.proximaVisita) {
@@ -198,6 +190,70 @@ export default function VisitaDetail() {
       toast({
         title: "Erro",
         description: "Falha ao gerar PDF. Por favor, tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAddToCalendar = async () => {
+    if (!visita) return;
+
+    if (!isOnline) {
+      toast({
+        title: "Offline",
+        description: "A adição ao calendário só está disponível quando estiver online.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/visitas/${visitaId}/ics`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        if (response.status === 403) {
+          toast({
+            title: "Acesso Negado",
+            description: "Não tem permissão para exportar esta visita.",
+            variant: "destructive",
+          });
+          return;
+        }
+        throw new Error('Failed to generate calendar file');
+      }
+
+      // Get the ICS content
+      const blob = await response.blob();
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      
+      // Get filename from Content-Disposition header or use default
+      const contentDisposition = response.headers.get('Content-Disposition');
+      const fileName = contentDisposition
+        ? contentDisposition.split('filename=')[1]?.replace(/"/g, '')
+        : `Visita-${visita.gabinete?.nome || visita.entidade?.nome || visita.id}-${format(new Date(visita.dataVisita), 'yyyy-MM-dd')}.ics`;
+      
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Adicionado ao Calendário",
+        description: "Ficheiro .ics descarregado! Abra-o para adicionar ao seu calendário.",
+      });
+    } catch (error) {
+      console.error('Error downloading ICS:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao gerar ficheiro de calendário. Por favor, tente novamente.",
         variant: "destructive",
       });
     }
@@ -454,14 +510,24 @@ export default function VisitaDetail() {
         <Separator />
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Button
-            variant="outline"
-            onClick={handleExportToCalendar}
-            data-testid="button-export-calendar"
-          >
-            <Calendar className="h-4 w-4 mr-2" />
-            Exportar para Calendário
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                onClick={handleAddToCalendar}
+                disabled={!isOnline || !visita}
+                data-testid="button-add-to-calendar"
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Adicionar ao Calendário
+              </Button>
+            </TooltipTrigger>
+            {!isOnline && (
+              <TooltipContent>
+                <p>A adição ao calendário só está disponível quando estiver online.</p>
+              </TooltipContent>
+            )}
+          </Tooltip>
           <Button
             variant="outline"
             onClick={handleExportPDF}
