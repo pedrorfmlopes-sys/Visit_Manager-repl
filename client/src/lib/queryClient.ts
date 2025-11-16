@@ -73,22 +73,33 @@ export const getQueryFn: <T>(options: {
       await throwIfResNotOk(res);
       const data = await res.json();
       
-      // Cache successful responses in IndexedDB
+      // Cache successful responses in IndexedDB (both lists and individual items)
       if (navigator.onLine) {
-        if (endpoint.includes("/api/visitas") && Array.isArray(data)) {
-          await offlineStorage.init();
-          for (const visita of data) {
-            await offlineStorage.saveVisita(visita);
+        await offlineStorage.init();
+        
+        if (endpoint.includes("/api/visitas")) {
+          if (Array.isArray(data)) {
+            for (const visita of data) {
+              await offlineStorage.saveVisita(visita);
+            }
+          } else if (data && data.id) {
+            await offlineStorage.saveVisita(data);
           }
-        } else if (endpoint.includes("/api/gabinetes") && Array.isArray(data)) {
-          await offlineStorage.init();
-          for (const gabinete of data) {
-            await offlineStorage.saveGabinete(gabinete);
+        } else if (endpoint.includes("/api/gabinetes")) {
+          if (Array.isArray(data)) {
+            for (const gabinete of data) {
+              await offlineStorage.saveGabinete(gabinete);
+            }
+          } else if (data && data.id) {
+            await offlineStorage.saveGabinete(data);
           }
-        } else if (endpoint.includes("/api/contactos") && Array.isArray(data)) {
-          await offlineStorage.init();
-          for (const contacto of data) {
-            await offlineStorage.saveContacto(contacto);
+        } else if (endpoint.includes("/api/contactos")) {
+          if (Array.isArray(data)) {
+            for (const contacto of data) {
+              await offlineStorage.saveContacto(contacto);
+            }
+          } else if (data && data.id) {
+            await offlineStorage.saveContacto(data);
           }
         }
       }
