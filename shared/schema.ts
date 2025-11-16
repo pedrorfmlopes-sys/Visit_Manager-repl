@@ -193,11 +193,27 @@ export const contactosRelations = relations(contactos, ({ one }) => ({
     fields: [contactos.gabineteId],
     references: [gabinetes.id],
   }),
+  assignedUser: one(users, {
+    fields: [contactos.assignedUserId],
+    references: [users.id],
+  }),
+  createdByUser: one(users, {
+    fields: [contactos.createdByUserId],
+    references: [users.id],
+  }),
 }));
 
-export const entidadesRelations = relations(entidades, ({ many }) => ({
+export const entidadesRelations = relations(entidades, ({ one, many }) => ({
   contactos: many(contactos),
   visitas: many(visitas),
+  assignedUser: one(users, {
+    fields: [entidades.assignedUserId],
+    references: [users.id],
+  }),
+  createdByUser: one(users, {
+    fields: [entidades.createdByUserId],
+    references: [users.id],
+  }),
 }));
 
 export const gabinetesRelations = relations(gabinetes, ({ many }) => ({
@@ -269,6 +285,14 @@ export const visitasRelations = relations(visitas, ({ one }) => ({
     fields: [visitas.userId],
     references: [users.id],
   }),
+  assignedUser: one(users, {
+    fields: [visitas.assignedUserId],
+    references: [users.id],
+  }),
+  createdByUser: one(users, {
+    fields: [visitas.createdByUserId],
+    references: [users.id],
+  }),
 }));
 
 export const insertVisitaSchema = createInsertSchema(visitas).omit({
@@ -293,6 +317,8 @@ export type Visita = typeof visitas.$inferSelect;
 export type EntidadeWithRelations = Entidade & {
   contactos?: Contacto[];
   visitas?: Visita[];
+  assignedUser?: User | null;
+  createdByUser?: User | null;
 };
 
 export type GabineteWithRelations = Gabinete & {
@@ -303,6 +329,8 @@ export type GabineteWithRelations = Gabinete & {
 export type ContactoWithRelations = Contacto & {
   entidade?: Entidade | null;
   gabinete?: Gabinete | null;
+  assignedUser?: User | null;
+  createdByUser?: User | null;
 };
 
 export type VisitaWithRelations = Visita & {
@@ -310,4 +338,6 @@ export type VisitaWithRelations = Visita & {
   gabinete?: Gabinete | null;
   contacto?: Contacto | null;
   user?: User;
+  assignedUser?: User | null;
+  createdByUser?: User | null;
 };

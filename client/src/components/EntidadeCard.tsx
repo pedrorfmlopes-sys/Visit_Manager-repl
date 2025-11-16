@@ -1,11 +1,11 @@
-import { Building2, ChevronRight, Mail, Phone, MapPin, Users, Package, Briefcase, Construction, HandHeart } from "lucide-react";
+import { Building2, ChevronRight, Mail, Phone, MapPin, Users, Package, Briefcase, Construction, HandHeart, UserCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import type { Entidade } from "@shared/schema";
+import type { EntidadeWithRelations } from "@shared/schema";
 
 interface EntidadeCardProps {
-  entidade: Entidade;
+  entidade: EntidadeWithRelations;
   onClick: () => void;
   showSyncStatus?: boolean;
 }
@@ -63,6 +63,16 @@ export function EntidadeCard({ entidade, onClick, showSyncStatus = false }: Enti
           </div>
           
           <div className="flex flex-col gap-1">
+            {entidade.assignedUser && (
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <UserCheck className="h-3.5 w-3.5 flex-shrink-0" />
+                <span className="truncate">
+                  {entidade.assignedUser.firstName && entidade.assignedUser.lastName
+                    ? `${entidade.assignedUser.firstName} ${entidade.assignedUser.lastName}`
+                    : entidade.assignedUser.email}
+                </span>
+              </div>
+            )}
             {entidade.cidade && (
               <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                 <MapPin className="h-3.5 w-3.5 flex-shrink-0" />

@@ -1,4 +1,4 @@
-import { ChevronRight, Mail, Phone, Building2, Briefcase } from "lucide-react";
+import { ChevronRight, Mail, Phone, Building2, Briefcase, UserCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { ContactoWithRelations } from "@shared/schema";
@@ -36,6 +36,16 @@ export function ContactoCard({ contacto, onClick }: ContactoCardProps) {
           </h3>
           
           <div className="flex flex-col gap-1 mt-1">
+            {contacto.assignedUser && (
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <UserCheck className="h-3.5 w-3.5 flex-shrink-0" />
+                <span className="truncate">
+                  {contacto.assignedUser.firstName && contacto.assignedUser.lastName
+                    ? `${contacto.assignedUser.firstName} ${contacto.assignedUser.lastName}`
+                    : contacto.assignedUser.email}
+                </span>
+              </div>
+            )}
             {contacto.funcao && (
               <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                 <Briefcase className="h-3.5 w-3.5 flex-shrink-0" />

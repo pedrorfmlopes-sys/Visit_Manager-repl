@@ -1,4 +1,4 @@
-import { Calendar, Building2, User, ChevronRight, Image as ImageIcon, Mic } from "lucide-react";
+import { Calendar, Building2, User, ChevronRight, Image as ImageIcon, Mic, UserCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -42,6 +42,16 @@ export function VisitaCard({ visita, onClick }: VisitaCardProps) {
           </div>
           
           <div className="flex flex-col gap-1">
+            {visita.assignedUser && (
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <UserCheck className="h-3.5 w-3.5 flex-shrink-0" />
+                <span className="truncate">
+                  {visita.assignedUser.firstName && visita.assignedUser.lastName
+                    ? `${visita.assignedUser.firstName} ${visita.assignedUser.lastName}`
+                    : visita.assignedUser.email}
+                </span>
+              </div>
+            )}
             {visita.contacto && (
               <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                 <User className="h-3.5 w-3.5 flex-shrink-0" />

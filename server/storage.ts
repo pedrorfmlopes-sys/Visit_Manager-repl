@@ -103,21 +103,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Entidades (Universal Entities)
-  async getEntidades(userId: string, userRole: 'admin' | 'agent'): Promise<Entidade[]> {
+  async getEntidades(userId: string, userRole: 'admin' | 'agent'): Promise<EntidadeWithRelations[]> {
     // Admin sees all entidades, agents see only their created/assigned ones
-    if (userRole === 'admin') {
-      return db.select().from(entidades).orderBy(desc(entidades.createdAt));
+    let whereClause;
+    if (userRole === 'agent') {
+      whereClause = or(
+        eq(entidades.createdByUserId, userId),
+        eq(entidades.assignedUserId, userId)
+      );
     }
     
-    // Filter for agents: created by user OR assigned to user
-    return db.select().from(entidades)
-      .where(
-        or(
-          eq(entidades.createdByUserId, userId),
-          eq(entidades.assignedUserId, userId)
-        )
-      )
-      .orderBy(desc(entidades.createdAt));
+    return db.query.entidades.findMany({
+      where: whereClause,
+      orderBy: desc(entidades.createdAt),
+      with: {
+        assignedUser: true,
+        createdByUser: true,
+      },
+    });
   }
 
   async getEntidade(id: string, userId: string, userRole: 'admin' | 'agent'): Promise<EntidadeWithRelations | undefined> {
@@ -264,6 +267,8 @@ export class DatabaseStorage implements IStorage {
       with: {
         gabinete: true,
         entidade: true,
+        assignedUser: true,
+        createdByUser: true,
       },
     });
   }
@@ -355,6 +360,8 @@ export class DatabaseStorage implements IStorage {
         entidade: true,
         contacto: true,
         user: true,
+        assignedUser: true,
+        createdByUser: true,
       },
     });
   }
