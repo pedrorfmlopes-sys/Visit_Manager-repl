@@ -25,6 +25,7 @@ import Tarefas from "@/pages/Tarefas";
 import TarefaForm from "@/pages/TarefaForm";
 import TarefaDetail from "@/pages/TarefaDetail";
 import Analytics from "@/pages/Analytics";
+import QRScanner from "@/pages/QRScanner";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -66,6 +67,7 @@ function Router() {
           <Route path="/tarefas/:id" component={TarefaDetail} />
           <Route path="/tarefas/:id/editar" component={TarefaForm} />
           <Route path="/analytics" component={Analytics} />
+          <Route path="/qr" component={QRScanner} />
         </>
       )}
       <Route component={NotFound} />

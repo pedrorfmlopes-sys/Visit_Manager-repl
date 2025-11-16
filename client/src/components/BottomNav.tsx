@@ -1,10 +1,10 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Building2, Users, FileText, CheckCircle2 } from "lucide-react";
+import { LayoutDashboard, Building2, Users, FileText, CheckCircle2, QrCode } from "lucide-react";
 
 const navItems = [
   { path: "/", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/entidades", icon: Building2, label: "Entidades" },
-  { path: "/contactos", icon: Users, label: "Contactos" },
+  { path: "/qr", icon: QrCode, label: "QR" },
   { path: "/visitas", icon: FileText, label: "Visitas" },
   { path: "/tarefas", icon: CheckCircle2, label: "Tarefas" },
 ];

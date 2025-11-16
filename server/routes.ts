@@ -341,6 +341,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // vCard import endpoint
+  app.post('/api/tools/vcard-import', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole } = await getUserContext(req);
+      const { name, organization, email, phone, title, address } = req.body;
+
+      if (!name) {
+        return res.status(400).json({ message: "Contact name is required" });
+      }
+
+      let entidadeId: string | undefined;
+
+      // Try to find existing entidade by organization name
+      if (organization) {
+        const existingEntidade = await storage.findEntidadeByNome(organization, userId, userRole);
+        if (existingEntidade) {
+          entidadeId = existingEntidade.id;
+        } else {
+          // Create new entidade
+          const newEntidade = await storage.createEntidade({
+            nome: organization,
+            tipoEntidade: 'Outro',
+            createdByUserId: userId,
+            assignedUserId: userId,
+          });
+          entidadeId = newEntidade.id;
+        }
+      }
+
+      // Create contacto
+      const contacto = await storage.createContacto({
+        nome: name,
+        email: email || undefined,
+        telemovel: phone || undefined,
+        funcao: title || undefined,
+        entidadeId: entidadeId,
+        createdByUserId: userId,
+      });
+
+      res.json({
+        contacto,
+        entidadeId,
+        message: "Contact imported from vCard successfully",
+      });
+    } catch (error) {
+      console.error("Error importing vCard:", error);
+      res.status(500).json({ message: "Failed to import vCard" });
+    }
+  });
+
   // Visitas endpoints
   app.get('/api/visitas', isAuthenticated, async (req: any, res) => {
     try {

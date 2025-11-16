@@ -1,0 +1,185 @@
+Please implement a complete, production-quality QR Code Scanner module for the application with all the features described below. This must integrate cleanly with the existing Entidades, Contactos, and Visitas systems, RBAC, React Query, offline mode, and navigation structure.
+
+1. Create New Page: QRScanner.tsx
+
+This page must include:
+
+1.1 Camera-based live QR scanning
+
+Use a library compatible with PWAs (e.g., qr-scanner).
+Requirements:
+
+Real-time scanning
+
+Auto-focus support
+
+High scan accuracy
+
+Scan outline + scan region highlight
+
+Max 3 scans per second
+
+1.2 UI/UX Features
+
+Fullscreen video view on mobile
+
+Transparent overlay with scanning frame
+
+Vibration (navigator.vibrate) on successful scan
+
+Optional beep sound (short audio)
+
+Button to toggle flashlight (if supported)
+
+Clean “Scan successful” feedback
+
+1.3 Offline handling
+
+If offline, still allow scanning
+
+Only disallow opening URLs that require internet
+
+2. QR Content Handling (Complete Logic)
+
+Implement the following detection pipeline:
+
+2.1 If QR contains a URL
+
+If starts with http:// or https:// → open in new tab
+
+2.2 If QR contains vCard
+
+Example:
+
+BEGIN:VCARD
+FN:Maria Silva
+TEL:+351912345678
+EMAIL:maria@arquipro.pt
+ORG:ArquiPro Lda
+END:VCARD
+
+
+Then:
+
+Parse full vCard (name, org, email, phone, role, address).
+
+Check if entidade with ORG exists:
+
+If exists → use it
+
+If not → create entidade with fields parsed
+
+Create contacto:
+
+name
+
+email
+
+phone
+
+entidade_id linked
+
+Navigate to Contact Detail page
+
+Show toast: “Contacto criado a partir de cartão de visita”
+
+2.3 If QR contains internal deep links (Divitek codes)
+entidade:
+
+divitek-visit://entidade/{id}
+→ navigate to /entidades/{id}
+
+visita:
+
+divitek-visit://visita/{id}
+→ navigate to /visitas/{id}
+
+contacto:
+
+divitek-visit://contacto/{id}
+→ navigate to /contactos/{id}
+
+2.4 If QR contains plain text
+
+Show result + "Copy" + "Search on Google" options.
+
+3. Add “Scan QR” Entry to Bottom Navigation
+
+Add an icon (Scan or QrCode) and route /qr.
+Ensure mobile-first layout.
+
+4. vCard Parser
+
+Implement a small parser supporting:
+
+FN
+
+N
+
+ORG
+
+TITLE (optional)
+
+EMAIL
+
+TEL
+
+ADR
+
+NOTE
+
+Normalize phone numbers and email.
+
+5. Backend Adjustments
+
+Create a utility endpoint (optional):
+
+POST /api/tools/vcard-import
+
+This endpoint must:
+
+Accept parsed vCard JSON from frontend
+
+Create entidade if not exists
+
+Create contacto
+
+Return both records
+
+Enforce RBAC (agent creates only in their allowed scope)
+
+6. Error Handling & Stability
+
+Handle camera permission denial
+
+Provide retry button
+
+Ensure no crashes if QR contains malformed vCard
+
+Provide snackbar/toast feedback
+
+Show loading indicator when creating entities/contactos
+
+7. Final Testing Requirements
+
+Verify:
+
+Works on iOS Safari
+
+Works on Android Chrome
+
+Flashlight toggle works on supported devices
+
+Scanning performance stable
+
+vCard import fully functional
+
+Deep links navigate correctly
+
+Offline behavior correct
+
+No TypeScript or ESLint errors
+
+Clean UI consistent with current design system
+
+Proceed.
