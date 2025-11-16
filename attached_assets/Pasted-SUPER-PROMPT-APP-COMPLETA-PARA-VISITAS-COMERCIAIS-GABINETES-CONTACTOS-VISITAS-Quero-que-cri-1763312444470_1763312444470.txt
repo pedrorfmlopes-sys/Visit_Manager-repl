@@ -1,0 +1,288 @@
+SUPER PROMPT — APP COMPLETA PARA VISITAS COMERCIAIS (GABINETES + CONTACTOS + VISITAS)
+
+Quero que cries uma aplicação completa, pronta a usar, que funcione perfeitamente num telemóvel (PWA mobile-first).
+A app serve para registar visitas comerciais a gabinetes de arquitetura.
+
+A app deve incluir:
+
+1) Autenticação
+
+– Login e registo simples
+– Guardar o utilizador responsável por cada visita
+
+2) Base de dados (criar tabelas completas)
+
+Cria as seguintes entidades:
+
+Gabinetes
+
+id
+
+nome
+
+morada
+
+codigo_postal
+
+cidade
+
+telefone
+
+email
+
+website
+
+marcas (array de strings)
+
+observacoes
+
+data_criacao
+
+Contactos
+
+id
+
+nome
+
+funcao
+
+telemovel
+
+email
+
+gabinete_id (foreign key)
+
+observacoes
+
+foto_url
+
+Visitas
+
+id
+
+gabinete_id
+
+contacto_id
+
+data_visita
+
+notas
+
+marcas_entregues (array)
+
+audio_url
+
+media_urls (array de fotos/vídeos)
+
+proxima_visita
+
+link_visita
+
+resumo_ia
+
+user_id (utilizador que fez a visita)
+
+data_registo
+
+Marcas
+
+id
+
+nome
+
+descricao
+
+logo_url
+
+3) Funcionalidades obrigatórias
+✔ Pesquisa inteligente tipo Odoo
+
+Quando o utilizador começa a escrever o nome de um gabinete ou contacto,
+filtra automaticamente
+
+Se não existir, deve permitir criar
+
+Se existir, deve preencher automaticamente morada, telefone, email, website
+
+✔ Criar visitas com upload
+
+Notas escritas
+
+Upload de áudio (ficheiro)
+
+Upload de vídeo / fotos
+
+Seleção de marcas entregues
+
+Guardar tudo numa só página
+
+Gerar link único da visita para consulta posterior
+
+✔ Histórico completo
+
+Por gabinete
+
+Por contacto
+
+Por utilizador
+
+Por data
+
+✔ Resumo da visita feito por IA
+
+Implementar endpoint interno:
+
+Recebe texto das notas
+
+Recebe transcrição do áudio
+
+Recebe marcas e dados
+
+Gera:
+
+Síntese geral
+
+Necessidades
+
+Oportunidades comerciais
+
+Materiais entregues
+
+Ações a realizar
+
+Sugestão para próxima visita
+
+O resumo deve ser guardado automaticamente em resumo_ia.
+
+✔ Transcrição de áudio por IA
+
+Se houver áudio, a IA deve transcrever automaticamente
+
+A transcrição deve alimentar o resumo IA
+
+✔ Email automático após visita
+
+Quando uma visita é criada, enviar email contendo:
+
+Gabinete
+
+Contacto
+
+Data
+
+Notas
+
+Marcas entregues
+
+Resumo IA
+
+Link da visita
+Formato limpo e profissional.
+
+✔ App PWA (mobile-first)
+
+Layout otimizado para telemóvel
+
+Botões grandes
+
+Navegação inferior
+
+Velocidade rápida
+
+Instalar como app (PWA manifest + service worker)
+
+4) Estrutura visual
+
+Cria páginas:
+
+Página 1 — Gabinetes
+
+Lista
+
+Pesquisa
+
+Botão “Criar Gabinete”
+
+Ao clicar → detalhes + contactos + visitas associadas
+
+Página 2 — Contactos
+
+Lista
+
+Pesquisa
+
+Botão “Criar Contacto”
+
+Ao clicar → detalhes + visitas associadas
+
+Página 3 — Visitas
+
+Lista com filtros
+
+Botão “Nova Visita”
+
+Upload de áudio/vídeo
+
+Seleção de marcas
+
+Campo notas
+
+Campo próxima visita
+
+Botão “Guardar”
+
+Gerar resumo IA automaticamente
+
+Página 4 — Dashboard
+
+Nº de gabinetes visitados
+
+Nº de contactos
+
+Nº de visitas por período
+
+Marcas mais entregues
+
+Proximas visitas
+
+5) Backend completo
+
+Criar API REST:
+
+/gabinetes
+
+/contactos
+
+/visitas
+
+/marcas
+
+/upload
+
+/ia/resumo
+
+/ia/transcrever
+
+/email/enviar
+
+6) Requisitos finais
+
+Tudo a funcionar imediatamente após gerar
+
+Sem dependências pagas
+
+Sem necessidade de workflow externo
+
+PWA instalável no telemóvel
+
+Código limpo e modular
+
+IA integrada no backend
+
+Email automático incluído
+
+Pesquisa inteligente
+
+App 100% funcional no mobile
+
+Cria a aplicação completa, totalmente implementada, com frontend + backend + base de dados + IA + email + PWA.
