@@ -2,9 +2,22 @@
 
 ## Overview
 
-This is a mobile-first Progressive Web Application (PWA) designed for managing commercial visits to architecture offices (gabinetes). The application enables field sales professionals to efficiently track offices, contacts, and visits, with advanced features including audio transcription, AI-powered visit summaries, and automated email notifications.
+This is a mobile-first Progressive Web Application (PWA) designed for managing commercial visits to architecture offices (gabinetes). The application enables field sales professionals to efficiently track offices, contacts, and visits, with advanced features including audio transcription, AI-powered visit summaries, automated email notifications, geolocation capture, calendar integration, PDF export, and comprehensive analytics.
 
-The system is built as a full-stack TypeScript application using React for the frontend, Express for the backend, and PostgreSQL with Drizzle ORM for data persistence. It emphasizes mobile usability with Material Design principles and provides offline-capable PWA functionality.
+The system is built as a full-stack TypeScript application using React for the frontend, Express for the backend, and PostgreSQL with Drizzle ORM for data persistence. It emphasizes mobile usability with Material Design principles and user data isolation for security.
+
+## Recent Updates (November 2025)
+
+**Extended Features Implemented:**
+1. ✅ **Geolocation Integration** - Automatic GPS capture during visit creation with validation, LocationPreview component, and map links
+2. ✅ **Calendar Integration** - Export visits to .ics files for adding to external calendars (Google Calendar, Outlook, etc.) with sanitized content
+3. ✅ **PDF Export** - Generate comprehensive PDF reports for individual visits with sanitized text output
+4. ✅ **Advanced Analytics** - User-scoped dashboard with visit trends, top offices, frequency metrics, GPS usage, and performance KPIs using Recharts
+
+**Data Security:**
+- All visit queries scoped to authenticated user (userId filtering)
+- No cross-user data leakage in analytics or visit lists
+- Input sanitization for GPS coordinates, ICS files, and PDF content
 
 ## User Preferences
 
