@@ -1,8 +1,9 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
-import { ArrowLeft, Loader2, WifiOff, Building2, Users, Package, Construction, Briefcase, HandHeart, MapPin } from "lucide-react";
+import { ArrowLeft, Loader2, WifiOff, Building2, Users, Package, Construction, Briefcase, HandHeart, MapPin, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,6 +18,7 @@ import { insertEntidadeSchema, type InsertEntidade, type Entidade } from "@share
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { syncManager } from "@/lib/syncManager";
+import { CompanyAutocomplete } from "@/components/CompanyAutocomplete";
 
 const tipoOptions = [
   { value: "Gabinete", label: "Gabinete", icon: Building2 },
@@ -40,6 +42,9 @@ export default function EntidadeForm() {
   const { data: currentUser } = useCurrentUser();
   const { data: allUsers = [] } = useAllUsers();
   const isAdmin = useIsAdmin();
+  
+  // Enrichment state
+  const [isEnriching, setIsEnriching] = useState(false);
 
   const { data: entidade } = useQuery<Entidade>({
     queryKey: ["/api/entidades", params?.id],
@@ -207,6 +212,110 @@ export default function EntidadeForm() {
     });
   }
 
+  // Enrichment handlers
+  const handleCompanySelect = async (company: { name: string; domain: string; logo: string }) => {
+    if (!isOnline) {
+      toast({
+        title: "Modo Offline",
+        description: "Enriquecimento automático não disponível offline.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsEnriching(true);
+    try {
+      const response = await fetch('/api/enrichment/enrich', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: company.name, domain: company.domain }),
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const enrichedData = await response.json();
+        
+        // Auto-fill form fields with enriched data
+        if (enrichedData.website) form.setValue("website", enrichedData.website);
+        if (enrichedData.email) form.setValue("email", enrichedData.email);
+        if (enrichedData.telefone) form.setValue("telefone", enrichedData.telefone);
+        if (enrichedData.morada) form.setValue("morada", enrichedData.morada);
+        if (enrichedData.cidade) form.setValue("cidade", enrichedData.cidade);
+        
+        toast({
+          title: "Dados enriquecidos",
+          description: `Informações de ${company.name} preenchidas automaticamente.`,
+        });
+      }
+    } catch (error) {
+      console.error('[Enrichment] Error:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível enriquecer os dados.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsEnriching(false);
+    }
+  };
+
+  const handleManualEnrich = async () => {
+    const entityName = form.getValues("nome");
+    
+    if (!entityName) {
+      toast({
+        title: "Nome necessário",
+        description: "Preencha o nome da entidade primeiro.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!isOnline) {
+      toast({
+        title: "Modo Offline",
+        description: "Enriquecimento automático não disponível offline.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsEnriching(true);
+    try {
+      const response = await fetch('/api/enrichment/enrich', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: entityName }),
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const enrichedData = await response.json();
+        
+        // Auto-fill form fields with enriched data
+        if (enrichedData.website) form.setValue("website", enrichedData.website);
+        if (enrichedData.email) form.setValue("email", enrichedData.email);
+        if (enrichedData.telefone) form.setValue("telefone", enrichedData.telefone);
+        if (enrichedData.morada) form.setValue("morada", enrichedData.morada);
+        if (enrichedData.cidade) form.setValue("cidade", enrichedData.cidade);
+        
+        toast({
+          title: "Dados atualizados",
+          description: "Informações atualizadas da web.",
+        });
+      }
+    } catch (error) {
+      console.error('[Enrichment] Error:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar os dados.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsEnriching(false);
+    }
+  };
+
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
@@ -308,15 +417,49 @@ export default function EntidadeForm() {
               name="nome"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nome *</FormLabel>
+                  <div className="flex items-center justify-between gap-2">
+                    <FormLabel>Nome *</FormLabel>
+                    {isEdit && isOnline && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleManualEnrich}
+                        disabled={isEnriching || !field.value}
+                        className="h-8"
+                        data-testid="button-refresh-web"
+                      >
+                        {isEnriching ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4" />
+                        )}
+                        <span className="ml-1">Atualizar da Web</span>
+                      </Button>
+                    )}
+                  </div>
                   <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="Nome da entidade"
-                      className="h-12"
-                      data-testid="input-nome"
-                    />
+                    {isEdit ? (
+                      <Input
+                        {...field}
+                        placeholder="Nome da entidade"
+                        className="h-12"
+                        data-testid="input-nome"
+                      />
+                    ) : (
+                      <CompanyAutocomplete
+                        value={field.value}
+                        onChange={field.onChange}
+                        onSelect={handleCompanySelect}
+                        disabled={!isOnline}
+                      />
+                    )}
                   </FormControl>
+                  {!isOnline && !isEdit && (
+                    <FormDescription className="text-xs text-muted-foreground">
+                      Enriquecimento automático não disponível offline
+                    </FormDescription>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
