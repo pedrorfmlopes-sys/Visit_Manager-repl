@@ -2,22 +2,26 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { insertContactoSchema, type InsertContacto, type Contacto, type Gabinete } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { syncManager } from "@/lib/syncManager";
 
 export default function ContactoForm() {
   const [, setLocation] = useLocation();
   const [, params] = useRoute("/contactos/:id");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isOnline = useOnlineStatus();
   const isEdit = params?.id && params.id !== "novo";
 
   const { data: contacto } = useQuery<Contacto>({
@@ -108,7 +112,26 @@ export default function ContactoForm() {
     },
   });
 
-  const onSubmit = (data: InsertContacto) => {
+  const onSubmit = async (data: InsertContacto) => {
+    if (!isOnline && !isEdit) {
+      await syncManager.queueContactoCreation(data);
+      toast({
+        title: "Contacto guardado",
+        description: "Será sincronizado automaticamente quando voltar online.",
+      });
+      setLocation("/contactos");
+      return;
+    }
+
+    if (!isOnline && isEdit) {
+      toast({
+        title: "Modo Offline",
+        description: "Não é possível editar enquanto offline. Tente novamente quando voltar online.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (isEdit) {
       updateMutation.mutate(data);
     } else {
@@ -137,6 +160,15 @@ export default function ContactoForm() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6">
+        {!isOnline && (
+          <Alert className="mb-4 border-destructive bg-destructive/10" data-testid="alert-offline">
+            <WifiOff className="h-4 w-4" />
+            <AlertDescription>
+              Está offline. {isEdit ? "Não é possível editar enquanto offline." : "O contacto será guardado localmente e sincronizado quando voltar online."}
+            </AlertDescription>
+          </Alert>
+        )}
+        
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField

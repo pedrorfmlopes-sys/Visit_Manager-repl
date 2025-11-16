@@ -77,6 +77,16 @@ class OfflineStorage {
     });
   }
 
+  async getVisita(id: string): Promise<Visita | null> {
+    const db = await this.ensureDB();
+    const tx = db.transaction('visits', 'readonly');
+    return new Promise((resolve, reject) => {
+      const request = tx.objectStore('visits').get(id);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
   async saveGabinete(gabinete: Gabinete): Promise<void> {
     const db = await this.ensureDB();
     const tx = db.transaction('gabinetes', 'readwrite');
@@ -93,6 +103,16 @@ class OfflineStorage {
     });
   }
 
+  async getGabinete(id: string): Promise<Gabinete | null> {
+    const db = await this.ensureDB();
+    const tx = db.transaction('gabinetes', 'readonly');
+    return new Promise((resolve, reject) => {
+      const request = tx.objectStore('gabinetes').get(id);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
   async saveContacto(contacto: Contacto): Promise<void> {
     const db = await this.ensureDB();
     const tx = db.transaction('contactos', 'readwrite');
@@ -105,6 +125,16 @@ class OfflineStorage {
     return new Promise((resolve, reject) => {
       const request = tx.objectStore('contactos').getAll();
       request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getContacto(id: string): Promise<Contacto | null> {
+    const db = await this.ensureDB();
+    const tx = db.transaction('contactos', 'readonly');
+    return new Promise((resolve, reject) => {
+      const request = tx.objectStore('contactos').get(id);
+      request.onsuccess = () => resolve(request.result || null);
       request.onerror = () => reject(request.error);
     });
   }

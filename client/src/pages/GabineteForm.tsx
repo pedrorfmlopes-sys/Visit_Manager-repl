@@ -2,21 +2,25 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { insertGabineteSchema, type InsertGabinete, type Gabinete } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { syncManager } from "@/lib/syncManager";
 
 export default function GabineteForm() {
   const [, setLocation] = useLocation();
   const [, params] = useRoute("/gabinetes/:id");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isOnline = useOnlineStatus();
   const isEdit = params?.id && params.id !== "novo";
 
   const { data: gabinete } = useQuery<Gabinete>({
@@ -105,7 +109,26 @@ export default function GabineteForm() {
     },
   });
 
-  const onSubmit = (data: InsertGabinete) => {
+  const onSubmit = async (data: InsertGabinete) => {
+    if (!isOnline && !isEdit) {
+      await syncManager.queueGabineteCreation(data);
+      toast({
+        title: "Gabinete guardado",
+        description: "Será sincronizado automaticamente quando voltar online.",
+      });
+      setLocation("/gabinetes");
+      return;
+    }
+
+    if (!isOnline && isEdit) {
+      toast({
+        title: "Modo Offline",
+        description: "Não é possível editar enquanto offline. Tente novamente quando voltar online.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (isEdit) {
       updateMutation.mutate(data);
     } else {
@@ -134,6 +157,15 @@ export default function GabineteForm() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6">
+        {!isOnline && (
+          <Alert className="mb-4 border-destructive bg-destructive/10" data-testid="alert-offline">
+            <WifiOff className="h-4 w-4" />
+            <AlertDescription>
+              Está offline. {isEdit ? "Não é possível editar enquanto offline." : "O gabinete será guardado localmente e sincronizado quando voltar online."}
+            </AlertDescription>
+          </Alert>
+        )}
+        
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField

@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { ArrowLeft, Loader2, Calendar as CalendarIcon, Upload, X } from "lucide-react";
+import { ArrowLeft, Loader2, Calendar as CalendarIcon, Upload, X, WifiOff } from "lucide-react";
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -13,12 +13,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useGeolocation } from "@/hooks/useGeolocation";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { LocationPreview } from "@/components/LocationPreview";
 import { insertVisitaSchema, type InsertVisita, type Gabinete, type Contacto } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { syncManager } from "@/lib/syncManager";
+import { offlineStorage } from "@/lib/offlineStorage";
 import { z } from "zod";
 
 const visitaFormSchema = insertVisitaSchema.extend({
@@ -32,6 +36,7 @@ export default function VisitaForm() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isOnline = useOnlineStatus();
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const { location: gpsLocation, error: gpsError, isLoading: gpsLoading, requestLocation } = useGeolocation(true);
@@ -105,6 +110,40 @@ export default function VisitaForm() {
   });
 
   const onSubmit = async (data: VisitaFormData) => {
+    // Offline mode - queue for sync
+    if (!isOnline) {
+      if (audioFile || mediaFiles.length > 0) {
+        toast({
+          title: "Modo Offline",
+          description: "Ficheiros de áudio/media não serão enviados. Notas serão sincronizadas quando voltar online.",
+          variant: "destructive",
+        });
+      }
+
+      const visitaData = {
+        gabineteId: data.gabineteId,
+        contactoId: data.contactoId || null,
+        dataVisita: data.dataVisita.toISOString(),
+        notas: data.notas || null,
+        proximaVisita: data.proximaVisita?.toISOString() || null,
+        marcasEntregues: data.marcasEntregues || [],
+        latitude: gpsLocation?.latitude || null,
+        longitude: gpsLocation?.longitude || null,
+        locationAccuracy: gpsLocation?.accuracy || null,
+      };
+
+      await syncManager.queueVisitaCreation(visitaData);
+      
+      toast({
+        title: "Visita guardada",
+        description: "Será sincronizada automaticamente quando voltar online.",
+      });
+      
+      setLocation("/visitas");
+      return;
+    }
+
+    // Online mode - normal submission
     const formData = new FormData();
     
     formData.append("gabineteId", data.gabineteId);
@@ -161,6 +200,16 @@ export default function VisitaForm() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6">
+        {!isOnline && (
+          <Alert className="mb-4 border-destructive bg-destructive/10" data-testid="alert-offline">
+            <WifiOff className="h-4 w-4" />
+            <AlertDescription>
+              Está offline. A visita será guardada localmente e sincronizada automaticamente quando voltar online. 
+              {(audioFile || mediaFiles.length > 0) && " Ficheiros de áudio/media não serão enviados."}
+            </AlertDescription>
+          </Alert>
+        )}
+        
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
