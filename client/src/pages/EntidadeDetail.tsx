@@ -183,7 +183,12 @@ export default function EntidadeDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <LocationPreview location={gpsLocation} />
+              <LocationPreview 
+                location={gpsLocation} 
+                error={null}
+                isLoading={false}
+                onRequestLocation={() => {}}
+              />
             </CardContent>
           </Card>
         )}

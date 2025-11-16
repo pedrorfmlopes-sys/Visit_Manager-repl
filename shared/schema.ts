@@ -65,6 +65,14 @@ export const tipoEntidadeEnum = pgEnum('tipo_entidade', [
   'Outro'
 ]);
 
+// Odoo Sync Status enum
+export const syncStatusEnum = pgEnum('sync_status', [
+  'pending',
+  'synced',
+  'error',
+  'never'
+]);
+
 // Entidades (Universal Entities) table - replaces Gabinetes
 export const entidades = pgTable("entidades", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -80,6 +88,11 @@ export const entidades = pgTable("entidades", {
   latitude: varchar("latitude", { length: 50 }),
   longitude: varchar("longitude", { length: 50 }),
   nif: varchar("nif", { length: 50 }),
+  // Odoo Integration Fields
+  odooEntityId: integer("odoo_entity_id"),
+  syncStatus: syncStatusEnum("sync_status").default('never'),
+  lastSyncAt: timestamp("last_sync_at"),
+  syncError: text("sync_error"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -88,6 +101,10 @@ export const insertEntidadeSchema = createInsertSchema(entidades).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  odooEntityId: true,
+  syncStatus: true,
+  lastSyncAt: true,
+  syncError: true,
 }).extend({
   // Add validation for coordinates
   latitude: z.string().regex(/^-?([0-9]{1,2}|1[0-7][0-9]|180)(\.[0-9]+)?$/).optional().nullable(),
@@ -133,6 +150,11 @@ export const contactos = pgTable("contactos", {
   gabineteId: varchar("gabinete_id").references(() => gabinetes.id, { onDelete: 'set null' }), // DEPRECATED
   observacoes: text("observacoes"),
   fotoUrl: varchar("foto_url", { length: 500 }),
+  // Odoo Integration Fields
+  odooContactId: integer("odoo_contact_id"),
+  syncStatus: syncStatusEnum("sync_status").default('never'),
+  lastSyncAt: timestamp("last_sync_at"),
+  syncError: text("sync_error"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -163,6 +185,10 @@ export const insertContactoSchema = createInsertSchema(contactos).omit({
   createdAt: true,
   updatedAt: true,
   gabineteId: true, // DEPRECATED - use entidadeId
+  odooContactId: true,
+  syncStatus: true,
+  lastSyncAt: true,
+  syncError: true,
 });
 
 export type InsertContacto = z.infer<typeof insertContactoSchema>;
@@ -187,6 +213,11 @@ export const visitas = pgTable("visitas", {
   latitude: varchar("latitude", { length: 50 }),
   longitude: varchar("longitude", { length: 50 }),
   locationAccuracy: varchar("location_accuracy", { length: 50 }),
+  // Odoo Integration Fields
+  odooActivityId: integer("odoo_activity_id"),
+  syncStatus: syncStatusEnum("sync_status").default('never'),
+  lastSyncAt: timestamp("last_sync_at"),
+  syncError: text("sync_error"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -218,6 +249,10 @@ export const insertVisitaSchema = createInsertSchema(visitas).omit({
   resumoIa: true,
   transcricaoAudio: true,
   gabineteId: true, // DEPRECATED - use entidadeId
+  odooActivityId: true,
+  syncStatus: true,
+  lastSyncAt: true,
+  syncError: true,
 });
 
 export type InsertVisita = z.infer<typeof insertVisitaSchema>;
