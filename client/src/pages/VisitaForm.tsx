@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { LocationPreview } from "@/components/LocationPreview";
-import { insertVisitaSchema, type InsertVisita, type Gabinete, type Contacto } from "@shared/schema";
+import { insertVisitaSchema, type InsertVisita, type Entidade, type Contacto } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { syncManager } from "@/lib/syncManager";
@@ -26,7 +26,7 @@ import { offlineStorage } from "@/lib/offlineStorage";
 import { z } from "zod";
 
 const visitaFormSchema = insertVisitaSchema.extend({
-  gabineteId: z.string().min(1, "Selecione um gabinete"),
+  entidadeId: z.string().min(1, "Selecione uma entidade"),
   dataVisita: z.date(),
 });
 
@@ -41,8 +41,8 @@ export default function VisitaForm() {
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const { location: gpsLocation, error: gpsError, isLoading: gpsLoading, requestLocation } = useGeolocation(true);
 
-  const { data: gabinetes } = useQuery<Gabinete[]>({
-    queryKey: ["/api/gabinetes"],
+  const { data: entidades } = useQuery<Entidade[]>({
+    queryKey: ["/api/entidades"],
   });
 
   const { data: contactos } = useQuery<Contacto[]>({
@@ -52,7 +52,7 @@ export default function VisitaForm() {
   const form = useForm<VisitaFormData>({
     resolver: zodResolver(visitaFormSchema),
     defaultValues: {
-      gabineteId: "",
+      entidadeId: "",
       contactoId: "",
       dataVisita: new Date(),
       notas: "",
@@ -62,8 +62,8 @@ export default function VisitaForm() {
     },
   });
 
-  const selectedGabineteId = form.watch("gabineteId");
-  const filteredContactos = contactos?.filter(c => c.gabineteId === selectedGabineteId);
+  const selectedEntidadeId = form.watch("entidadeId");
+  const filteredContactos = contactos?.filter(c => c.entidadeId === selectedEntidadeId);
 
   const createMutation = useMutation({
     mutationFn: async (formData: FormData) => {
@@ -121,7 +121,7 @@ export default function VisitaForm() {
       }
 
       const visitaData = {
-        gabineteId: data.gabineteId,
+        entidadeId: data.entidadeId,
         contactoId: data.contactoId || null,
         dataVisita: data.dataVisita.toISOString(),
         notas: data.notas || null,
@@ -146,7 +146,7 @@ export default function VisitaForm() {
     // Online mode - normal submission
     const formData = new FormData();
     
-    formData.append("gabineteId", data.gabineteId);
+    formData.append("entidadeId", data.entidadeId);
     if (data.contactoId) formData.append("contactoId", data.contactoId);
     formData.append("dataVisita", data.dataVisita.toISOString());
     if (data.notas) formData.append("notas", data.notas);
@@ -214,20 +214,20 @@ export default function VisitaForm() {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
-              name="gabineteId"
+              name="entidadeId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Gabinete *</FormLabel>
+                  <FormLabel>Entidade *</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger className="h-12" data-testid="select-gabinete">
-                        <SelectValue placeholder="Selecione o gabinete" />
+                      <SelectTrigger className="h-12" data-testid="select-entidade">
+                        <SelectValue placeholder="Selecione a entidade" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {gabinetes?.map((gabinete) => (
-                        <SelectItem key={gabinete.id} value={gabinete.id}>
-                          {gabinete.nome}
+                      {entidades?.map((entidade) => (
+                        <SelectItem key={entidade.id} value={entidade.id}>
+                          {entidade.nome} ({entidade.tipoEntidade})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -246,17 +246,17 @@ export default function VisitaForm() {
                   <Select 
                     onValueChange={field.onChange} 
                     value={field.value || ""}
-                    disabled={!selectedGabineteId}
+                    disabled={!selectedEntidadeId}
                   >
                     <FormControl>
                       <SelectTrigger className="h-12" data-testid="select-contacto">
-                        <SelectValue placeholder={selectedGabineteId ? "Selecione o contacto" : "Selecione primeiro o gabinete"} />
+                        <SelectValue placeholder={selectedEntidadeId ? "Selecione o contacto" : "Selecione primeiro a entidade"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {filteredContactos?.map((contacto) => (
                         <SelectItem key={contacto.id} value={contacto.id}>
-                          {contacto.nome}
+                          {contacto.nome} {contacto.funcao && `- ${contacto.funcao}`}
                         </SelectItem>
                       ))}
                     </SelectContent>

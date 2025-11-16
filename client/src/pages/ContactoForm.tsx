@@ -212,7 +212,7 @@ export default function ContactoForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Entidade *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value || undefined}>
                     <FormControl>
                       <SelectTrigger className="h-12" data-testid="select-entidade">
                         <SelectValue placeholder="Selecione a entidade" />
