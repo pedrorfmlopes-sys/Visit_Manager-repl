@@ -13,6 +13,17 @@ The system is built as a full-stack TypeScript application using React for the f
 2. ✅ **Calendar Integration** - Export visits to .ics files for adding to external calendars (Google Calendar, Outlook, etc.) with sanitized content
 3. ✅ **PDF Export** - Generate comprehensive PDF reports for individual visits with sanitized text output
 4. ✅ **Advanced Analytics** - User-scoped dashboard with visit trends, top offices, frequency metrics, GPS usage, and performance KPIs using Recharts
+5. ✅ **Offline Data Caching** - Complete offline support with IndexedDB storage, automatic sync when back online, and temporary ID management
+
+**Offline Capabilities (November 16, 2025):**
+- **IndexedDB Storage**: Local database for visits, gabinetes, contactos, and pending sync queue
+- **Offline Creation**: Create gabinetes and contactos while offline → saved locally with temp IDs → appear in lists immediately
+- **Automatic Sync**: When back online, pending items automatically sync to server with temp IDs replaced by real server IDs
+- **Query Caching**: All server responses (lists and detail fetches) cached to IndexedDB for offline access
+- **Smart Fallback**: Forms first attempt online save, automatically fallback to offline if network fails
+- **Visual Indicators**: Alert banners show offline status, sync status indicator in UI
+- **Edit Restrictions**: Edit operations disabled when offline (with user notification)
+- **E2E Tested**: Playwright tests verify offline create → sync → server persistence flow
 
 **Data Security:**
 - All visit queries scoped to authenticated user (userId filtering)
