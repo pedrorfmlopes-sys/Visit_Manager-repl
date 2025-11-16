@@ -120,9 +120,20 @@ export default function VisitaForm() {
   });
 
   const onSubmit = async (data: VisitaFormData) => {
-    // Set ownership fields
-    const createdByUserId = currentUser?.id;
-    const assignedUserId = data.assignedUserId || currentUser?.id;
+    // Guard: Prevent submission until user context loads
+    if (!currentUser) {
+      toast({
+        title: "A carregar...",
+        description: "Por favor aguarde enquanto carregamos os seus dados.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Set ownership fields (currentUser now guaranteed to exist)
+    const createdByUserId = currentUser.id;
+    // For non-admins, ALWAYS use current user. For admins, use selected value or default to current user
+    const assignedUserId = (!isAdmin || !data.assignedUserId) ? currentUser.id : data.assignedUserId;
     
     // Offline mode - queue for sync
     if (!isOnline) {

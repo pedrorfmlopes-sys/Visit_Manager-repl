@@ -145,11 +145,21 @@ export default function ContactoForm() {
   });
 
   const onSubmit = async (data: InsertContacto) => {
-    // Set ownership on creation
-    if (!isEdit && currentUser) {
+    // Guard: Prevent submission until user context loads
+    if (!currentUser) {
+      toast({
+        title: "A carregar...",
+        description: "Por favor aguarde enquanto carregamos os seus dados.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Set ownership on creation (currentUser now guaranteed to exist)
+    if (!isEdit) {
       data.createdByUserId = currentUser.id;
-      // If assignedUserId not set, default to creator
-      if (!data.assignedUserId) {
+      // For non-admins, ALWAYS set to current user. For admins, use selected value or default to current user
+      if (!isAdmin || !data.assignedUserId) {
         data.assignedUserId = currentUser.id;
       }
     }
