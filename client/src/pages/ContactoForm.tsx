@@ -58,6 +58,7 @@ export default function ContactoForm() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contactos"] });
       queryClient.invalidateQueries({ queryKey: ["/api/entidades"] });
+      queryClient.refetchQueries({ queryKey: ["/api/entidades"] });
       toast({
         title: "Sucesso",
         description: "Contacto criado com sucesso",
@@ -108,6 +109,7 @@ export default function ContactoForm() {
       queryClient.invalidateQueries({ queryKey: ["/api/contactos"] });
       queryClient.invalidateQueries({ queryKey: ["/api/contactos", params?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/entidades"] });
+      queryClient.refetchQueries({ queryKey: ["/api/entidades"] });
       toast({
         title: "Sucesso",
         description: "Contacto atualizado com sucesso",
