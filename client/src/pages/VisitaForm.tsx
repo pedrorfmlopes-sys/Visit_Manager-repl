@@ -17,6 +17,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { useCurrentUser, useAllUsers, useIsAdmin } from "@/hooks/use-user-context";
 import { LocationPreview } from "@/components/LocationPreview";
 import { insertVisitaSchema, type InsertVisita, type Entidade, type Contacto } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
@@ -40,6 +41,11 @@ export default function VisitaForm() {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const { location: gpsLocation, error: gpsError, isLoading: gpsLoading, requestLocation } = useGeolocation(true);
+  
+  // User context for multi-agent system
+  const { data: currentUser } = useCurrentUser();
+  const { data: allUsers = [] } = useAllUsers();
+  const isAdmin = useIsAdmin();
 
   const { data: entidades } = useQuery<Entidade[]>({
     queryKey: ["/api/entidades"],
@@ -59,6 +65,8 @@ export default function VisitaForm() {
       marcasEntregues: [],
       proximaVisita: undefined,
       userId: "",
+      createdByUserId: currentUser?.id,
+      assignedUserId: currentUser?.id, // Default to current user
     },
   });
 
@@ -112,6 +120,10 @@ export default function VisitaForm() {
   });
 
   const onSubmit = async (data: VisitaFormData) => {
+    // Set ownership fields
+    const createdByUserId = currentUser?.id;
+    const assignedUserId = data.assignedUserId || currentUser?.id;
+    
     // Offline mode - queue for sync
     if (!isOnline) {
       if (audioFile || mediaFiles.length > 0) {
@@ -132,6 +144,8 @@ export default function VisitaForm() {
         latitude: gpsLocation?.latitude || null,
         longitude: gpsLocation?.longitude || null,
         locationAccuracy: gpsLocation?.accuracy || null,
+        createdByUserId: createdByUserId || null,
+        assignedUserId: assignedUserId || null,
       };
 
       await syncManager.queueVisitaCreation(visitaData);
@@ -154,6 +168,10 @@ export default function VisitaForm() {
     if (data.notas) formData.append("notas", data.notas);
     if (data.proximaVisita) formData.append("proximaVisita", data.proximaVisita.toISOString());
     if (data.marcasEntregues) formData.append("marcasEntregues", JSON.stringify(data.marcasEntregues));
+    
+    // Add ownership fields
+    if (createdByUserId) formData.append("createdByUserId", createdByUserId);
+    if (assignedUserId) formData.append("assignedUserId", assignedUserId);
     
     // Add GPS location if available (only send if we have valid coordinates)
     if (gpsLocation && gpsLocation.latitude && gpsLocation.longitude) {
@@ -267,6 +285,39 @@ export default function VisitaForm() {
                 </FormItem>
               )}
             />
+
+            {/* Assigned User Field - Admin Only */}
+            {isAdmin && (
+              <FormField
+                control={form.control}
+                name="assignedUserId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Atribuído a</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || currentUser?.id}>
+                      <FormControl>
+                        <SelectTrigger className="h-12" data-testid="select-assigned-user">
+                          <SelectValue placeholder="Selecione um utilizador" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {allUsers.map((user) => (
+                          <SelectItem key={user.id} value={user.id} data-testid={`option-user-${user.id}`}>
+                            {user.firstName && user.lastName 
+                              ? `${user.firstName} ${user.lastName}`
+                              : user.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription className="text-xs">
+                      Utilizador responsável por esta visita
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <FormField
               control={form.control}

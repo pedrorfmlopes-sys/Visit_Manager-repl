@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { useCurrentUser, useAllUsers, useIsAdmin } from "@/hooks/use-user-context";
 import { insertContactoSchema, type InsertContacto, type Contacto, type Entidade } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -23,6 +24,11 @@ export default function ContactoForm() {
   const queryClient = useQueryClient();
   const isOnline = useOnlineStatus();
   const isEdit = params?.id && params.id !== "novo";
+  
+  // User context for multi-agent system
+  const { data: currentUser } = useCurrentUser();
+  const { data: allUsers = [] } = useAllUsers();
+  const isAdmin = useIsAdmin();
   
   // Get entidadeId from query params
   const searchParams = new URLSearchParams(window.location.search);
@@ -47,6 +53,8 @@ export default function ContactoForm() {
       entidadeId: entidadeIdFromQuery,
       observacoes: "",
       fotoUrl: "",
+      createdByUserId: currentUser?.id,
+      assignedUserId: currentUser?.id, // Default to current user
     },
     values: contacto,
   });
@@ -137,6 +145,15 @@ export default function ContactoForm() {
   });
 
   const onSubmit = async (data: InsertContacto) => {
+    // Set ownership on creation
+    if (!isEdit && currentUser) {
+      data.createdByUserId = currentUser.id;
+      // If assignedUserId not set, default to creator
+      if (!data.assignedUserId) {
+        data.assignedUserId = currentUser.id;
+      }
+    }
+    
     if (!isOnline && !isEdit) {
       await syncManager.queueContactoCreation(data);
       toast({
@@ -213,6 +230,39 @@ export default function ContactoForm() {
                 </FormItem>
               )}
             />
+
+            {/* Assigned User Field - Admin Only */}
+            {isAdmin && (
+              <FormField
+                control={form.control}
+                name="assignedUserId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Atribuído a</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger className="h-12" data-testid="select-assigned-user">
+                          <SelectValue placeholder="Selecione um utilizador" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {allUsers.map((user) => (
+                          <SelectItem key={user.id} value={user.id} data-testid={`option-user-${user.id}`}>
+                            {user.firstName && user.lastName 
+                              ? `${user.firstName} ${user.lastName}`
+                              : user.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Utilizador responsável por este contacto
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <FormField
               control={form.control}

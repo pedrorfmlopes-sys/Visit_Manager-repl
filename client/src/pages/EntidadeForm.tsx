@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useGeolocation } from "@/hooks/useGeolocation";
+import { useCurrentUser, useAllUsers, useIsAdmin } from "@/hooks/use-user-context";
 import { insertEntidadeSchema, type InsertEntidade, type Entidade } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -34,6 +35,11 @@ export default function EntidadeForm() {
   const isOnline = useOnlineStatus();
   const { location: gpsLocation, isLoading: gpsLoading, requestLocation } = useGeolocation();
   const isEdit = params?.id && params.id !== "nova" && params.id !== "editar";
+  
+  // User context for multi-agent system
+  const { data: currentUser } = useCurrentUser();
+  const { data: allUsers = [] } = useAllUsers();
+  const isAdmin = useIsAdmin();
 
   const { data: entidade } = useQuery<Entidade>({
     queryKey: ["/api/entidades", params?.id],
@@ -55,6 +61,8 @@ export default function EntidadeForm() {
       notas: "",
       latitude: "",
       longitude: "",
+      createdByUserId: currentUser?.id,
+      assignedUserId: currentUser?.id, // Default to current user
     },
     values: entidade,
   });
@@ -140,6 +148,15 @@ export default function EntidadeForm() {
   });
 
   const onSubmit = async (data: InsertEntidade) => {
+    // Set ownership on creation
+    if (!isEdit && currentUser) {
+      data.createdByUserId = currentUser.id;
+      // If assignedUserId not set, default to creator
+      if (!data.assignedUserId) {
+        data.assignedUserId = currentUser.id;
+      }
+    }
+    
     if (!isOnline && !isEdit) {
       await syncManager.queueEntidadeCreation(data);
       toast({
@@ -242,6 +259,39 @@ export default function EntidadeForm() {
                 </FormItem>
               )}
             />
+
+            {/* Assigned User Field - Admin Only */}
+            {isAdmin && (
+              <FormField
+                control={form.control}
+                name="assignedUserId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Atribuído a</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger className="h-12" data-testid="select-assigned-user">
+                          <SelectValue placeholder="Selecione um utilizador" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {allUsers.map((user) => (
+                          <SelectItem key={user.id} value={user.id} data-testid={`option-user-${user.id}`}>
+                            {user.firstName && user.lastName 
+                              ? `${user.firstName} ${user.lastName}`
+                              : user.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Utilizador responsável por esta entidade
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <FormField
               control={form.control}
