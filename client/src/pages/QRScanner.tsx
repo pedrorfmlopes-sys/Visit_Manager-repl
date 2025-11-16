@@ -9,6 +9,7 @@ import { parseVCard, isVCard } from "@/lib/vcardParser";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { ContactCreationDialog } from "@/components/ContactCreationDialog";
+import { queueVCardImport, getPendingVCardImports, updateVCardImportStatus, deleteVCardImport } from "@/lib/offlineQueue";
 
 export default function QRScanner() {
   const [, setLocation] = useLocation();
@@ -30,6 +31,85 @@ export default function QRScanner() {
     id: string;
     name: string;
   } | null>(null);
+
+  // Offline sync state
+  const [isSyncing, setIsSyncing] = useState(false);
+  const prevOnlineStatus = useRef<boolean | null>(null);
+
+  // Auto-sync when connection is restored OR on initial mount if online
+  useEffect(() => {
+    // On initial mount (prevOnlineStatus is null) or when transitioning from offline to online
+    if (isOnline && (prevOnlineStatus.current === null || !prevOnlineStatus.current)) {
+      syncOfflineQueue();
+    }
+    prevOnlineStatus.current = isOnline;
+  }, [isOnline]);
+
+  const syncOfflineQueue = async () => {
+    if (isSyncing) return;
+
+    setIsSyncing(true);
+
+    try {
+      const pending = await getPendingVCardImports();
+
+      if (pending.length === 0) {
+        setIsSyncing(false);
+        return;
+      }
+
+      toast({
+        title: "A sincronizar",
+        description: `A importar ${pending.length} cartão(ões) guardado(s)...`,
+      });
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const item of pending) {
+        try {
+          await updateVCardImportStatus(item.id, 'syncing');
+
+          const res = await apiRequest("POST", "/api/tools/vcard-import", item.vcardData);
+
+          if (!res.ok) {
+            throw new Error("Failed to import");
+          }
+
+          await deleteVCardImport(item.id);
+          successCount++;
+        } catch (error) {
+          console.error("Error syncing vCard:", error);
+          await updateVCardImportStatus(item.id, 'failed', String(error));
+          failCount++;
+        }
+      }
+
+      // Invalidate caches after sync if any succeeded
+      if (successCount > 0) {
+        await queryClient.invalidateQueries({ queryKey: ["/api/contactos"] });
+        await queryClient.invalidateQueries({ queryKey: ["/api/entidades"] });
+      }
+
+      // Always show completion toast with summary
+      toast({
+        title: "Sincronização completa",
+        description: successCount > 0 
+          ? `${successCount} cartão(ões) importado(s)${failCount > 0 ? `, ${failCount} falharam` : ""}.`
+          : `Todos os ${failCount} cartões falharam. Tente novamente mais tarde.`,
+        variant: failCount > 0 && successCount === 0 ? "destructive" : "default",
+      });
+    } catch (error) {
+      console.error("Error in sync process:", error);
+      toast({
+        title: "Erro na sincronização",
+        description: "Não foi possível sincronizar todos os cartões.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   useEffect(() => {
     if (!videoRef.current) return;
@@ -182,16 +262,6 @@ export default function QRScanner() {
   };
 
   const handleVCard = async (vcardData: string) => {
-    if (!isOnline) {
-      toast({
-        title: "Sem ligação",
-        description: "Não é possível importar cartões de visita sem ligação à internet.",
-        variant: "destructive",
-      });
-      resetScanner();
-      return;
-    }
-
     const parsed = parseVCard(vcardData);
     if (!parsed || !parsed.name) {
       toast({
@@ -201,6 +271,39 @@ export default function QRScanner() {
       });
       resetScanner();
       return;
+    }
+
+    // If offline, queue the import
+    if (!isOnline) {
+      try {
+        await queueVCardImport({
+          name: parsed.name,
+          organization: parsed.organization,
+          email: parsed.email,
+          phone: parsed.phone,
+          title: parsed.title,
+          address: parsed.address,
+          url: parsed.url,
+          domain: parsed.domain,
+        });
+
+        toast({
+          title: "Em fila",
+          description: "Cartão guardado. Será importado quando recuperar a ligação.",
+        });
+
+        resetScanner();
+        return;
+      } catch (error) {
+        console.error("Error queuing vCard:", error);
+        toast({
+          title: "Erro",
+          description: "Não foi possível guardar o cartão offline.",
+          variant: "destructive",
+        });
+        resetScanner();
+        return;
+      }
     }
 
     try {
