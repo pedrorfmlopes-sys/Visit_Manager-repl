@@ -11,7 +11,16 @@ The system is built as a full-stack TypeScript application using React for the f
 **Extended Features Implemented:**
 1. ✅ **Geolocation Integration** - Automatic GPS capture during visit creation with validation, LocationPreview component, and map links
 2. ✅ **Calendar Integration** - Export visits to .ics files for adding to external calendars (Google Calendar, Outlook, etc.) with sanitized content
-3. ✅ **PDF Export** - Generate comprehensive PDF reports for individual visits with sanitized text output
+3. ✅ **PDF Export** - Complete backend-generated PDF system with Node.js canvas support:
+   - **Endpoint**: GET /api/visitas/:id/pdf with RBAC enforcement
+   - **Logo Rendering**: Entidade logos (PNG/JPEG) embedded at 30x30 in header
+   - **Photo Embedding**: Visit photos embedded as scaled images (max 100px height) with captions
+   - **Media Support**: PNG/JPEG images embedded, WEBP/SVG gracefully skipped with placeholders
+   - **Timeout Protection**: 5-second timeout on all remote media fetches to prevent blocking
+   - **Complete Content**: Header with logo, entidade details with enrichment data (NIF, domain, industry, description, social links), contacto info, visit details with highlighted IA summary, GPS coordinates, linked tarefas sorted by due date with status badges, embedded photos, video/audio links, footer with timestamp and page numbers
+   - **Smart Pagination**: Automatic page breaks before images and large text sections to prevent overflow
+   - **Offline Handling**: Frontend button disabled when offline with user notification
+   - **Professional Output**: Clean typography, section headers, color-coded content, proper spacing
 4. ✅ **Advanced Analytics** - User-scoped dashboard with visit trends, top offices, frequency metrics, GPS usage, and performance KPIs using Recharts
 5. ✅ **Offline Data Caching** - Complete offline support with IndexedDB storage, automatic sync when back online, and temporary ID management
 

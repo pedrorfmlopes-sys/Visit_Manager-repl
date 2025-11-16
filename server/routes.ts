@@ -335,6 +335,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/visitas/:id/pdf', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole } = await getUserContext(req);
+      const visita = await storage.getVisita(req.params.id, userId, userRole);
+      
+      if (!visita) {
+        return res.status(404).json({ message: "Visita not found" });
+      }
+
+      // Fetch related tarefas
+      const allTarefas = await storage.getTarefas(userId, userRole);
+      const visitaTarefas = allTarefas.filter(t => t.visitaId === req.params.id);
+
+      // Generate PDF using jsPDF
+      const { generateVisitaPDF } = await import('./pdfGenerator.js');
+      const pdfBuffer = await generateVisitaPDF(visita, visitaTarefas);
+
+      // Set headers for PDF download
+      const entidadeNome = visita.entidade?.nome || visita.gabinete?.nome || 'visita';
+      const dataVisita = new Date(visita.dataVisita).toISOString().split('T')[0];
+      const fileName = `Visita-${entidadeNome.replace(/\s/g, '-')}-${dataVisita}.pdf`;
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+      res.send(Buffer.from(pdfBuffer));
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      res.status(500).json({ message: "Failed to generate PDF" });
+    }
+  });
+
   app.post('/api/visitas', isAuthenticated, upload.fields([
     { name: 'audio', maxCount: 1 },
     { name: 'media', maxCount: 10 }

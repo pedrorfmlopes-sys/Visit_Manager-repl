@@ -12,7 +12,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 import type { VisitaWithRelations, Tarefa, InsertTarefa } from "@shared/schema";
 import { downloadICS, downloadNextVisitICS } from "@/lib/calendarExport";
-import { generateVisitPDF } from "@/lib/pdfExport";
 import { LocationPreview } from "@/components/LocationPreview";
 import { TarefaCard } from "@/components/TarefaCard";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -148,12 +147,58 @@ export default function VisitaDetail() {
     }
   };
 
-  const handleExportPDF = () => {
-    if (visita) {
-      generateVisitPDF(visita);
+  const handleExportPDF = async () => {
+    if (!visita) return;
+
+    if (!isOnline) {
+      toast({
+        title: "Offline",
+        description: "A exportação PDF só está disponível quando estiver online.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/visitas/${visitaId}/pdf`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF');
+      }
+
+      // Get the blob from the response
+      const blob = await response.blob();
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      
+      // Get filename from Content-Disposition header or use default
+      const contentDisposition = response.headers.get('Content-Disposition');
+      const fileName = contentDisposition
+        ? contentDisposition.split('filename=')[1]?.replace(/"/g, '')
+        : `Visita-${visita.gabinete?.nome || visita.entidade?.nome || visita.id}-${format(new Date(visita.dataVisita), 'yyyy-MM-dd')}.pdf`;
+      
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
       toast({
         title: "Exportado",
         description: "Relatório PDF descarregado com sucesso!",
+      });
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao gerar PDF. Por favor, tente novamente.",
+        variant: "destructive",
       });
     }
   };
@@ -420,6 +465,7 @@ export default function VisitaDetail() {
           <Button
             variant="outline"
             onClick={handleExportPDF}
+            disabled={!isOnline || !visita}
             data-testid="button-export-pdf"
           >
             <Download className="h-4 w-4 mr-2" />
