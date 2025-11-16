@@ -39,6 +39,7 @@ export interface IStorage {
   getEntidades(userId: string, userRole: 'admin' | 'agent'): Promise<Entidade[]>;
   getEntidade(id: string, userId: string, userRole: 'admin' | 'agent'): Promise<EntidadeWithRelations | undefined>;
   findEntidadeByNome(nome: string, userId: string, userRole: 'admin' | 'agent'): Promise<Entidade | undefined>;
+  findEntidadeByDomain(domain: string, userId: string, userRole: 'admin' | 'agent'): Promise<Entidade | undefined>;
   createEntidade(entidade: InsertEntidade): Promise<Entidade>;
   updateEntidade(id: string, entidade: Partial<InsertEntidade>, userId?: string, userRole?: 'admin' | 'agent'): Promise<Entidade | undefined>;
   deleteEntidade(id: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void>;
@@ -205,6 +206,30 @@ export class DatabaseStorage implements IStorage {
     } else {
       whereClause = and(
         sql`LOWER(${entidades.nome}) = LOWER(${nome})`,
+        or(
+          eq(entidades.createdByUserId, userId),
+          eq(entidades.assignedUserId, userId)
+        )
+      );
+    }
+    
+    const [entidade] = await db
+      .select()
+      .from(entidades)
+      .where(whereClause)
+      .limit(1);
+    
+    return entidade;
+  }
+
+  async findEntidadeByDomain(domain: string, userId: string, userRole: 'admin' | 'agent'): Promise<Entidade | undefined> {
+    // Build the where clause based on role
+    let whereClause;
+    if (userRole === 'admin') {
+      whereClause = sql`LOWER(${entidades.domain}) = LOWER(${domain})`;
+    } else {
+      whereClause = and(
+        sql`LOWER(${entidades.domain}) = LOWER(${domain})`,
         or(
           eq(entidades.createdByUserId, userId),
           eq(entidades.assignedUserId, userId)

@@ -341,36 +341,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // vCard import endpoint
+  // vCard import endpoint with universal entity auto-creation
   app.post('/api/tools/vcard-import', isAuthenticated, async (req: any, res) => {
     try {
       const { userId, userRole } = await getUserContext(req);
-      const { name, organization, email, phone, title, address } = req.body;
+      const { name, organization, email, phone, title, address, url, domain } = req.body;
 
       if (!name) {
         return res.status(400).json({ message: "Contact name is required" });
       }
 
       let entidadeId: string | undefined;
+      let entidadeStatus: 'existing' | 'created' | 'none' = 'none';
+      let entidadeNome: string | undefined;
 
-      // Try to find existing entidade by organization name
+      // UNIVERSAL ENTITY AUTO-CREATION LOGIC
+      // Step 1: Try to find existing entity by organization name
       if (organization) {
-        const existingEntidade = await storage.findEntidadeByNome(organization, userId, userRole);
-        if (existingEntidade) {
-          entidadeId = existingEntidade.id;
-        } else {
-          // Create new entidade
-          const newEntidade = await storage.createEntidade({
-            nome: organization,
-            tipoEntidade: 'Outro',
-            createdByUserId: userId,
-            assignedUserId: userId,
-          });
-          entidadeId = newEntidade.id;
+        const existingByName = await storage.findEntidadeByNome(organization, userId, userRole);
+        if (existingByName) {
+          entidadeId = existingByName.id;
+          entidadeNome = existingByName.nome;
+          entidadeStatus = 'existing';
         }
       }
 
-      // Create contacto
+      // Step 2: If not found and we have domain, try to find by domain
+      if (!entidadeId && domain) {
+        const existingByDomain = await storage.findEntidadeByDomain(domain, userId, userRole);
+        if (existingByDomain) {
+          entidadeId = existingByDomain.id;
+          entidadeNome = existingByDomain.nome;
+          entidadeStatus = 'existing';
+        }
+      }
+
+      // Step 3: If still not found but we have clues, create new entity
+      if (!entidadeId && (organization || domain)) {
+        const entityName = organization || domain || 'Entidade Desconhecida';
+        const newEntidade = await storage.createEntidade({
+          nome: entityName,
+          tipoEntidade: 'Outro',
+          domain: domain || undefined,
+          website: url || undefined,
+          createdByUserId: userId,
+          assignedUserId: userId,
+        });
+        entidadeId = newEntidade.id;
+        entidadeNome = newEntidade.nome;
+        entidadeStatus = 'created';
+      }
+
+      // Step 4: Always create contacto
       const contacto = await storage.createContacto({
         nome: name,
         email: email || undefined,
@@ -380,10 +402,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdByUserId: userId,
       });
 
+      // Return comprehensive response
       res.json({
         contacto,
-        entidadeId,
-        message: "Contact imported from vCard successfully",
+        entidade: entidadeId ? {
+          id: entidadeId,
+          nome: entidadeNome,
+          status: entidadeStatus,
+        } : null,
+        message: entidadeStatus === 'created' 
+          ? `Contacto e entidade "${entidadeNome}" criados automaticamente`
+          : entidadeStatus === 'existing'
+          ? `Contacto criado e associado à entidade "${entidadeNome}"`
+          : "Contacto criado sem entidade associada",
       });
     } catch (error) {
       console.error("Error importing vCard:", error);

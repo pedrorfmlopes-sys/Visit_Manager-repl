@@ -8,6 +8,8 @@ export interface ParsedVCard {
   phone?: string;
   address?: string;
   note?: string;
+  url?: string;
+  domain?: string; // Extracted from email or URL
 }
 
 export function parseVCard(vcardText: string): ParsedVCard | null {
@@ -62,8 +64,16 @@ export function parseVCard(vcardText: string): ParsedVCard | null {
         case 'NOTE':
           result.note = value;
           break;
+        case 'URL':
+          if (!result.url) {
+            result.url = value;
+          }
+          break;
       }
     }
+
+    // Extract domain from email or URL
+    result.domain = extractDomain(result.email, result.url);
 
     return result;
   } catch (error) {
@@ -80,6 +90,30 @@ function normalizePhone(phone: string): string {
   }
   
   return normalized;
+}
+
+export function extractDomain(email?: string, url?: string): string | undefined {
+  // Try to extract domain from email first
+  if (email && email.includes('@')) {
+    const domain = email.split('@')[1].toLowerCase();
+    // Filter out generic email providers
+    const genericProviders = ['gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com', 'icloud.com', 'live.com', 'aol.com', 'protonmail.com'];
+    if (!genericProviders.includes(domain)) {
+      return domain;
+    }
+  }
+
+  // Try to extract domain from URL
+  if (url) {
+    try {
+      const urlObj = new URL(url.startsWith('http') ? url : `https://${url}`);
+      return urlObj.hostname.replace(/^www\./, '').toLowerCase();
+    } catch (e) {
+      // Invalid URL, ignore
+    }
+  }
+
+  return undefined;
 }
 
 export function isVCard(text: string): boolean {

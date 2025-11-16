@@ -203,6 +203,8 @@ export default function QRScanner() {
         phone: parsed.phone,
         title: parsed.title,
         address: parsed.address,
+        url: parsed.url,
+        domain: parsed.domain,
       });
 
       if (!res.ok) {
@@ -218,16 +220,24 @@ export default function QRScanner() {
 
       const response = await res.json() as {
         contacto: { id: string };
-        entidadeId?: string;
+        entidade: {
+          id: string;
+          nome: string;
+          status: 'existing' | 'created' | 'none';
+        } | null;
         message: string;
       };
 
-      // Invalidate contacts cache
+      // Invalidate caches
       await queryClient.invalidateQueries({ queryKey: ["/api/contactos"] });
+      if (response.entidade) {
+        await queryClient.invalidateQueries({ queryKey: ["/api/entidades"] });
+      }
 
+      // Show appropriate toast based on entity status
       toast({
-        title: "Contacto criado",
-        description: "Contacto criado a partir de cartão de visita.",
+        title: response.entidade?.status === 'created' ? "Criados automaticamente" : "Contacto criado",
+        description: response.message,
       });
 
       // Navigate to contact detail
