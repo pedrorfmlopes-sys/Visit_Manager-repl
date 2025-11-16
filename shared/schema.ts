@@ -8,6 +8,7 @@ import {
   varchar,
   text,
   integer,
+  pgEnum,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -54,7 +55,45 @@ export const insertMarcaSchema = createInsertSchema(marcas).omit({
 export type InsertMarca = z.infer<typeof insertMarcaSchema>;
 export type Marca = typeof marcas.$inferSelect;
 
-// Gabinetes (Architecture Offices) table
+// Tipo de Entidade enum
+export const tipoEntidadeEnum = pgEnum('tipo_entidade', [
+  'Gabinete',
+  'Cliente',
+  'Distribuidor',
+  'Obra',
+  'Parceiro',
+  'Outro'
+]);
+
+// Entidades (Universal Entities) table - replaces Gabinetes
+export const entidades = pgTable("entidades", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tipoEntidade: tipoEntidadeEnum("tipo_entidade").notNull().default('Gabinete'),
+  nome: varchar("nome", { length: 255 }).notNull(),
+  morada: text("morada"),
+  cidade: varchar("cidade", { length: 100 }),
+  codigoPostal: varchar("codigo_postal", { length: 20 }),
+  email: varchar("email", { length: 255 }),
+  telefone: varchar("telefone", { length: 50 }),
+  website: varchar("website", { length: 500 }),
+  notas: text("notas"),
+  latitude: varchar("latitude", { length: 50 }),
+  longitude: varchar("longitude", { length: 50 }),
+  nif: varchar("nif", { length: 50 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEntidadeSchema = createInsertSchema(entidades).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertEntidade = z.infer<typeof insertEntidadeSchema>;
+export type Entidade = typeof entidades.$inferSelect;
+
+// Gabinetes (Architecture Offices) table - DEPRECATED, will be removed after migration
 export const gabinetes = pgTable("gabinetes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   nome: varchar("nome", { length: 255 }).notNull(),
@@ -84,17 +123,28 @@ export const contactos = pgTable("contactos", {
   funcao: varchar("funcao", { length: 255 }),
   telemovel: varchar("telemovel", { length: 50 }),
   email: varchar("email", { length: 255 }),
-  gabineteId: varchar("gabinete_id").notNull().references(() => gabinetes.id, { onDelete: 'cascade' }),
+  entidadeId: varchar("entidade_id").references(() => entidades.id, { onDelete: 'set null' }),
+  gabineteId: varchar("gabinete_id").references(() => gabinetes.id, { onDelete: 'set null' }), // DEPRECATED
   observacoes: text("observacoes"),
   fotoUrl: varchar("foto_url", { length: 500 }),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const contactosRelations = relations(contactos, ({ one }) => ({
-  gabinete: one(gabinetes, {
+  entidade: one(entidades, {
+    fields: [contactos.entidadeId],
+    references: [entidades.id],
+  }),
+  gabinete: one(gabinetes, { // DEPRECATED
     fields: [contactos.gabineteId],
     references: [gabinetes.id],
   }),
+}));
+
+export const entidadesRelations = relations(entidades, ({ many }) => ({
+  contactos: many(contactos),
+  visitas: many(visitas),
 }));
 
 export const gabinetesRelations = relations(gabinetes, ({ many }) => ({
@@ -105,6 +155,8 @@ export const gabinetesRelations = relations(gabinetes, ({ many }) => ({
 export const insertContactoSchema = createInsertSchema(contactos).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
+  gabineteId: true, // DEPRECATED - use entidadeId
 });
 
 export type InsertContacto = z.infer<typeof insertContactoSchema>;
@@ -113,7 +165,8 @@ export type Contacto = typeof contactos.$inferSelect;
 // Visitas (Visits) table
 export const visitas = pgTable("visitas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  gabineteId: varchar("gabinete_id").notNull().references(() => gabinetes.id, { onDelete: 'cascade' }),
+  entidadeId: varchar("entidade_id").references(() => entidades.id, { onDelete: 'set null' }),
+  gabineteId: varchar("gabinete_id").references(() => gabinetes.id, { onDelete: 'set null' }), // DEPRECATED
   contactoId: varchar("contacto_id").references(() => contactos.id, { onDelete: 'set null' }),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
   dataVisita: timestamp("data_visita").notNull(),
@@ -129,10 +182,15 @@ export const visitas = pgTable("visitas", {
   longitude: varchar("longitude", { length: 50 }),
   locationAccuracy: varchar("location_accuracy", { length: 50 }),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const visitasRelations = relations(visitas, ({ one }) => ({
-  gabinete: one(gabinetes, {
+  entidade: one(entidades, {
+    fields: [visitas.entidadeId],
+    references: [entidades.id],
+  }),
+  gabinete: one(gabinetes, { // DEPRECATED
     fields: [visitas.gabineteId],
     references: [gabinetes.id],
   }),
@@ -149,26 +207,35 @@ export const visitasRelations = relations(visitas, ({ one }) => ({
 export const insertVisitaSchema = createInsertSchema(visitas).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
   linkVisita: true,
   resumoIa: true,
   transcricaoAudio: true,
+  gabineteId: true, // DEPRECATED - use entidadeId
 });
 
 export type InsertVisita = z.infer<typeof insertVisitaSchema>;
 export type Visita = typeof visitas.$inferSelect;
 
 // Extended types for relations
+export type EntidadeWithRelations = Entidade & {
+  contactos?: Contacto[];
+  visitas?: Visita[];
+};
+
 export type GabineteWithRelations = Gabinete & {
   contactos?: Contacto[];
   visitas?: Visita[];
 };
 
 export type ContactoWithRelations = Contacto & {
-  gabinete?: Gabinete;
+  entidade?: Entidade | null;
+  gabinete?: Gabinete | null;
 };
 
 export type VisitaWithRelations = Visita & {
-  gabinete?: Gabinete;
+  entidade?: Entidade | null;
+  gabinete?: Gabinete | null;
   contacto?: Contacto | null;
   user?: User;
 };

@@ -1,11 +1,11 @@
-import type { Visita, Gabinete, Contacto } from "@shared/schema";
+import type { Visita, Gabinete, Contacto, Entidade } from "@shared/schema";
 
 const DB_NAME = 'VisitasDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Incremented for entidades migration
 
 export interface PendingSyncItem {
   id?: number;
-  type: 'visita' | 'gabinete' | 'contacto';
+  type: 'visita' | 'gabinete' | 'contacto' | 'entidade';
   action: 'create' | 'update' | 'delete';
   data: any;
   endpoint: string;
@@ -29,6 +29,7 @@ class OfflineStorage {
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
+        const oldVersion = event.oldVersion;
 
         if (!db.objectStoreNames.contains('pendingSync')) {
           const pendingStore = db.createObjectStore('pendingSync', { keyPath: 'id', autoIncrement: true });
@@ -50,6 +51,11 @@ class OfflineStorage {
 
         if (!db.objectStoreNames.contains('marcas')) {
           db.createObjectStore('marcas', { keyPath: 'id' });
+        }
+
+        // Version 2: Add entidades store
+        if (oldVersion < 2 && !db.objectStoreNames.contains('entidades')) {
+          db.createObjectStore('entidades', { keyPath: 'id' });
         }
       };
     });
@@ -124,6 +130,39 @@ class OfflineStorage {
     const db = await this.ensureDB();
     const tx = db.transaction('gabinetes', 'readwrite');
     await tx.objectStore('gabinetes').delete(id);
+  }
+
+  // Entidades methods
+  async saveEntidade(entidade: Entidade): Promise<void> {
+    const db = await this.ensureDB();
+    const tx = db.transaction('entidades', 'readwrite');
+    await tx.objectStore('entidades').put(entidade);
+  }
+
+  async getEntidades(): Promise<Entidade[]> {
+    const db = await this.ensureDB();
+    const tx = db.transaction('entidades', 'readonly');
+    return new Promise((resolve, reject) => {
+      const request = tx.objectStore('entidades').getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getEntidade(id: string): Promise<Entidade | null> {
+    const db = await this.ensureDB();
+    const tx = db.transaction('entidades', 'readonly');
+    return new Promise((resolve, reject) => {
+      const request = tx.objectStore('entidades').get(id);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async deleteEntidade(id: string): Promise<void> {
+    const db = await this.ensureDB();
+    const tx = db.transaction('entidades', 'readwrite');
+    await tx.objectStore('entidades').delete(id);
   }
 
   async saveContacto(contacto: Contacto): Promise<void> {

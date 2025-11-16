@@ -13,12 +13,15 @@ async function getOfflineData(endpoint: string): Promise<any> {
   
   // Extract ID from detail endpoints like /api/visitas/123
   const visitaMatch = endpoint.match(/\/api\/visitas\/([^\/]+)$/);
+  const entidadeMatch = endpoint.match(/\/api\/entidades\/([^\/]+)$/);
   const gabineteMatch = endpoint.match(/\/api\/gabinetes\/([^\/]+)$/);
   const contactoMatch = endpoint.match(/\/api\/contactos\/([^\/]+)$/);
   
   // Detail queries - return single object
   if (visitaMatch) {
     return await offlineStorage.getVisita(visitaMatch[1]);
+  } else if (entidadeMatch) {
+    return await offlineStorage.getEntidade(entidadeMatch[1]);
   } else if (gabineteMatch) {
     return await offlineStorage.getGabinete(gabineteMatch[1]);
   } else if (contactoMatch) {
@@ -28,6 +31,8 @@ async function getOfflineData(endpoint: string): Promise<any> {
   // List queries - return arrays
   if (endpoint.includes("/api/visitas")) {
     return await offlineStorage.getVisitas();
+  } else if (endpoint.includes("/api/entidades")) {
+    return await offlineStorage.getEntidades();
   } else if (endpoint.includes("/api/gabinetes")) {
     return await offlineStorage.getGabinetes();
   } else if (endpoint.includes("/api/contactos")) {
@@ -84,6 +89,14 @@ export const getQueryFn: <T>(options: {
             }
           } else if (data && data.id) {
             await offlineStorage.saveVisita(data);
+          }
+        } else if (endpoint.includes("/api/entidades")) {
+          if (Array.isArray(data)) {
+            for (const entidade of data) {
+              await offlineStorage.saveEntidade(entidade);
+            }
+          } else if (data && data.id) {
+            await offlineStorage.saveEntidade(data);
           }
         } else if (endpoint.includes("/api/gabinetes")) {
           if (Array.isArray(data)) {

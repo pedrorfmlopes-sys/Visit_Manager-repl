@@ -67,6 +67,9 @@ class SyncManager {
           if (type === 'visita') {
             await offlineStorage.deleteVisita(tempId);
             await offlineStorage.saveVisita(createdItem);
+          } else if (type === 'entidade') {
+            await offlineStorage.deleteEntidade(tempId);
+            await offlineStorage.saveEntidade(createdItem);
           } else if (type === 'gabinete') {
             await offlineStorage.deleteGabinete(tempId);
             await offlineStorage.saveGabinete(createdItem);
@@ -98,6 +101,32 @@ class SyncManager {
       action: 'create',
       data,
       endpoint: '/api/visitas',
+      timestamp: Date.now(),
+      retryCount: 0,
+      tempId, // Track temporary ID for replacement after sync
+    });
+
+    const count = await offlineStorage.getPendingSyncCount();
+    this.notifyCallbacks(count);
+
+    if (navigator.onLine) {
+      await this.syncPendingItems();
+    }
+  }
+
+  async queueEntidadeCreation(data: any): Promise<void> {
+    // Generate temporary ID and save locally
+    const tempId = `temp-${crypto.randomUUID()}`;
+    const entidadeWithId = { ...data, id: tempId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    
+    // Save to local IndexedDB so it appears in lists immediately
+    await offlineStorage.saveEntidade(entidadeWithId);
+    
+    await offlineStorage.addPendingSync({
+      type: 'entidade',
+      action: 'create',
+      data,
+      endpoint: '/api/entidades',
       timestamp: Date.now(),
       retryCount: 0,
       tempId, // Track temporary ID for replacement after sync
