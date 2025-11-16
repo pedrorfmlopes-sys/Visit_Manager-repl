@@ -15,6 +15,7 @@ export default function QRScanner() {
   const isOnline = useOnlineStatus();
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerRef = useRef<QrScanner | null>(null);
+  const isProcessingRef = useRef<boolean>(false);
   const [hasFlash, setHasFlash] = useState(false);
   const [flashOn, setFlashOn] = useState(false);
   const [isScanning, setIsScanning] = useState(true);
@@ -28,12 +29,15 @@ export default function QRScanner() {
     const scanner = new QrScanner(
       videoRef.current,
       async (result) => {
+        // Block concurrent scans while processing (use ref to avoid stale closure)
+        if (isProcessingRef.current) return;
+
         // Throttle to max 3 scans per second
         const now = Date.now();
         if (now - lastScanTime.current < 333) return;
         lastScanTime.current = now;
 
-        // Stop scanning temporarily
+        // Mark as processing (scanner keeps running, callback just gates)
         setIsScanning(false);
         setScannedResult(result.data);
 
@@ -115,6 +119,7 @@ export default function QRScanner() {
   };
 
   const handleQRResult = async (data: string) => {
+    isProcessingRef.current = true;
     setIsProcessing(true);
 
     try {
@@ -152,6 +157,7 @@ export default function QRScanner() {
 
       // 4. Plain text - show options
       setScannedResult(data);
+      setIsScanning(true);
       setIsProcessing(false);
     } catch (error) {
       console.error("Error processing QR code:", error);
@@ -161,6 +167,9 @@ export default function QRScanner() {
         variant: "destructive",
       });
       resetScanner();
+    } finally {
+      // Always clear processing flag so scanner can process next QR
+      isProcessingRef.current = false;
     }
   };
 
@@ -196,6 +205,17 @@ export default function QRScanner() {
         address: parsed.address,
       });
 
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: "Failed to import vCard" }));
+        toast({
+          title: "Erro ao importar",
+          description: errorData.message || "Erro ao importar cartão de visita.",
+          variant: "destructive",
+        });
+        resetScanner();
+        return;
+      }
+
       const response = await res.json() as {
         contacto: { id: string };
         entidadeId?: string;
@@ -224,7 +244,8 @@ export default function QRScanner() {
   };
 
   const handleDeepLink = (link: string) => {
-    const regex = /^divitek-visit:\/\/(entidade|visita|contacto)\/(.+)$/;
+    // Only accept UUIDs or alphanumeric IDs (no path traversal)
+    const regex = /^divitek-visit:\/\/(entidade|visita|contacto)\/([a-zA-Z0-9-]+)$/;
     const match = link.match(regex);
 
     if (!match) {
@@ -238,6 +259,17 @@ export default function QRScanner() {
     }
 
     const [, type, id] = match;
+
+    // Additional validation: ID should look like a UUID or valid ID
+    if (!id || id.includes('..') || id.includes('/')) {
+      toast({
+        title: "ID inválido",
+        description: "Identificador do deep link não é válido.",
+        variant: "destructive",
+      });
+      resetScanner();
+      return;
+    }
 
     switch (type) {
       case "entidade":
@@ -258,6 +290,7 @@ export default function QRScanner() {
   };
 
   const resetScanner = () => {
+    isProcessingRef.current = false;
     setScannedResult(null);
     setIsProcessing(false);
     setIsScanning(true);
