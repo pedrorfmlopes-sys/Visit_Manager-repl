@@ -4,6 +4,7 @@ import {
   gabinetes,
   contactos,
   visitas,
+  tarefas,
   marcas,
   type User,
   type UpsertUser,
@@ -15,12 +16,15 @@ import {
   type InsertContacto,
   type Visita,
   type InsertVisita,
+  type Tarefa,
+  type InsertTarefa,
   type Marca,
   type InsertMarca,
   type EntidadeWithRelations,
   type GabineteWithRelations,
   type ContactoWithRelations,
   type VisitaWithRelations,
+  type TarefaWithRelations,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, gte, sql, or, and } from "drizzle-orm";
@@ -59,6 +63,13 @@ export interface IStorage {
   createVisita(visita: InsertVisita): Promise<Visita>;
   updateVisita(id: string, visita: Partial<Visita>, userId?: string, userRole?: 'admin' | 'agent'): Promise<Visita | undefined>;
   deleteVisita(id: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void>;
+  
+  // Tarefas
+  getTarefas(userId: string, userRole: 'admin' | 'agent', filters?: { status?: string; assignedUserId?: string; entidadeId?: string; overdue?: boolean }): Promise<TarefaWithRelations[]>;
+  getTarefa(id: string, userId: string, userRole: 'admin' | 'agent'): Promise<TarefaWithRelations | undefined>;
+  createTarefa(tarefa: InsertTarefa): Promise<Tarefa>;
+  updateTarefa(id: string, tarefa: Partial<InsertTarefa>, userId?: string, userRole?: 'admin' | 'agent'): Promise<Tarefa | undefined>;
+  deleteTarefa(id: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void>;
   
   // Marcas
   getMarcas(): Promise<Marca[]>;
@@ -436,6 +447,123 @@ export class DatabaseStorage implements IStorage {
       : eq(visitas.id, id);
     
     await db.delete(visitas).where(whereClause);
+  }
+
+  // Tarefas (Tasks)
+  async getTarefas(userId: string, userRole: 'admin' | 'agent', filters?: { status?: string; assignedUserId?: string; entidadeId?: string; overdue?: boolean }): Promise<TarefaWithRelations[]> {
+    // Build where clauses for role-based filtering
+    const conditions: any[] = [];
+    
+    // Role-based access: admin sees all, agent sees only created/assigned
+    if (userRole === 'agent') {
+      conditions.push(
+        or(
+          eq(tarefas.createdByUserId, userId),
+          eq(tarefas.assignedUserId, userId)
+        )
+      );
+    }
+    
+    // Apply filters
+    if (filters?.status) {
+      conditions.push(eq(tarefas.status, filters.status as any));
+    }
+    if (filters?.assignedUserId) {
+      conditions.push(eq(tarefas.assignedUserId, filters.assignedUserId));
+    }
+    if (filters?.entidadeId) {
+      conditions.push(eq(tarefas.entidadeId, filters.entidadeId));
+    }
+    if (filters?.overdue) {
+      conditions.push(
+        and(
+          eq(tarefas.status, 'pending'),
+          sql`${tarefas.dueDate} < NOW()`
+        )
+      );
+    }
+    
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    return db.query.tarefas.findMany({
+      where: whereClause,
+      orderBy: [desc(tarefas.createdAt)],
+      with: {
+        visita: true,
+        entidade: true,
+        assignedUser: true,
+        createdByUser: true,
+      },
+    });
+  }
+
+  async getTarefa(id: string, userId: string, userRole: 'admin' | 'agent'): Promise<TarefaWithRelations | undefined> {
+    // Build where clause based on role
+    let whereClause;
+    if (userRole === 'agent') {
+      whereClause = and(
+        eq(tarefas.id, id),
+        or(
+          eq(tarefas.createdByUserId, userId),
+          eq(tarefas.assignedUserId, userId)
+        )
+      );
+    } else {
+      whereClause = eq(tarefas.id, id);
+    }
+    
+    return db.query.tarefas.findFirst({
+      where: whereClause,
+      with: {
+        visita: true,
+        entidade: true,
+        assignedUser: true,
+        createdByUser: true,
+      },
+    });
+  }
+
+  async createTarefa(tarefaData: InsertTarefa): Promise<Tarefa> {
+    const [tarefa] = await db
+      .insert(tarefas)
+      .values({ ...tarefaData, updatedAt: new Date() })
+      .returning();
+    return tarefa;
+  }
+
+  async updateTarefa(id: string, tarefaData: Partial<InsertTarefa>, userId?: string, userRole?: 'admin' | 'agent'): Promise<Tarefa | undefined> {
+    // Build where clause: admin or no auth = id only, agent = id + ownership
+    const whereClause = (userId && userRole === 'agent')
+      ? and(
+          eq(tarefas.id, id),
+          or(
+            eq(tarefas.createdByUserId, userId),
+            eq(tarefas.assignedUserId, userId)
+          )
+        )
+      : eq(tarefas.id, id);
+    
+    const [tarefa] = await db
+      .update(tarefas)
+      .set({ ...tarefaData, updatedAt: new Date() })
+      .where(whereClause)
+      .returning();
+    return tarefa;
+  }
+
+  async deleteTarefa(id: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void> {
+    // Build where clause: admin or no auth = id only, agent = id + ownership
+    const whereClause = (userId && userRole === 'agent')
+      ? and(
+          eq(tarefas.id, id),
+          or(
+            eq(tarefas.createdByUserId, userId),
+            eq(tarefas.assignedUserId, userId)
+          )
+        )
+      : eq(tarefas.id, id);
+    
+    await db.delete(tarefas).where(whereClause);
   }
 
   // Marcas

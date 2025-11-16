@@ -1,0 +1,161 @@
+Now please implement the complete Task Management System for the app.
+This is a core feature and must integrate perfectly with the existing architecture (Entidades, Contactos, Visitas, Multi-Agent, Offline Mode, and Supabase).
+
+1. Create a new table “tarefas” with:
+
+id
+
+titulo
+
+descricao
+
+visita_id (nullable)
+
+entidade_id (nullable)
+
+createdByUserId (required)
+
+assignedUserId (nullable)
+
+due_date (nullable)
+
+repeat_interval (enum: none, daily, 2days, 3days, weekly)
+
+status (pending, done)
+
+needsSync
+
+syncStatus
+
+syncError
+
+lastSyncAt
+
+odoo_task_id (nullable)
+
+created_at
+
+updated_at
+
+All fields must be compatible with offline mode (temp-IDs).
+
+2. Create the full frontend interface:
+New pages/components:
+
+TaskList
+
+TaskCard
+
+TaskDetail
+
+TaskForm
+
+TaskToolbar
+
+Requirements:
+
+Admin: see all tasks
+
+Agent: see only tasks they created or assigned
+
+Status badges
+
+Assigned user badge
+
+Linked entity and visit preview
+
+Filters by status, agent, due date
+
+3. VisitForm integration:
+
+When user creates a visit:
+
+Add option “Create follow-up task”
+
+If selected, open TaskForm modal
+
+Pre-fill:
+
+titulo = “Follow-up visita — {entidade.nome}”
+
+descricao = notas da visita
+
+visita_id = id da visita
+
+createdByUserId = current user
+
+assignedUserId = current user (admins can choose)
+
+4. Offline Mode support:
+
+Tasks must:
+
+be created offline
+
+sync when online
+
+replace temp-ID with real ID
+
+keep ownership
+
+appear in dashboard and entity details
+
+ensure React Query cache updates
+
+5. Export Tools:
+
+Add export buttons in TaskDetail:
+
+Export as ICS (fully implemented)
+
+Export to Planner (placeholder, no Graph API logic yet)
+
+Export to Microsoft To Do (placeholder)
+
+Export to Odoo (placeholder)
+
+ICS export must include:
+
+title
+
+description
+
+start date (due_date)
+
+reminder 1 hour before
+
+6. Reminders Engine:
+
+Add local reminder system:
+
+Daily check for tasks pending
+
+Highlight overdue tasks
+
+For tasks with repeat_interval:
+
+regenerate next reminder based on interval
+
+UI badge in navbar showing number of pending tasks
+
+7. Dashboard integration:
+
+Number of tasks pending
+
+Tasks overdue
+
+Tasks by agent (admins only)
+
+Ensure full compatibility with:
+
+multi-agent roles
+
+offline-first design
+
+react-query cache
+
+Supabase sync
+
+future Odoo activity sync
+
+Proceed.

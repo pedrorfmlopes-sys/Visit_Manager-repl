@@ -8,7 +8,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { randomUUID } from "crypto";
-import { insertEntidadeSchema, insertGabineteSchema, insertContactoSchema, insertVisitaSchema } from "@shared/schema";
+import { insertEntidadeSchema, insertGabineteSchema, insertContactoSchema, insertVisitaSchema, insertTarefaSchema } from "@shared/schema";
 import express from "express";
 
 // Ensure upload directory exists
@@ -463,6 +463,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting visita:", error);
       res.status(500).json({ message: "Failed to delete visita" });
+    }
+  });
+
+  // Tarefas (Tasks) endpoints
+  app.get('/api/tarefas', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole } = await getUserContext(req);
+      const filters = {
+        status: req.query.status as string | undefined,
+        assignedUserId: req.query.assignedUserId as string | undefined,
+        entidadeId: req.query.entidadeId as string | undefined,
+        overdue: req.query.overdue === 'true',
+      };
+      const tarefas = await storage.getTarefas(userId, userRole, filters);
+      res.json(tarefas);
+    } catch (error) {
+      console.error("Error fetching tarefas:", error);
+      res.status(500).json({ message: "Failed to fetch tarefas" });
+    }
+  });
+
+  app.get('/api/tarefas/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole } = await getUserContext(req);
+      const tarefa = await storage.getTarefa(req.params.id, userId, userRole);
+      if (!tarefa) {
+        return res.status(404).json({ message: "Tarefa not found" });
+      }
+      res.json(tarefa);
+    } catch (error) {
+      console.error("Error fetching tarefa:", error);
+      res.status(500).json({ message: "Failed to fetch tarefa" });
+    }
+  });
+
+  app.post('/api/tarefas', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId } = await getUserContext(req);
+      const validatedData = insertTarefaSchema.parse(req.body);
+      const tarefa = await storage.createTarefa({
+        ...validatedData,
+        createdByUserId: userId,
+      });
+      res.json(tarefa);
+    } catch (error) {
+      console.error("Error creating tarefa:", error);
+      res.status(400).json({ message: "Failed to create tarefa" });
+    }
+  });
+
+  app.patch('/api/tarefas/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole } = await getUserContext(req);
+      const validatedData = insertTarefaSchema.partial().parse(req.body);
+      const tarefa = await storage.updateTarefa(req.params.id, validatedData, userId, userRole);
+      if (!tarefa) {
+        return res.status(404).json({ message: "Tarefa not found or unauthorized" });
+      }
+      res.json(tarefa);
+    } catch (error) {
+      console.error("Error updating tarefa:", error);
+      res.status(400).json({ message: "Failed to update tarefa" });
+    }
+  });
+
+  app.delete('/api/tarefas/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole } = await getUserContext(req);
+      await storage.deleteTarefa(req.params.id, userId, userRole);
+      res.json({ message: "Tarefa deleted" });
+    } catch (error) {
+      console.error("Error deleting tarefa:", error);
+      res.status(500).json({ message: "Failed to delete tarefa" });
     }
   });
 

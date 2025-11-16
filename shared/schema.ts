@@ -42,6 +42,21 @@ export const syncStatusEnum = pgEnum('sync_status', [
   'never'
 ]);
 
+// Task Status enum
+export const taskStatusEnum = pgEnum('task_status', [
+  'pending',
+  'done'
+]);
+
+// Task Repeat Interval enum
+export const taskRepeatEnum = pgEnum('task_repeat_interval', [
+  'none',
+  'daily',
+  '2days',
+  '3days',
+  'weekly'
+]);
+
 // ============================================
 // TABLES
 // ============================================
@@ -354,6 +369,61 @@ export const insertVisitaSchema = createInsertSchema(visitas).omit({
 export type InsertVisita = z.infer<typeof insertVisitaSchema>;
 export type Visita = typeof visitas.$inferSelect;
 
+// Tarefas (Tasks) table
+export const tarefas = pgTable("tarefas", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  titulo: varchar("titulo", { length: 500 }).notNull(),
+  descricao: text("descricao"),
+  visitaId: varchar("visita_id").references(() => visitas.id, { onDelete: 'set null' }),
+  entidadeId: varchar("entidade_id").references(() => entidades.id, { onDelete: 'set null' }),
+  createdByUserId: varchar("created_by_user_id", { length: 255 }).notNull(),
+  assignedUserId: varchar("assigned_user_id", { length: 255 }),
+  dueDate: timestamp("due_date"),
+  repeatInterval: taskRepeatEnum("repeat_interval").default('none').notNull(),
+  status: taskStatusEnum("status").default('pending').notNull(),
+  // Odoo Integration Fields
+  odooTaskId: integer("odoo_task_id"),
+  needsSync: boolean("needs_sync").default(false).notNull(),
+  syncStatus: syncStatusEnum("sync_status").default('never'),
+  lastSyncAt: timestamp("last_sync_at"),
+  syncError: text("sync_error"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const tarefasRelations = relations(tarefas, ({ one }) => ({
+  visita: one(visitas, {
+    fields: [tarefas.visitaId],
+    references: [visitas.id],
+  }),
+  entidade: one(entidades, {
+    fields: [tarefas.entidadeId],
+    references: [entidades.id],
+  }),
+  assignedUser: one(users, {
+    fields: [tarefas.assignedUserId],
+    references: [users.id],
+  }),
+  createdByUser: one(users, {
+    fields: [tarefas.createdByUserId],
+    references: [users.id],
+  }),
+}));
+
+export const insertTarefaSchema = createInsertSchema(tarefas).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  odooTaskId: true,
+  needsSync: true,
+  syncStatus: true,
+  lastSyncAt: true,
+  syncError: true,
+});
+
+export type InsertTarefa = z.infer<typeof insertTarefaSchema>;
+export type Tarefa = typeof tarefas.$inferSelect;
+
 // Extended types for relations
 export type EntidadeWithRelations = Entidade & {
   contactos?: Contacto[];
@@ -379,6 +449,13 @@ export type VisitaWithRelations = Visita & {
   gabinete?: Gabinete | null;
   contacto?: Contacto | null;
   user?: User;
+  assignedUser?: User | null;
+  createdByUser?: User | null;
+};
+
+export type TarefaWithRelations = Tarefa & {
+  visita?: Visita | null;
+  entidade?: Entidade | null;
   assignedUser?: User | null;
   createdByUser?: User | null;
 };

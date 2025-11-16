@@ -21,6 +21,9 @@ import ContactoForm from "@/pages/ContactoForm";
 import Visitas from "@/pages/Visitas";
 import VisitaForm from "@/pages/VisitaForm";
 import VisitaDetail from "@/pages/VisitaDetail";
+import Tarefas from "@/pages/Tarefas";
+import TarefaForm from "@/pages/TarefaForm";
+import TarefaDetail from "@/pages/TarefaDetail";
 import Analytics from "@/pages/Analytics";
 
 function Router() {
@@ -58,6 +61,10 @@ function Router() {
           <Route path="/visitas" component={Visitas} />
           <Route path="/visitas/nova" component={VisitaForm} />
           <Route path="/visitas/:id" component={VisitaDetail} />
+          <Route path="/tarefas" component={Tarefas} />
+          <Route path="/tarefas/nova" component={TarefaForm} />
+          <Route path="/tarefas/:id" component={TarefaDetail} />
+          <Route path="/tarefas/:id/editar" component={TarefaForm} />
           <Route path="/analytics" component={Analytics} />
         </>
       )}
