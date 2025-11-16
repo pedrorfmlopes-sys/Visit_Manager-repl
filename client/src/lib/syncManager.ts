@@ -52,22 +52,47 @@ class SyncManager {
   }
 
   private async syncItem(item: PendingSyncItem): Promise<void> {
-    const { endpoint, data, action } = item;
+    const { endpoint, data, action, type, tempId } = item;
 
     switch (action) {
       case 'create':
-        await apiRequest(endpoint, 'POST', data);
+        const response = await apiRequest('POST', endpoint, data);
+        const createdItem = await response.json();
+        
+        // Replace temporary item with real item in local storage
+        if (tempId && createdItem.id) {
+          await offlineStorage.init();
+          
+          // Remove temp item and save real item
+          if (type === 'visita') {
+            await offlineStorage.deleteVisita(tempId);
+            await offlineStorage.saveVisita(createdItem);
+          } else if (type === 'gabinete') {
+            await offlineStorage.deleteGabinete(tempId);
+            await offlineStorage.saveGabinete(createdItem);
+          } else if (type === 'contacto') {
+            await offlineStorage.deleteContacto(tempId);
+            await offlineStorage.saveContacto(createdItem);
+          }
+        }
         break;
       case 'update':
-        await apiRequest(endpoint, 'PATCH', data);
+        await apiRequest('PATCH', endpoint, data);
         break;
       case 'delete':
-        await apiRequest(endpoint, 'DELETE');
+        await apiRequest('DELETE', endpoint);
         break;
     }
   }
 
   async queueVisitaCreation(data: any): Promise<void> {
+    // Generate temporary ID and save locally
+    const tempId = `temp-${crypto.randomUUID()}`;
+    const visitaWithId = { ...data, id: tempId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    
+    // Save to local IndexedDB so it appears in lists immediately
+    await offlineStorage.saveVisita(visitaWithId);
+    
     await offlineStorage.addPendingSync({
       type: 'visita',
       action: 'create',
@@ -75,6 +100,7 @@ class SyncManager {
       endpoint: '/api/visitas',
       timestamp: Date.now(),
       retryCount: 0,
+      tempId, // Track temporary ID for replacement after sync
     });
 
     const count = await offlineStorage.getPendingSyncCount();
@@ -86,6 +112,13 @@ class SyncManager {
   }
 
   async queueGabineteCreation(data: any): Promise<void> {
+    // Generate temporary ID and save locally
+    const tempId = `temp-${crypto.randomUUID()}`;
+    const gabineteWithId = { ...data, id: tempId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    
+    // Save to local IndexedDB so it appears in lists immediately
+    await offlineStorage.saveGabinete(gabineteWithId);
+    
     await offlineStorage.addPendingSync({
       type: 'gabinete',
       action: 'create',
@@ -93,6 +126,7 @@ class SyncManager {
       endpoint: '/api/gabinetes',
       timestamp: Date.now(),
       retryCount: 0,
+      tempId, // Track temporary ID for replacement after sync
     });
 
     const count = await offlineStorage.getPendingSyncCount();
@@ -104,6 +138,13 @@ class SyncManager {
   }
 
   async queueContactoCreation(data: any): Promise<void> {
+    // Generate temporary ID and save locally
+    const tempId = `temp-${crypto.randomUUID()}`;
+    const contactoWithId = { ...data, id: tempId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    
+    // Save to local IndexedDB so it appears in lists immediately
+    await offlineStorage.saveContacto(contactoWithId);
+    
     await offlineStorage.addPendingSync({
       type: 'contacto',
       action: 'create',
@@ -111,6 +152,7 @@ class SyncManager {
       endpoint: '/api/contactos',
       timestamp: Date.now(),
       retryCount: 0,
+      tempId, // Track temporary ID for replacement after sync
     });
 
     const count = await offlineStorage.getPendingSyncCount();

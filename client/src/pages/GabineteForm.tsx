@@ -56,7 +56,26 @@ export default function GabineteForm() {
       });
       setLocation("/gabinetes");
     },
-    onError: (error: Error) => {
+    onError: async (error: Error, data) => {
+      console.log('❌ createMutation error:', error);
+      
+      // Check if it's a network error (offline)
+      const isNetworkError = error.message.includes('fetch') || 
+                            error.message.includes('NetworkError') ||
+                            error.message.includes('Failed to fetch') ||
+                            !navigator.onLine;
+      
+      if (isNetworkError) {
+        console.log('📱 Network error detected, saving offline...');
+        await syncManager.queueGabineteCreation(data);
+        toast({
+          title: "Gabinete guardado",
+          description: "Será sincronizado automaticamente quando voltar online.",
+        });
+        setLocation("/gabinetes");
+        return;
+      }
+      
       if (isUnauthorizedError(error)) {
         toast({
           title: "Não autorizado",
@@ -110,7 +129,10 @@ export default function GabineteForm() {
   });
 
   const onSubmit = async (data: InsertGabinete) => {
+    console.log('📝 GabineteForm.onSubmit', { isOnline, isEdit, data });
+    
     if (!isOnline && !isEdit) {
+      console.log('💾 Saving offline...');
       await syncManager.queueGabineteCreation(data);
       toast({
         title: "Gabinete guardado",
@@ -121,6 +143,7 @@ export default function GabineteForm() {
     }
 
     if (!isOnline && isEdit) {
+      console.log('⚠️ Offline edit blocked');
       toast({
         title: "Modo Offline",
         description: "Não é possível editar enquanto offline. Tente novamente quando voltar online.",
@@ -129,6 +152,7 @@ export default function GabineteForm() {
       return;
     }
 
+    console.log('🌐 Online mutation...');
     if (isEdit) {
       updateMutation.mutate(data);
     } else {

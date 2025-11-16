@@ -11,6 +11,7 @@ export interface PendingSyncItem {
   endpoint: string;
   timestamp: number;
   retryCount?: number;
+  tempId?: string; // Temporary ID for offline-created items
 }
 
 class OfflineStorage {
@@ -87,6 +88,12 @@ class OfflineStorage {
     });
   }
 
+  async deleteVisita(id: string): Promise<void> {
+    const db = await this.ensureDB();
+    const tx = db.transaction('visits', 'readwrite');
+    await tx.objectStore('visits').delete(id);
+  }
+
   async saveGabinete(gabinete: Gabinete): Promise<void> {
     const db = await this.ensureDB();
     const tx = db.transaction('gabinetes', 'readwrite');
@@ -113,6 +120,12 @@ class OfflineStorage {
     });
   }
 
+  async deleteGabinete(id: string): Promise<void> {
+    const db = await this.ensureDB();
+    const tx = db.transaction('gabinetes', 'readwrite');
+    await tx.objectStore('gabinetes').delete(id);
+  }
+
   async saveContacto(contacto: Contacto): Promise<void> {
     const db = await this.ensureDB();
     const tx = db.transaction('contactos', 'readwrite');
@@ -137,6 +150,12 @@ class OfflineStorage {
       request.onsuccess = () => resolve(request.result || null);
       request.onerror = () => reject(request.error);
     });
+  }
+
+  async deleteContacto(id: string): Promise<void> {
+    const db = await this.ensureDB();
+    const tx = db.transaction('contactos', 'readwrite');
+    await tx.objectStore('contactos').delete(id);
   }
 
   async addPendingSync(item: Omit<PendingSyncItem, 'id'>): Promise<number> {

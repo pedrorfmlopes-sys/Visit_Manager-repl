@@ -59,7 +59,23 @@ export default function ContactoForm() {
       });
       setLocation("/contactos");
     },
-    onError: (error: Error) => {
+    onError: async (error: Error, data) => {
+      // Check if it's a network error (offline)
+      const isNetworkError = error.message.includes('fetch') || 
+                            error.message.includes('NetworkError') ||
+                            error.message.includes('Failed to fetch') ||
+                            !navigator.onLine;
+      
+      if (isNetworkError) {
+        await syncManager.queueContactoCreation(data);
+        toast({
+          title: "Contacto guardado",
+          description: "Será sincronizado automaticamente quando voltar online.",
+        });
+        setLocation("/contactos");
+        return;
+      }
+      
       if (isUnauthorizedError(error)) {
         toast({
           title: "Não autorizado",
