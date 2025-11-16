@@ -33,7 +33,7 @@ export default function EntidadeForm() {
   const queryClient = useQueryClient();
   const isOnline = useOnlineStatus();
   const { location: gpsLocation, isLoading: gpsLoading, requestLocation } = useGeolocation();
-  const isEdit = params?.id && params.id !== "novo";
+  const isEdit = params?.id && params.id !== "nova" && params.id !== "editar";
 
   const { data: entidade } = useQuery<Entidade>({
     queryKey: ["/api/entidades", params?.id],
