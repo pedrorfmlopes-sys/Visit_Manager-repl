@@ -54,8 +54,8 @@ function Router() {
           {/* NEW: Entidades routes (Universal Entities) */}
           <Route path="/entidades" component={Entidades} />
           <Route path="/entidades/nova" component={EntidadeForm} />
-          <Route path="/entidades/:id" component={EntidadeDetail} />
           <Route path="/entidades/:id/editar" component={EntidadeForm} />
+          <Route path="/entidades/:id" component={EntidadeDetail} />
           {/* LEGACY: Gabinetes routes (backward compatibility) */}
           <Route path="/gabinetes" component={Gabinetes} />
           <Route path="/gabinetes/novo" component={GabineteForm} />
