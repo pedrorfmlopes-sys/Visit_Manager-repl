@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, User, Phone, Mail, Building2, Edit, Share2, MessageCircle, Link as LinkIcon, Copy, FileText, Globe, MapPin, Linkedin, Instagram, Facebook } from "lucide-react";
+import { ArrowLeft, User, Phone, Mail, Building2, Edit, Share2, MessageCircle, Link as LinkIcon, Copy, FileText, Globe, MapPin, Linkedin, Instagram, Facebook, Sparkles } from "lucide-react";
 import { SiX } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ShareDialog, useShareActions } from "@/components/ShareDialog";
+import { EmailAIDialog } from "@/components/EmailAIDialog";
 import { QuickActionButton } from "@/components/QuickActionButton";
 import { formatContactForSharing } from "@/lib/shareFormatters";
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +19,7 @@ export default function ContactoDetail() {
   const [, setLocation] = useLocation();
   const contactoId = params?.id;
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const { toast } = useToast();
   
   const { isOnline, shareViaWhatsApp, shareViaEmail, copyToClipboard, copyLink } = useShareActions();
@@ -359,6 +361,12 @@ export default function ContactoDetail() {
                   testId="button-quick-x"
                 />
               )}
+              <QuickActionButton
+                icon={Sparkles}
+                label="Gerar Email"
+                onClick={() => setEmailDialogOpen(true)}
+                testId="button-quick-generate-email"
+              />
             </div>
           </CardContent>
         </Card>
@@ -370,6 +378,13 @@ export default function ContactoDetail() {
         title="Partilhar Contacto"
         description={`Partilhar informações de ${contacto.nome}`}
         options={shareOptions}
+      />
+
+      <EmailAIDialog
+        open={emailDialogOpen}
+        onOpenChange={setEmailDialogOpen}
+        contactoId={contactoId ? parseInt(contactoId) : undefined}
+        defaultTemplate="agradecimento"
       />
     </div>
   );
