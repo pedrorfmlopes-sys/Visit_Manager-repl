@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { pt } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,8 @@ import type { VisitaWithRelations, Tarefa, InsertTarefa } from "@shared/schema";
 import { downloadNextVisitICS } from "@/lib/calendarExport";
 import { LocationPreview } from "@/components/LocationPreview";
 import { TarefaCard } from "@/components/TarefaCard";
+import { ShareDialog, useShareActions } from "@/components/ShareDialog";
+import { formatVisitForSharing } from "@/lib/shareFormatters";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
@@ -35,9 +37,12 @@ export default function VisitaDetail() {
   const queryClient = useQueryClient();
   const visitaId = params?.id;
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const { data: currentUser } = useCurrentUser();
   const isAdmin = useIsAdmin();
   const isOnline = useOnlineStatus();
+  
+  const { shareViaWhatsApp, shareViaEmail, copyToClipboard, copyLink } = useShareActions();
 
   const { data: visita, isLoading } = useQuery<VisitaWithRelations>({
     queryKey: ["/api/visitas", visitaId],
@@ -259,25 +264,8 @@ export default function VisitaDetail() {
     }
   };
 
-  const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/visitas/${visitaId}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `Visita - ${visita?.gabinete?.nome}`,
-          text: `Detalhes da visita a ${visita?.gabinete?.nome}`,
-          url: shareUrl,
-        });
-      } catch (error) {
-        // User cancelled sharing
-      }
-    } else {
-      navigator.clipboard.writeText(shareUrl);
-      toast({
-        title: "Link copiado",
-        description: "Link único da visita copiado para a área de transferência!",
-      });
-    }
+  const handleShare = () => {
+    setShareDialogOpen(true);
   };
 
   if (isLoading) {
@@ -655,6 +643,43 @@ export default function VisitaDetail() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      <ShareDialog
+        open={shareDialogOpen}
+        onOpenChange={setShareDialogOpen}
+        title="Partilhar Visita"
+        description={`Partilhar detalhes da visita a ${visita?.gabinete?.nome || visita?.entidade?.nome || ""}`}
+        options={[
+          {
+            icon: MessageCircle,
+            label: "Enviar por WhatsApp",
+            action: () => shareViaWhatsApp(formatVisitForSharing(visita)),
+            disabled: !isOnline,
+          },
+          {
+            icon: Mail,
+            label: "Enviar por Email",
+            action: () => shareViaEmail(formatVisitForSharing(visita), `Visita - ${visita?.gabinete?.nome || visita?.entidade?.nome || ""}`),
+            disabled: !isOnline,
+          },
+          {
+            icon: Download,
+            label: "Exportar PDF",
+            action: handleExportPDF,
+            disabled: !isOnline,
+          },
+          {
+            icon: LinkIcon,
+            label: "Copiar Link",
+            action: () => copyLink(`/visitas/${visita?.id}`),
+          },
+          {
+            icon: FileText,
+            label: "Copiar Visita (texto)",
+            action: () => copyToClipboard(formatVisitForSharing(visita), "Visita copiada!"),
+          },
+        ]}
+      />
     </div>
   );
 }

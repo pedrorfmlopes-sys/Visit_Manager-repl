@@ -53,7 +53,7 @@ export default function Contactos() {
               <ContactoCard
                 key={contacto.id}
                 contacto={contacto}
-                onClick={() => setLocation(`/contactos/${contacto.id}`)}
+                onClick={() => setLocation(`/contactos/${contacto.id}/detalhes`)}
               />
             ))}
           </div>
