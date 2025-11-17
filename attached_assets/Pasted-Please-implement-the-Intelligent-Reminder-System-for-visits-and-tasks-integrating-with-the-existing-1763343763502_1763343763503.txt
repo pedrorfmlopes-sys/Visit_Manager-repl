@@ -1,0 +1,208 @@
+Please implement the Intelligent Reminder System for visits and tasks, integrating with the existing entities, visitas, tarefas, AI email module, offline sync, and RBAC.
+
+⭐ 1. NEW: Reminder Engine (Backend)
+
+Create a backend reminder engine (non-real-time, trigger-based) that evaluates reminders whenever:
+
+the user opens the app
+
+the user returns online
+
+a visit is created/updated
+
+a task is created/updated
+
+daily at the first query (local trigger)
+
+The reminder engine should:
+
+A) Generate visit reminders
+
+For each entity:
+
+If last visit was > 30 days → Reminder:
+“Já passaram 30 dias desde a última visita a {entidade}. Pretende agendar uma nova visita?”
+
+If entity has tasks pending and no new visit scheduled → Reminder:
+“Existem tarefas pendentes para {entidade} sem visita agendada. Deseja criar follow-up?”
+
+If entity has IA Summary with explicit next steps and they are not done → Reminder:
+“A IA sugeriu um follow-up para {entidade}. Deseja criar tarefa ou agendar visita?”
+
+B) Generate task reminders
+
+For each tarefa:
+
+If overdue:
+“A tarefa {tarefa.titulo} está atrasada. Reagendar?”
+
+If due date is tomorrow:
+“A tarefa {tarefa.titulo} vence amanhã. Deseja antecipar ou preparar follow-up?”
+
+If assigned to user and no activity in > 7 days:
+“Esta tarefa parece parada. Quer atualizá-la?”
+
+C) Generate AI-suggested reminders
+
+Use the existing visit AI Summary and entity metadata to produce high-value follow-ups:
+
+interest keyword detection
+
+product/brand delivered follow-up
+
+pending catalogs or samples
+
+stalled opportunities
+
+Use OpenAI ONLY for suggestion generation, NOT for scheduling.
+
+AI prompt inputs:
+
+last visits
+
+visit IA summary
+
+tasks
+
+entity details
+
+agent performance
+
+brand delivered list
+
+Output: short suggestions.
+
+⭐ 2. FRONTEND: Reminder Inbox
+
+Add a new page:
+/lembretes
+
+With:
+
+list of reminders
+
+type badges (Visita, Tarefa, IA Sugestão)
+
+timestamp
+
+action buttons
+
+Buttons per reminder:
+
+Visit reminders:
+
+Criar visita
+
+Abrir entidade
+
+Adiar (2 dias / 7 dias / 30 dias)
+
+Task reminders:
+
+Abrir tarefa
+
+Marcar como concluída
+
+Reagendar
+
+Adiar
+
+AI suggestions:
+
+Criar tarefa sugerida
+
+Gerar email com IA
+
+Abrir entidade
+
+⭐ 3. INTEGRATION IN UI
+A) Add a bell icon in the navbar
+
+Show red badge with number of reminders
+
+Real-time updates when new reminders are generated
+
+B) VisitDetail
+
+If reminder exists for entity → show banner
+“Existe um lembrete pendente para esta entidade.”
+
+C) ContactDetail / EntidadeDetail
+
+Show “Ver lembretes” button if any exist.
+
+⭐ 4. NOTIFICATIONS
+
+Use toast or banner-style inline notifications when reminder is triggered on page load.
+
+No background push notifications (not needed).
+
+⭐ 5. OFFLINE SUPPORT
+
+reminders are generated only when online
+
+but existing reminders are visible offline
+
+snooze actions work offline and sync later
+
+creation of tarefas/visitas triggered by reminders → use offline queue
+
+⭐ 6. RBAC
+
+Admin → sees all reminders
+
+Agent → sees reminders only for their assigned entities/tasks
+
+All RBAC logic consistent with your current architecture
+
+⭐ 7. DATA MODEL
+
+Add table lembretes:
+
+id
+
+userId
+
+entidadeId (optional)
+
+visitaId (optional)
+
+tarefaId (optional)
+
+tipo (visita | tarefa | ia)
+
+mensagem
+
+dataCriacao
+
+dataVencimento (optional)
+
+snoozedUntil (optional)
+
+resolved (boolean)
+
+resolvedAt (timestamp)
+
+Backend endpoints:
+
+GET /api/lembretes
+
+POST /api/lembretes/snooze
+
+POST /api/lembretes/resolve
+
+POST /api/lembretes/generate (internal use)
+
+⭐ 8. TESTING CHECKLIST
+
+✓ Reminder badge updates
+✓ Reminders generate correctly
+✓ Snooze works
+✓ Creating tasks/visits from reminders works
+✓ Offline queue honored
+✓ RBAC enforced
+✓ No TS errors
+✓ No breaking changes
+✓ Reminder inbox functions smoothly
+
+✅ Proceed.

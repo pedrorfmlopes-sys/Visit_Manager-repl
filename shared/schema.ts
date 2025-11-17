@@ -57,6 +57,13 @@ export const taskRepeatEnum = pgEnum('task_repeat_interval', [
   'weekly'
 ]);
 
+// Reminder Type enum
+export const lembreteTipoEnum = pgEnum('lembrete_tipo', [
+  'visita',
+  'tarefa',
+  'ia'
+]);
+
 // ============================================
 // TABLES
 // ============================================
@@ -432,6 +439,49 @@ export const insertTarefaSchema = createInsertSchema(tarefas).omit({
 export type InsertTarefa = z.infer<typeof insertTarefaSchema>;
 export type Tarefa = typeof tarefas.$inferSelect;
 
+// Lembretes (Reminders) table
+export const lembretes = pgTable("lembretes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  entidadeId: varchar("entidade_id").references(() => entidades.id, { onDelete: 'cascade' }),
+  visitaId: varchar("visita_id").references(() => visitas.id, { onDelete: 'cascade' }),
+  tarefaId: varchar("tarefa_id").references(() => tarefas.id, { onDelete: 'cascade' }),
+  tipo: lembreteTipoEnum("tipo").notNull(),
+  mensagem: text("mensagem").notNull(),
+  dataCriacao: timestamp("data_criacao").defaultNow().notNull(),
+  dataVencimento: timestamp("data_vencimento"),
+  snoozedUntil: timestamp("snoozed_until"),
+  resolved: boolean("resolved").default(false).notNull(),
+  resolvedAt: timestamp("resolved_at"),
+});
+
+export const lembretesRelations = relations(lembretes, ({ one }) => ({
+  user: one(users, {
+    fields: [lembretes.userId],
+    references: [users.id],
+  }),
+  entidade: one(entidades, {
+    fields: [lembretes.entidadeId],
+    references: [entidades.id],
+  }),
+  visita: one(visitas, {
+    fields: [lembretes.visitaId],
+    references: [visitas.id],
+  }),
+  tarefa: one(tarefas, {
+    fields: [lembretes.tarefaId],
+    references: [tarefas.id],
+  }),
+}));
+
+export const insertLembreteSchema = createInsertSchema(lembretes).omit({
+  id: true,
+  dataCriacao: true,
+});
+
+export type InsertLembrete = z.infer<typeof insertLembreteSchema>;
+export type Lembrete = typeof lembretes.$inferSelect;
+
 // Extended types for relations
 export type EntidadeWithRelations = Entidade & {
   contactos?: Contacto[];
@@ -466,4 +516,11 @@ export type TarefaWithRelations = Tarefa & {
   entidade?: Entidade | null;
   assignedUser?: User | null;
   createdByUser?: User | null;
+};
+
+export type LembreteWithRelations = Lembrete & {
+  user?: User;
+  entidade?: Entidade | null;
+  visita?: Visita | null;
+  tarefa?: Tarefa | null;
 };
