@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail } from "lucide-react";
+import { ArrowLeft, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { pt } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { downloadNextVisitICS } from "@/lib/calendarExport";
 import { LocationPreview } from "@/components/LocationPreview";
 import { TarefaCard } from "@/components/TarefaCard";
 import { ShareDialog, useShareActions } from "@/components/ShareDialog";
+import { EmailAIDialog } from "@/components/EmailAIDialog";
 import { formatVisitForSharing } from "@/lib/shareFormatters";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
@@ -37,6 +38,7 @@ export default function VisitaDetail() {
   const visitaId = params?.id;
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const { data: currentUser } = useCurrentUser();
   const isAdmin = useIsAdmin();
   
@@ -495,7 +497,7 @@ export default function VisitaDetail() {
 
         <Separator />
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -522,6 +524,14 @@ export default function VisitaDetail() {
           >
             <Download className="h-4 w-4 mr-2" />
             Exportar PDF
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setEmailDialogOpen(true)}
+            data-testid="button-generate-email"
+          >
+            <Sparkles className="h-4 w-4 mr-2" />
+            Gerar Email
           </Button>
           <Button
             variant="outline"
@@ -677,6 +687,13 @@ export default function VisitaDetail() {
             action: () => copyToClipboard(formatVisitForSharing(visita), "Visita copiada!"),
           },
         ]}
+      />
+
+      <EmailAIDialog
+        open={emailDialogOpen}
+        onOpenChange={setEmailDialogOpen}
+        visitaId={visitaId ? parseInt(visitaId) : undefined}
+        defaultTemplate="followup_pos_visita"
       />
     </div>
   );
