@@ -258,10 +258,6 @@ export const contactosRelations = relations(contactos, ({ one }) => ({
     fields: [contactos.entidadeId],
     references: [entidades.id],
   }),
-  gabinete: one(gabinetes, { // DEPRECATED
-    fields: [contactos.gabineteId],
-    references: [gabinetes.id],
-  }),
   assignedUser: one(users, {
     fields: [contactos.assignedUserId],
     references: [users.id],
@@ -283,11 +279,6 @@ export const entidadesRelations = relations(entidades, ({ one, many }) => ({
     fields: [entidades.createdByUserId],
     references: [users.id],
   }),
-}));
-
-export const gabinetesRelations = relations(gabinetes, ({ many }) => ({
-  contactos: many(contactos),
-  visitas: many(visitas),
 }));
 
 export const insertContactoSchema = createInsertSchema(contactos).omit({
@@ -344,10 +335,6 @@ export const visitasRelations = relations(visitas, ({ one }) => ({
   entidade: one(entidades, {
     fields: [visitas.entidadeId],
     references: [entidades.id],
-  }),
-  gabinete: one(gabinetes, { // DEPRECATED
-    fields: [visitas.gabineteId],
-    references: [gabinetes.id],
   }),
   contacto: one(contactos, {
     fields: [visitas.contactoId],
