@@ -71,7 +71,12 @@ export function fillEntityForm(
   
   setFieldIfEmpty('domain', dataSource.domain);
   setFieldIfEmpty('website', dataSource.website);
-  setFieldIfEmpty('morada', dataSource.morada);
+  
+  const parsedAddress = parsePortugueseAddress(dataSource.morada);
+  setFieldIfEmpty('morada', parsedAddress.morada);
+  setFieldIfEmpty('codigoPostal', parsedAddress.codigoPostal);
+  setFieldIfEmpty('cidade', parsedAddress.cidade);
+  
   setFieldIfEmpty('telefone', dataSource.telefone);
   setFieldIfEmpty('email', dataSource.email);
   setFieldIfEmpty('logoUrl', dataSource.logoUrl);
@@ -109,4 +114,42 @@ export function normalizeDomain(input: string | undefined | null): string | unde
   if (websiteDomain) return websiteDomain;
   
   return input.toLowerCase().trim();
+}
+
+export interface ParsedAddress {
+  morada?: string;
+  codigoPostal?: string;
+  cidade?: string;
+}
+
+export function parsePortugueseAddress(fullAddress: string | undefined | null): ParsedAddress {
+  if (!fullAddress) return {};
+  
+  const normalized = fullAddress.trim();
+  
+  const postalCodeRegex = /\b(\d{4}-\d{3})\b/;
+  const match = normalized.match(postalCodeRegex);
+  
+  if (!match) {
+    return { morada: normalized };
+  }
+  
+  const codigoPostal = match[1];
+  const postalCodeIndex = normalized.indexOf(codigoPostal);
+  
+  const beforePostalCode = normalized.substring(0, postalCodeIndex).trim();
+  const afterPostalCode = normalized.substring(postalCodeIndex + codigoPostal.length).trim();
+  
+  let morada = beforePostalCode.replace(/,\s*$/, '').trim();
+  
+  let cidade = afterPostalCode
+    .replace(/^,\s*/, '')
+    .replace(/,?\s*Portugal\s*$/i, '')
+    .trim();
+  
+  return {
+    morada: morada || undefined,
+    codigoPostal: codigoPostal || undefined,
+    cidade: cidade || undefined,
+  };
 }
