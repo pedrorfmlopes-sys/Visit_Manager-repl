@@ -1557,6 +1557,400 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // MICROSOFT 365 INTEGRATION ROUTES
+  // ============================================
+
+  // Microsoft OAuth Login
+  app.get('/api/microsoft/auth/login', isAuthenticated, async (req, res) => {
+    try {
+      const clientId = process.env.MICROSOFT_CLIENT_ID;
+      const redirectUri = `${req.protocol}://${req.get('host')}/api/microsoft/auth/callback`;
+      
+      if (!clientId) {
+        return res.status(500).json({ message: 'Microsoft OAuth not configured' });
+      }
+      
+      const scopes = [
+        'offline_access',
+        'Tasks.ReadWrite',
+        'User.Read',
+        'Group.ReadWrite.All',
+        'Calendars.ReadWrite'
+      ];
+      
+      const state = randomUUID();
+      req.session.msOAuthState = state;
+      
+      const authUrl = new URL('https://login.microsoftonline.com/common/oauth2/v2.0/authorize');
+      authUrl.searchParams.set('client_id', clientId);
+      authUrl.searchParams.set('response_type', 'code');
+      authUrl.searchParams.set('redirect_uri', redirectUri);
+      authUrl.searchParams.set('scope', scopes.join(' '));
+      authUrl.searchParams.set('state', state);
+      authUrl.searchParams.set('response_mode', 'query');
+      
+      res.redirect(authUrl.toString());
+    } catch (error) {
+      console.error('[Microsoft Auth] Login error:', error);
+      res.status(500).json({ message: 'Microsoft auth failed' });
+    }
+  });
+
+  // Microsoft OAuth Callback
+  app.get('/api/microsoft/auth/callback', isAuthenticated, async (req, res) => {
+    try {
+      const { code, state, error, error_description } = req.query;
+      
+      if (error) {
+        console.error('[Microsoft Auth] OAuth error:', error, error_description);
+        return res.redirect('/#/integracoes/microsoft?error=' + encodeURIComponent(error_description as string || 'Authentication failed'));
+      }
+      
+      if (!code || !state || state !== req.session.msOAuthState) {
+        return res.redirect('/#/integracoes/microsoft?error=invalid_state');
+      }
+      
+      const clientId = process.env.MICROSOFT_CLIENT_ID;
+      const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
+      const redirectUri = `${req.protocol}://${req.get('host')}/api/microsoft/auth/callback`;
+      
+      if (!clientId || !clientSecret) {
+        return res.status(500).json({ message: 'Microsoft OAuth not configured' });
+      }
+      
+      const tokenEndpoint = 'https://login.microsoftonline.com/common/oauth2/v2.0/token';
+      const params = new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        code: code as string,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code',
+      });
+      
+      const response = await fetch(tokenEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString(),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[Microsoft Auth] Token exchange failed:', errorText);
+        return res.redirect('/#/integracoes/microsoft?error=token_exchange_failed');
+      }
+      
+      const tokenData = await response.json();
+      
+      const { userId } = await getUserContext(req);
+      const { storeMicrosoftTokens } = await import('./microsoft');
+      
+      await storeMicrosoftTokens(userId, {
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token,
+        scopes: tokenData.scope ? tokenData.scope.split(' ') : [],
+        expiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
+      });
+      
+      delete req.session.msOAuthState;
+      
+      res.redirect('/#/integracoes/microsoft?success=true');
+    } catch (error) {
+      console.error('[Microsoft Auth] Callback error:', error);
+      res.redirect('/#/integracoes/microsoft?error=callback_failed');
+    }
+  });
+
+  // Microsoft Disconnect
+  app.post('/api/microsoft/auth/disconnect', isAuthenticated, async (req, res) => {
+    try {
+      const { userId } = await getUserContext(req);
+      const { deleteMicrosoftTokens } = await import('./microsoft');
+      
+      await deleteMicrosoftTokens(userId);
+      
+      res.json({ message: 'Microsoft account disconnected' });
+    } catch (error) {
+      console.error('[Microsoft Auth] Disconnect error:', error);
+      res.status(500).json({ message: 'Failed to disconnect Microsoft account' });
+    }
+  });
+
+  // Get Microsoft Connection Status
+  app.get('/api/microsoft/auth/status', isAuthenticated, async (req, res) => {
+    try {
+      const { userId } = await getUserContext(req);
+      const { getMicrosoftTokens } = await import('./microsoft');
+      
+      const tokens = await getMicrosoftTokens(userId);
+      
+      if (tokens) {
+        res.json({
+          connected: true,
+          scopes: tokens.scopes,
+          expiresAt: tokens.expiresAt,
+        });
+      } else {
+        res.json({ connected: false });
+      }
+    } catch (error) {
+      console.error('[Microsoft Auth] Status error:', error);
+      res.status(500).json({ message: 'Failed to get Microsoft status' });
+    }
+  });
+
+  // Get Microsoft Planner Groups
+  app.get('/api/microsoft/planner/groups', isAuthenticated, async (req, res) => {
+    try {
+      const { userId } = await getUserContext(req);
+      const { createMicrosoftGraphClient } = await import('./microsoft');
+      
+      const client = await createMicrosoftGraphClient(userId);
+      const groups = await client.get('/me/joinedTeams');
+      
+      res.json(groups.value || []);
+    } catch (error: any) {
+      console.error('[Microsoft Planner] Get groups error:', error);
+      if (error.message.includes('not connected')) {
+        return res.status(401).json({ message: 'Microsoft account not connected' });
+      }
+      res.status(500).json({ message: 'Failed to get Microsoft groups' });
+    }
+  });
+
+  // Get Microsoft Planner Plans for a Group
+  app.get('/api/microsoft/planner/plans/:groupId', isAuthenticated, async (req, res) => {
+    try {
+      const { groupId } = req.params;
+      const { userId } = await getUserContext(req);
+      const { createMicrosoftGraphClient } = await import('./microsoft');
+      
+      const client = await createMicrosoftGraphClient(userId);
+      const plans = await client.get(`/groups/${groupId}/planner/plans`);
+      
+      res.json(plans.value || []);
+    } catch (error: any) {
+      console.error('[Microsoft Planner] Get plans error:', error);
+      if (error.message.includes('not connected')) {
+        return res.status(401).json({ message: 'Microsoft account not connected' });
+      }
+      res.status(500).json({ message: 'Failed to get planner plans' });
+    }
+  });
+
+  // Get Microsoft Planner Buckets for a Plan
+  app.get('/api/microsoft/planner/buckets/:planId', isAuthenticated, async (req, res) => {
+    try {
+      const { planId } = req.params;
+      const { userId } = await getUserContext(req);
+      const { createMicrosoftGraphClient } = await import('./microsoft');
+      
+      const client = await createMicrosoftGraphClient(userId);
+      const buckets = await client.get(`/planner/plans/${planId}/buckets`);
+      
+      res.json(buckets.value || []);
+    } catch (error: any) {
+      console.error('[Microsoft Planner] Get buckets error:', error);
+      if (error.message.includes('not connected')) {
+        return res.status(401).json({ message: 'Microsoft account not connected' });
+      }
+      res.status(500).json({ message: 'Failed to get planner buckets' });
+    }
+  });
+
+  // Export Task to Planner
+  app.post('/api/microsoft/planner/export/:tarefaId', isAuthenticated, async (req, res) => {
+    try {
+      const { tarefaId } = req.params;
+      const { planId, bucketId } = req.body;
+      const { userId, userRole } = await getUserContext(req);
+      
+      if (!planId || !bucketId) {
+        return res.status(400).json({ message: 'Plan ID and Bucket ID required' });
+      }
+      
+      const tarefa = await storage.getTarefa(tarefaId, userId, userRole);
+      if (!tarefa) {
+        return res.status(404).json({ message: 'Tarefa not found' });
+      }
+      
+      const { createMicrosoftGraphClient } = await import('./microsoft');
+      const client = await createMicrosoftGraphClient(userId);
+      
+      const entidadeName = tarefa.entidadeId ? (await storage.getEntidade(tarefa.entidadeId, userId, userRole))?.nome : '';
+      const visitaInfo = tarefa.visitaId ? (await storage.getVisita(tarefa.visitaId, userId, userRole)) : null;
+      
+      const appUrl = `${req.protocol}://${req.get('host')}`;
+      let description = `Link: ${appUrl}/#/tarefas/${tarefa.id}\n\n`;
+      if (entidadeName) description += `Entidade: ${entidadeName}\n`;
+      if (visitaInfo) description += `Visita relacionada\n`;
+      if (tarefa.descricao) description += `\n${tarefa.descricao}`;
+      
+      const msUser = await client.get('/me');
+      
+      const plannerTask = await client.post('/planner/tasks', {
+        planId,
+        bucketId,
+        title: tarefa.titulo,
+        dueDateTime: tarefa.dueDate ? tarefa.dueDate.toISOString() : null,
+        assignments: {
+          [msUser.id]: {
+            '@odata.type': '#microsoft.graph.plannerAssignment',
+            orderHint: ' !',
+          },
+        },
+      });
+      
+      await client.patch(`/planner/tasks/${plannerTask.id}/details`, {
+        description,
+      });
+      
+      await storage.updateTarefaMicrosoftFields(tarefaId, {
+        plannerTaskId: plannerTask.id,
+        plannerPlanId: planId,
+        plannerBucketId: bucketId,
+        microsoftUserId: msUser.id,
+        lastPlannerSyncAt: new Date(),
+      });
+      
+      res.json({ message: 'Tarefa enviada para o Planner', plannerTaskId: plannerTask.id });
+    } catch (error: any) {
+      console.error('[Microsoft Planner] Export error:', error);
+      if (error.message.includes('not connected')) {
+        return res.status(401).json({ message: 'Microsoft account not connected' });
+      }
+      res.status(500).json({ message: 'Failed to export to Planner' });
+    }
+  });
+
+  // Export Task to Microsoft To-Do
+  app.post('/api/microsoft/todo/export/:tarefaId', isAuthenticated, async (req, res) => {
+    try {
+      const { tarefaId } = req.params;
+      const { userId, userRole } = await getUserContext(req);
+      
+      const tarefa = await storage.getTarefa(tarefaId, userId, userRole);
+      if (!tarefa) {
+        return res.status(404).json({ message: 'Tarefa not found' });
+      }
+      
+      const { createMicrosoftGraphClient } = await import('./microsoft');
+      const client = await createMicrosoftGraphClient(userId);
+      
+      const lists = await client.get('/me/todo/lists');
+      const defaultList = lists.value?.find((l: any) => l.wellknownListName === 'defaultList') || lists.value?.[0];
+      
+      if (!defaultList) {
+        return res.status(500).json({ message: 'No To-Do list found' });
+      }
+      
+      const appUrl = `${req.protocol}://${req.get('host')}`;
+      const entidadeName = tarefa.entidadeId ? (await storage.getEntidade(tarefa.entidadeId, userId, userRole))?.nome : '';
+      
+      let bodyContent = `Link: ${appUrl}/#/tarefas/${tarefa.id}\n\n`;
+      if (entidadeName) bodyContent += `Entidade: ${entidadeName}\n`;
+      if (tarefa.descricao) bodyContent += `\n${tarefa.descricao}`;
+      
+      const categories: string[] = [];
+      if (entidadeName) categories.push(entidadeName);
+      
+      const todoTask = await client.post(`/me/todo/lists/${defaultList.id}/tasks`, {
+        title: tarefa.titulo,
+        body: {
+          content: bodyContent,
+          contentType: 'text',
+        },
+        dueDateTime: tarefa.dueDate ? {
+          dateTime: tarefa.dueDate.toISOString(),
+          timeZone: 'UTC',
+        } : null,
+        categories: categories.length > 0 ? categories : undefined,
+      });
+      
+      await storage.updateTarefaMicrosoftFields(tarefaId, {
+        todoTaskId: todoTask.id,
+        lastTodoSyncAt: new Date(),
+      });
+      
+      res.json({ message: 'Tarefa criada no Microsoft To-Do', todoTaskId: todoTask.id });
+    } catch (error: any) {
+      console.error('[Microsoft To-Do] Export error:', error);
+      if (error.message.includes('not connected')) {
+        return res.status(401).json({ message: 'Microsoft account not connected' });
+      }
+      res.status(500).json({ message: 'Failed to export to To-Do' });
+    }
+  });
+
+  // Export Visit to Outlook Calendar
+  app.post('/api/microsoft/calendar/export/:visitaId', isAuthenticated, async (req, res) => {
+    try {
+      const { visitaId } = req.params;
+      const { startDateTime } = req.body;
+      const { userId, userRole } = await getUserContext(req);
+      
+      if (!startDateTime) {
+        return res.status(400).json({ message: 'Start date/time required' });
+      }
+      
+      const visita = await storage.getVisita(visitaId, userId, userRole);
+      if (!visita) {
+        return res.status(404).json({ message: 'Visita not found' });
+      }
+      
+      const { createMicrosoftGraphClient } = await import('./microsoft');
+      const client = await createMicrosoftGraphClient(userId);
+      
+      const entidade = visita.entidadeId ? await storage.getEntidade(visita.entidadeId, userId, userRole) : null;
+      const appUrl = `${req.protocol}://${req.get('host')}`;
+      
+      const start = new Date(startDateTime);
+      const end = new Date(start.getTime() + 60 * 60 * 1000);
+      
+      let bodyContent = `Link: ${appUrl}/#/visitas/${visita.id}\n\n`;
+      if (visita.resumoIa) bodyContent += `Resumo:\n${visita.resumoIa}\n\n`;
+      if (visita.notas) bodyContent += `Notas:\n${visita.notas}\n\n`;
+      if (visita.marcasEntregues && visita.marcasEntregues.length > 0) {
+        bodyContent += `Marcas entregues: ${visita.marcasEntregues.join(', ')}\n`;
+      }
+      
+      const event = await client.post('/me/events', {
+        subject: `Visita - ${entidade?.nome || 'Entidade'}`,
+        body: {
+          contentType: 'text',
+          content: bodyContent,
+        },
+        start: {
+          dateTime: start.toISOString(),
+          timeZone: 'UTC',
+        },
+        end: {
+          dateTime: end.toISOString(),
+          timeZone: 'UTC',
+        },
+        location: entidade?.morada ? {
+          displayName: entidade.morada,
+        } : undefined,
+        isReminderOn: true,
+        reminderMinutesBeforeStart: 30,
+        isOnlineMeeting: false,
+      });
+      
+      await storage.updateVisitaMicrosoftFields(visitaId, {
+        outlookEventId: event.id,
+        lastCalendarSyncAt: new Date(),
+      });
+      
+      res.json({ message: 'Evento adicionado ao Outlook', eventId: event.id });
+    } catch (error: any) {
+      console.error('[Microsoft Calendar] Export error:', error);
+      if (error.message.includes('not connected')) {
+        return res.status(401).json({ message: 'Microsoft account not connected' });
+      }
+      res.status(500).json({ message: 'Failed to export to Outlook Calendar' });
+    }
+  });
+
   // Serve uploaded files
   app.use('/uploads', isAuthenticated, (req, res, next) => {
     const filePath = path.join('/tmp/uploads', req.path);

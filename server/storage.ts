@@ -650,6 +650,41 @@ export class DatabaseStorage implements IStorage {
     await db.delete(tarefas).where(whereClause);
   }
 
+  async updateTarefaMicrosoftFields(
+    id: string,
+    fields: {
+      plannerTaskId?: string;
+      plannerPlanId?: string;
+      plannerBucketId?: string;
+      lastPlannerSyncAt?: Date;
+      todoTaskId?: string;
+      lastTodoSyncAt?: Date;
+      microsoftUserId?: string;
+    }
+  ): Promise<Tarefa | undefined> {
+    const [tarefa] = await db
+      .update(tarefas)
+      .set({ ...fields, updatedAt: new Date() })
+      .where(eq(tarefas.id, id))
+      .returning();
+    return tarefa;
+  }
+
+  async updateVisitaMicrosoftFields(
+    id: string,
+    fields: {
+      outlookEventId?: string;
+      lastCalendarSyncAt?: Date;
+    }
+  ): Promise<Visita | undefined> {
+    const [visita] = await db
+      .update(visitas)
+      .set({ ...fields, updatedAt: new Date() })
+      .where(eq(visitas.id, id))
+      .returning();
+    return visita;
+  }
+
   // Marcas
   async getMarcas(): Promise<Marca[]> {
     return db.select().from(marcas).orderBy(marcas.nome);
