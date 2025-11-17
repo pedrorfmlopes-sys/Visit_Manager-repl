@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
-import { ArrowLeft, Loader2, WifiOff, Building2, Users, Package, Construction, Briefcase, HandHeart, MapPin, RefreshCw } from "lucide-react";
+import { ArrowLeft, Loader2, WifiOff, Building2, User, Package, Construction, Briefcase, MapPin, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,12 +22,11 @@ import { GoogleCompanySearch } from "@/components/GoogleCompanySearch";
 import { fillEntityForm, type PTEnrichmentResult } from "@/lib/enrichmentUtils";
 
 const tipoOptions = [
-  { value: "Gabinete", label: "Gabinete", icon: Building2 },
-  { value: "Cliente", label: "Cliente", icon: Users },
+  { value: "Gabinete", label: "Gabinete de Arquitetura", icon: Building2 },
   { value: "Distribuidor", label: "Distribuidor", icon: Package },
-  { value: "Obra", label: "Obra", icon: Construction },
-  { value: "Parceiro", label: "Parceiro", icon: Briefcase },
-  { value: "Outro", label: "Outro", icon: HandHeart },
+  { value: "Parceiro", label: "Parceiro Comercial", icon: Briefcase },
+  { value: "Construtor", label: "Construtor / Empreiteiro", icon: Construction },
+  { value: "Contato Pessoal", label: "Contato Pessoal", icon: User },
 ];
 
 export default function EntidadeForm() {

@@ -10,7 +10,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocation } from "wouter";
 import type { EntidadeWithRelations } from "@shared/schema";
 
-type TipoEntidade = "Todos" | "Gabinete" | "Cliente" | "Distribuidor" | "Obra" | "Parceiro" | "Outro";
+type TipoEntidade = "Todos" | "Gabinete" | "Distribuidor" | "Parceiro" | "Construtor" | "Contato Pessoal";
 
 export default function Entidades() {
   const [, setLocation] = useLocation();
@@ -49,15 +49,15 @@ export default function Entidades() {
             <TabsList className="w-full grid grid-cols-3 h-auto gap-1" data-testid="tabs-tipo-filter">
               <TabsTrigger value="Todos" className="text-xs py-2" data-testid="tab-todos">Todos</TabsTrigger>
               <TabsTrigger value="Gabinete" className="text-xs py-2" data-testid="tab-gabinete">Gabinetes</TabsTrigger>
-              <TabsTrigger value="Cliente" className="text-xs py-2" data-testid="tab-cliente">Clientes</TabsTrigger>
+              <TabsTrigger value="Distribuidor" className="text-xs py-2" data-testid="tab-distribuidor">Distribuidores</TabsTrigger>
             </TabsList>
           </Tabs>
           
           <Tabs value={tipoFilter} onValueChange={(v) => setTipoFilter(v as TipoEntidade)} className="mt-1">
             <TabsList className="w-full grid grid-cols-3 h-auto gap-1">
-              <TabsTrigger value="Distribuidor" className="text-xs py-2" data-testid="tab-distribuidor">Distribuidores</TabsTrigger>
-              <TabsTrigger value="Obra" className="text-xs py-2" data-testid="tab-obra">Obras</TabsTrigger>
               <TabsTrigger value="Parceiro" className="text-xs py-2" data-testid="tab-parceiro">Parceiros</TabsTrigger>
+              <TabsTrigger value="Construtor" className="text-xs py-2" data-testid="tab-construtor">Construtores</TabsTrigger>
+              <TabsTrigger value="Contato Pessoal" className="text-xs py-2" data-testid="tab-contato">Contatos</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
