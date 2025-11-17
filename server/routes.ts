@@ -189,7 +189,7 @@ async function createContactWithUniversalLogic(data: {
     // Validate and create entity using schema validation
     const validatedEntityData = insertEntidadeSchema.parse({
       nome: entityName,
-      tipoEntidade: 'Outro',
+      tipoEntidade: 'Contato Pessoal',
       domain: data.domain || undefined,
       website: data.website || undefined,
       morada: data.address || undefined,

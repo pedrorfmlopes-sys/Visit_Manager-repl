@@ -489,7 +489,7 @@ export default function QRScanner() {
       // Create entity
       const entityRes = await apiRequest("POST", "/api/entidades", {
         nome: entityName,
-        tipoEntidade: "Outro",
+        tipoEntidade: "Contato Pessoal",
       });
 
       if (!entityRes.ok) {

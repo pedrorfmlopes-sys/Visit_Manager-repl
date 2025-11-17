@@ -1,4 +1,4 @@
-import { Building2, ChevronRight, Mail, Phone, MapPin, Users, Package, Briefcase, Construction, HandHeart, UserCheck } from "lucide-react";
+import { Building2, ChevronRight, Mail, Phone, MapPin, User, Package, Briefcase, Construction, UserCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -12,20 +12,18 @@ interface EntidadeCardProps {
 
 const tipoIcons = {
   Gabinete: Building2,
-  Cliente: Users,
   Distribuidor: Package,
-  Obra: Construction,
   Parceiro: Briefcase,
-  Outro: HandHeart,
+  Construtor: Construction,
+  "Contato Pessoal": User,
 };
 
 const tipoLabels = {
   Gabinete: "Gabinete",
-  Cliente: "Cliente",
   Distribuidor: "Distribuidor",
-  Obra: "Obra",
   Parceiro: "Parceiro",
-  Outro: "Outro",
+  Construtor: "Construtor",
+  "Contato Pessoal": "Contato Pessoal",
 };
 
 export function EntidadeCard({ entidade, onClick, showSyncStatus = false }: EntidadeCardProps) {

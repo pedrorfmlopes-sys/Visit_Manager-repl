@@ -30,8 +30,7 @@ export const tipoEntidadeEnum = pgEnum('tipo_entidade', [
   'Distribuidor',
   'Parceiro',
   'Construtor',
-  'Contato Pessoal',
-  'Outro'
+  'Contato Pessoal'
 ]);
 
 // Odoo Sync Status enum

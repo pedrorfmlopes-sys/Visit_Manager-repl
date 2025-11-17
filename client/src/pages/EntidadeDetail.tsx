@@ -25,11 +25,10 @@ import { useState } from "react";
 
 const tipoLabels: Record<string, string> = {
   Gabinete: "Gabinete",
-  Cliente: "Cliente",
   Distribuidor: "Distribuidor",
-  Obra: "Obra",
   Parceiro: "Parceiro",
-  Outro: "Outro",
+  Construtor: "Construtor",
+  "Contato Pessoal": "Contato Pessoal",
 };
 
 export default function EntidadeDetail() {

@@ -164,11 +164,10 @@ export default function Analytics() {
               <SelectContent>
                 <SelectItem value="all">Todos os tipos</SelectItem>
                 <SelectItem value="Gabinete">Gabinete</SelectItem>
-                <SelectItem value="Cliente">Cliente</SelectItem>
                 <SelectItem value="Distribuidor">Distribuidor</SelectItem>
-                <SelectItem value="Obra">Obra</SelectItem>
                 <SelectItem value="Parceiro">Parceiro</SelectItem>
-                <SelectItem value="Outro">Outro</SelectItem>
+                <SelectItem value="Construtor">Construtor</SelectItem>
+                <SelectItem value="Contato Pessoal">Contato Pessoal</SelectItem>
               </SelectContent>
             </Select>
           </div>
