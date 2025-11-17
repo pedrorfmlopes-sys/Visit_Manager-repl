@@ -61,7 +61,74 @@ export default function EntidadeDetail() {
 
   const entityReminders = allLembretes?.filter(l => l.entidadeId === entidadeId) || [];
   
-  // Enrichment mutation
+  // PT Enrichment mutation
+  const ptEnrichMutation = useMutation({
+    mutationFn: async () => {
+      if (!entidadeId || !entidade) throw new Error("Entity data required");
+      
+      const searchResponse = await apiRequest('POST', '/api/enrichment/pt-intelligent-search', {
+        nome: entidade.nome,
+        existingEntityId: parseInt(entidadeId),
+      });
+      
+      if (!searchResponse.ok) {
+        const errorData = await searchResponse.json().catch(() => ({ message: 'PT search failed' }));
+        throw new Error(errorData.message || 'Failed to search for enrichment data');
+      }
+      
+      const searchData = await searchResponse.json();
+      
+      if (searchData.enrichmentSource === 'none' || 
+          (!searchData.fuzzyMatches?.length && !searchData.webScanData)) {
+        return { enrichmentSource: 'none' };
+      }
+      
+      const dataToApply = searchData.fuzzyMatches?.[0] || searchData.webScanData;
+      
+      const updatePayload: any = {};
+      if (dataToApply.domain && !entidade.domain) updatePayload.domain = dataToApply.domain;
+      if (dataToApply.website && !entidade.website) updatePayload.website = dataToApply.website;
+      if (dataToApply.logoUrl && !entidade.logoUrl) updatePayload.logoUrl = dataToApply.logoUrl;
+      if (dataToApply.morada && !entidade.morada) updatePayload.morada = dataToApply.morada;
+      if (dataToApply.telefone && !entidade.telefone) updatePayload.telefone = dataToApply.telefone;
+      if (dataToApply.email && !entidade.email) updatePayload.email = dataToApply.email;
+      if (dataToApply.descricao && !entidade.descricao) updatePayload.descricao = dataToApply.descricao;
+      
+      if (Object.keys(updatePayload).length > 0) {
+        await apiRequest('PATCH', `/api/entidades/${entidadeId}`, updatePayload);
+      }
+      
+      return searchData;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/entidades", entidadeId] });
+      
+      if (data.enrichmentSource === 'none') {
+        toast({
+          title: "Sem enriquecimento",
+          description: "Não foram encontrados dados adicionais para esta entidade.",
+        });
+      } else {
+        toast({
+          title: "Entidade enriquecida",
+          description: data.enrichmentSource === 'fuzzy' 
+            ? "Dados atualizados da base de dados local" 
+            : data.enrichmentSource === 'webscan'
+            ? "Dados atualizados da pesquisa online (IA)"
+            : "Dados atualizados de múltiplas fontes",
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao enriquecer",
+        description: error.message || "Não foi possível enriquecer a entidade.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Legacy Clearbit enrichment mutation (deprecated)
   const enrichMutation = useMutation({
     mutationFn: async () => {
       if (!entidadeId) throw new Error("Entity ID is required");
@@ -273,12 +340,12 @@ export default function EntidadeDetail() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => enrichMutation.mutate()}
-              disabled={enrichMutation.isPending}
-              data-testid="button-enrich"
-              title="Enriquecer dados"
+              onClick={() => ptEnrichMutation.mutate()}
+              disabled={ptEnrichMutation.isPending}
+              data-testid="button-enrich-pt"
+              title="Enriquecer com IA (Portugal)"
             >
-              {enrichMutation.isPending ? (
+              {ptEnrichMutation.isPending ? (
                 <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
               ) : (
                 <Sparkles className="h-5 w-5" />

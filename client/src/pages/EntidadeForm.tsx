@@ -18,7 +18,8 @@ import { insertEntidadeSchema, type InsertEntidade, type Entidade } from "@share
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { syncManager } from "@/lib/syncManager";
-import { CompanyAutocomplete } from "@/components/CompanyAutocomplete";
+import { PTCompanySearch } from "@/components/PTCompanySearch";
+import { fillEntityForm, type PTEnrichmentResult } from "@/lib/enrichmentUtils";
 
 const tipoOptions = [
   { value: "Gabinete", label: "Gabinete", icon: Building2 },
@@ -225,11 +226,34 @@ export default function EntidadeForm() {
     });
   }
 
-  // Enrichment handlers
+  // PT Enrichment handlers
+  const handlePTCompanySelect = async (enrichmentData: PTEnrichmentResult) => {
+    setIsEnriching(true);
+    
+    try {
+      fillEntityForm(form, enrichmentData, { overwriteExisting: false });
+      
+      toast({
+        title: "Dados preenchidos",
+        description: enrichmentData.enrichmentSource === 'fuzzy' 
+          ? "Empresa encontrada na base de dados" 
+          : enrichmentData.enrichmentSource === 'webscan'
+          ? "Dados obtidos da pesquisa online (IA)"
+          : "Dados combinados de múltiplas fontes",
+      });
+    } catch (error) {
+      console.error('[EntidadeForm] PT enrichment error:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao preencher dados da empresa",
+        variant: "destructive",
+      });
+    } finally {
+      setIsEnriching(false);
+    }
+  };
+
   const handleCompanySelect = async (company: { name: string; domain: string; logo: string }) => {
-    // Immediately set Clearbit data (domain, logo, website)
-    // This ensures we have basic data even if AI enrichment fails
-    // Note: Clearbit autocomplete API returns logo=null, so we construct the logo URL ourselves
     form.setValue("domain", company.domain);
     form.setValue("logoUrl", `https://logo.clearbit.com/${company.domain}`);
     form.setValue("website", `https://${company.domain}`);
@@ -478,17 +502,18 @@ export default function EntidadeForm() {
                         data-testid="input-nome"
                       />
                     ) : (
-                      <CompanyAutocomplete
+                      <PTCompanySearch
                         value={field.value}
                         onChange={field.onChange}
-                        onSelect={handleCompanySelect}
-                        disabled={!isOnline}
+                        onSelect={handlePTCompanySelect}
+                        placeholder="Nome da empresa..."
+                        className="h-12"
                       />
                     )}
                   </FormControl>
                   {!isOnline && !isEdit && (
                     <FormDescription className="text-xs text-muted-foreground">
-                      Enriquecimento automático não disponível offline
+                      Pesquisa inteligente funciona offline usando dados locais
                     </FormDescription>
                   )}
                   <FormMessage />
