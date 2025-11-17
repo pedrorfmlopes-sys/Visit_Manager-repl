@@ -1,0 +1,96 @@
+Objetivo:
+Corrigir o fluxo de autenticação Microsoft 365 para que funcione completamente: 
+- login abre e conclui
+- sessão é guardada corretamente
+- cookie é aceite no browser
+- callback redefine a sessão sem erros
+- utilizador permanece autenticado sem loops
+
+Todas as verificações e ajustes devem seguir o flowchart documentado.
+
+---------------------------------------------------------
+1. VALIDAR O CALLBACK E REDIRECT
+---------------------------------------------------------
+Localiza o endpoint /api/microsoft/auth/callback e verifica:
+
+- Após obter o access_token e refresh_token,
+  o backend deve guardar estes valores dentro de req.session.microsoft.
+
+- Garante que req.session.save() é chamado antes de qualquer redirect.
+
+- Confirma que o redirect final aponta exatamente para a mesma origem:
+    - mesmo domínio Replit
+    - mesma porta
+    - sem localhost
+    - sem mistura de .repl.dev e .repl.co
+
+Se a origem estiver errada, corrige-a.
+
+---------------------------------------------------------
+2. AJUSTAR AS OPÇÕES DE COOKIE DA SESSÃO
+---------------------------------------------------------
+Localiza a configuração de express-session.
+
+Garante que a sessão usa estas opções:
+  sameSite: 'none'
+  secure: true
+  httpOnly: true
+
+Isto é obrigatório para o browser aceitar o cookie após o redirect da Microsoft.
+
+Se atualmente estiver 'lax', 'strict' ou secure=false → corrigir.
+
+---------------------------------------------------------
+3. GARANTIR QUE A SESSÃO É ARMAZENADA ANTES DO REDIRECT
+---------------------------------------------------------
+No callback Microsoft:
+- Confirmar que req.session.microsoft = {tokens...}
+- Confirmar que req.session.save() é chamado
+- Só depois executar res.redirect()
+
+Se a aplicação estiver a fazer redirect ANTES de guardar a sessão → corrigir.
+
+---------------------------------------------------------
+4. VERIFICAR SE O SERVICE WORKER BLOQUEIA O CALLBACK
+---------------------------------------------------------
+Localizar o service worker da PWA.
+
+Verificar:
+- Nenhum fetch handler deve interferir com requests a /api/microsoft/*
+- O service worker não pode tentar cachear ou redirecionar o callback.
+
+Se interferir, adicionar exceção explícita.
+
+---------------------------------------------------------
+5. VALIDAR O STATUS DE SESSÃO
+---------------------------------------------------------
+Localizar /api/microsoft/auth/status.
+
+Verificar:
+- deve apenas ler req.session.microsoft
+- devolver connected=true se tokens existem
+- devolver connected=false se não existem
+
+Garantir que esta rota não está a aplicar RBAC, nem exigir admin.
+
+---------------------------------------------------------
+6. TESTAR FLUXO COMPLETO
+---------------------------------------------------------
+Simular o fluxo:
+
+1. Frontend chama /api/microsoft/auth/login
+2. Microsoft abre login
+3. Utilizador completa login
+4. Microsoft chama callback
+5. Sessão é guardada
+6. Redirect volta para a origem
+7. Frontend faz GET /api/microsoft/auth/status
+8. Backend devolve connected=true
+9. A UI mostra "Conta Microsoft ligada"
+
+Se algum passo falhar, corrigir.
+
+---------------------------------------------------------
+7. MOSTRAR DIFF COMPLETO
+---------------------------------------------------------
+Após todas as alterações, mostrar o diff de todos os ficheiros modificados.
