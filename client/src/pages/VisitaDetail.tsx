@@ -19,7 +19,6 @@ import { ShareDialog, useShareActions } from "@/components/ShareDialog";
 import { formatVisitForSharing } from "@/lib/shareFormatters";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
-import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { apiRequest } from "@/lib/queryClient";
 import { syncManager } from "@/lib/syncManager";
 import { insertTarefaSchema } from "@shared/schema";
@@ -40,9 +39,8 @@ export default function VisitaDetail() {
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const { data: currentUser } = useCurrentUser();
   const isAdmin = useIsAdmin();
-  const isOnline = useOnlineStatus();
   
-  const { shareViaWhatsApp, shareViaEmail, copyToClipboard, copyLink } = useShareActions();
+  const { isOnline, shareViaWhatsApp, shareViaEmail, copyToClipboard, copyLink } = useShareActions();
 
   const { data: visita, isLoading } = useQuery<VisitaWithRelations>({
     queryKey: ["/api/visitas", visitaId],
