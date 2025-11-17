@@ -1557,15 +1557,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // MICROSOFT 365 INTEGRATION ROUTES
   // ============================================
 
-  // Microsoft OAuth Login (Admin only)
+  // Microsoft OAuth Login
   app.get('/api/microsoft/auth/login', isAuthenticated, async (req, res) => {
     try {
-      const { userRole } = await getUserContext(req);
-      
-      // RBAC: Microsoft integrations are admin-only
-      if (userRole !== 'admin') {
-        return res.status(403).json({ message: 'Microsoft integrations require admin privileges' });
-      }
+      const { userId } = await getUserContext(req);
       
       const clientId = process.env.MICROSOFT_CLIENT_ID;
       const redirectUri = `${req.protocol}://${req.get('host')}/api/microsoft/auth/callback`;
@@ -1600,15 +1595,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Microsoft OAuth Callback (Admin only)
+  // Microsoft OAuth Callback
   app.get('/api/microsoft/auth/callback', isAuthenticated, async (req, res) => {
     try {
-      const { userRole } = await getUserContext(req);
-      
-      // RBAC: Microsoft integrations are admin-only
-      if (userRole !== 'admin') {
-        return res.redirect('/#/integracoes/microsoft?error=admin_required');
-      }
+      const { userId } = await getUserContext(req);
       
       const { code, state, error, error_description } = req.query;
       
@@ -1652,7 +1642,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const tokenData = await response.json();
       
-      const { userId } = await getUserContext(req);
       const { storeMicrosoftTokens } = await import('./microsoft');
       
       await storeMicrosoftTokens(userId, {
@@ -1671,15 +1660,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Microsoft Disconnect (Admin only)
+  // Microsoft Disconnect
   app.post('/api/microsoft/auth/disconnect', isAuthenticated, async (req, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
-      
-      // RBAC: Microsoft integrations are admin-only
-      if (userRole !== 'admin') {
-        return res.status(403).json({ message: 'Microsoft integrations require admin privileges' });
-      }
+      const { userId } = await getUserContext(req);
       
       const { deleteMicrosoftTokens } = await import('./microsoft');
       
@@ -1692,15 +1676,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get Microsoft Connection Status (Admin only)
+  // Get Microsoft Connection Status
   app.get('/api/microsoft/auth/status', isAuthenticated, async (req, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
-      
-      // RBAC: Microsoft integrations are admin-only
-      if (userRole !== 'admin') {
-        return res.status(403).json({ message: 'Microsoft integrations require admin privileges' });
-      }
+      const { userId } = await getUserContext(req);
       
       const { getMicrosoftTokens } = await import('./microsoft');
       
@@ -1721,15 +1700,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get Microsoft Planner Groups (Admin only)
+  // Get Microsoft Planner Groups
   app.get('/api/microsoft/planner/groups', isAuthenticated, async (req, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
-      
-      // RBAC: Microsoft integrations are admin-only
-      if (userRole !== 'admin') {
-        return res.status(403).json({ message: 'Microsoft integrations require admin privileges' });
-      }
+      const { userId } = await getUserContext(req);
       
       const { createMicrosoftGraphClient } = await import('./microsoft');
       
@@ -1746,16 +1720,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get Microsoft Planner Plans for a Group (Admin only)
+  // Get Microsoft Planner Plans for a Group
   app.get('/api/microsoft/planner/plans/:groupId', isAuthenticated, async (req, res) => {
     try {
       const { groupId } = req.params;
-      const { userId, userRole } = await getUserContext(req);
-      
-      // RBAC: Microsoft integrations are admin-only
-      if (userRole !== 'admin') {
-        return res.status(403).json({ message: 'Microsoft integrations require admin privileges' });
-      }
+      const { userId } = await getUserContext(req);
       
       const { createMicrosoftGraphClient } = await import('./microsoft');
       
@@ -1772,16 +1741,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get Microsoft Planner Buckets for a Plan (Admin only)
+  // Get Microsoft Planner Buckets for a Plan
   app.get('/api/microsoft/planner/buckets/:planId', isAuthenticated, async (req, res) => {
     try {
       const { planId } = req.params;
-      const { userId, userRole } = await getUserContext(req);
-      
-      // RBAC: Microsoft integrations are admin-only
-      if (userRole !== 'admin') {
-        return res.status(403).json({ message: 'Microsoft integrations require admin privileges' });
-      }
+      const { userId } = await getUserContext(req);
       
       const { createMicrosoftGraphClient } = await import('./microsoft');
       
@@ -1798,17 +1762,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Export Task to Planner (Admin only)
+  // Export Task to Planner
   app.post('/api/microsoft/planner/export/:tarefaId', isAuthenticated, async (req, res) => {
     try {
       const { tarefaId } = req.params;
       const { planId, bucketId } = req.body;
       const { userId, userRole } = await getUserContext(req);
-      
-      // RBAC: Microsoft integrations are admin-only
-      if (userRole !== 'admin') {
-        return res.status(403).json({ message: 'Microsoft integrations require admin privileges' });
-      }
       
       if (!planId || !bucketId) {
         return res.status(400).json({ message: 'Plan ID and Bucket ID required' });
@@ -1868,16 +1827,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Export Task to Microsoft To-Do (Admin only)
+  // Export Task to Microsoft To-Do
   app.post('/api/microsoft/todo/export/:tarefaId', isAuthenticated, async (req, res) => {
     try {
       const { tarefaId } = req.params;
       const { userId, userRole } = await getUserContext(req);
-      
-      // RBAC: Microsoft integrations are admin-only
-      if (userRole !== 'admin') {
-        return res.status(403).json({ message: 'Microsoft integrations require admin privileges' });
-      }
       
       const tarefa = await storage.getTarefa(tarefaId, userId, userRole);
       if (!tarefa) {
@@ -1932,17 +1886,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Export Visit to Outlook Calendar (Admin only)
+  // Export Visit to Outlook Calendar
   app.post('/api/microsoft/calendar/export/:visitaId', isAuthenticated, async (req, res) => {
     try {
       const { visitaId } = req.params;
       const { startDateTime } = req.body;
       const { userId, userRole } = await getUserContext(req);
-      
-      // RBAC: Microsoft integrations are admin-only
-      if (userRole !== 'admin') {
-        return res.status(403).json({ message: 'Microsoft integrations require admin privileges' });
-      }
       
       if (!startDateTime) {
         return res.status(400).json({ message: 'Start date/time required' });
