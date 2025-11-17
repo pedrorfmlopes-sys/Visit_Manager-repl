@@ -241,7 +241,7 @@ export default function EntidadeDetail() {
         </Card>
 
         {/* Enriched Data */}
-        {(entidade.description || entidade.industry || entidade.logoUrl || 
+        {(entidade.descricao || entidade.industry || entidade.logoUrl || 
           entidade.linkedinUrl || entidade.facebookUrl || entidade.instagramUrl || 
           entidade.xUrl || entidade.enrichmentSource) && (
           <Card>
@@ -275,10 +275,10 @@ export default function EntidadeDetail() {
                 </div>
               )}
               
-              {entidade.description && (
+              {entidade.descricao && (
                 <div>
                   <p className="text-sm text-muted-foreground">Descrição</p>
-                  <p className="text-sm" data-testid="text-description">{entidade.description}</p>
+                  <p className="text-sm" data-testid="text-description">{entidade.descricao}</p>
                 </div>
               )}
               
