@@ -505,6 +505,7 @@ export default function EntidadeForm() {
                         value={field.value}
                         onChange={field.onChange}
                         onSelect={handlePTCompanySelect}
+                        tipoEntidade={form.watch("tipoEntidade")}
                         placeholder="Nome da empresa..."
                         className="h-12"
                       />

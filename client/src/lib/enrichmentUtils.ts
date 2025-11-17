@@ -51,7 +51,7 @@ export function fillEntityForm(
   enrichmentData: PTEnrichmentResult,
   options: {
     overwriteExisting?: boolean;
-    preferredSource?: 'fuzzy' | 'webscan';
+    preferredSource?: 'fuzzy' | 'webscan' | 'google';
   } = {}
 ): void {
   const { overwriteExisting = false, preferredSource = 'fuzzy' } = options;
@@ -65,14 +65,18 @@ export function fillEntityForm(
     form.setValue(field, value, { shouldValidate: false, shouldDirty: true });
   };
   
-  let dataSource: FuzzyMatch | WebScanData | null = null;
+  let dataSource: FuzzyMatch | WebScanData | GoogleSearchData | null = null;
   
   if (preferredSource === 'fuzzy' && enrichmentData.fuzzyMatches.length > 0) {
     dataSource = enrichmentData.fuzzyMatches[0];
   } else if (preferredSource === 'webscan' && enrichmentData.webScanData) {
     dataSource = enrichmentData.webScanData;
+  } else if (preferredSource === 'google' && enrichmentData.googleResults && enrichmentData.googleResults.length > 0) {
+    dataSource = enrichmentData.googleResults[0];
   } else if (enrichmentData.fuzzyMatches.length > 0) {
     dataSource = enrichmentData.fuzzyMatches[0];
+  } else if (enrichmentData.googleResults && enrichmentData.googleResults.length > 0) {
+    dataSource = enrichmentData.googleResults[0];
   } else if (enrichmentData.webScanData) {
     dataSource = enrichmentData.webScanData;
   }
@@ -92,7 +96,7 @@ export function fillEntityForm(
     setFieldIfEmpty('morada', dataSource.morada);
     setFieldIfEmpty('cidade', dataSource.cidade);
     setFieldIfEmpty('codigoPostal', dataSource.codigoPostal);
-  } else {
+  } else if (dataSource.morada) {
     const parsedAddress = parsePortugueseAddress(dataSource.morada);
     setFieldIfEmpty('morada', parsedAddress.morada);
     setFieldIfEmpty('codigoPostal', parsedAddress.codigoPostal);

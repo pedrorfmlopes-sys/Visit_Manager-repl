@@ -1571,6 +1571,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Nome parameter required' });
       }
       
+      if (!tipoEntidade || typeof tipoEntidade !== 'string') {
+        console.log('[PT-Search] Missing tipoEntidade - blocking search for safety');
+        return res.json({
+          fuzzyMatches: [],
+          googleResults: [],
+          enrichmentSource: 'disabled',
+        });
+      }
+      
       if (tipoEntidade === 'Contato Pessoal') {
         console.log('[PT-Search] Skipping search for personal contact');
         return res.json({
@@ -1589,9 +1598,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await ptIntelligentSearch(input, storage, userRole);
       
       if (result.fuzzyMatches.length === 0) {
-        console.log('[PT-Search] No fuzzy matches, trying Google Search');
+        console.log(`[PT-Search] No fuzzy matches for "${nome}", attempting Google Search (user: ${userId}, role: ${userRole})`);
         const { searchCompanyData } = await import('./googleSearch');
         const googleResults = await searchCompanyData(nome);
+        
+        console.log(`[PT-Search] Google Search returned ${googleResults.length} results`);
         
         return res.json({
           ...result,

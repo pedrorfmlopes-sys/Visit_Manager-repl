@@ -125,6 +125,20 @@ export function PTCompanySearch({
     }
   }, [data?.webScanData, onChange, onSelect]);
 
+  const handleSelectGoogleResult = useCallback((googleResult: GoogleSearchData) => {
+    if (googleResult.nome) {
+      onChange(googleResult.nome);
+    }
+    setShowSuggestions(false);
+    if (onSelect) {
+      onSelect({
+        fuzzyMatches: [],
+        googleResults: [googleResult],
+        enrichmentSource: 'google',
+      });
+    }
+  }, [onChange, onSelect]);
+
   const getScoreColor = (score: number): string => {
     if (score >= 0.90) return 'text-green-600 dark:text-green-400';
     if (score >= 0.75) return 'text-blue-600 dark:text-blue-400';
@@ -225,12 +239,80 @@ export function PTCompanySearch({
                   </button>
                 ))}
               </>
-            ) : (
+            ) : null}
+
+            {data?.googleResults && data.googleResults.length > 0 && (
+              <>
+                <div className="px-2 py-1 text-xs font-medium text-muted-foreground border-t mt-2 pt-2">
+                  Resultados da pesquisa online
+                </div>
+                {data.googleResults.map((result, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleSelectGoogleResult(result)}
+                    className="w-full text-left p-3 rounded-md hover-elevate active-elevate-2"
+                    data-testid={`button-google-result-${index}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 flex-shrink-0 text-blue-500" />
+                          <span className="font-medium truncate">{result.nome}</span>
+                        </div>
+                        <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                          {result.morada && (
+                            <div className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              <span className="truncate">{result.morada}</span>
+                            </div>
+                          )}
+                          {result.telefone && (
+                            <div className="flex items-center gap-1">
+                              <Phone className="h-3 w-3" />
+                              <span className="truncate">{result.telefone}</span>
+                            </div>
+                          )}
+                          {result.website && (
+                            <div className="flex items-center gap-1">
+                              <Globe className="h-3 w-3" />
+                              <span className="truncate">{result.website}</span>
+                            </div>
+                          )}
+                          {result.email && (
+                            <div className="flex items-center gap-1">
+                              <Mail className="h-3 w-3" />
+                              <span className="truncate">{result.email}</span>
+                            </div>
+                          )}
+                          {result.sourceUrl && (
+                            <div className="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                              Fonte: {new URL(result.sourceUrl).hostname}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        <Badge variant="outline" className="text-xs">
+                          <span className={getScoreColor(result.confidence)}>
+                            {Math.round(result.confidence * 100)}%
+                          </span>
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          Pesquisa
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </>
+            )}
+
+            {!data?.fuzzyMatches.length && !data?.googleResults?.length && (
               <div className="p-4 text-center text-sm text-muted-foreground">
                 <Building2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p className="font-medium">Nenhuma empresa encontrada</p>
                 <p className="text-xs mt-1">
-                  Nenhuma correspondência na base de dados para "{debouncedValue}"
+                  Nenhuma correspondência para "{debouncedValue}"
                 </p>
                 <p className="text-xs mt-2">
                   Pode preencher os dados manualmente
