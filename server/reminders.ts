@@ -1,6 +1,6 @@
 import { db } from './db';
 import { lembretes, entidades, visitas, tarefas, users } from '@shared/schema';
-import { eq, and, sql, desc, lt, gte } from 'drizzle-orm';
+import { eq, and, sql, desc, lt, gte, inArray, or } from 'drizzle-orm';
 import type { User } from '@shared/schema';
 
 export interface ReminderContext {
@@ -13,33 +13,49 @@ export interface GeneratedReminder {
   entidadeId?: string;
   visitaId?: string;
   tarefaId?: string;
-  tipo: 'visita' | 'tarefa' | 'ia';
+  tipo: 'visita_followup' | 'tarefa_overdue' | 'ai_suggestion';
   mensagem: string;
   dataVencimento?: Date;
 }
 
+/**
+ * Generate visit follow-up reminders for entities that haven't been visited in 7+ days
+ * 
+ * RBAC Logic:
+ * - Admins: See reminders for all entities
+ * - Agents: See reminders only for entities assigned to them (entidades.assignedUserId)
+ * 
+ * Note: When an entity is assigned to an agent, they have access to ALL visits for that entity,
+ * even if created by other users. This is intentional - entity assignment conveys full access
+ * to the entity's visit history, necessary for effective follow-up workflows.
+ */
 export async function generateVisitReminders(context: ReminderContext): Promise<GeneratedReminder[]> {
   const reminders: GeneratedReminder[] = [];
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  let entidadesQuery = db
+  // Filter entities by RBAC: agents see only their assigned entities
+  // CRITICAL: Filter entities BEFORE leftJoin to prevent RBAC leakage
+  const filteredEntidades = context.userRole === 'agent'
+    ? await db.select().from(entidades).where(eq(entidades.assignedUserId, context.userId))
+    : await db.select().from(entidades);
+
+  const entidadeIds = filteredEntidades.map(e => e.id);
+  
+  if (entidadeIds.length === 0) {
+    return reminders; // No entities to process
+  }
+
+  // Now fetch visits for these filtered entities
+  const entidadesData = await db
     .select({
       entidade: entidades,
       lastVisit: visitas,
     })
     .from(entidades)
     .leftJoin(visitas, eq(visitas.entidadeId, entidades.id))
-    .orderBy(desc(visitas.dataVisita))
-    .$dynamic();
-
-  if (context.userRole === 'agent') {
-    entidadesQuery = entidadesQuery.where(
-      eq(entidades.assignedUserId, context.userId)
-    );
-  }
-
-  const entidadesData = await entidadesQuery;
+    .where(inArray(entidades.id, entidadeIds))
+    .orderBy(desc(visitas.dataVisita));
 
   const entidadeMap = new Map<string, { entidade: typeof entidades.$inferSelect; lastVisitDate?: Date }>();
   
@@ -55,7 +71,7 @@ export async function generateVisitReminders(context: ReminderContext): Promise<
   for (const [entidadeId, data] of Array.from(entidadeMap.entries())) {
     const { entidade, lastVisitDate } = data;
 
-    if (!lastVisitDate || lastVisitDate < thirtyDaysAgo) {
+    if (!lastVisitDate || lastVisitDate < sevenDaysAgo) {
       const daysSince = lastVisitDate
         ? Math.floor((Date.now() - lastVisitDate.getTime()) / (1000 * 60 * 60 * 24))
         : null;
@@ -67,12 +83,12 @@ export async function generateVisitReminders(context: ReminderContext): Promise<
       reminders.push({
         userId: context.userId,
         entidadeId: entidade.id,
-        tipo: 'visita',
+        tipo: 'visita_followup',
         mensagem,
       });
     }
 
-    const pendingTasks = await db
+    let pendingTasksQuery = db
       .select()
       .from(tarefas)
       .where(
@@ -80,7 +96,16 @@ export async function generateVisitReminders(context: ReminderContext): Promise<
           eq(tarefas.entidadeId, entidade.id),
           eq(tarefas.status, 'pending')
         )
+      )
+      .$dynamic();
+
+    if (context.userRole === 'agent') {
+      pendingTasksQuery = pendingTasksQuery.where(
+        eq(tarefas.assignedUserId, context.userId)
       );
+    }
+
+    const pendingTasks = await pendingTasksQuery;
 
     if (pendingTasks.length > 0) {
       const futureVisits = await db
@@ -97,7 +122,7 @@ export async function generateVisitReminders(context: ReminderContext): Promise<
         reminders.push({
           userId: context.userId,
           entidadeId: entidade.id,
-          tipo: 'visita',
+          tipo: 'visita_followup',
           mensagem: `Existem ${pendingTasks.length} tarefa(s) pendente(s) para ${entidade.nome} sem visita agendada. Deseja criar follow-up?`,
         });
       }
@@ -122,7 +147,7 @@ export async function generateVisitReminders(context: ReminderContext): Promise<
           userId: context.userId,
           entidadeId: entidade.id,
           visitaId: visit.id,
-          tipo: 'ia',
+          tipo: 'ai_suggestion',
           mensagem: `A IA sugeriu um follow-up para ${entidade.nome} com base na última visita. Deseja criar tarefa ou agendar visita?`,
         });
       }
@@ -140,19 +165,58 @@ export async function generateTaskReminders(context: ReminderContext): Promise<G
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  let tasksQuery = db
-    .select()
-    .from(tarefas)
-    .where(eq(tarefas.status, 'pending'))
-    .$dynamic();
-
+  // For agents, filter tasks to show only those:
+  // 1. Assigned to the agent (assignedUserId), OR
+  // 2. Belonging to entities assigned to the agent (entidadeId)
+  // CRITICAL: Separate queries to prevent inArray([]) from leaking data
+  let tasks;
   if (context.userRole === 'agent') {
-    tasksQuery = tasksQuery.where(
-      eq(tarefas.assignedUserId, context.userId)
-    );
-  }
+    // Get agent's assigned entities
+    const agentEntidades = await db
+      .select()
+      .from(entidades)
+      .where(eq(entidades.assignedUserId, context.userId));
+    
+    const agentEntidadeIds = agentEntidades.map(e => e.id);
 
-  const tasks = await tasksQuery;
+    // Fetch tasks directly assigned to agent
+    const directlyAssignedTasks = await db
+      .select()
+      .from(tarefas)
+      .where(
+        and(
+          eq(tarefas.status, 'pending'),
+          eq(tarefas.assignedUserId, context.userId)
+        )
+      );
+
+    // Fetch tasks from agent's entities (only if agent has entities)
+    let entityTasks = [];
+    if (agentEntidadeIds.length > 0) {
+      entityTasks = await db
+        .select()
+        .from(tarefas)
+        .where(
+          and(
+            eq(tarefas.status, 'pending'),
+            inArray(tarefas.entidadeId, agentEntidadeIds)
+          )
+        );
+    }
+
+    // Combine and deduplicate tasks
+    const taskMap = new Map();
+    for (const task of [...directlyAssignedTasks, ...entityTasks]) {
+      taskMap.set(task.id, task);
+    }
+    tasks = Array.from(taskMap.values());
+  } else {
+    // Admins see all pending tasks
+    tasks = await db
+      .select()
+      .from(tarefas)
+      .where(eq(tarefas.status, 'pending'));
+  }
 
   for (const task of tasks) {
     if (task.dueDate) {
@@ -161,7 +225,7 @@ export async function generateTaskReminders(context: ReminderContext): Promise<G
         reminders.push({
           userId: context.userId,
           tarefaId: task.id,
-          tipo: 'tarefa',
+          tipo: 'tarefa_overdue',
           mensagem: `A tarefa "${task.titulo}" está atrasada (${daysOverdue} dia(s)). Reagendar?`,
           dataVencimento: task.dueDate,
         });
@@ -169,7 +233,7 @@ export async function generateTaskReminders(context: ReminderContext): Promise<G
         reminders.push({
           userId: context.userId,
           tarefaId: task.id,
-          tipo: 'tarefa',
+          tipo: 'tarefa_overdue',
           mensagem: `A tarefa "${task.titulo}" vence amanhã. Deseja antecipar ou preparar follow-up?`,
           dataVencimento: task.dueDate,
         });
@@ -180,7 +244,7 @@ export async function generateTaskReminders(context: ReminderContext): Promise<G
       reminders.push({
         userId: context.userId,
         tarefaId: task.id,
-        tipo: 'tarefa',
+        tipo: 'tarefa_overdue',
         mensagem: `A tarefa "${task.titulo}" não tem atividade há ${Math.floor((now.getTime() - task.updatedAt.getTime()) / (1000 * 60 * 60 * 24))} dias. Quer atualizá-la?`,
       });
     }

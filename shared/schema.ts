@@ -59,9 +59,9 @@ export const taskRepeatEnum = pgEnum('task_repeat_interval', [
 
 // Reminder Type enum
 export const lembreteTipoEnum = pgEnum('lembrete_tipo', [
-  'visita',
-  'tarefa',
-  'ia'
+  'visita_followup',
+  'tarefa_overdue',
+  'ai_suggestion'
 ]);
 
 // ============================================

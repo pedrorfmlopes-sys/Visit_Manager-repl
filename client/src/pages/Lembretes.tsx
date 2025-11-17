@@ -79,11 +79,11 @@ export default function Lembretes() {
 
   const getTipoBadge = (tipo: string) => {
     switch (tipo) {
-      case 'visita':
+      case 'visita_followup':
         return <Badge variant="default" className="gap-1"><MapPin className="h-3 w-3" />Visita</Badge>;
-      case 'tarefa':
+      case 'tarefa_overdue':
         return <Badge variant="secondary" className="gap-1"><CheckCircle className="h-3 w-3" />Tarefa</Badge>;
-      case 'ia':
+      case 'ai_suggestion':
         return <Badge variant="outline" className="gap-1"><Sparkles className="h-3 w-3" />IA</Badge>;
       default:
         return <Badge>{tipo}</Badge>;
@@ -192,7 +192,7 @@ export default function Lembretes() {
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="flex flex-wrap gap-2">
-                  {lembrete.tipo === 'visita' && (
+                  {lembrete.tipo === 'visita_followup' && (
                     <>
                       <Button
                         size="sm"
@@ -216,7 +216,7 @@ export default function Lembretes() {
                     </>
                   )}
 
-                  {lembrete.tipo === 'tarefa' && (
+                  {lembrete.tipo === 'tarefa_overdue' && (
                     <>
                       {lembrete.tarefaId && (
                         <Button
@@ -239,7 +239,7 @@ export default function Lembretes() {
                     </>
                   )}
 
-                  {lembrete.tipo === 'ia' && (
+                  {lembrete.tipo === 'ai_suggestion' && (
                     <>
                       <Button
                         size="sm"
