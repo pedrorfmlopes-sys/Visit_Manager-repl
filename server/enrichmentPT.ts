@@ -387,22 +387,9 @@ export async function ptIntelligentSearch(
     
     console.log(`[PT-Search] Found ${fuzzyMatches.length} fuzzy matches`);
     
-    const hasStrongMatches = fuzzyMatches.some(m => m.score >= 0.80);
-    
-    if (!hasStrongMatches) {
-      console.log('[PT-Search] No strong fuzzy matches, calling PT-WebScan');
-      const webScanData = await ptWebScanFinder(nome);
-      
-      return {
-        fuzzyMatches,
-        webScanData,
-        enrichmentSource: fuzzyMatches.length > 0 ? 'combined' : 'webscan',
-      };
-    }
-    
     return {
       fuzzyMatches,
-      enrichmentSource: 'fuzzy',
+      enrichmentSource: fuzzyMatches.length > 0 ? 'fuzzy' : 'none',
     };
   } catch (error) {
     console.error('[PT-Search] Error:', error);

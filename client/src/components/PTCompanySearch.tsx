@@ -84,7 +84,7 @@ export function PTCompanySearch({
   }, [error, toast]);
 
   useEffect(() => {
-    if (debouncedValue.length >= 3 && (data?.fuzzyMatches.length || data?.webScanData)) {
+    if (debouncedValue.length >= 3 && data) {
       setShowSuggestions(true);
     } else {
       setShowSuggestions(false);
@@ -156,10 +156,10 @@ export function PTCompanySearch({
         )}
       </div>
 
-      {showSuggestions && (data?.fuzzyMatches.length || data?.webScanData) && (
+      {showSuggestions && data && (
         <Card className="absolute z-50 mt-1 w-full max-h-96 overflow-y-auto" data-testid="card-suggestions">
           <CardContent className="p-2 space-y-1">
-            {data.fuzzyMatches.length > 0 && (
+            {data.fuzzyMatches.length > 0 ? (
               <>
                 <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
                   Empresas na base de dados
@@ -218,63 +218,17 @@ export function PTCompanySearch({
                   </button>
                 ))}
               </>
-            )}
-
-            {data.webScanData && (
-              <>
-                {data.fuzzyMatches.length > 0 && (
-                  <div className="border-t my-2" />
-                )}
-                <div className="px-2 py-1 text-xs font-medium text-muted-foreground flex items-center gap-1">
-                  <Sparkles className="h-3 w-3" />
-                  Dados da pesquisa online (IA)
-                </div>
-                <button
-                  onClick={handleSelectWebScan}
-                  className="w-full text-left p-3 rounded-md hover-elevate active-elevate-2"
-                  data-testid="button-webscan-data"
-                >
-                  <div className="space-y-2">
-                    {data.webScanData.nome && (
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{data.webScanData.nome}</span>
-                      </div>
-                    )}
-                    <div className="space-y-0.5 text-xs text-muted-foreground">
-                      {data.webScanData.website && (
-                        <div className="flex items-center gap-1">
-                          <Globe className="h-3 w-3" />
-                          <span className="truncate">{data.webScanData.website}</span>
-                        </div>
-                      )}
-                      {data.webScanData.email && (
-                        <div className="flex items-center gap-1">
-                          <Mail className="h-3 w-3" />
-                          <span className="truncate">{data.webScanData.email}</span>
-                        </div>
-                      )}
-                      {data.webScanData.morada && (
-                        <div className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          <span className="truncate">{data.webScanData.morada}</span>
-                        </div>
-                      )}
-                      {data.webScanData.telefone && (
-                        <div className="flex items-center gap-1">
-                          <Phone className="h-3 w-3" />
-                          <span className="truncate">{data.webScanData.telefone}</span>
-                        </div>
-                      )}
-                      {data.webScanData.descricao && (
-                        <div className="mt-1 text-xs">
-                          <p className="line-clamp-2">{data.webScanData.descricao}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              </>
+            ) : (
+              <div className="p-4 text-center text-sm text-muted-foreground">
+                <Building2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="font-medium">Nenhuma empresa encontrada</p>
+                <p className="text-xs mt-1">
+                  Nenhuma correspondência na base de dados para "{debouncedValue}"
+                </p>
+                <p className="text-xs mt-2">
+                  Pode preencher os dados manualmente
+                </p>
+              </div>
             )}
 
             <div className="border-t pt-2">
