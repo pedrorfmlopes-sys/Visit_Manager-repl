@@ -55,7 +55,7 @@ export default function MicrosoftIntegration() {
   };
 
   const handleDisconnect = () => {
-    if (confirm('Tem a certeza que deseja desligar a sua conta Microsoft? Isto irá remover o acesso ao Planner, To-Do e Outlook Calendar.')) {
+    if (confirm('Tem a certeza que deseja desligar a sua conta Microsoft? Isto irá remover o acesso ao To-Do e Planner.')) {
       disconnectMutation.mutate();
     }
   };
@@ -76,7 +76,7 @@ export default function MicrosoftIntegration() {
         <div>
           <h1 className="text-3xl font-bold">Integração Microsoft 365</h1>
           <p className="text-muted-foreground mt-2">
-            Ligue a sua conta Microsoft para exportar tarefas para o Planner e To-Do, e visitas para o Outlook Calendar.
+            Ligue a sua conta Microsoft para exportar tarefas para o To-Do (e opcionalmente para o Planner).
           </p>
         </div>
 
@@ -107,11 +107,12 @@ export default function MicrosoftIntegration() {
                   <div className="text-sm">
                     <span className="font-medium">Permissões concedidas:</span>
                     <ul className="list-disc list-inside mt-1 text-muted-foreground">
-                      <li>Microsoft Planner (leitura e escrita)</li>
                       <li>Microsoft To-Do (leitura e escrita)</li>
-                      <li>Outlook Calendar (leitura e escrita)</li>
-                      <li>Grupos e Teams (leitura)</li>
+                      <li>Perfil de utilizador (leitura)</li>
                     </ul>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Nota: O acesso ao Planner requer permissões adicionais que podem não estar disponíveis para todas as contas.
+                    </p>
                   </div>
                   {status?.expiresAt && (
                     <p className="text-sm text-muted-foreground">
@@ -170,37 +171,25 @@ export default function MicrosoftIntegration() {
           <CardContent className="space-y-4">
             <div className="space-y-3">
               <div className="flex gap-3">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                  <span className="text-lg">📋</span>
-                </div>
-                <div>
-                  <h3 className="font-medium">Exportar Tarefas para o Planner</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Sincronize as suas tarefas com o Microsoft Planner. Escolha o grupo, plano e bucket de destino.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
                   <span className="text-lg">✓</span>
                 </div>
                 <div>
-                  <h3 className="font-medium">Exportar Tarefas para o To-Do</h3>
+                  <h3 className="font-medium">Exportar Tarefas para o To-Do (Principal)</h3>
                   <p className="text-sm text-muted-foreground">
-                    Crie rapidamente tarefas no Microsoft To-Do com um clique, incluindo data de vencimento e categorias.
+                    Crie rapidamente tarefas no Microsoft To-Do com um clique, incluindo data de vencimento e categorias. Funciona para todas as contas Microsoft.
                   </p>
                 </div>
               </div>
 
               <div className="flex gap-3">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
-                  <span className="text-lg">📅</span>
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                  <span className="text-lg">📋</span>
                 </div>
                 <div>
-                  <h3 className="font-medium">Adicionar Visitas ao Outlook Calendar</h3>
+                  <h3 className="font-medium">Exportar Tarefas para o Planner (Opcional)</h3>
                   <p className="text-sm text-muted-foreground">
-                    Crie eventos no Outlook Calendar para as suas visitas, com resumo IA, localização e lembretes automáticos.
+                    Sincronize as suas tarefas com o Microsoft Planner. Escolha o grupo, plano e bucket de destino. Requer permissões adicionais que podem não estar disponíveis para todas as contas.
                   </p>
                 </div>
               </div>
