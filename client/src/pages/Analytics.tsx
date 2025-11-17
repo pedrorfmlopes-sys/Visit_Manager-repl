@@ -167,7 +167,6 @@ export default function Analytics() {
                 <SelectItem value="Distribuidor">Distribuidor</SelectItem>
                 <SelectItem value="Parceiro">Parceiro</SelectItem>
                 <SelectItem value="Construtor">Construtor</SelectItem>
-                <SelectItem value="Contato Pessoal">Contato Pessoal</SelectItem>
               </SelectContent>
             </Select>
           </div>

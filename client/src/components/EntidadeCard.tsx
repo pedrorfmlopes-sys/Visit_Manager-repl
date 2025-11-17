@@ -15,7 +15,6 @@ const tipoIcons = {
   Distribuidor: Package,
   Parceiro: Briefcase,
   Construtor: Construction,
-  "Contato Pessoal": User,
 };
 
 const tipoLabels = {
@@ -23,7 +22,6 @@ const tipoLabels = {
   Distribuidor: "Distribuidor",
   Parceiro: "Parceiro",
   Construtor: "Construtor",
-  "Contato Pessoal": "Contato Pessoal",
 };
 
 export function EntidadeCard({ entidade, onClick, showSyncStatus = false }: EntidadeCardProps) {

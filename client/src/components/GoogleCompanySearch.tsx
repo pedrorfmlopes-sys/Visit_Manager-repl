@@ -34,8 +34,7 @@ export function GoogleCompanySearch({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const { toast } = useToast();
   
-  const isPersonalContact = tipoEntidade === 'Contato Pessoal';
-  const searchDisabled = disabled || isPersonalContact;
+  const searchDisabled = disabled;
 
   useEffect(() => {
     if (!value || value.trim().length === 0) {
@@ -74,7 +73,7 @@ export function GoogleCompanySearch({
         enrichmentSource: result.enrichmentSource || 'none',
       };
     },
-    enabled: debouncedValue.length >= 3 && !isPersonalContact,
+    enabled: debouncedValue.length >= 3,
     staleTime: 60000,
     retry: 1,
   });

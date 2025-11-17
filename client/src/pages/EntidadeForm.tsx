@@ -26,7 +26,6 @@ const tipoOptions = [
   { value: "Distribuidor", label: "Distribuidor", icon: Package },
   { value: "Parceiro", label: "Parceiro Comercial", icon: Briefcase },
   { value: "Construtor", label: "Construtor / Empreiteiro", icon: Construction },
-  { value: "Contato Pessoal", label: "Contato Pessoal", icon: User },
 ];
 
 export default function EntidadeForm() {
@@ -470,13 +469,12 @@ export default function EntidadeForm() {
               name="nome"
               render={({ field }) => {
                 const tipoEntidade = form.watch("tipoEntidade");
-                const isContatoPessoal = tipoEntidade === "Contato Pessoal";
                 
                 return (
                   <FormItem>
                     <div className="flex items-center justify-between gap-2">
                       <FormLabel>Nome *</FormLabel>
-                      {isEdit && isOnline && !isContatoPessoal && (
+                      {isEdit && isOnline && (
                         <Button
                           type="button"
                           variant="ghost"
@@ -496,10 +494,10 @@ export default function EntidadeForm() {
                       )}
                     </div>
                     <FormControl>
-                      {isEdit || isContatoPessoal ? (
+                      {isEdit ? (
                         <Input
                           {...field}
-                          placeholder={isContatoPessoal ? "Nome do contato" : "Nome da entidade"}
+                          placeholder="Nome da entidade"
                           className="h-12"
                           data-testid="input-nome"
                         />
@@ -514,12 +512,7 @@ export default function EntidadeForm() {
                         />
                       )}
                     </FormControl>
-                    {isContatoPessoal && !isEdit && (
-                      <FormDescription className="text-xs text-muted-foreground">
-                        Para contatos pessoais, preencha os dados manualmente ou utilize QRCode/OCR/vCard
-                      </FormDescription>
-                    )}
-                    {!isOnline && !isEdit && !isContatoPessoal && (
+                    {!isOnline && !isEdit && (
                       <FormDescription className="text-xs text-muted-foreground">
                         Pesquisa inteligente funciona offline usando dados locais
                       </FormDescription>

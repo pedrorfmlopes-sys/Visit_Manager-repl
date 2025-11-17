@@ -10,7 +10,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocation } from "wouter";
 import type { EntidadeWithRelations } from "@shared/schema";
 
-type TipoEntidade = "Todos" | "Gabinete" | "Distribuidor" | "Parceiro" | "Construtor" | "Contato Pessoal";
+type TipoEntidade = "Todos" | "Gabinete" | "Distribuidor" | "Parceiro" | "Construtor";
 
 export default function Entidades() {
   const [, setLocation] = useLocation();
@@ -54,10 +54,9 @@ export default function Entidades() {
           </Tabs>
           
           <Tabs value={tipoFilter} onValueChange={(v) => setTipoFilter(v as TipoEntidade)} className="mt-1">
-            <TabsList className="w-full grid grid-cols-3 h-auto gap-1">
+            <TabsList className="w-full grid grid-cols-2 h-auto gap-1">
               <TabsTrigger value="Parceiro" className="text-xs py-2" data-testid="tab-parceiro">Parceiros</TabsTrigger>
               <TabsTrigger value="Construtor" className="text-xs py-2" data-testid="tab-construtor">Construtores</TabsTrigger>
-              <TabsTrigger value="Contato Pessoal" className="text-xs py-2" data-testid="tab-contato">Contatos</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>

@@ -486,10 +486,10 @@ export default function QRScanner() {
     if (!pendingContact) return;
 
     try {
-      // Create entity
+      // Create entity (defaults to Gabinete - user can edit type later)
       const entityRes = await apiRequest("POST", "/api/entidades", {
         nome: entityName,
-        tipoEntidade: "Contato Pessoal",
+        tipoEntidade: "Gabinete",
       });
 
       if (!entityRes.ok) {

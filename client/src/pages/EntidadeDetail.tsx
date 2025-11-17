@@ -28,7 +28,6 @@ const tipoLabels: Record<string, string> = {
   Distribuidor: "Distribuidor",
   Parceiro: "Parceiro",
   Construtor: "Construtor",
-  "Contato Pessoal": "Contato Pessoal",
 };
 
 export default function EntidadeDetail() {

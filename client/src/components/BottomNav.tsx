@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 const navItems = [
   { path: "/", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/entidades", icon: Building2, label: "Entidades" },
-  { path: "/qr", icon: QrCode, label: "QR" },
+  { path: "/contactos", icon: Users, label: "Contactos" },
   { path: "/visitas", icon: FileText, label: "Visitas" },
   { path: "/tarefas", icon: CheckCircle2, label: "Tarefas" },
   { path: "/lembretes", icon: Bell, label: "Lembretes", showBadge: true },
