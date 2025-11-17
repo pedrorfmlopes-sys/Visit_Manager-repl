@@ -50,6 +50,14 @@ Relationships are managed via foreign keys, and data integrity is maintained wit
   2. **Overdue Tasks**: Alerts users about pending tasks past their due date
   3. **AI-Suggested Reminders**: Future capability for intelligent reminder suggestions
   Reminders are RBAC-aware with watertight security - agents see only reminders for their assigned entities and tasks. Features include snooze (1, 3, 7 days), resolve, and reminder banners integrated into entity and visit detail pages. Real-time badge counts in navigation bell icon.
+- **Microsoft 365 Integration Module (Admin-Only)**: Seamless integration with Microsoft 365 services for task and visit export:
+  1. **OAuth 2.0 Authentication**: Secure OAuth flow with state validation and encrypted token storage in `microsoft_tokens` table. Automatic token refresh via Microsoft Graph API client.
+  2. **Microsoft Planner Export**: Export tasks to Planner with full group/plan/bucket selection, automatic assignment, and bidirectional sync tracking (`plannerTaskId`, `lastPlannerSyncAt` fields).
+  3. **Microsoft To-Do Export**: One-click task creation in To-Do with categories, due dates, and deep links back to the PWA.
+  4. **Outlook Calendar Export**: Create calendar events for visits with AI summaries, location data, automatic reminders, and sync tracking (`outlookEventId`, `lastCalendarSyncAt` fields).
+  5. **RBAC Enforcement**: All Microsoft integration endpoints (auth, data retrieval, export) enforce admin-only access with 403 responses for agents. Tokens are user-specific and isolated per admin account.
+  6. **Frontend Integration Page**: Accessible at `/integracoes/microsoft` with connection status, scopes display, connect/disconnect functionality, and feature overview. Linked prominently from Dashboard.
+  Features full RBAC enforcement, comprehensive error handling, and follows OAuth 2.0 best practices with encrypted credential storage.
 
 ## External Dependencies
 
