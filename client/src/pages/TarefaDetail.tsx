@@ -433,7 +433,16 @@ export default function TarefaDetail() {
               <Button
                 variant="default"
                 size="sm"
-                onClick={() => setLocation('/integracoes/microsoft')}
+                onClick={() => {
+                  window.open('/api/microsoft/auth/login', '_blank', 'width=600,height=700');
+                  toast({
+                    title: "Autenticação Microsoft",
+                    description: "Uma nova janela foi aberta. Complete o login e volte aqui.",
+                  });
+                  setTimeout(() => {
+                    queryClient.invalidateQueries({ queryKey: ["/api/microsoft/auth/status"] });
+                  }, 3000);
+                }}
                 data-testid="button-goto-microsoft-login"
               >
                 <Cloud className="h-4 w-4 mr-2" />
