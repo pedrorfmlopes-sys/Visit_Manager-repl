@@ -22,11 +22,31 @@ interface VCardQueueItem {
   retryCount?: number; // Track number of retries
 }
 
+interface EnrichmentQueueItem {
+  id: string;
+  timestamp: number;
+  entityId: string;
+  enrichmentData: {
+    name: string;
+    domain?: string;
+    website?: string;
+    visionText?: string;
+  };
+  status: 'pending' | 'syncing' | 'completed' | 'failed' | 'dead';
+  error?: string;
+  retryCount?: number;
+}
+
 interface OfflineQueueDB extends DBSchema {
   vcardQueue: {
     key: string;
     value: VCardQueueItem;
     indexes: { 'by-status': string };
+  };
+  enrichmentQueue: {
+    key: string;
+    value: EnrichmentQueueItem;
+    indexes: { 'by-status': string; 'by-entity': string };
   };
 }
 
@@ -35,10 +55,20 @@ let db: IDBPDatabase<OfflineQueueDB> | null = null;
 async function getDB() {
   if (db) return db;
 
-  db = await openDB<OfflineQueueDB>('offline-queue', 1, {
-    upgrade(upgradeDb) {
-      const store = upgradeDb.createObjectStore('vcardQueue', { keyPath: 'id' });
-      store.createIndex('by-status', 'status');
+  db = await openDB<OfflineQueueDB>('offline-queue', 2, {
+    upgrade(upgradeDb, oldVersion) {
+      // Version 1: vCard queue
+      if (oldVersion < 1) {
+        const vcardStore = upgradeDb.createObjectStore('vcardQueue', { keyPath: 'id' });
+        vcardStore.createIndex('by-status', 'status');
+      }
+      
+      // Version 2: Enrichment queue
+      if (oldVersion < 2) {
+        const enrichmentStore = upgradeDb.createObjectStore('enrichmentQueue', { keyPath: 'id' });
+        enrichmentStore.createIndex('by-status', 'status');
+        enrichmentStore.createIndex('by-entity', 'entityId');
+      }
     },
   });
 
@@ -186,5 +216,155 @@ export async function retryDeadVCardImport(id: string): Promise<void> {
     
     // Reinsert with updated status
     await database.add('vcardQueue', retriedItem);
+  }
+}
+
+// ============================================
+// ENRICHMENT QUEUE FUNCTIONS
+// ============================================
+
+/**
+ * Queue an enrichment request for offline processing
+ */
+export async function queueEnrichmentRequest(
+  entityId: string,
+  enrichmentData: EnrichmentQueueItem['enrichmentData']
+): Promise<string> {
+  const database = await getDB();
+  const id = `enrichment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  
+  const item: EnrichmentQueueItem = {
+    id,
+    timestamp: Date.now(),
+    entityId,
+    enrichmentData,
+    status: 'pending',
+    retryCount: 0,
+  };
+
+  await database.add('enrichmentQueue', item);
+  console.log(`[Enrichment Queue] Queued enrichment for entity ${entityId}`);
+  return id;
+}
+
+/**
+ * Get pending enrichment requests (including retryable failed items)
+ */
+export async function getPendingEnrichmentRequests(): Promise<EnrichmentQueueItem[]> {
+  const database = await getDB();
+  const pending = await database.getAllFromIndex('enrichmentQueue', 'by-status', 'pending');
+  const failed = await database.getAllFromIndex('enrichmentQueue', 'by-status', 'failed');
+  
+  // Filter out items that have exceeded max retries
+  const retryableItems = failed.filter(item => (item.retryCount || 0) < MAX_RETRIES);
+  
+  return [...pending, ...retryableItems];
+}
+
+/**
+ * Update enrichment request status
+ */
+export async function updateEnrichmentRequestStatus(
+  id: string,
+  status: EnrichmentQueueItem['status'],
+  error?: string
+): Promise<void> {
+  const database = await getDB();
+  const item = await database.get('enrichmentQueue', id);
+  
+  if (item) {
+    // Delete and reinsert to ensure index update
+    await database.delete('enrichmentQueue', id);
+    
+    // Increment retry count on failures
+    if (status === 'failed') {
+      item.retryCount = (item.retryCount || 0) + 1;
+      
+      // Move to 'dead' status if max retries exceeded
+      if (item.retryCount >= MAX_RETRIES) {
+        item.status = 'dead';
+        item.error = `Max retries (${MAX_RETRIES}) exceeded. ${error || ''}`;
+      } else {
+        item.status = status;
+        if (error) item.error = error;
+      }
+    } else {
+      item.status = status;
+      if (error) item.error = error;
+      
+      // Reset retry count on success
+      if (status === 'completed') {
+        item.retryCount = 0;
+      }
+    }
+    
+    // Reinsert with updated status
+    await database.add('enrichmentQueue', item);
+  }
+}
+
+/**
+ * Clear completed enrichment requests
+ */
+export async function clearCompletedEnrichmentRequests(): Promise<void> {
+  const database = await getDB();
+  const completed = await database.getAllFromIndex('enrichmentQueue', 'by-status', 'completed');
+  
+  for (const item of completed) {
+    await database.delete('enrichmentQueue', item.id);
+  }
+}
+
+/**
+ * Get all enrichment requests for a specific entity
+ */
+export async function getEnrichmentRequestsByEntity(entityId: string): Promise<EnrichmentQueueItem[]> {
+  const database = await getDB();
+  return database.getAllFromIndex('enrichmentQueue', 'by-entity', entityId);
+}
+
+/**
+ * Get dead enrichment requests
+ */
+export async function getDeadEnrichmentRequests(): Promise<EnrichmentQueueItem[]> {
+  const database = await getDB();
+  return database.getAllFromIndex('enrichmentQueue', 'by-status', 'dead');
+}
+
+/**
+ * Clear dead enrichment requests
+ */
+export async function clearDeadEnrichmentRequests(): Promise<number> {
+  const database = await getDB();
+  const deadItems = await getDeadEnrichmentRequests();
+  
+  for (const item of deadItems) {
+    await database.delete('enrichmentQueue', item.id);
+  }
+  
+  return deadItems.length;
+}
+
+/**
+ * Retry a dead enrichment request
+ */
+export async function retryDeadEnrichmentRequest(id: string): Promise<void> {
+  const database = await getDB();
+  const item = await database.get('enrichmentQueue', id);
+  
+  if (item && item.status === 'dead') {
+    // Delete the old record
+    await database.delete('enrichmentQueue', id);
+    
+    // Create new record with updated status (ensures indices update)
+    const retriedItem: EnrichmentQueueItem = {
+      ...item,
+      status: 'pending',
+      retryCount: 0,
+      error: undefined,
+    };
+    
+    // Reinsert with updated status
+    await database.add('enrichmentQueue', retriedItem);
   }
 }
