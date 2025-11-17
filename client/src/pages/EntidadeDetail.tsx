@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, MapPin, Phone, Mail, Globe, Edit, Building2, Users, UserCircle, Calendar, Sparkles, Linkedin, Facebook, Instagram } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, Mail, Globe, Edit, Building2, Users, UserCircle, Calendar, Sparkles, Linkedin, Facebook, Instagram, Share2, MessageCircle, Link as LinkIcon, Copy, FileText } from "lucide-react";
 import { SiX } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,8 @@ import { Separator } from "@/components/ui/separator";
 import { ContactoCard } from "@/components/ContactoCard";
 import { VisitaCard } from "@/components/VisitaCard";
 import { LocationPreview } from "@/components/LocationPreview";
+import { ShareDialog, useShareActions } from "@/components/ShareDialog";
+import { formatEntityForSharing } from "@/lib/shareFormatters";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { EntidadeWithRelations } from "@shared/schema";
@@ -28,6 +30,9 @@ export default function EntidadeDetail() {
   const [, setLocation] = useLocation();
   const entidadeId = params?.id;
   const { toast } = useToast();
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  
+  const { isOnline, shareViaWhatsApp, shareViaEmail, copyToClipboard, copyLink } = useShareActions();
 
   const { data: entidade, isLoading } = useQuery<EntidadeWithRelations>({
     queryKey: ["/api/entidades", entidadeId],
@@ -136,6 +141,15 @@ export default function EntidadeDetail() {
               ) : (
                 <Sparkles className="h-5 w-5" />
               )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShareDialogOpen(true)}
+              data-testid="button-share"
+              title="Partilhar"
+            >
+              <Share2 className="h-5 w-5" />
             </Button>
             <Button
               variant="ghost"
@@ -468,6 +482,37 @@ export default function EntidadeDetail() {
           </CardContent>
         </Card>
       </main>
+
+      <ShareDialog
+        open={shareDialogOpen}
+        onOpenChange={setShareDialogOpen}
+        title="Partilhar Entidade"
+        description={`Partilhar informações de ${entidade.nome}`}
+        options={[
+          {
+            icon: MessageCircle,
+            label: "Enviar por WhatsApp",
+            action: () => shareViaWhatsApp(formatEntityForSharing(entidade)),
+            disabled: !isOnline,
+          },
+          {
+            icon: Mail,
+            label: "Enviar por Email",
+            action: () => shareViaEmail(formatEntityForSharing(entidade), `Entidade - ${entidade.nome}`),
+            disabled: !isOnline,
+          },
+          {
+            icon: LinkIcon,
+            label: "Copiar Link",
+            action: () => copyLink(`/entidades/${entidade.id}`),
+          },
+          {
+            icon: FileText,
+            label: "Copiar Entidade (texto)",
+            action: () => copyToClipboard(formatEntityForSharing(entidade), "Entidade copiada!"),
+          },
+        ]}
+      />
     </div>
   );
 }
