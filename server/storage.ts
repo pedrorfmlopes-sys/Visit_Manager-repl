@@ -1,7 +1,6 @@
 import {
   users,
   entidades,
-  gabinetes,
   contactos,
   visitas,
   tarefas,
@@ -10,8 +9,6 @@ import {
   type UpsertUser,
   type Entidade,
   type InsertEntidade,
-  type Gabinete,
-  type InsertGabinete,
   type Contacto,
   type InsertContacto,
   type Visita,
@@ -21,7 +18,6 @@ import {
   type Marca,
   type InsertMarca,
   type EntidadeWithRelations,
-  type GabineteWithRelations,
   type ContactoWithRelations,
   type VisitaWithRelations,
   type TarefaWithRelations,
@@ -44,13 +40,6 @@ export interface IStorage {
   updateEntidade(id: string, entidade: Partial<InsertEntidade>, userId?: string, userRole?: 'admin' | 'agent'): Promise<Entidade | undefined>;
   deleteEntidade(id: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void>;
   checkEntidadeHasRelations(id: string): Promise<boolean>;
-  
-  // Gabinetes (DEPRECATED - use Entidades)
-  getGabinetes(): Promise<Gabinete[]>;
-  getGabinete(id: string): Promise<GabineteWithRelations | undefined>;
-  createGabinete(gabinete: InsertGabinete): Promise<Gabinete>;
-  updateGabinete(id: string, gabinete: Partial<InsertGabinete>): Promise<Gabinete>;
-  deleteGabinete(id: string): Promise<void>;
   
   // Contactos
   getContactos(userId: string, userRole: 'admin' | 'agent'): Promise<ContactoWithRelations[]>;
@@ -315,46 +304,6 @@ export class DatabaseStorage implements IStorage {
     await db.delete(entidades).where(whereClause);
   }
 
-  // Gabinetes (DEPRECATED - use Entidades)
-  async getGabinetes(): Promise<Gabinete[]> {
-    return db.select().from(gabinetes).orderBy(desc(gabinetes.createdAt));
-  }
-
-  async getGabinete(id: string): Promise<GabineteWithRelations | undefined> {
-    const [gabinete] = await db.query.gabinetes.findMany({
-      where: eq(gabinetes.id, id),
-      with: {
-        contactos: true,
-        visitas: {
-          orderBy: desc(visitas.dataVisita),
-          limit: 10,
-        },
-      },
-    });
-    return gabinete;
-  }
-
-  async createGabinete(gabinete: InsertGabinete): Promise<Gabinete> {
-    const [newGabinete] = await db
-      .insert(gabinetes)
-      .values(gabinete)
-      .returning();
-    return newGabinete;
-  }
-
-  async updateGabinete(id: string, gabinete: Partial<InsertGabinete>): Promise<Gabinete> {
-    const [updated] = await db
-      .update(gabinetes)
-      .set(gabinete)
-      .where(eq(gabinetes.id, id))
-      .returning();
-    return updated;
-  }
-
-  async deleteGabinete(id: string): Promise<void> {
-    await db.delete(gabinetes).where(eq(gabinetes.id, id));
-  }
-
   // Contactos
   async getContactos(userId: string, userRole: 'admin' | 'agent'): Promise<ContactoWithRelations[]> {
     // Admin sees all contactos, agents see only their created/assigned ones
@@ -370,7 +319,6 @@ export class DatabaseStorage implements IStorage {
       where: whereClause,
       orderBy: desc(contactos.createdAt),
       with: {
-        gabinete: true,
         entidade: true,
         assignedUser: true,
         createdByUser: true,
@@ -396,7 +344,6 @@ export class DatabaseStorage implements IStorage {
     return db.query.contactos.findFirst({
       where: whereClause,
       with: {
-        gabinete: true,
         entidade: true,
       },
     });
@@ -461,7 +408,6 @@ export class DatabaseStorage implements IStorage {
       where: whereClause,
       orderBy: desc(visitas.dataVisita),
       with: {
-        gabinete: true,
         entidade: true,
         contacto: true,
         user: true,
@@ -490,7 +436,6 @@ export class DatabaseStorage implements IStorage {
     return db.query.visitas.findFirst({
       where: whereClause,
       with: {
-        gabinete: true,
         entidade: true,
         contacto: true,
         user: true,
@@ -740,21 +685,19 @@ export class DatabaseStorage implements IStorage {
     // SQL-level filtering with RBAC
     const whereClause = userRole === 'agent'
       ? and(
-          or(eq(visitas.gabineteId, entidadeId), eq(visitas.entidadeId, entidadeId)),
+          eq(visitas.entidadeId, entidadeId),
           eq(visitas.createdByUserId, userId)
         )
-      : or(eq(visitas.gabineteId, entidadeId), eq(visitas.entidadeId, entidadeId));
+      : eq(visitas.entidadeId, entidadeId);
     
     const results = await db.select().from(visitas)
       .leftJoin(entidades, eq(visitas.entidadeId, entidades.id))
-      .leftJoin(gabinetes, eq(visitas.gabineteId, gabinetes.id))
       .where(whereClause)
       .orderBy(desc(visitas.dataVisita));
     
     return results.map(row => ({
       ...row.visitas,
       entidade: row.entidades || undefined,
-      gabinete: row.gabinetes || undefined,
     }));
   }
 
@@ -773,14 +716,12 @@ export class DatabaseStorage implements IStorage {
     
     const results = await db.select().from(visitas)
       .leftJoin(entidades, eq(visitas.entidadeId, entidades.id))
-      .leftJoin(gabinetes, eq(visitas.gabineteId, gabinetes.id))
       .where(whereClause)
       .orderBy(desc(visitas.dataVisita));
     
     return results.map(row => ({
       ...row.visitas,
       entidade: row.entidades || undefined,
-      gabinete: row.gabinetes || undefined,
     }));
   }
 
@@ -855,7 +796,6 @@ export class DatabaseStorage implements IStorage {
     const allVisitas = await db.query.visitas.findMany({
       where: visitasWhereClause,
       with: {
-        gabinete: true,
         entidade: true,
         contacto: true,
       },
@@ -867,20 +807,20 @@ export class DatabaseStorage implements IStorage {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const visitasEstesMes = allVisitas.filter(v => new Date(v.dataVisita) >= startOfMonth).length;
 
-    // Count gabinetes/entidades based on role
-    let gabinetesCount;
+    // Count entidades based on role
+    let entidadesCount;
     if (userRole === 'admin') {
-      gabinetesCount = await db.select({ count: sql<number>`count(distinct ${entidades.id})` })
+      entidadesCount = await db.select({ count: sql<number>`count(distinct ${entidades.id})` })
         .from(entidades);
     } else {
-      gabinetesCount = await db.select({ count: sql<number>`count(distinct ${entidades.id})` })
+      entidadesCount = await db.select({ count: sql<number>`count(distinct ${entidades.id})` })
         .from(entidades)
         .where(or(
           eq(entidades.createdByUserId, userId),
           eq(entidades.assignedUserId, userId)
         ));
     }
-    const totalGabinetes = Number(gabinetesCount[0]?.count || 0);
+    const totalEntidades = Number(entidadesCount[0]?.count || 0);
 
     // Count contactos based on role
     let contactosCount;
@@ -916,7 +856,7 @@ export class DatabaseStorage implements IStorage {
       .slice(0, 5);
 
     return {
-      totalGabinetes,
+      totalGabinetes: totalEntidades, // Legacy field name for backwards compatibility
       totalContactos,
       totalVisitas,
       visitasEstesMes,
