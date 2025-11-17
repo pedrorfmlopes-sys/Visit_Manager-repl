@@ -128,7 +128,7 @@ async function refreshAccessToken(userId: string): Promise<string> {
     throw new Error('Microsoft OAuth credentials not configured');
   }
   
-  const tokenEndpoint = 'https://login.microsoftonline.com/common/oauth2/v2.0/token';
+  const tokenEndpoint = 'https://login.microsoftonline.com/organizations/oauth2/v2.0/token';
   
   const params = new URLSearchParams({
     client_id: clientId,

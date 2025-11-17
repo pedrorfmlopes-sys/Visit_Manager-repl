@@ -1585,7 +1585,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const state = randomUUID();
       req.session.msOAuthState = state;
       
-      const authUrl = new URL('https://login.microsoftonline.com/common/oauth2/v2.0/authorize');
+      const authUrl = new URL('https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize');
       authUrl.searchParams.set('client_id', clientId);
       authUrl.searchParams.set('response_type', 'code');
       authUrl.searchParams.set('redirect_uri', redirectUri);
@@ -1629,7 +1629,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: 'Microsoft OAuth not configured' });
       }
       
-      const tokenEndpoint = 'https://login.microsoftonline.com/common/oauth2/v2.0/token';
+      const tokenEndpoint = 'https://login.microsoftonline.com/organizations/oauth2/v2.0/token';
       const params = new URLSearchParams({
         client_id: clientId,
         client_secret: clientSecret,
