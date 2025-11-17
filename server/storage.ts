@@ -79,7 +79,7 @@ export interface IStorage {
   
   // Dashboard stats
   getDashboardStats(userId: string, userRole: 'admin' | 'agent'): Promise<{
-    totalGabinetes: number;
+    totalEntidades: number;
     totalContactos: number;
     totalVisitas: number;
     visitasEstesMes: number;
@@ -856,7 +856,7 @@ export class DatabaseStorage implements IStorage {
       .slice(0, 5);
 
     return {
-      totalGabinetes: totalEntidades, // Legacy field name for backwards compatibility
+      totalEntidades,
       totalContactos,
       totalVisitas,
       visitasEstesMes,

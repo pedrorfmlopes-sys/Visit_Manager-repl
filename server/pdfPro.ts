@@ -601,7 +601,7 @@ export async function generateMonthlyReportPDF(
   pdf.addSectionHeader("Indicadores Principais (KPIs)");
   pdf.addText(`Total de Visitas: ${visitas.length}`, 12, true);
   pdf.addText(`Total de Tarefas: ${tarefas.length}`, 12, true);
-  pdf.addText(`Entidades Visitadas: ${new Set(visitas.map(v => v.entidadeId || v.gabineteId)).size}`, 12, true);
+  pdf.addText(`Entidades Visitadas: ${new Set(visitas.map(v => v.entidadeId)).size}`, 12, true);
   
   const tarefasConcluidas = tarefas.filter(t => t.status === 'concluída').length;
   const taxaConclusao = tarefas.length > 0 ? ((tarefasConcluidas / tarefas.length) * 100).toFixed(1) : '0';
@@ -650,7 +650,7 @@ export async function generateMonthlyReportPDF(
     pdf.addSectionHeader("Resumo de Visitas");
     const tableData = visitas.slice(0, 15).map(v => [
       format(new Date(v.dataVisita), 'dd/MM', { locale: pt }),
-      v.entidade?.nome || v.gabinete?.nome || '-',
+      v.entidade?.nome || '-',
       v.contacto?.nome || '-',
       v.marcasEntregues?.slice(0, 2).join(', ') || '-'
     ]);

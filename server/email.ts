@@ -3,7 +3,7 @@
 
 export async function sendVisitEmail(data: {
   toEmail: string;
-  gabineteNome: string;
+  entidadeNome: string;
   contactoNome?: string;
   dataVisita: Date;
   notas?: string;
@@ -15,7 +15,7 @@ export async function sendVisitEmail(data: {
   const emailContent = `
 Nova Visita Registada
 
-Gabinete: ${data.gabineteNome}
+Entidade: ${data.entidadeNome}
 ${data.contactoNome ? `Contacto: ${data.contactoNome}` : ''}
 Data: ${data.dataVisita.toLocaleDateString('pt-PT')}
 
@@ -32,7 +32,7 @@ Ver visita completa: ${data.linkVisita}
   // For now, just log it
   console.log('=== EMAIL NOTIFICATION ===');
   console.log(`To: ${data.toEmail}`);
-  console.log(`Subject: Nova Visita - ${data.gabineteNome}`);
+  console.log(`Subject: Nova Visita - ${data.entidadeNome}`);
   console.log(emailContent);
   console.log('=========================');
   
@@ -40,7 +40,7 @@ Ver visita completa: ${data.linkVisita}
   // await resend.emails.send({
   //   from: 'visitas@yourcompany.com',
   //   to: data.toEmail,
-  //   subject: `Nova Visita - ${data.gabineteNome}`,
+  //   subject: `Nova Visita - ${data.entidadeNome}`,
   //   text: emailContent,
   // });
 }

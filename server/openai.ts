@@ -119,19 +119,19 @@ export async function generateVisitSummary(data: {
   notas?: string;
   transcricaoAudio?: string;
   marcasEntregues?: string[];
-  gabineteNome: string;
+  entidadeNome: string;
   contactoNome?: string;
 }): Promise<string> {
   if (!openai) {
     console.warn("OpenAI not configured. Skipping AI summary generation.");
-    return `## Resumo da Visita\n\nVisita ao gabinete ${data.gabineteNome}${data.contactoNome ? ` - Contacto: ${data.contactoNome}` : ''}.\n\n[Resumo automático indisponível - API key não configurada]`;
+    return `## Resumo da Visita\n\nVisita à entidade ${data.entidadeNome}${data.contactoNome ? ` - Contacto: ${data.contactoNome}` : ''}.\n\n[Resumo automático indisponível - API key não configurada]`;
   }
 
   try {
     const prompt = `
-Analisa esta visita comercial a um gabinete de arquitetura e cria um resumo profissional em português.
+Analisa esta visita comercial a uma entidade empresarial e cria um resumo profissional em português.
 
-**Gabinete:** ${data.gabineteNome}
+**Entidade:** ${data.entidadeNome}
 ${data.contactoNome ? `**Contacto:** ${data.contactoNome}` : ''}
 
 **Notas da visita:**

@@ -101,7 +101,7 @@ export async function generateVisitaPDF(visita: any, tarefas: any[]): Promise<Ui
   };
 
   // ========== HEADER ==========
-  const entidade = visita.entidade || visita.gabinete;
+  const entidade = visita.entidade;
   
   // Helper to check if image format is supported by jsPDF in Node
   const isSupportedFormat = (mimeType: string | null, url: string): boolean => {

@@ -72,8 +72,8 @@ export function generateVisitaICS(visita: any): string {
   const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // +1 hour default
   const now = new Date();
 
-  // Get entidade (or fallback to legacy gabinete)
-  const entidade = visita.entidade || visita.gabinete;
+  // Get entidade
+  const entidade = visita.entidade;
   const entidadeNome = entidade?.nome || 'Visita';
   const entidadeTipo = entidade?.tipoEntidade || '';
 
@@ -207,7 +207,7 @@ export function generateVisitaICS(visita: any): string {
  * Generate safe filename for ICS download
  */
 export function generateVisitaICSFilename(visita: any): string {
-  const entidade = visita.entidade || visita.gabinete;
+  const entidade = visita.entidade;
   const entidadeNome = entidade?.nome || 'visita';
   const dataVisita = format(new Date(visita.dataVisita), 'yyyy-MM-dd');
   

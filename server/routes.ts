@@ -11,7 +11,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { randomUUID } from "crypto";
-import { insertEntidadeSchema, insertGabineteSchema, insertContactoSchema, insertVisitaSchema, insertTarefaSchema, lembretes } from "@shared/schema";
+import { insertEntidadeSchema, insertContactoSchema, insertVisitaSchema, insertTarefaSchema, lembretes } from "@shared/schema";
 import { generateEmailRequestSchema, getTemplate } from "@shared/emailTemplates";
 import { eq, and, desc, sql } from "drizzle-orm";
 import express from "express";
@@ -486,62 +486,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting entidade:", error);
       res.status(500).json({ message: "Failed to delete entidade" });
-    }
-  });
-
-  // Gabinetes endpoints (DEPRECATED - use /api/entidades)
-  app.get('/api/gabinetes', isAuthenticated, async (req, res) => {
-    try {
-      const gabinetes = await storage.getGabinetes();
-      res.json(gabinetes);
-    } catch (error) {
-      console.error("Error fetching gabinetes:", error);
-      res.status(500).json({ message: "Failed to fetch gabinetes" });
-    }
-  });
-
-  app.get('/api/gabinetes/:id', isAuthenticated, async (req, res) => {
-    try {
-      const gabinete = await storage.getGabinete(req.params.id);
-      if (!gabinete) {
-        return res.status(404).json({ message: "Gabinete not found" });
-      }
-      res.json(gabinete);
-    } catch (error) {
-      console.error("Error fetching gabinete:", error);
-      res.status(500).json({ message: "Failed to fetch gabinete" });
-    }
-  });
-
-  app.post('/api/gabinetes', isAuthenticated, async (req, res) => {
-    try {
-      const validatedData = insertGabineteSchema.parse(req.body);
-      const gabinete = await storage.createGabinete(validatedData);
-      res.json(gabinete);
-    } catch (error) {
-      console.error("Error creating gabinete:", error);
-      res.status(400).json({ message: "Failed to create gabinete" });
-    }
-  });
-
-  app.patch('/api/gabinetes/:id', isAuthenticated, async (req, res) => {
-    try {
-      const validatedData = insertGabineteSchema.partial().parse(req.body);
-      const gabinete = await storage.updateGabinete(req.params.id, validatedData);
-      res.json(gabinete);
-    } catch (error) {
-      console.error("Error updating gabinete:", error);
-      res.status(400).json({ message: "Failed to update gabinete" });
-    }
-  });
-
-  app.delete('/api/gabinetes/:id', isAuthenticated, async (req, res) => {
-    try {
-      await storage.deleteGabinete(req.params.id);
-      res.json({ message: "Gabinete deleted" });
-    } catch (error) {
-      console.error("Error deleting gabinete:", error);
-      res.status(500).json({ message: "Failed to delete gabinete" });
     }
   });
 
@@ -1177,7 +1121,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pdfBuffer = await generateVisitaPDF(visita, visitaTarefas);
 
       // Set headers for PDF download
-      const entidadeNome = visita.entidade?.nome || visita.gabinete?.nome || 'visita';
+      const entidadeNome = visita.entidade?.nome || 'visita';
       const dataVisita = new Date(visita.dataVisita).toISOString().split('T')[0];
       const fileName = `Visita-${entidadeNome.replace(/\s/g, '-')}-${dataVisita}.pdf`;
 
@@ -1253,7 +1197,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const visitaData = {
-        gabineteId: req.body.gabineteId,
         entidadeId: req.body.entidadeId || null,
         contactoId: req.body.contactoId || null,
         userId: userId, // Legacy field
@@ -1303,7 +1246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             notas: visitaData.notas || undefined,
             transcricaoAudio: visitaData.transcricaoAudio || undefined,
             marcasEntregues: visitaData.marcasEntregues,
-            gabineteNome: visitaComplete.gabinete?.nome || '',
+            entidadeNome: visitaComplete.entidade?.nome || '',
             contactoNome: visitaComplete.contacto?.nome,
           });
           
@@ -1314,7 +1257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (user?.email) {
             await sendVisitEmail({
               toEmail: user.email,
-              gabineteNome: visitaComplete.gabinete?.nome || '',
+              entidadeNome: visitaComplete.entidade?.nome || '',
               contactoNome: visitaComplete.contacto?.nome,
               dataVisita: visitaData.dataVisita,
               notas: visitaData.notas || undefined,

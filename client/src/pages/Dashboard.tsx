@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { VisitaWithRelations } from "@shared/schema";
 
 interface DashboardStats {
-  totalGabinetes: number;
+  totalEntidades: number;
   totalContactos: number;
   totalVisitas: number;
   visitasEstesMes: number;
@@ -118,10 +118,10 @@ export default function Dashboard() {
                 <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mx-auto">
                   <Building2 className="h-5 w-5 text-primary" />
                 </div>
-                <p className="text-2xl font-bold text-foreground" data-testid="stat-gabinetes">
-                  {stats.totalGabinetes}
+                <p className="text-2xl font-bold text-foreground" data-testid="stat-entidades">
+                  {stats.totalEntidades}
                 </p>
-                <p className="text-xs text-muted-foreground">Gabinetes</p>
+                <p className="text-xs text-muted-foreground">Entidades</p>
               </Card>
 
               <Card className="p-4 text-center space-y-2">
