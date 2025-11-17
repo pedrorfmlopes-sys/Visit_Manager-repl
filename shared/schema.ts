@@ -335,6 +335,9 @@ export const visitas = pgTable("visitas", {
   syncStatus: syncStatusEnum("sync_status").default('never'),
   lastSyncAt: timestamp("last_sync_at"),
   syncError: text("sync_error"),
+  // Microsoft 365 Integration Fields
+  outlookEventId: varchar("outlook_event_id", { length: 255 }),
+  lastCalendarSyncAt: timestamp("last_calendar_sync_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -379,6 +382,8 @@ export const insertVisitaSchema = createInsertSchema(visitas).omit({
   syncStatus: true,
   lastSyncAt: true,
   syncError: true,
+  outlookEventId: true,
+  lastCalendarSyncAt: true,
 });
 
 export type InsertVisita = z.infer<typeof insertVisitaSchema>;
@@ -402,6 +407,14 @@ export const tarefas = pgTable("tarefas", {
   syncStatus: syncStatusEnum("sync_status").default('never'),
   lastSyncAt: timestamp("last_sync_at"),
   syncError: text("sync_error"),
+  // Microsoft 365 Integration Fields
+  plannerTaskId: varchar("planner_task_id", { length: 255 }),
+  plannerPlanId: varchar("planner_plan_id", { length: 255 }),
+  plannerBucketId: varchar("planner_bucket_id", { length: 255 }),
+  lastPlannerSyncAt: timestamp("last_planner_sync_at"),
+  todoTaskId: varchar("todo_task_id", { length: 255 }),
+  lastTodoSyncAt: timestamp("last_todo_sync_at"),
+  microsoftUserId: varchar("microsoft_user_id", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -434,6 +447,13 @@ export const insertTarefaSchema = createInsertSchema(tarefas).omit({
   syncStatus: true,
   lastSyncAt: true,
   syncError: true,
+  plannerTaskId: true,
+  plannerPlanId: true,
+  plannerBucketId: true,
+  lastPlannerSyncAt: true,
+  todoTaskId: true,
+  lastTodoSyncAt: true,
+  microsoftUserId: true,
 });
 
 export type InsertTarefa = z.infer<typeof insertTarefaSchema>;
@@ -481,6 +501,34 @@ export const insertLembreteSchema = createInsertSchema(lembretes).omit({
 
 export type InsertLembrete = z.infer<typeof insertLembreteSchema>;
 export type Lembrete = typeof lembretes.$inferSelect;
+
+// Microsoft 365 Tokens table (per-user OAuth tokens)
+export const microsoftTokens = pgTable("microsoft_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 255 }).notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
+  accessToken: text("access_token").notNull(), // Encrypted
+  refreshToken: text("refresh_token").notNull(), // Encrypted
+  scopes: text("scopes").notNull(), // JSON array of granted scopes
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const microsoftTokensRelations = relations(microsoftTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [microsoftTokens.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertMicrosoftTokenSchema = createInsertSchema(microsoftTokens).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMicrosoftToken = z.infer<typeof insertMicrosoftTokenSchema>;
+export type MicrosoftToken = typeof microsoftTokens.$inferSelect;
 
 // Extended types for relations
 export type EntidadeWithRelations = Entidade & {

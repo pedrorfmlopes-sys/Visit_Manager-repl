@@ -1,0 +1,275 @@
+Please implement the Microsoft 365 Integration Module with full support for:
+
+Microsoft Planner
+
+Microsoft To-Do
+
+Outlook Calendar
+
+using per-user authentication (OAuth 2.0), integrated with the existing tasks, visits, offline queue, RBAC, and navigation system.
+
+⭐ 1. MICROSOFT LOGIN (PER USER)
+
+Add a new page:
+
+/integracoes/microsoft
+
+
+with:
+
+button “Ligar Conta Microsoft”
+
+button “Desligar Conta Microsoft”
+
+status indicator (connected / not connected)
+
+last sync timestamp
+
+explanation text in PT-PT
+
+UI must follow the same style as “Configurações”.
+
+OAuth Requirements:
+
+Request the following scopes:
+
+offline_access
+Tasks.ReadWrite
+User.Read
+Group.ReadWrite.All
+Calendars.ReadWrite
+
+
+Store tokens securely:
+
+access_token (encrypted)
+
+refresh_token (encrypted)
+
+scopes
+
+expires_at
+
+Auto-refresh tokens when expired.
+
+⭐ 2. BACKEND SETUP — AUTH + GRAPH CLIENT
+
+Create backend:
+
+/api/microsoft/auth/login
+/api/microsoft/auth/callback
+/api/microsoft/auth/disconnect
+
+
+Set up reusable Microsoft Graph Client:
+
+refresh tokens automatically
+
+handle 401 → refresh and retry
+
+throw meaningful errors for rate limits or permission issues
+
+⭐ 3. EXPORTAR TAREFA → PLANNER
+
+Add button in TarefaDetail:
+
+⚙ “Exportar para Planner”
+
+When clicked:
+
+if user not connected → redirect to /integracoes/microsoft
+
+else → open dialog:
+
+Select:
+
+Planner group (list user’s groups)
+
+Planner plan (list plans inside the group)
+
+Planner bucket (list buckets inside the plan)
+
+Then create Planner task with:
+
+title = tarefa.titulo
+
+due date
+
+assignee = Microsoft account of user
+
+description =
+
+link para tarefa na app
+
+entidade
+
+visita relacionada
+
+notas
+
+responsável
+
+Store returned:
+
+plannerTaskId
+
+plannerPlanId
+
+plannerBucketId
+
+microsoftUserId
+
+lastPlannerSyncAt
+
+Show toast.
+
+⭐ 4. EXPORTAR TAREFA → MICROSOFT TO-DO
+
+In TarefaDetail:
+
+⚙ “Exportar para To-Do”
+
+Create To-Do task:
+
+title
+
+due date
+
+reminder if exists
+
+body with link to tarefa
+
+categories: entidade, marca (if any)
+
+Store:
+
+todoTaskId
+
+lastTodoSyncAt
+
+⭐ 5. EXPORTAR VISITA → OUTLOOK CALENDAR
+
+In VisitaDetail:
+
+📆 “Adicionar ao Calendário Outlook”
+
+Event fields:
+
+Title: “Visita — {Entidade}”
+
+Start: date chosen (default = now + 1 hour)
+
+Duration: 1h
+
+Body:
+
+resumo IA
+
+notas
+
+tarefas ligadas
+
+marcas entregues
+
+Location: entidade.morada (if available)
+
+Reminder: 30min antes
+
+Online meeting: false
+
+Store:
+
+outlookEventId
+
+lastCalendarSyncAt
+
+⭐ 6. OFFLINE SUPPORT
+
+If offline:
+
+All export buttons disabled
+
+Toast: “Disponível apenas com ligação à internet.”
+
+If export attempted offline:
+
+store in offlineQueue:
+
+type (planner | todo | calendar)
+
+data (task or visit)
+
+userId
+
+When back online:
+
+process queue automatically
+
+update task/visit with Microsoft IDs
+
+show generic toast
+
+mark sync result
+
+retry failed exports up to 3 times
+
+⭐ 7. RBAC
+
+Maintain all existing RBAC:
+
+Admin:
+
+can export tasks created/assigned to anyone
+
+Agent:
+
+can export only tasks/visitas they own or are assigned to
+
+No visibility leaks allowed.
+
+⭐ 8. UI/UX REQUIREMENTS
+
+Planner export dialog:
+
+3 dropdowns: Group → Plan → Bucket
+
+Loading states
+
+Cache results to avoid Graph overuse
+
+Optional default selections for faster workflow
+
+To-Do export:
+
+light, fast, 1-step
+
+Calendar export:
+
+small dialog: pick date/time
+
+default time = next hour
+
+All actions must provide clean Portuguese toasts:
+
+“Tarefa enviada para o Planner.”
+
+“Tarefa criada no Microsoft To-Do.”
+
+“Evento adicionado ao Outlook.”
+
+⭐ 9. TESTING CHECKLIST (MANDATORY)
+
+✓ Microsoft login works
+✓ Tokens auto-refresh
+✓ Planner groups load correctly
+✓ Plans + Buckets load
+✓ Planner task created with correct metadata
+✓ To-Do task created
+✓ Calendar event created
+✓ Offline disabled correctly
+✓ Offline queue syncs automatically
+✓ RBAC respected
+✓ No TypeScript errors
+✓ No breaking changes
+
+⭐ 10. PROCEED.
