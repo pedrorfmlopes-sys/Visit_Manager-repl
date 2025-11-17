@@ -3,6 +3,7 @@ import { pt } from "date-fns/locale";
 import { CheckCircle2, Circle, Calendar, Building2, User, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { RichTextViewer } from "@/components/RichTextViewer";
 import type { TarefaWithRelations } from "@shared/schema";
 
 interface TarefaCardProps {
@@ -32,9 +33,9 @@ export function TarefaCard({ tarefa, onClick }: TarefaCardProps) {
           </h3>
           
           {tarefa.descricao && (
-            <p className="text-sm text-muted-foreground mb-2 line-clamp-2" data-testid="text-descricao">
-              {tarefa.descricao}
-            </p>
+            <div className="text-sm text-muted-foreground mb-2 line-clamp-2" data-testid="text-descricao">
+              <RichTextViewer content={tarefa.descricao} />
+            </div>
           )}
           
           <div className="flex flex-wrap gap-2 mb-2">

@@ -2250,6 +2250,206 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== SIMPLIFIED PDF REPORT ENDPOINTS (RESTful) ==========
+  
+  // GET /api/pdf/reports/monthly/agent - Relatório mensal do agente atual
+  app.get('/api/pdf/reports/monthly/agent', isAuthenticated, async (req, res) => {
+    try {
+      const { userId, userRole } = await getUserContext(req);
+      const { year, month } = req.query;
+      
+      const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
+      const targetMonth = month ? parseInt(month as string) - 1 : new Date().getMonth();
+      
+      const periodStart = startOfMonth(new Date(targetYear, targetMonth));
+      const periodEnd = endOfMonth(new Date(targetYear, targetMonth));
+      
+      const visitas = await storage.getVisitasInPeriod(periodStart, periodEnd, userId, userRole);
+      const tarefas = await storage.getTarefasInPeriod(periodStart, periodEnd, userId, userRole);
+      const entidades = await storage.getAllEntidades(userId, userRole);
+      
+      const { generateMonthlyReportPDF } = await import('./pdfPro');
+      const { getOpenAIClient } = await import('./openai');
+      
+      const options = {
+        includePhotos: true,
+        includeTasks: true,
+        includeIA: true,
+        includeCharts: true,
+        type: 'interno' as const
+      };
+      
+      const openaiClient = getOpenAIClient();
+      const pdfBuffer = await generateMonthlyReportPDF(
+        { start: periodStart, end: periodEnd },
+        visitas,
+        tarefas,
+        entidades,
+        userId,
+        userRole,
+        options,
+        openaiClient
+      );
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="relatorio-mensal-${targetMonth + 1}-${targetYear}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('[PDF] Error generating monthly agent report:', error);
+      res.status(500).json({ message: 'Erro ao gerar relatório mensal' });
+    }
+  });
+
+  // GET /api/pdf/reports/weekly/agent - Relatório semanal do agente atual
+  app.get('/api/pdf/reports/weekly/agent', isAuthenticated, async (req, res) => {
+    try {
+      const { userId, userRole } = await getUserContext(req);
+      const { date } = req.query;
+      
+      const referenceDate = date ? new Date(date as string) : new Date();
+      const periodStart = startOfWeek(referenceDate, { weekStartsOn: 1 });
+      const periodEnd = endOfWeek(referenceDate, { weekStartsOn: 1 });
+      
+      const visitas = await storage.getVisitasInPeriod(periodStart, periodEnd, userId, userRole);
+      const tarefas = await storage.getTarefasInPeriod(periodStart, periodEnd, userId, userRole);
+      const entidades = await storage.getAllEntidades(userId, userRole);
+      
+      const { generateMonthlyReportPDF } = await import('./pdfPro');
+      const { getOpenAIClient } = await import('./openai');
+      
+      const options = {
+        includePhotos: true,
+        includeTasks: true,
+        includeIA: true,
+        includeCharts: true,
+        type: 'interno' as const
+      };
+      
+      const openaiClient = getOpenAIClient();
+      const pdfBuffer = await generateMonthlyReportPDF(
+        { start: periodStart, end: periodEnd },
+        visitas,
+        tarefas,
+        entidades,
+        userId,
+        userRole,
+        options,
+        openaiClient
+      );
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="relatorio-semanal-${format(periodStart, 'dd-MM-yyyy', { locale: pt })}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('[PDF] Error generating weekly agent report:', error);
+      res.status(500).json({ message: 'Erro ao gerar relatório semanal' });
+    }
+  });
+
+  // GET /api/pdf/reports/monthly/company - Relatório mensal da empresa (Admin only)
+  app.get('/api/pdf/reports/monthly/company', isAuthenticated, async (req, res) => {
+    try {
+      const { userId, userRole } = await getUserContext(req);
+      const { year, month } = req.query;
+      
+      // RBAC: Admin only
+      if (userRole !== 'admin') {
+        return res.status(403).json({ message: 'Relatórios da empresa requerem privilégios de admin' });
+      }
+      
+      const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
+      const targetMonth = month ? parseInt(month as string) - 1 : new Date().getMonth();
+      
+      const periodStart = startOfMonth(new Date(targetYear, targetMonth));
+      const periodEnd = endOfMonth(new Date(targetYear, targetMonth));
+      
+      const visitas = await storage.getVisitasInPeriod(periodStart, periodEnd, userId, userRole);
+      const tarefas = await storage.getTarefasInPeriod(periodStart, periodEnd, userId, userRole);
+      const entidades = await storage.getAllEntidades(userId, userRole);
+      
+      const { generateMonthlyReportPDF } = await import('./pdfPro');
+      const { getOpenAIClient } = await import('./openai');
+      
+      const options = {
+        includePhotos: true,
+        includeTasks: true,
+        includeIA: true,
+        includeCharts: true,
+        type: 'interno' as const
+      };
+      
+      const openaiClient = getOpenAIClient();
+      const pdfBuffer = await generateMonthlyReportPDF(
+        { start: periodStart, end: periodEnd },
+        visitas,
+        tarefas,
+        entidades,
+        userId,
+        userRole,
+        options,
+        openaiClient
+      );
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="relatorio-empresa-mensal-${targetMonth + 1}-${targetYear}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('[PDF] Error generating monthly company report:', error);
+      res.status(500).json({ message: 'Erro ao gerar relatório da empresa' });
+    }
+  });
+
+  // GET /api/pdf/reports/weekly/company - Relatório semanal da empresa (Admin only)
+  app.get('/api/pdf/reports/weekly/company', isAuthenticated, async (req, res) => {
+    try {
+      const { userId, userRole } = await getUserContext(req);
+      const { date } = req.query;
+      
+      // RBAC: Admin only
+      if (userRole !== 'admin') {
+        return res.status(403).json({ message: 'Relatórios da empresa requerem privilégios de admin' });
+      }
+      
+      const referenceDate = date ? new Date(date as string) : new Date();
+      const periodStart = startOfWeek(referenceDate, { weekStartsOn: 1 });
+      const periodEnd = endOfWeek(referenceDate, { weekStartsOn: 1 });
+      
+      const visitas = await storage.getVisitasInPeriod(periodStart, periodEnd, userId, userRole);
+      const tarefas = await storage.getTarefasInPeriod(periodStart, periodEnd, userId, userRole);
+      const entidades = await storage.getAllEntidades(userId, userRole);
+      
+      const { generateMonthlyReportPDF } = await import('./pdfPro');
+      const { getOpenAIClient } = await import('./openai');
+      
+      const options = {
+        includePhotos: true,
+        includeTasks: true,
+        includeIA: true,
+        includeCharts: true,
+        type: 'interno' as const
+      };
+      
+      const openaiClient = getOpenAIClient();
+      const pdfBuffer = await generateMonthlyReportPDF(
+        { start: periodStart, end: periodEnd },
+        visitas,
+        tarefas,
+        entidades,
+        userId,
+        userRole,
+        options,
+        openaiClient
+      );
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="relatorio-empresa-semanal-${format(periodStart, 'dd-MM-yyyy', { locale: pt })}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('[PDF] Error generating weekly company report:', error);
+      res.status(500).json({ message: 'Erro ao gerar relatório da empresa' });
+    }
+  });
+
   // Serve uploaded files
   app.use('/uploads', isAuthenticated, (req, res, next) => {
     const filePath = path.join('/tmp/uploads', req.path);
