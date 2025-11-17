@@ -25,6 +25,7 @@ import VisitaDetail from "@/pages/VisitaDetail";
 import Tarefas from "@/pages/Tarefas";
 import TarefaForm from "@/pages/TarefaForm";
 import TarefaDetail from "@/pages/TarefaDetail";
+import Lembretes from "@/pages/Lembretes";
 import Analytics from "@/pages/Analytics";
 import QRScanner from "@/pages/QRScanner";
 
@@ -68,6 +69,7 @@ function Router() {
           <Route path="/tarefas/nova" component={TarefaForm} />
           <Route path="/tarefas/:id" component={TarefaDetail} />
           <Route path="/tarefas/:id/editar" component={TarefaForm} />
+          <Route path="/lembretes" component={Lembretes} />
           <Route path="/analytics" component={Analytics} />
           <Route path="/qr" component={QRScanner} />
         </>
