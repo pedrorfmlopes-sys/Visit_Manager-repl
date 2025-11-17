@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Users, Plus } from "lucide-react";
+import { Users, Plus, QrCode } from "lucide-react";
 import { SearchBar } from "@/components/SearchBar";
 import { ContactoCard } from "@/components/ContactoCard";
 import { FAB } from "@/components/FAB";
 import { EmptyState } from "@/components/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import type { ContactoWithRelations } from "@shared/schema";
 
@@ -31,7 +32,18 @@ export default function Contactos() {
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-10 bg-card border-b border-card-border px-4 py-4">
         <div className="max-w-2xl mx-auto">
-          <h1 className="text-xl font-semibold text-foreground mb-3">Contactos</h1>
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h1 className="text-xl font-semibold text-foreground">Contactos</h1>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setLocation("/qr-scanner")}
+              data-testid="button-qr-scanner-header"
+              title="Importar de QR Code ou Cartão"
+            >
+              <QrCode className="h-5 w-5" />
+            </Button>
+          </div>
           <SearchBar
             value={searchQuery}
             onChange={setSearchQuery}

@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
-import { ArrowLeft, Loader2, WifiOff } from "lucide-react";
+import { ArrowLeft, Loader2, WifiOff, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -58,6 +58,32 @@ export default function ContactoForm() {
     },
     values: contacto,
   });
+
+  // Auto-fill address when entity is selected
+  const handleEntidadeChange = (entidadeId: string) => {
+    // Handle "Sem entidade" option by setting to undefined
+    if (entidadeId === "__none__" || !entidadeId) {
+      return;
+    }
+    
+    const selectedEntity = entidades?.find(e => e.id === entidadeId);
+    if (selectedEntity) {
+      // Only auto-fill observacoes if it's currently empty
+      const currentObservacoes = form.getValues("observacoes") || "";
+      if (!currentObservacoes.trim()) {
+        const addressParts = [
+          selectedEntity.morada,
+          selectedEntity.codigoPostal && selectedEntity.cidade 
+            ? `${selectedEntity.codigoPostal} ${selectedEntity.cidade}`
+            : selectedEntity.codigoPostal || selectedEntity.cidade
+        ].filter(Boolean);
+        
+        if (addressParts.length > 0) {
+          form.setValue("observacoes", `Morada: ${addressParts.join(", ")}`);
+        }
+      }
+    }
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: InsertContacto) => {
@@ -155,6 +181,11 @@ export default function ContactoForm() {
       return;
     }
     
+    // Normalize empty string and __none__ to undefined for optional entidadeId
+    if (!data.entidadeId || data.entidadeId === "__none__" || data.entidadeId === "") {
+      data.entidadeId = undefined;
+    }
+    
     // Set ownership on creation (currentUser now guaranteed to exist)
     if (!isEdit) {
       data.createdByUserId = currentUser.id;
@@ -195,18 +226,31 @@ export default function ContactoForm() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-10 bg-card border-b border-card-border px-4 py-4">
-        <div className="flex items-center gap-3 max-w-2xl mx-auto">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setLocation("/contactos")}
-            data-testid="button-voltar"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-xl font-semibold text-foreground">
-            {isEdit ? "Editar Contacto" : "Novo Contacto"}
-          </h1>
+        <div className="flex items-center justify-between gap-3 max-w-2xl mx-auto">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setLocation("/contactos")}
+              data-testid="button-voltar"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-xl font-semibold text-foreground">
+              {isEdit ? "Editar Contacto" : "Novo Contacto"}
+            </h1>
+          </div>
+          {!isEdit && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setLocation("/qr-scanner")}
+              data-testid="button-qr-scanner"
+              title="Importar de QR Code ou Cartão de Visita"
+            >
+              <QrCode className="h-5 w-5" />
+            </Button>
+          )}
         </div>
       </header>
 
@@ -279,21 +323,35 @@ export default function ContactoForm() {
               name="entidadeId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Entidade *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || undefined}>
+                  <FormLabel>Entidade</FormLabel>
+                  <Select 
+                    onValueChange={(value) => {
+                      // Convert __none__ to undefined immediately in form state
+                      const normalizedValue = (value === "__none__" || !value) ? undefined : value;
+                      field.onChange(normalizedValue);
+                      handleEntidadeChange(value);
+                    }} 
+                    value={field.value || "__none__"}
+                  >
                     <FormControl>
                       <SelectTrigger className="h-12" data-testid="select-entidade">
-                        <SelectValue placeholder="Selecione a entidade" />
+                        <SelectValue placeholder="Opcional - Selecione se aplicável" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
+                      <SelectItem value="__none__" data-testid="option-entidade-none">
+                        Sem entidade
+                      </SelectItem>
                       {entidades?.map((entidade) => (
-                        <SelectItem key={entidade.id} value={entidade.id}>
+                        <SelectItem key={entidade.id} value={entidade.id} data-testid={`option-entidade-${entidade.id}`}>
                           {entidade.nome} ({entidade.tipoEntidade})
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormDescription>
+                    Contactos podem existir sem entidade associada
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
