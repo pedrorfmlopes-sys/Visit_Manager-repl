@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { db } from "./db";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { transcribeAudio, generateVisitSummary, extractBusinessCardData, generateEmailDraft } from "./openai";
 import { sendVisitEmail } from "./email";
@@ -9,8 +10,9 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { randomUUID } from "crypto";
-import { insertEntidadeSchema, insertGabineteSchema, insertContactoSchema, insertVisitaSchema, insertTarefaSchema } from "@shared/schema";
+import { insertEntidadeSchema, insertGabineteSchema, insertContactoSchema, insertVisitaSchema, insertTarefaSchema, lembretes } from "@shared/schema";
 import { generateEmailRequestSchema, getTemplate } from "@shared/emailTemplates";
+import { eq, and, desc, sql } from "drizzle-orm";
 import express from "express";
 
 // Ensure upload directory exists
@@ -997,6 +999,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error enriching entity:", error);
       res.status(500).json({ message: "Failed to enrich entity" });
+    }
+  });
+
+  // Lembretes (Reminders) endpoints
+  app.get('/api/lembretes', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole } = await getUserContext(req);
+      
+      const { generateAllReminders } = await import('./reminders');
+      const user = await storage.getUser(userId);
+      if (user) {
+        await generateAllReminders(user);
+      }
+      
+      let query = db
+        .select()
+        .from(lembretes)
+        .where(
+          and(
+            eq(lembretes.userId, userId),
+            eq(lembretes.resolved, false),
+            sql`(${lembretes.snoozedUntil} IS NULL OR ${lembretes.snoozedUntil} <= NOW())`
+          )
+        )
+        .orderBy(desc(lembretes.dataCriacao))
+        .$dynamic();
+
+      const results = await query;
+      res.json(results);
+    } catch (error) {
+      console.error("Error fetching lembretes:", error);
+      res.status(500).json({ message: "Failed to fetch reminders" });
+    }
+  });
+
+  app.post('/api/lembretes/snooze', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId } = await getUserContext(req);
+      const { reminderId, duration } = req.body;
+
+      if (!reminderId || !duration) {
+        return res.status(400).json({ message: "Reminder ID and duration required" });
+      }
+
+      if (!['2days', '7days', '30days'].includes(duration)) {
+        return res.status(400).json({ message: "Invalid duration" });
+      }
+
+      const reminder = await db
+        .select()
+        .from(lembretes)
+        .where(
+          and(
+            eq(lembretes.id, reminderId),
+            eq(lembretes.userId, userId)
+          )
+        )
+        .limit(1);
+
+      if (reminder.length === 0) {
+        return res.status(404).json({ message: "Reminder not found" });
+      }
+
+      const { snoozeReminder } = await import('./reminders');
+      await snoozeReminder(reminderId, duration);
+
+      res.json({ message: "Reminder snoozed successfully" });
+    } catch (error) {
+      console.error("Error snoozing reminder:", error);
+      res.status(500).json({ message: "Failed to snooze reminder" });
+    }
+  });
+
+  app.post('/api/lembretes/resolve', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId } = await getUserContext(req);
+      const { reminderId } = req.body;
+
+      if (!reminderId) {
+        return res.status(400).json({ message: "Reminder ID required" });
+      }
+
+      const reminder = await db
+        .select()
+        .from(lembretes)
+        .where(
+          and(
+            eq(lembretes.id, reminderId),
+            eq(lembretes.userId, userId)
+          )
+        )
+        .limit(1);
+
+      if (reminder.length === 0) {
+        return res.status(404).json({ message: "Reminder not found" });
+      }
+
+      const { resolveReminder } = await import('./reminders');
+      await resolveReminder(reminderId);
+
+      res.json({ message: "Reminder resolved successfully" });
+    } catch (error) {
+      console.error("Error resolving reminder:", error);
+      res.status(500).json({ message: "Failed to resolve reminder" });
+    }
+  });
+
+  app.post('/api/lembretes/generate', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId } = await getUserContext(req);
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const { generateAllReminders } = await import('./reminders');
+      const count = await generateAllReminders(user);
+
+      res.json({ 
+        message: "Reminders generated successfully",
+        count 
+      });
+    } catch (error) {
+      console.error("Error generating reminders:", error);
+      res.status(500).json({ message: "Failed to generate reminders" });
     }
   });
 
