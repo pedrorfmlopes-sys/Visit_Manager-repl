@@ -800,7 +800,7 @@ export default function VisitaDetail() {
       <EmailAIDialog
         open={emailDialogOpen}
         onOpenChange={setEmailDialogOpen}
-        visitaId={visitaId ? parseInt(visitaId) : undefined}
+        visitaId={visitaId}
         defaultTemplate="followup_pos_visita"
       />
 

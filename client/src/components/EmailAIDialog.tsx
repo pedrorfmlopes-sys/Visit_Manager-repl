@@ -28,9 +28,9 @@ import { emailTemplates, type EmailTemplateType, type EmailTone, type GenerateEm
 interface EmailAIDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  visitaId?: number;
-  contactoId?: number;
-  entidadeId?: number;
+  visitaId?: string;
+  contactoId?: string;
+  entidadeId?: string;
   defaultTemplate?: EmailTemplateType;
 }
 
@@ -63,9 +63,9 @@ export function EmailAIDialog({
         body: JSON.stringify({
           templateType: selectedTemplate,
           tone: selectedTone,
-          visitaId: visitaId?.toString(),
-          contactoId: contactoId?.toString(),
-          entidadeId: entidadeId?.toString(),
+          visitaId,
+          contactoId,
+          entidadeId,
         }),
       });
       

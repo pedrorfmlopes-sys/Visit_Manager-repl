@@ -383,7 +383,7 @@ export default function ContactoDetail() {
       <EmailAIDialog
         open={emailDialogOpen}
         onOpenChange={setEmailDialogOpen}
-        contactoId={contactoId ? parseInt(contactoId) : undefined}
+        contactoId={contactoId}
         defaultTemplate="agradecimento"
       />
     </div>

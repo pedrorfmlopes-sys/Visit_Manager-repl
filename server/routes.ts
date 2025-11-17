@@ -2062,7 +2062,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Entidade não encontrada' });
       }
       
-      const contactos = await storage.getContactosByGabinete(id, userId, userRole);
+      const allContactos = await storage.getContactos(userId, userRole);
+      const contactos = allContactos.filter(c => c.entidadeId === id);
       const visitas = await storage.getVisitasByEntidade(id, userId, userRole);
       const tarefas = await storage.getTarefasByEntidadeId(id, userId, userRole);
       

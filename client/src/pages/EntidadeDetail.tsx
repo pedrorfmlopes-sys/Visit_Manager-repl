@@ -66,7 +66,7 @@ export default function EntidadeDetail() {
       
       const searchResponse = await apiRequest('POST', '/api/enrichment/pt-intelligent-search', {
         nome: entidade.nome,
-        existingEntityId: parseInt(entidadeId),
+        existingEntityId: entidadeId,
       });
       
       if (!searchResponse.ok) {
@@ -845,7 +845,7 @@ export default function EntidadeDetail() {
       <EmailAIDialog
         open={emailDialogOpen}
         onOpenChange={setEmailDialogOpen}
-        entidadeId={entidadeId ? parseInt(entidadeId) : undefined}
+        entidadeId={entidadeId}
         defaultTemplate="envio_catalogo"
       />
 
