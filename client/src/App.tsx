@@ -18,6 +18,7 @@ import EntidadeForm from "@/pages/EntidadeForm";
 import EntidadeDetail from "@/pages/EntidadeDetail";
 import Contactos from "@/pages/Contactos";
 import ContactoForm from "@/pages/ContactoForm";
+import ContactoDetail from "@/pages/ContactoDetail";
 import Visitas from "@/pages/Visitas";
 import VisitaForm from "@/pages/VisitaForm";
 import VisitaDetail from "@/pages/VisitaDetail";
@@ -58,6 +59,7 @@ function Router() {
           <Route path="/gabinetes/:id" component={GabineteForm} />
           <Route path="/contactos" component={Contactos} />
           <Route path="/contactos/novo" component={ContactoForm} />
+          <Route path="/contactos/:id/detalhes" component={ContactoDetail} />
           <Route path="/contactos/:id" component={ContactoForm} />
           <Route path="/visitas" component={Visitas} />
           <Route path="/visitas/nova" component={VisitaForm} />
