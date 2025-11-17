@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Building2, Users, FileText, Package, Calendar, LogOut, BarChart } from "lucide-react";
+import { Building2, Users, FileText, Package, Calendar, LogOut, BarChart, Link2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -113,6 +113,25 @@ export default function Dashboard() {
                 <p className="text-xs text-muted-foreground">Este Mês</p>
               </Card>
             </div>
+
+            <Card 
+              className="p-4 hover-elevate cursor-pointer" 
+              onClick={() => setLocation("/integracoes/microsoft")}
+              data-testid="card-microsoft-integration"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                  <Link2 className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-foreground">Integração Microsoft 365</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Ligue ao Planner, To-Do e Outlook Calendar
+                  </p>
+                </div>
+                <div className="text-muted-foreground">→</div>
+              </div>
+            </Card>
 
             {stats.marcasMaisEntregues.length > 0 && (
               <div>
