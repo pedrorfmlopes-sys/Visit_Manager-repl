@@ -348,82 +348,100 @@ export default function TarefaDetail() {
           </Card>
         )}
 
-        {msStatus?.authenticated && (
-          <Card className="p-6" data-testid="card-microsoft-export">
-            <div className="flex items-center gap-2 mb-4">
-              <Cloud className="h-5 w-5 text-blue-600" />
-              <h3 className="font-semibold">Exportações Microsoft 365</h3>
-            </div>
-            <p className="text-sm text-muted-foreground mb-4">
-              Exporte esta tarefa para as suas ferramentas Microsoft
-            </p>
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <p className="font-medium text-sm">Microsoft Planner</p>
-                  <p className="text-xs text-muted-foreground">
-                    {tarefa.plannerTaskId 
-                      ? `Exportada em ${format(new Date(tarefa.lastPlannerSyncAt!), "PP", { locale: pt })}`
-                      : "Não exportada"}
-                  </p>
+        <Card className="p-6" data-testid="card-microsoft-export">
+          <div className="flex items-center gap-2 mb-4">
+            <Cloud className="h-5 w-5 text-blue-600" />
+            <h3 className="font-semibold">Exportações Microsoft 365</h3>
+          </div>
+          
+          {msStatus?.authenticated ? (
+            <>
+              <p className="text-sm text-muted-foreground mb-4">
+                Exporte esta tarefa para as suas ferramentas Microsoft
+              </p>
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">Microsoft Planner</p>
+                    <p className="text-xs text-muted-foreground">
+                      {tarefa.plannerTaskId 
+                        ? `Exportada em ${format(new Date(tarefa.lastPlannerSyncAt!), "PP", { locale: pt })}`
+                        : "Não exportada"}
+                    </p>
+                  </div>
+                  <Button
+                    variant={tarefa.plannerTaskId ? "outline" : "default"}
+                    size="sm"
+                    onClick={handlePlannerExport}
+                    disabled={exportToPlannerMutation.isPending}
+                    data-testid="button-export-planner"
+                  >
+                    {exportToPlannerMutation.isPending ? (
+                      "A exportar..."
+                    ) : tarefa.plannerTaskId ? (
+                      <>
+                        <Send className="h-4 w-4 mr-2" />
+                        Exportar novamente
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4 mr-2" />
+                        Exportar
+                      </>
+                    )}
+                  </Button>
                 </div>
-                <Button
-                  variant={tarefa.plannerTaskId ? "outline" : "default"}
-                  size="sm"
-                  onClick={handlePlannerExport}
-                  disabled={exportToPlannerMutation.isPending}
-                  data-testid="button-export-planner"
-                >
-                  {exportToPlannerMutation.isPending ? (
-                    "A exportar..."
-                  ) : tarefa.plannerTaskId ? (
-                    <>
-                      <Send className="h-4 w-4 mr-2" />
-                      Exportar novamente
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 mr-2" />
-                      Exportar
-                    </>
-                  )}
-                </Button>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <p className="font-medium text-sm">Microsoft To-Do</p>
-                  <p className="text-xs text-muted-foreground">
-                    {tarefa.todoTaskId 
-                      ? `Exportada em ${format(new Date(tarefa.lastTodoSyncAt!), "PP", { locale: pt })}`
-                      : "Não exportada"}
-                  </p>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">Microsoft To-Do</p>
+                    <p className="text-xs text-muted-foreground">
+                      {tarefa.todoTaskId 
+                        ? `Exportada em ${format(new Date(tarefa.lastTodoSyncAt!), "PP", { locale: pt })}`
+                        : "Não exportada"}
+                    </p>
+                  </div>
+                  <Button
+                    variant={tarefa.todoTaskId ? "outline" : "default"}
+                    size="sm"
+                    onClick={handleTodoExport}
+                    disabled={exportToTodoMutation.isPending}
+                    data-testid="button-export-todo"
+                  >
+                    {exportToTodoMutation.isPending ? (
+                      "A exportar..."
+                    ) : tarefa.todoTaskId ? (
+                      <>
+                        <Send className="h-4 w-4 mr-2" />
+                        Exportar novamente
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4 mr-2" />
+                        Exportar
+                      </>
+                    )}
+                  </Button>
                 </div>
-                <Button
-                  variant={tarefa.todoTaskId ? "outline" : "default"}
-                  size="sm"
-                  onClick={handleTodoExport}
-                  disabled={exportToTodoMutation.isPending}
-                  data-testid="button-export-todo"
-                >
-                  {exportToTodoMutation.isPending ? (
-                    "A exportar..."
-                  ) : tarefa.todoTaskId ? (
-                    <>
-                      <Send className="h-4 w-4 mr-2" />
-                      Exportar novamente
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 mr-2" />
-                      Exportar
-                    </>
-                  )}
-                </Button>
               </div>
-            </div>
-          </Card>
-        )}
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground mb-4">
+                Faça login com Microsoft 365 para exportar tarefas para Planner e To-Do
+              </p>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setLocation('/integracoes/microsoft')}
+                data-testid="button-goto-microsoft-login"
+              >
+                <Cloud className="h-4 w-4 mr-2" />
+                Conectar Microsoft 365
+              </Button>
+            </>
+          )}
+        </Card>
       </main>
 
       <Dialog open={showPlannerDialog} onOpenChange={setShowPlannerDialog}>
