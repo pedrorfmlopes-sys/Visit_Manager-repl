@@ -7,7 +7,6 @@ import { ArrowLeft, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { insertTarefaSchema, type InsertTarefa, type Tarefa, type Entidade, type User } from "@shared/schema";
@@ -18,6 +17,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { isUnauthorizedError } from "@/lib/errors";
 import { useAllUsers } from "@/hooks/useAllUsers";
+import { RichTextEditor } from "@/components/RichTextEditor";
 
 export default function TarefaForm() {
   const [, setLocation] = useLocation();
@@ -182,12 +182,10 @@ export default function TarefaForm() {
                 <FormItem>
                   <FormLabel>Descrição</FormLabel>
                   <FormControl>
-                    <Textarea
-                      {...field}
-                      value={field.value || ""}
-                      placeholder="Descrição detalhada da tarefa"
-                      rows={4}
-                      data-testid="input-descricao"
+                    <RichTextEditor
+                      content={field.value || ""}
+                      onChange={field.onChange}
+                      placeholder="Descrição detalhada da tarefa (pode usar formatação e checkboxes)"
                     />
                   </FormControl>
                   <FormMessage />

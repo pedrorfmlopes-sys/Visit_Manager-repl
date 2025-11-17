@@ -12,6 +12,7 @@ import { formatDistanceToNow, format } from "date-fns";
 import { pt } from "date-fns/locale";
 import { isUnauthorizedError } from "@/lib/errors";
 import { exportTarefaAsICS } from "@/lib/icsExport";
+import { RichTextViewer } from "@/components/RichTextViewer";
 
 export default function TarefaDetail() {
   const [, setLocation] = useLocation();
@@ -142,9 +143,10 @@ export default function TarefaDetail() {
                 {tarefa.titulo}
               </h2>
               {tarefa.descricao && (
-                <p className="text-muted-foreground whitespace-pre-wrap" data-testid="text-descricao">
-                  {tarefa.descricao}
-                </p>
+                <RichTextViewer
+                  content={tarefa.descricao}
+                  className="text-muted-foreground"
+                />
               )}
             </div>
           </div>

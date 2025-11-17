@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { ArrowLeft, Loader2, Calendar as CalendarIcon, Upload, X, WifiOff } from "lucide-react";
+import { ArrowLeft, Loader2, Calendar as CalendarIcon, Upload, X, WifiOff, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -14,16 +14,19 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useCurrentUser, useAllUsers, useIsAdmin } from "@/hooks/use-user-context";
 import { LocationPreview } from "@/components/LocationPreview";
-import { insertVisitaSchema, type InsertVisita, type Entidade, type Contacto } from "@shared/schema";
+import { insertVisitaSchema, type InsertVisita, type Entidade, type Contacto, type InsertTarefa } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { syncManager } from "@/lib/syncManager";
 import { offlineStorage } from "@/lib/offlineStorage";
+import { RichTextEditor } from "@/components/RichTextEditor";
 import { z } from "zod";
 
 const visitaFormSchema = insertVisitaSchema.extend({
@@ -41,6 +44,12 @@ export default function VisitaForm() {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const { location: gpsLocation, error: gpsError, isLoading: gpsLoading, requestLocation } = useGeolocation(true);
+  
+  // Task creation state
+  const [createTask, setCreateTask] = useState(false);
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDescription, setTaskDescription] = useState("");
+  const [taskDueDate, setTaskDueDate] = useState<Date | undefined>(undefined);
   
   // User context for multi-agent system
   const { data: currentUser } = useCurrentUser();
@@ -88,15 +97,49 @@ export default function VisitaForm() {
       
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: async (visitaData) => {
       queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/entidades"] });
       queryClient.refetchQueries({ queryKey: ["/api/entidades"] });
-      toast({
-        title: "Sucesso",
-        description: "Visita criada com sucesso! A processar IA...",
-      });
+      
+      // Create task if requested
+      if (createTask && taskTitle && currentUser) {
+        try {
+          const tarefaData = {
+            titulo: taskTitle,
+            descricao: taskDescription || null,
+            visitaId: visitaData.id,
+            entidadeId: form.getValues("entidadeId"),
+            createdByUserId: currentUser.id,
+            assignedUserId: currentUser.id,
+            dueDate: taskDueDate || null,
+            repeatInterval: "none" as const,
+            status: "pending" as const,
+          };
+          
+          await apiRequest("POST", "/api/tarefas", tarefaData);
+          queryClient.invalidateQueries({ queryKey: ["/api/tarefas"] });
+          
+          toast({
+            title: "Sucesso",
+            description: "Visita e tarefa criadas com sucesso! A processar IA...",
+          });
+        } catch (error) {
+          console.error("Failed to create task:", error);
+          toast({
+            title: "Atenção",
+            description: "Visita criada mas falhou a criação da tarefa.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        toast({
+          title: "Sucesso",
+          description: "Visita criada com sucesso! A processar IA...",
+        });
+      }
+      
       setLocation("/visitas");
     },
     onError: (error: Error) => {
@@ -495,11 +538,85 @@ export default function VisitaForm() {
               />
             </div>
 
+            <div className="space-y-4 pt-4 border-t">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="create-task"
+                  checked={createTask}
+                  onCheckedChange={(checked) => setCreateTask(checked as boolean)}
+                  data-testid="checkbox-criar-tarefa"
+                />
+                <label
+                  htmlFor="create-task"
+                  className="text-sm font-medium leading-none cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Criar tarefa associada a esta visita
+                </label>
+              </div>
+
+              {createTask && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Plus className="h-5 w-5" />
+                      Nova Tarefa
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <FormLabel>Título da Tarefa *</FormLabel>
+                      <Input
+                        value={taskTitle}
+                        onChange={(e) => setTaskTitle(e.target.value)}
+                        placeholder="Ex: Follow-up com orçamento"
+                        data-testid="input-task-titulo"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <FormLabel>Descrição</FormLabel>
+                      <RichTextEditor
+                        content={taskDescription}
+                        onChange={setTaskDescription}
+                        placeholder="Use formatação e checkboxes para organizar a tarefa..."
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <FormLabel>Data de Vencimento</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start text-left font-normal"
+                            data-testid="button-task-due-date"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {taskDueDate ? format(taskDueDate, "PPP", { locale: pt }) : "Selecione a data"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={taskDueDate}
+                            onSelect={setTaskDueDate}
+                            locale={pt}
+                            disabled={(date) => date < new Date()}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
             <div className="sticky bottom-20 pt-4">
               <Button
                 type="submit"
                 className="w-full h-12"
-                disabled={createMutation.isPending}
+                disabled={createMutation.isPending || (createTask && !taskTitle)}
                 data-testid="button-guardar"
               >
                 {createMutation.isPending ? (
@@ -508,7 +625,7 @@ export default function VisitaForm() {
                     A criar visita...
                   </>
                 ) : (
-                  "Criar Visita"
+                  createTask ? "Criar Visita e Tarefa" : "Criar Visita"
                 )}
               </Button>
             </div>
