@@ -196,3 +196,103 @@ Responde apenas com o JSON, sem explicações adicionais.
     throw new Error("Failed to generate visit summary");
   }
 }
+
+export async function generateEmailDraft(data: {
+  templateType: string;
+  tone: string;
+  entidadeName?: string;
+  contactoName?: string;
+  contactoEmail?: string;
+  visitData?: {
+    dataVisita: Date;
+    notas?: string;
+    marcasEntregues?: string[];
+    resumoIa?: string;
+    tarefas?: Array<{ titulo: string; descricao?: string }>;
+  };
+  recentVisits?: Array<{
+    dataVisita: Date;
+    notas?: string;
+  }>;
+  userName?: string;
+}): Promise<{ subject: string; body: string }> {
+  if (!openai) {
+    console.warn("OpenAI not configured. Returning default email template.");
+    return {
+      subject: "Assunto do email",
+      body: "[Geração automática de email indisponível - API key não configurada]",
+    };
+  }
+
+  try {
+    const toneInstructions = {
+      formal: "Tom extremamente formal e profissional, utilizando tratamento protocolar",
+      neutro: "Tom profissional mas acessível, equilibrado entre formal e cordial",
+      amigavel: "Tom cordial e próximo, mantendo profissionalismo",
+    }[data.tone] || "Tom profissional";
+
+    const prompt = `
+Gera um email profissional em português de Portugal para o seguinte contexto:
+
+**Tipo de email:** ${data.templateType}
+**Tom:** ${toneInstructions}
+
+**Informação disponível:**
+${data.entidadeName ? `- Entidade: ${data.entidadeName}` : ''}
+${data.contactoName ? `- Contacto: ${data.contactoName}` : ''}
+${data.contactoEmail ? `- Email do destinatário: ${data.contactoEmail}` : ''}
+${data.userName ? `- Remetente: ${data.userName}` : ''}
+
+${data.visitData ? `
+**Última visita:**
+- Data: ${data.visitData.dataVisita.toLocaleDateString('pt-PT')}
+${data.visitData.notas ? `- Notas: ${data.visitData.notas}` : ''}
+${data.visitData.marcasEntregues && data.visitData.marcasEntregues.length > 0 ? `- Marcas entregues: ${data.visitData.marcasEntregues.join(', ')}` : ''}
+${data.visitData.resumoIa ? `- Resumo IA: ${data.visitData.resumoIa}` : ''}
+${data.visitData.tarefas && data.visitData.tarefas.length > 0 ? `- Tarefas: ${data.visitData.tarefas.map(t => t.titulo).join(', ')}` : ''}
+` : ''}
+
+${data.recentVisits && data.recentVisits.length > 0 ? `
+**Visitas recentes:**
+${data.recentVisits.map((v, i) => `${i + 1}. ${v.dataVisita.toLocaleDateString('pt-PT')}${v.notas ? `: ${v.notas.substring(0, 100)}...` : ''}`).join('\n')}
+` : ''}
+
+Gera um email profissional seguindo estas diretrizes:
+1. Sem emojis
+2. Estilo comercial português de Portugal
+3. Tom conforme especificado
+4. Assunto claro e direto
+5. Corpo do email bem estruturado com parágrafos apropriados
+6. Terminar com assinatura formal
+
+Responde em JSON com os campos: "subject" e "body"
+`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-5",
+      messages: [
+        {
+          role: "system",
+          content: "És um assistente especializado em redação de emails comerciais. Respondes sempre em português de Portugal, sem emojis, em formato JSON.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.7,
+    });
+
+    const result = response.choices[0].message.content;
+    const parsedResult = JSON.parse(result || "{}");
+
+    return {
+      subject: parsedResult.subject || "Assunto do email",
+      body: parsedResult.body || "",
+    };
+  } catch (error) {
+    console.error("Error generating email draft:", error);
+    throw new Error("Failed to generate email draft");
+  }
+}

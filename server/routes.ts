@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { transcribeAudio, generateVisitSummary, extractBusinessCardData } from "./openai";
+import { transcribeAudio, generateVisitSummary, extractBusinessCardData, generateEmailDraft } from "./openai";
 import { sendVisitEmail } from "./email";
 import { enrichEntity, type EnrichmentInput, extractDomainFromEmail, isPersonalEmailDomain } from "./enrichment";
 import multer from "multer";
@@ -10,6 +10,7 @@ import path from "path";
 import fs from "fs";
 import { randomUUID } from "crypto";
 import { insertEntidadeSchema, insertGabineteSchema, insertContactoSchema, insertVisitaSchema, insertTarefaSchema } from "@shared/schema";
+import { generateEmailRequestSchema, getTemplate } from "@shared/emailTemplates";
 import express from "express";
 
 // Ensure upload directory exists
@@ -727,6 +728,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error processing business card:", error);
       res.status(500).json({ message: "Failed to process business card image" });
+    }
+  });
+
+  // Email generation endpoint with AI
+  app.post('/api/tools/generate-email', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole } = await getUserContext(req);
+      
+      // Validate request
+      const validationResult = generateEmailRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid request", 
+          errors: validationResult.error.issues 
+        });
+      }
+
+      const { templateType, tone, visitaId, contactoId, entidadeId } = validationResult.data;
+
+      // Get template for fallback
+      const template = getTemplate(templateType);
+
+      // Fetch data based on provided IDs (respecting RBAC)
+      let visita: any = null;
+      let contacto: any = null;
+      let entidade: any = null;
+      let user: any = null;
+      let recentVisits: any[] = [];
+
+      if (visitaId) {
+        visita = await storage.getVisita(visitaId, userId, userRole);
+        if (!visita) {
+          return res.status(404).json({ message: "Visit not found or unauthorized" });
+        }
+
+        // Get related data from visit
+        if (visita.contactoId) {
+          contacto = await storage.getContacto(visita.contactoId, userId, userRole);
+        }
+        if (visita.entidadeId) {
+          entidade = await storage.getEntidade(visita.entidadeId, userId, userRole);
+        }
+
+        // Get recent visits for context (last 3)
+        if (visita.entidadeId) {
+          const allVisits = await storage.getVisitas(userId, userRole);
+          recentVisits = allVisits
+            .filter((v: any) => v.entidadeId === visita.entidadeId && v.id !== visitaId)
+            .sort((a: any, b: any) => new Date(b.dataVisita).getTime() - new Date(a.dataVisita).getTime())
+            .slice(0, 3);
+        }
+      } else if (contactoId) {
+        contacto = await storage.getContacto(contactoId, userId, userRole);
+        if (!contacto) {
+          return res.status(404).json({ message: "Contact not found or unauthorized" });
+        }
+        if (contacto.entidadeId) {
+          entidade = await storage.getEntidade(contacto.entidadeId, userId, userRole);
+        }
+      } else if (entidadeId) {
+        entidade = await storage.getEntidade(entidadeId, userId, userRole);
+        if (!entidade) {
+          return res.status(404).json({ message: "Entity not found or unauthorized" });
+        }
+      }
+
+      // Get user info for signature
+      user = await storage.getUser(userId);
+
+      // Prepare visit data if available
+      let visitData;
+      if (visita) {
+        // Get tasks related to visit
+        const allTasks = await storage.getTarefas(userId, userRole);
+        const visitTasks = allTasks.filter(t => t.visitaId === visitaId);
+
+        visitData = {
+          dataVisita: new Date(visita.dataVisita),
+          notas: visita.notas || undefined,
+          marcasEntregues: visita.marcasEntregues || undefined,
+          resumoIa: visita.resumoIa || undefined,
+          tarefas: visitTasks.map(t => ({
+            titulo: t.titulo,
+            descricao: t.descricao || undefined,
+          })),
+        };
+      }
+
+      // Generate email using AI
+      const result = await generateEmailDraft({
+        templateType: template.label,
+        tone,
+        entidadeName: entidade?.nome,
+        contactoName: contacto?.nome,
+        contactoEmail: contacto?.email || undefined,
+        visitData,
+        recentVisits: recentVisits.map((v: any) => ({
+          dataVisita: new Date(v.dataVisita),
+          notas: v.notas ?? undefined,
+        })),
+        userName: user?.firstName && user?.lastName
+          ? `${user.firstName} ${user.lastName}`
+          : user?.email,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error generating email:", error);
+      res.status(500).json({ message: "Failed to generate email" });
     }
   });
 
