@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, User, Phone, Mail, Building2, Edit, Share2, MessageCircle, Link as LinkIcon, Copy, FileText } from "lucide-react";
+import { ArrowLeft, User, Phone, Mail, Building2, Edit, Share2, MessageCircle, Link as LinkIcon, Copy, FileText, Globe, MapPin, Linkedin, Instagram, Facebook } from "lucide-react";
+import { SiX } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ShareDialog, useShareActions } from "@/components/ShareDialog";
+import { QuickActionButton } from "@/components/QuickActionButton";
 import { formatContactForSharing } from "@/lib/shareFormatters";
+import { useToast } from "@/hooks/use-toast";
 import type { ContactoWithRelations } from "@shared/schema";
 
 export default function ContactoDetail() {
@@ -15,6 +18,7 @@ export default function ContactoDetail() {
   const [, setLocation] = useLocation();
   const contactoId = params?.id;
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const { toast } = useToast();
   
   const { isOnline, shareViaWhatsApp, shareViaEmail, copyToClipboard, copyLink } = useShareActions();
 
@@ -46,6 +50,92 @@ export default function ContactoDetail() {
       </div>
     );
   }
+
+  // Helper functions for quick actions
+  const cleanPhoneNumber = (phone: string) => {
+    const cleaned = phone.replace(/\D/g, '');
+    if (!cleaned.startsWith('351') && !cleaned.startsWith('+')) {
+      return `351${cleaned}`;
+    }
+    return cleaned.replace(/^\+/, '');
+  };
+
+  const handlePhoneCall = () => {
+    if (contacto.telemovel) {
+      window.location.href = `tel:${contacto.telemovel}`;
+    }
+  };
+
+  const handleWhatsApp = () => {
+    if (!isOnline) {
+      toast({
+        title: "Sem internet",
+        description: "Esta ação requer ligação à internet.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (contacto.telemovel) {
+      const cleanNumber = cleanPhoneNumber(contacto.telemovel);
+      window.open(`https://wa.me/${cleanNumber}`, '_blank');
+    }
+  };
+
+  const handleEmail = () => {
+    if (!isOnline) {
+      toast({
+        title: "Sem internet",
+        description: "Esta ação requer ligação à internet.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (contacto.email) {
+      window.location.href = `mailto:${contacto.email}`;
+    }
+  };
+
+  const handleWebsite = () => {
+    if (!isOnline) {
+      toast({
+        title: "Sem internet",
+        description: "Esta ação requer ligação à internet.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (contacto.entidade?.website) {
+      window.open(contacto.entidade.website, '_blank');
+    }
+  };
+
+  const handleMaps = () => {
+    if (!isOnline) {
+      toast({
+        title: "Sem internet",
+        description: "Esta ação requer ligação à internet.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (contacto.entidade?.morada) {
+      const address = `${contacto.entidade.morada}, ${contacto.entidade.cidade || ''} ${contacto.entidade.codigoPostal || ''}`.trim();
+      const encodedAddress = encodeURIComponent(address);
+      window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, '_blank');
+    }
+  };
+
+  const handleSocialLink = (url: string) => {
+    if (!isOnline) {
+      toast({
+        title: "Sem internet",
+        description: "Esta ação requer ligação à internet.",
+        variant: "destructive",
+      });
+      return;
+    }
+    window.open(url, '_blank');
+  };
 
   const shareText = formatContactForSharing(contacto);
   
@@ -179,6 +269,97 @@ export default function ContactoDetail() {
                 </div>
               </>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Quick Actions */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Ações Rápidas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {contacto.telemovel && (
+                <QuickActionButton
+                  icon={Phone}
+                  label="Ligar"
+                  onClick={handlePhoneCall}
+                  testId="button-quick-phone"
+                />
+              )}
+              {contacto.telemovel && (
+                <QuickActionButton
+                  icon={MessageCircle}
+                  label="WhatsApp"
+                  onClick={handleWhatsApp}
+                  disabled={!isOnline}
+                  testId="button-quick-whatsapp"
+                />
+              )}
+              {contacto.email && (
+                <QuickActionButton
+                  icon={Mail}
+                  label="Email"
+                  onClick={handleEmail}
+                  disabled={!isOnline}
+                  testId="button-quick-email"
+                />
+              )}
+              {contacto.entidade?.website && (
+                <QuickActionButton
+                  icon={Globe}
+                  label="Website"
+                  onClick={handleWebsite}
+                  disabled={!isOnline}
+                  testId="button-quick-website"
+                />
+              )}
+              {contacto.entidade?.morada && (
+                <QuickActionButton
+                  icon={MapPin}
+                  label="Morada"
+                  onClick={handleMaps}
+                  disabled={!isOnline}
+                  testId="button-quick-maps"
+                />
+              )}
+              {contacto.entidade?.linkedinUrl && (
+                <QuickActionButton
+                  icon={Linkedin}
+                  label="LinkedIn"
+                  onClick={() => handleSocialLink(contacto.entidade!.linkedinUrl!)}
+                  disabled={!isOnline}
+                  testId="button-quick-linkedin"
+                />
+              )}
+              {contacto.entidade?.instagramUrl && (
+                <QuickActionButton
+                  icon={Instagram}
+                  label="Instagram"
+                  onClick={() => handleSocialLink(contacto.entidade!.instagramUrl!)}
+                  disabled={!isOnline}
+                  testId="button-quick-instagram"
+                />
+              )}
+              {contacto.entidade?.facebookUrl && (
+                <QuickActionButton
+                  icon={Facebook}
+                  label="Facebook"
+                  onClick={() => handleSocialLink(contacto.entidade!.facebookUrl!)}
+                  disabled={!isOnline}
+                  testId="button-quick-facebook"
+                />
+              )}
+              {contacto.entidade?.xUrl && (
+                <QuickActionButton
+                  icon={SiX}
+                  label="X"
+                  onClick={() => handleSocialLink(contacto.entidade!.xUrl!)}
+                  disabled={!isOnline}
+                  testId="button-quick-x"
+                />
+              )}
+            </div>
           </CardContent>
         </Card>
       </main>
