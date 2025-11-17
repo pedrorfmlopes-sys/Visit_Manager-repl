@@ -439,6 +439,8 @@ export const insertTarefaSchema = createInsertSchema(tarefas).omit({
   todoTaskId: true,
   lastTodoSyncAt: true,
   microsoftUserId: true,
+}).extend({
+  dueDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional().nullable(),
 });
 
 export type InsertTarefa = z.infer<typeof insertTarefaSchema>;

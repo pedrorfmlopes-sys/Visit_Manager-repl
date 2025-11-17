@@ -6,7 +6,6 @@ if (!process.env.OPENAI_API_KEY) {
   console.warn("⚠️  OPENAI_API_KEY not configured. AI features will be disabled.");
 }
 
-// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = process.env.OPENAI_API_KEY 
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
@@ -155,7 +154,7 @@ Responde apenas com o JSON, sem explicações adicionais.
 `;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
@@ -276,7 +275,7 @@ Responde em JSON com os campos: "subject" e "body"
 `;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
