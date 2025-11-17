@@ -74,6 +74,7 @@ function Router() {
           <Route path="/lembretes" component={Lembretes} />
           <Route path="/analytics" component={Analytics} />
           <Route path="/qr" component={QRScanner} />
+          <Route path="/qr-scanner" component={QRScanner} />
           <Route path="/integracoes/microsoft" component={MicrosoftIntegration} />
         </>
       )}
