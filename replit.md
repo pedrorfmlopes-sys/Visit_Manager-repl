@@ -58,6 +58,15 @@ Relationships are managed via foreign keys, and data integrity is maintained wit
   5. **RBAC Enforcement**: All Microsoft integration endpoints (auth, data retrieval, export) enforce admin-only access with 403 responses for agents. Tokens are user-specific and isolated per admin account.
   6. **Frontend Integration Page**: Accessible at `/integracoes/microsoft` with connection status, scopes display, connect/disconnect functionality, and feature overview. Linked prominently from Dashboard.
   Features full RBAC enforcement, comprehensive error handling, and follows OAuth 2.0 best practices with encrypted credential storage.
+- **PRO Exports Module**: Advanced PDF generation system with comprehensive analytics, charts, and AI-powered summaries:
+  1. **Visit PDF PRO Export**: Detailed visit reports with embedded photos, AI summaries, linked tasks, GPS coordinates with map links, and optional performance charts. Accessible via `/api/pdf/visita/:id/pro` with query params for options (includePhotos, includeTasks, includeIA, includeCharts). Frontend dialog in VisitaDetail page.
+  2. **Entity PDF PRO Export**: Complete entity history reports including all visits, contact list, task summary, visit frequency charts, brand distribution analytics, and AI-powered executive summaries. Accessible via `/api/pdf/entidade/:id/pro`. Frontend dialog in EntidadeDetail page.
+  3. **Periodic Reports (Monthly/Weekly)**: Agent-specific and company-wide (admin-only) performance reports with KPI metrics, visit trends, task completion rates, brand analytics, and AI-generated insights. Endpoints: `/api/pdf/reports/monthly` and `/api/pdf/reports/weekly` with `scope` param (agent/company). Frontend buttons in Dashboard Reports section.
+  4. **Chart Rendering**: Server-side chart generation using chartjs-node-canvas for embedding bar charts, line charts, and pie charts in PDFs. Supports visit frequency analysis, brand distribution, and task completion metrics.
+  5. **AI-Powered Summaries**: Professional Portuguese (PT-PT) executive summaries generated via OpenAI GPT-4o-mini, providing actionable insights and key highlights for each report type.
+  6. **RBAC Enforcement**: SQL-level filtering ensures agents access only their owned/assigned data; admins access all data. Company-wide reports restricted to admin role.
+  7. **Frontend Implementation**: PDF PRO buttons with dialogs in VisitaDetail, EntidadeDetail, and Dashboard pages. Options include toggles for photos, tasks, AI summaries, charts, and report type selection.
+  Features comprehensive error handling, graceful degradation for missing data, smart pagination for large reports, and offline usage guards.
 
 ## External Dependencies
 
