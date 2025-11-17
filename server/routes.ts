@@ -197,6 +197,58 @@ async function createContactWithUniversalLogic(data: {
     entidadeId = newEntidade.id;
     entidadeNome = newEntidade.nome;
     entidadeStatus = 'created';
+    
+    // Step 3.5: Auto-enrich newly created entity
+    try {
+      console.log(`[Auto-Enrichment] Enriching new entity: ${entityName}`);
+      
+      const enrichmentInput: EnrichmentInput = {
+        name: entityName,
+        domain: data.domain,
+        website: data.website,
+      };
+      
+      const enrichmentResult = await enrichEntity(enrichmentInput);
+      
+      // Only update if we got meaningful enrichment data
+      if (enrichmentResult.enrichmentSource !== 'none') {
+        const enrichedData: any = {
+          description: enrichmentResult.description,
+          industry: enrichmentResult.industry,
+          logoUrl: enrichmentResult.logoUrl,
+          linkedinUrl: enrichmentResult.linkedinUrl,
+          facebookUrl: enrichmentResult.facebookUrl,
+          instagramUrl: enrichmentResult.instagramUrl,
+          xUrl: enrichmentResult.xUrl,
+          lastEnrichedAt: new Date(),
+          enrichmentSource: enrichmentResult.enrichmentSource,
+        };
+        
+        // Update domain/website if enrichment found better values
+        if (enrichmentResult.domain && !newEntidade.domain) {
+          enrichedData.domain = enrichmentResult.domain;
+        }
+        if (enrichmentResult.website && !newEntidade.website) {
+          enrichedData.website = enrichmentResult.website;
+        }
+        if (enrichmentResult.telefone && !newEntidade.telefone) {
+          enrichedData.telefone = enrichmentResult.telefone;
+        }
+        if (enrichmentResult.morada && !newEntidade.morada) {
+          enrichedData.morada = enrichmentResult.morada;
+        }
+        
+        // Update entity with enriched data
+        await storage.updateEntidade(entidadeId, enrichedData);
+        console.log(`[Auto-Enrichment] Successfully enriched entity ${entidadeId} (source: ${enrichmentResult.enrichmentSource})`);
+      } else {
+        console.log(`[Auto-Enrichment] No enrichment data found for ${entityName}`);
+      }
+    } catch (enrichmentError) {
+      // Don't fail entity creation if enrichment fails
+      console.error('[Auto-Enrichment] Failed to enrich entity:', enrichmentError);
+      console.log('[Auto-Enrichment] Entity created without enrichment');
+    }
   }
 
   // Step 4: Always create contacto with validation
@@ -348,6 +400,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...validatedData,
         createdByUserId: userId,
       });
+      
+      // Auto-enrich newly created entity (non-blocking)
+      (async () => {
+        try {
+          console.log(`[Auto-Enrichment] Enriching manually created entity: ${entidade.nome}`);
+          
+          const enrichmentInput: EnrichmentInput = {
+            name: entidade.nome,
+            domain: entidade.domain || undefined,
+            website: entidade.website || undefined,
+          };
+          
+          const enrichmentResult = await enrichEntity(enrichmentInput);
+          
+          if (enrichmentResult.enrichmentSource !== 'none') {
+            const enrichedData: any = {
+              description: enrichmentResult.description,
+              industry: enrichmentResult.industry,
+              logoUrl: enrichmentResult.logoUrl,
+              linkedinUrl: enrichmentResult.linkedinUrl,
+              facebookUrl: enrichmentResult.facebookUrl,
+              instagramUrl: enrichmentResult.instagramUrl,
+              xUrl: enrichmentResult.xUrl,
+              lastEnrichedAt: new Date(),
+              enrichmentSource: enrichmentResult.enrichmentSource,
+            };
+            
+            if (enrichmentResult.domain && !entidade.domain) enrichedData.domain = enrichmentResult.domain;
+            if (enrichmentResult.website && !entidade.website) enrichedData.website = enrichmentResult.website;
+            if (enrichmentResult.telefone && !entidade.telefone) enrichedData.telefone = enrichmentResult.telefone;
+            if (enrichmentResult.morada && !entidade.morada) enrichedData.morada = enrichmentResult.morada;
+            
+            await storage.updateEntidade(entidade.id, enrichedData);
+            console.log(`[Auto-Enrichment] Successfully enriched entity ${entidade.id} (source: ${enrichmentResult.enrichmentSource})`);
+          }
+        } catch (enrichmentError) {
+          console.error('[Auto-Enrichment] Failed to enrich manually created entity:', enrichmentError);
+        }
+      })();
+      
       res.json(entidade);
     } catch (error) {
       console.error("Error creating entidade:", error);
