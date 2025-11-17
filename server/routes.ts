@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { transcribeAudio, generateVisitSummary, extractBusinessCardData } from "./openai";
 import { sendVisitEmail } from "./email";
+import { enrichEntity, type EnrichmentInput, extractDomainFromEmail, isPersonalEmailDomain } from "./enrichment";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -665,6 +666,135 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error importing vCard:", error);
       res.status(500).json({ message: "Failed to import vCard" });
+    }
+  });
+
+  // Entity enrichment endpoint with Clearbit + AI fallback
+  app.post('/api/enrichment/full', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole } = await getUserContext(req);
+      const { entityId, name, domain, website, visionText } = req.body;
+
+      // If enriching existing entity, check RBAC access
+      if (entityId) {
+        const existingEntity = await storage.getEntidade(entityId, userId, userRole);
+        if (!existingEntity) {
+          return res.status(404).json({ message: "Entity not found or unauthorized" });
+        }
+
+        // Build enrichment input
+        const enrichmentInput: EnrichmentInput = {
+          name: existingEntity.nome,
+          domain: domain || existingEntity.domain || undefined,
+          website: website || existingEntity.website || undefined,
+          visionText: visionText || undefined,
+        };
+
+        // Skip if domain is personal email
+        if (enrichmentInput.domain && isPersonalEmailDomain(enrichmentInput.domain)) {
+          return res.json({
+            skipped: true,
+            reason: 'personal_email',
+            message: 'Enrichment skipped for personal email domains',
+          });
+        }
+
+        // Call enrichment service
+        const enrichmentResult = await enrichEntity(enrichmentInput);
+
+        if (enrichmentResult.enrichmentSource === 'none') {
+          return res.json({
+            skipped: true,
+            reason: 'no_data',
+            message: 'No enrichment data available',
+          });
+        }
+
+        // Prepare update data - only update empty fields
+        const updateData: any = {
+          lastEnrichedAt: new Date(),
+          enrichmentSource: enrichmentResult.enrichmentSource,
+        };
+
+        // Only update fields that are currently empty or null
+        if (!existingEntity.domain && enrichmentResult.domain) {
+          updateData.domain = enrichmentResult.domain;
+        }
+        if (!existingEntity.website && enrichmentResult.website) {
+          updateData.website = enrichmentResult.website;
+        }
+        if (!existingEntity.logoUrl && enrichmentResult.logoUrl) {
+          updateData.logoUrl = enrichmentResult.logoUrl;
+        }
+        if (!existingEntity.descricao && enrichmentResult.description) {
+          updateData.descricao = enrichmentResult.description;
+        }
+        if (!existingEntity.industry && enrichmentResult.industry) {
+          updateData.industry = enrichmentResult.industry;
+        }
+        if (!existingEntity.linkedinUrl && enrichmentResult.linkedinUrl) {
+          updateData.linkedinUrl = enrichmentResult.linkedinUrl;
+        }
+        if (!existingEntity.facebookUrl && enrichmentResult.facebookUrl) {
+          updateData.facebookUrl = enrichmentResult.facebookUrl;
+        }
+        if (!existingEntity.instagramUrl && enrichmentResult.instagramUrl) {
+          updateData.instagramUrl = enrichmentResult.instagramUrl;
+        }
+        if (!existingEntity.xUrl && enrichmentResult.xUrl) {
+          updateData.xUrl = enrichmentResult.xUrl;
+        }
+        if (!existingEntity.telefone && enrichmentResult.telefone) {
+          updateData.telefone = enrichmentResult.telefone;
+        }
+        if (!existingEntity.morada && enrichmentResult.morada) {
+          updateData.morada = enrichmentResult.morada;
+        }
+
+        // Update entity
+        const updatedEntity = await storage.updateEntidade(entityId, updateData, userId, userRole);
+
+        // Return what was updated
+        const updatedFields = Object.keys(updateData).filter(k => k !== 'lastEnrichedAt' && k !== 'enrichmentSource');
+
+        return res.json({
+          success: true,
+          entity: updatedEntity,
+          updatedFields,
+          enrichmentSource: enrichmentResult.enrichmentSource,
+        });
+      }
+
+      // If no entityId, just return enrichment data (for preview)
+      if (!name) {
+        return res.status(400).json({ message: "Name is required for enrichment" });
+      }
+
+      const enrichmentInput: EnrichmentInput = {
+        name,
+        domain: domain || undefined,
+        website: website || undefined,
+        visionText: visionText || undefined,
+      };
+
+      // Skip if domain is personal email
+      if (enrichmentInput.domain && isPersonalEmailDomain(enrichmentInput.domain)) {
+        return res.json({
+          skipped: true,
+          reason: 'personal_email',
+          message: 'Enrichment skipped for personal email domains',
+        });
+      }
+
+      const enrichmentResult = await enrichEntity(enrichmentInput);
+
+      return res.json({
+        success: true,
+        data: enrichmentResult,
+      });
+    } catch (error) {
+      console.error("Error enriching entity:", error);
+      res.status(500).json({ message: "Failed to enrich entity" });
     }
   });
 
