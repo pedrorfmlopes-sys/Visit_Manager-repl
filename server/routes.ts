@@ -1572,9 +1572,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const scopes = [
         'offline_access',
         'Tasks.ReadWrite',
-        'User.Read',
-        'Group.ReadWrite.All',
-        'Calendars.ReadWrite'
+        'User.Read'
       ];
       
       const state = randomUUID();
@@ -1716,6 +1714,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error.message.includes('not connected')) {
         return res.status(401).json({ message: 'Microsoft account not connected' });
       }
+      if (error.message.includes('Insufficient privileges') || error.message.includes('Access is denied')) {
+        return res.status(403).json({ 
+          message: 'Insufficient permissions for Planner',
+          needsAdminConsent: true 
+        });
+      }
       res.status(500).json({ message: 'Failed to get Microsoft groups' });
     }
   });
@@ -1737,6 +1741,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error.message.includes('not connected')) {
         return res.status(401).json({ message: 'Microsoft account not connected' });
       }
+      if (error.message.includes('Insufficient privileges') || error.message.includes('Access is denied')) {
+        return res.status(403).json({ 
+          message: 'Insufficient permissions for Planner',
+          needsAdminConsent: true 
+        });
+      }
       res.status(500).json({ message: 'Failed to get planner plans' });
     }
   });
@@ -1757,6 +1767,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('[Microsoft Planner] Get buckets error:', error);
       if (error.message.includes('not connected')) {
         return res.status(401).json({ message: 'Microsoft account not connected' });
+      }
+      if (error.message.includes('Insufficient privileges') || error.message.includes('Access is denied')) {
+        return res.status(403).json({ 
+          message: 'Insufficient permissions for Planner',
+          needsAdminConsent: true 
+        });
       }
       res.status(500).json({ message: 'Failed to get planner buckets' });
     }
@@ -1822,6 +1838,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('[Microsoft Planner] Export error:', error);
       if (error.message.includes('not connected')) {
         return res.status(401).json({ message: 'Microsoft account not connected' });
+      }
+      if (error.message.includes('Insufficient privileges') || error.message.includes('Access is denied')) {
+        return res.status(403).json({ 
+          message: 'Sem permissões para exportar para o Planner. Por favor, use o Microsoft To-Do.',
+          needsAdminConsent: true 
+        });
       }
       res.status(500).json({ message: 'Failed to export to Planner' });
     }

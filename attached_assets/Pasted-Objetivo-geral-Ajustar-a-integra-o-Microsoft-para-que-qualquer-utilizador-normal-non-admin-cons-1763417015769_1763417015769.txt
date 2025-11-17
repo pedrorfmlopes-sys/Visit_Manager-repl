@@ -1,0 +1,83 @@
+Objetivo geral:
+Ajustar a integração Microsoft para que qualquer utilizador normal (non-admin) consiga autenticar-se e exportar tarefas sem pedidos de permissões administrativas. Tornar Microsoft To-Do o destino principal e manter o Planner apenas como funcionalidade opcional quando estiver disponível.
+
+Tarefas a executar:
+
+-------------------------------------------------------
+1. ALTERAR OS SCOPES DO MICROSOFT OAUTH
+-------------------------------------------------------
+- Localizar no backend toda a configuração da app Microsoft OAuth, incluindo:
+  - clientId
+  - tenant
+  - authorization URL
+  - token URL
+  - scopes
+
+- Substituir os scopes atuais por um conjunto mínimo que NÃO requer consentimento de administrador:
+    User.Read
+    Tasks.ReadWrite
+    offline_access
+
+- Remover quaisquer scopes que obriguem a admin consent:
+    Group.ReadWrite.All
+    Group.Read.All
+    Directory.Read.All
+    Planner.ReadWrite.All
+    Planner.Read.All
+
+- Garantir que estes novos scopes são usados na construção do URL de autorização e no refresh tokens.
+
+-------------------------------------------------------
+2. AJUSTAR A LÓGICA DO FRONTEND PARA O NOVO MODELO
+-------------------------------------------------------
+- Localizar o componente relativo à integração Microsoft (Microsoft card ou settings).
+- Atualizar a interface para refletir:
+  - Microsoft To-Do como método principal de exportação
+  - Microsoft Planner como funcionalidade opcional
+
+- Se Planner não tiver permissões suficientes, apresentar mensagem informativa, mas não bloquear a app:
+  "A sua conta Microsoft não tem permissões para exportar para o Planner. Pode exportar normalmente para o Microsoft To-Do."
+
+- Garantir que o botão de exportação para To-Do está sempre disponível.
+
+-------------------------------------------------------
+3. AJUSTAR O BACKEND PARA O NOVO MODELO DE PERMISSÕES
+-------------------------------------------------------
+- Verificar endpoints de exportação para Microsoft Planner e Microsoft To-Do.
+
+- Para o endpoint Planner:
+  - Implementar deteção de falta de permissões (erro MS Graph: insufficient privileges).
+  - Em caso de erro de permissões, devolver resposta clara ao frontend para desativar esta funcionalidade apenas para esse utilizador.
+  - Não deve bloquear o resto da aplicação.
+
+- Para o endpoint To-Do:
+  - Garantir que funciona apenas com os scopes mínimos:
+      User.Read
+      Tasks.ReadWrite
+
+- Validar que tokens existentes continuam funcionais ou são substituídos com o novo fluxo OAuth.
+
+-------------------------------------------------------
+4. AJUSTAR A LÓGICA DE EXIBIÇÃO NO FRONTEND (UI)
+-------------------------------------------------------
+- No detalhe de cada tarefa:
+  - Mostrar sempre o botão "Exportar para Microsoft To-Do".
+  - Mostrar o estado (exportada / última sincronização) com base nos atributos existentes.
+  - Apenas mostrar o botão Planner se o utilizador tiver permissões válidas.
+
+- Se Planner devolver erro de permissão, ocultar automaticamente o botão para esse utilizador ou apresentar mensagem explicativa.
+
+-------------------------------------------------------
+5. TESTAR FLUXOS DE AUTENTICAÇÃO E EXPORTAÇÃO
+-------------------------------------------------------
+- Testar fluxo de login com utilizador NÃO admin.
+- Verificar se:
+    - Login Microsoft é bem sucedido
+    - Exportar para To-Do funciona sem erros
+    - Exportar para Planner retorna mensagem de “sem permissões”
+    - A aplicação continua funcional, sem crashes
+
+-------------------------------------------------------
+6. MOSTRAR O DIFF COMPLETO
+-------------------------------------------------------
+- Depois de todas as alterações, mostrar o diff completo dos ficheiros alterados para revisão.
