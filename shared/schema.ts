@@ -27,10 +27,10 @@ export const userRoleEnum = pgEnum('user_role', [
 // Tipo de Entidade enum
 export const tipoEntidadeEnum = pgEnum('tipo_entidade', [
   'Gabinete',
-  'Cliente',
   'Distribuidor',
-  'Obra',
   'Parceiro',
+  'Construtor',
+  'Contato Pessoal',
   'Outro'
 ]);
 

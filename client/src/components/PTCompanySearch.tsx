@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Building2, Globe, Mail, MapPin, Phone, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
-import type { PTEnrichmentResult, FuzzyMatch, WebScanData } from '@/lib/enrichmentUtils';
+import type { PTEnrichmentResult, FuzzyMatch, WebScanData, GoogleSearchData } from '@/lib/enrichmentUtils';
 
 interface PTCompanySearchProps {
   value: string;
@@ -15,6 +15,7 @@ interface PTCompanySearchProps {
   onSelect?: (data: PTEnrichmentResult) => void;
   placeholder?: string;
   existingEntityId?: number;
+  tipoEntidade?: string;
   disabled?: boolean;
   className?: string;
 }
@@ -25,12 +26,16 @@ export function PTCompanySearch({
   onSelect,
   placeholder = 'Nome da empresa...',
   existingEntityId,
+  tipoEntidade,
   disabled = false,
   className = '',
 }: PTCompanySearchProps) {
   const [debouncedValue, setDebouncedValue] = useState(value);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const { toast } = useToast();
+  
+  const isPersonalContact = tipoEntidade === 'Contato Pessoal';
+  const searchDisabled = disabled || isPersonalContact;
 
   useEffect(() => {
     if (!value || value.trim().length === 0) {
@@ -47,11 +52,12 @@ export function PTCompanySearch({
   }, [value]);
 
   const { data, isLoading, isFetching, error } = useQuery<PTEnrichmentResult>({
-    queryKey: ['/api/enrichment/pt-intelligent-search', debouncedValue, existingEntityId],
+    queryKey: ['/api/enrichment/pt-intelligent-search', debouncedValue, existingEntityId, tipoEntidade],
     queryFn: async () => {
       const response = await apiRequest('POST', '/api/enrichment/pt-intelligent-search', {
         nome: debouncedValue,
         existingEntityId: existingEntityId,
+        tipoEntidade: tipoEntidade,
       });
       
       if (!response.ok) {
@@ -64,10 +70,11 @@ export function PTCompanySearch({
       return {
         fuzzyMatches: result.fuzzyMatches || [],
         webScanData: result.webScanData || undefined,
+        googleResults: result.googleResults || [],
         enrichmentSource: result.enrichmentSource || 'none',
       };
     },
-    enabled: debouncedValue.length >= 3,
+    enabled: debouncedValue.length >= 3 && !isPersonalContact,
     staleTime: 60000,
     retry: 1,
   });

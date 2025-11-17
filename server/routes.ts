@@ -1561,26 +1561,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/enrichment/pt-intelligent-search - Portugal-optimized company search with fuzzy matching + AI WebScan
+  // POST /api/enrichment/pt-intelligent-search - Portugal-optimized company search with fuzzy matching + Google Search
   app.post('/api/enrichment/pt-intelligent-search', isAuthenticated, async (req: any, res) => {
     try {
       const { userId, userRole } = await getUserContext(req);
-      const { nome, existingEntityId, domain, website, email } = req.body;
+      const { nome, existingEntityId, tipoEntidade } = req.body;
       
       if (!nome || typeof nome !== 'string') {
         return res.status(400).json({ message: 'Nome parameter required' });
+      }
+      
+      if (tipoEntidade === 'Contato Pessoal') {
+        console.log('[PT-Search] Skipping search for personal contact');
+        return res.json({
+          fuzzyMatches: [],
+          googleResults: [],
+          enrichmentSource: 'disabled',
+        });
       }
       
       const input: PTEnrichmentInput = {
         nome,
         userId,
         existingEntityId,
-        domain,
-        website,
-        email,
       };
       
       const result = await ptIntelligentSearch(input, storage, userRole);
+      
+      if (result.fuzzyMatches.length === 0) {
+        console.log('[PT-Search] No fuzzy matches, trying Google Search');
+        const { searchCompanyData } = await import('./googleSearch');
+        const googleResults = await searchCompanyData(nome);
+        
+        return res.json({
+          ...result,
+          googleResults,
+          enrichmentSource: googleResults.length > 0 ? 'google' : result.enrichmentSource,
+        });
+      }
       
       res.json(result);
     } catch (error) {

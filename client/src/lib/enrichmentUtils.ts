@@ -26,10 +26,24 @@ export interface WebScanData {
   descricao?: string;
 }
 
+export interface GoogleSearchData {
+  nome?: string;
+  morada?: string;
+  cidade?: string;
+  codigoPostal?: string;
+  telefone?: string;
+  email?: string;
+  website?: string;
+  descricao?: string;
+  confidence: number;
+  sourceUrl: string;
+}
+
 export interface PTEnrichmentResult {
   fuzzyMatches: FuzzyMatch[];
   webScanData?: WebScanData;
-  enrichmentSource: 'fuzzy' | 'webscan' | 'combined' | 'none';
+  googleResults?: GoogleSearchData[];
+  enrichmentSource: 'fuzzy' | 'webscan' | 'combined' | 'google' | 'disabled' | 'none';
 }
 
 export function fillEntityForm(
