@@ -24,8 +24,8 @@ export function BottomNav() {
   const lembretesCount = lembretes?.length || 0;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 h-16 bg-card border-t border-card-border z-50 safe-area-inset-bottom">
-      <div className="h-full flex items-center justify-around max-w-2xl mx-auto px-2">
+    <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-card-border z-50 safe-bottom-nav">
+      <div className="h-16 flex items-center justify-around max-w-2xl mx-auto px-2">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location === item.path || (item.path !== "/" && location.startsWith(item.path));
