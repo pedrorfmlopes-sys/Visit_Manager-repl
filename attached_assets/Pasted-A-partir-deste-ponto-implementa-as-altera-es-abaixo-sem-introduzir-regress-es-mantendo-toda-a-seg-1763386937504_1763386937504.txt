@@ -1,0 +1,112 @@
+A partir deste ponto, implementa as alterações abaixo sem introduzir regressões, mantendo toda a segurança RBAc e compatibilidade com o sistema atual.
+
+====================================================
+1) Atualizar regra de enriquecimento por tipoEntidade
+====================================================
+
+NOVO COMPORTAMENTO:
+
+Se tipoEntidade ∈ {Gabinete, Distribuidor, Parceiro, Construtor}:
+    - ATIVAR APENAS Google Custom Search como fonte externa.
+    - DESATIVAR completamente:
+        * PT-WebScan
+        * IA-WebScan
+        * IA-Normalizer (para pesquisa)
+        * Qualquer scrape alternativo
+    - O enrichment deve ocorrer:
+        * No formulário EntidadeForm (auto-preencher)
+        * No botão “Enriquecer Dados”
+        * Após QRCode (se tipo permitir)
+        * Após OCR de cartão (se tipo permitir)
+        * Após vCard (se tipo permitir)
+
+Se tipoEntidade === "ContatoPessoal":
+    - DESATIVAR toda a busca externa (Google, scraping, IA, etc.)
+    - MAS PERMITIR:
+        * Preenchimento via QRCode
+        * Preenchimento via vCard
+        * Preenchimento via OCR (cartão de visita)
+        * Preenchimento via dados já presentes (telefone/email/website)
+    - O formulário deve ser 100% manual EXCEPTO estes métodos.
+    - Nenhum enrichment externo deve ser chamado para este tipo.
+    - Nenhum pedido ao /api/enrichment deve ser feito.
+    - Nenhum item deve entrar na offline queue de enrichment.
+
+====================================================
+2) EntidadeForm – regras de interface
+====================================================
+
+Para entidades empresariais:
+    - Mostrar barra GoogleCompanySearch.
+    - Autofill permitido.
+    - Botão "Enriquecer com IA" ativo.
+
+Para ContatoPessoal:
+    - Ocultar GoogleCompanySearch.
+    - Botão "Enriquecer com IA" deve estar oculto.
+    - Mostrar mensagem:
+      “Para contatos pessoais, preencha os dados manualmente ou utilize QRCode/OCR/vCard.”
+
+====================================================
+3) Fluxos de importação (QRCode, vCard, OCR)
+====================================================
+
+Se o utilizador importar um contato via QRCode / vCard / OCR:
+
+Se tipoEntidade IN empresariais → aplicar enrichment normal.
+Se tipoEntidade === ContatoPessoal:
+    - NÃO chamar Google Search.
+    - NÃO chamar IA para enrichment.
+    - Preencher apenas com o que veio do QR/vCard/OCR.
+    - Permitir edição manual.
+
+====================================================
+4) Ajustes nos componentes afetados
+====================================================
+
+Atualizar:
+- GoogleCompanySearch (substitui completamente PTCompanySearch)
+- fillEntityForm → adicionar regra tipoEntidade === "ContatoPessoal"
+- EntidadeForm → lógica condicional de barras e botões
+- EntidadeDetail → desativar enrichment para contatos pessoais
+- vCard import flow → respeitar o tipo
+- OCR flow → respeitar o tipo
+- QR Scan → respeitar o tipo
+- Offline queue → ignorar enriquecimento para contatos pessoais
+
+====================================================
+5) Dashboard de entidades
+====================================================
+
+Separar listas em:
+- Gabinetes
+- Distribuidores
+- Parceiros
+- Construtores
+- Contatos Pessoais
+
+Contatos Pessoais:
+- Sem logotipo
+- Sem website enriquecido
+- Sem dados empresariais
+- Apenas dados básicos importados ou escritos manualmente
+
+====================================================
+6) Garantias
+====================================================
+
+NÃO modificar:
+- Microsoft 365 Integration
+- PDF PRO Module
+- Reminder Engine
+- Tasks
+- Visits
+- QR/OCR core (apenas integração)
+- AI Emails
+- RBAC já implementado
+
+No final:
+- Confirmar que ContatoPessoal nunca faz chamadas externas.
+- Confirmar que entidades empresariais usam exclusivamente Google CSE.
+- Confirmar que tudo arranca sem erros.
+- Enviar resumo da implementação.

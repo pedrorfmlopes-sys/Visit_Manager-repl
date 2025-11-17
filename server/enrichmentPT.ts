@@ -330,12 +330,10 @@ export async function ptIntelligentSearch(
     console.log(`[PT-Search] Starting intelligent search for: "${nome}"`);
     
     const normalized = normalizeString(nome);
-    const variantsResult = await generateIANormalizedVariants(nome);
     
-    const allVariants = [normalized, ...variantsResult.variants];
+    const allVariants = [normalized];
     
-    console.log(`[PT-Search] Generated ${allVariants.length} normalized variants (including base)`);
-    console.log(`[PT-Search] Variants:`, allVariants);
+    console.log(`[PT-Search] Using ${allVariants.length} normalized variant (IA-Normalizer disabled)`);
     
     const allEntidades = await storage.getEntidades(userId, userRole);
     const allContactos = await storage.getContactos(userId, userRole);

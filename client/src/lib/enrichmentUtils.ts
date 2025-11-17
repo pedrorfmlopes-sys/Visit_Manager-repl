@@ -89,7 +89,9 @@ export function fillEntityForm(
     setFieldIfEmpty('nome', dataSource.nome);
   }
   
-  setFieldIfEmpty('domain', dataSource.domain);
+  if ('domain' in dataSource) {
+    setFieldIfEmpty('domain', dataSource.domain);
+  }
   setFieldIfEmpty('website', dataSource.website);
   
   if ('cidade' in dataSource && dataSource.cidade) {
@@ -105,7 +107,9 @@ export function fillEntityForm(
   
   setFieldIfEmpty('telefone', dataSource.telefone);
   setFieldIfEmpty('email', dataSource.email);
-  setFieldIfEmpty('logoUrl', dataSource.logoUrl);
+  if ('logoUrl' in dataSource) {
+    setFieldIfEmpty('logoUrl', dataSource.logoUrl);
+  }
   
   if ('descricao' in dataSource && dataSource.descricao) {
     setFieldIfEmpty('descricao', dataSource.descricao);

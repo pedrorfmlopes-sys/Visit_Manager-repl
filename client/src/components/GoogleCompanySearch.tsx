@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import type { PTEnrichmentResult, FuzzyMatch, WebScanData, GoogleSearchData } from '@/lib/enrichmentUtils';
 
-interface PTCompanySearchProps {
+interface GoogleCompanySearchProps {
   value: string;
   onChange: (value: string) => void;
   onSelect?: (data: PTEnrichmentResult) => void;
@@ -20,7 +20,7 @@ interface PTCompanySearchProps {
   className?: string;
 }
 
-export function PTCompanySearch({
+export function GoogleCompanySearch({
   value,
   onChange,
   onSelect,
@@ -29,7 +29,7 @@ export function PTCompanySearch({
   tipoEntidade,
   disabled = false,
   className = '',
-}: PTCompanySearchProps) {
+}: GoogleCompanySearchProps) {
   const [debouncedValue, setDebouncedValue] = useState(value);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const { toast } = useToast();

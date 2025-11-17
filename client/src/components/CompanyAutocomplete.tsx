@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
 /**
- * @deprecated Legacy autocomplete component (use PTCompanySearch instead)
+ * @deprecated Legacy autocomplete component (use GoogleCompanySearch instead)
  * This component is kept for backwards compatibility only
- * All new implementations should use PTCompanySearch from @/components/PTCompanySearch
+ * All new implementations should use GoogleCompanySearch from @/components/GoogleCompanySearch
  */
 
 interface ClearbitCompany {
@@ -26,7 +26,7 @@ interface CompanyAutocompleteProps {
 }
 
 /**
- * @deprecated Use PTCompanySearch instead
+ * @deprecated Use GoogleCompanySearch instead
  */
 export function CompanyAutocomplete({
   value,

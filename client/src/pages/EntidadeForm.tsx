@@ -18,7 +18,7 @@ import { insertEntidadeSchema, type InsertEntidade, type Entidade } from "@share
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { syncManager } from "@/lib/syncManager";
-import { PTCompanySearch } from "@/components/PTCompanySearch";
+import { GoogleCompanySearch } from "@/components/GoogleCompanySearch";
 import { fillEntityForm, type PTEnrichmentResult } from "@/lib/enrichmentUtils";
 
 const tipoOptions = [
@@ -469,56 +469,66 @@ export default function EntidadeForm() {
             <FormField
               control={form.control}
               name="nome"
-              render={({ field }) => (
-                <FormItem>
-                  <div className="flex items-center justify-between gap-2">
-                    <FormLabel>Nome *</FormLabel>
-                    {isEdit && isOnline && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleManualEnrich}
-                        disabled={isEnriching || !field.value}
-                        className="h-8"
-                        data-testid="button-refresh-web"
-                      >
-                        {isEnriching ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-4 w-4" />
-                        )}
-                        <span className="ml-1">Atualizar da Web</span>
-                      </Button>
+              render={({ field }) => {
+                const tipoEntidade = form.watch("tipoEntidade");
+                const isContatoPessoal = tipoEntidade === "Contato Pessoal";
+                
+                return (
+                  <FormItem>
+                    <div className="flex items-center justify-between gap-2">
+                      <FormLabel>Nome *</FormLabel>
+                      {isEdit && isOnline && !isContatoPessoal && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleManualEnrich}
+                          disabled={isEnriching || !field.value}
+                          className="h-8"
+                          data-testid="button-refresh-web"
+                        >
+                          {isEnriching ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
+                          <span className="ml-1">Atualizar da Web</span>
+                        </Button>
+                      )}
+                    </div>
+                    <FormControl>
+                      {isEdit || isContatoPessoal ? (
+                        <Input
+                          {...field}
+                          placeholder={isContatoPessoal ? "Nome do contato" : "Nome da entidade"}
+                          className="h-12"
+                          data-testid="input-nome"
+                        />
+                      ) : (
+                        <GoogleCompanySearch
+                          value={field.value}
+                          onChange={field.onChange}
+                          onSelect={handlePTCompanySelect}
+                          tipoEntidade={tipoEntidade}
+                          placeholder="Nome da empresa..."
+                          className="h-12"
+                        />
+                      )}
+                    </FormControl>
+                    {isContatoPessoal && !isEdit && (
+                      <FormDescription className="text-xs text-muted-foreground">
+                        Para contatos pessoais, preencha os dados manualmente ou utilize QRCode/OCR/vCard
+                      </FormDescription>
                     )}
-                  </div>
-                  <FormControl>
-                    {isEdit ? (
-                      <Input
-                        {...field}
-                        placeholder="Nome da entidade"
-                        className="h-12"
-                        data-testid="input-nome"
-                      />
-                    ) : (
-                      <PTCompanySearch
-                        value={field.value}
-                        onChange={field.onChange}
-                        onSelect={handlePTCompanySelect}
-                        tipoEntidade={form.watch("tipoEntidade")}
-                        placeholder="Nome da empresa..."
-                        className="h-12"
-                      />
+                    {!isOnline && !isEdit && !isContatoPessoal && (
+                      <FormDescription className="text-xs text-muted-foreground">
+                        Pesquisa inteligente funciona offline usando dados locais
+                      </FormDescription>
                     )}
-                  </FormControl>
-                  {!isOnline && !isEdit && (
-                    <FormDescription className="text-xs text-muted-foreground">
-                      Pesquisa inteligente funciona offline usando dados locais
-                    </FormDescription>
-                  )}
-                  <FormMessage />
-                </FormItem>
-              )}
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
 
             <FormField

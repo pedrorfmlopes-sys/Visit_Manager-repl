@@ -1597,8 +1597,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const result = await ptIntelligentSearch(input, storage, userRole);
       
-      if (result.fuzzyMatches.length === 0) {
-        console.log(`[PT-Search] No fuzzy matches for "${nome}", attempting Google Search (user: ${userId}, role: ${userRole})`);
+      if (result.fuzzyMatches.length === 0 && tipoEntidade !== 'Contato Pessoal') {
+        console.log(`[PT-Search] No fuzzy matches for "${nome}", attempting Google Search (user: ${userId}, role: ${userRole}, type: ${tipoEntidade})`);
         const { searchCompanyData } = await import('./googleSearch');
         const googleResults = await searchCompanyData(nome);
         
