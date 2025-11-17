@@ -10,6 +10,7 @@ import { ContactoCard } from "@/components/ContactoCard";
 import { VisitaCard } from "@/components/VisitaCard";
 import { LocationPreview } from "@/components/LocationPreview";
 import { ShareDialog, useShareActions } from "@/components/ShareDialog";
+import { EmailAIDialog } from "@/components/EmailAIDialog";
 import { QuickActionButton } from "@/components/QuickActionButton";
 import { formatEntityForSharing } from "@/lib/shareFormatters";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +33,7 @@ export default function EntidadeDetail() {
   const entidadeId = params?.id;
   const { toast } = useToast();
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   
   const { isOnline, shareViaWhatsApp, shareViaEmail, copyToClipboard, copyLink } = useShareActions();
 
@@ -396,6 +398,12 @@ export default function EntidadeDetail() {
                   testId="button-quick-x"
                 />
               )}
+              <QuickActionButton
+                icon={Sparkles}
+                label="Gerar Email"
+                onClick={() => setEmailDialogOpen(true)}
+                testId="button-quick-generate-email"
+              />
             </div>
           </CardContent>
         </Card>
@@ -658,6 +666,13 @@ export default function EntidadeDetail() {
             action: () => copyToClipboard(formatEntityForSharing(entidade), "Entidade copiada!"),
           },
         ]}
+      />
+
+      <EmailAIDialog
+        open={emailDialogOpen}
+        onOpenChange={setEmailDialogOpen}
+        entidadeId={entidadeId ? parseInt(entidadeId) : undefined}
+        defaultTemplate="envio_catalogo"
       />
     </div>
   );
