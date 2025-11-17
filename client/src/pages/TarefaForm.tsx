@@ -41,7 +41,7 @@ export default function TarefaForm() {
 
   const form = useForm<InsertTarefa>({
     resolver: zodResolver(insertTarefaSchema),
-    defaultValues: tarefa || {
+    defaultValues: {
       titulo: "",
       descricao: "",
       visitaId: undefined,
@@ -52,7 +52,10 @@ export default function TarefaForm() {
       status: "pending",
       createdByUserId: currentUser?.id || "",
     },
-    values: tarefa,
+    values: tarefa ? {
+      ...tarefa,
+      descricao: (tarefa.descricao === '<p></p>' || !tarefa.descricao) ? "" : tarefa.descricao,
+    } : undefined,
   });
 
   const createMutation = useMutation({

@@ -28,6 +28,10 @@ export function RichTextEditor({
   placeholder = 'Escreva a descrição da tarefa...',
   className = '',
 }: RichTextEditorProps) {
+  // Normalize empty content to prevent <p></p> from being stored
+  // Handles null, undefined, empty strings, and <p></p>
+  const normalizedContent = !content || content === '<p></p>' || content.trim() === '' ? '' : content;
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -39,7 +43,7 @@ export function RichTextEditor({
         placeholder,
       }),
     ],
-    content,
+    content: normalizedContent,
     onUpdate: ({ editor }) => {
       const html = editor.getHTML();
       // Return empty string if content is just empty paragraph
@@ -55,10 +59,14 @@ export function RichTextEditor({
 
   // Sync editor content when controlled value changes (e.g., when editing existing task)
   useEffect(() => {
-    if (editor && content !== editor.getHTML()) {
-      editor.commands.setContent(content || '');
+    if (editor) {
+      const currentHtml = editor.getHTML();
+      const currentNormalized = currentHtml === '<p></p>' ? '' : currentHtml;
+      if (normalizedContent !== currentNormalized) {
+        editor.commands.setContent(normalizedContent);
+      }
     }
-  }, [content, editor]);
+  }, [normalizedContent, editor]);
 
   if (!editor) {
     return null;

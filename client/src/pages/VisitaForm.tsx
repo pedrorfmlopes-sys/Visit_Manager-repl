@@ -104,34 +104,42 @@ export default function VisitaForm() {
       queryClient.refetchQueries({ queryKey: ["/api/entidades"] });
       
       // Create task if requested
-      if (createTask && taskTitle && currentUser) {
-        try {
-          const tarefaData = {
-            titulo: taskTitle,
-            descricao: taskDescription || null,
-            visitaId: visitaData.id,
-            entidadeId: form.getValues("entidadeId"),
-            createdByUserId: currentUser.id,
-            assignedUserId: currentUser.id,
-            dueDate: taskDueDate || null,
-            repeatInterval: "none" as const,
-            status: "pending" as const,
-          };
-          
-          await apiRequest("POST", "/api/tarefas", tarefaData);
-          queryClient.invalidateQueries({ queryKey: ["/api/tarefas"] });
-          
+      if (createTask && taskTitle) {
+        if (!currentUser) {
           toast({
-            title: "Sucesso",
-            description: "Visita e tarefa criadas com sucesso! A processar IA...",
-          });
-        } catch (error) {
-          console.error("Failed to create task:", error);
-          toast({
-            title: "Atenção",
-            description: "Visita criada mas falhou a criação da tarefa.",
+            title: "Aviso",
+            description: "Visita criada mas tarefa não foi criada (login necessário).",
             variant: "destructive",
           });
+        } else {
+          try {
+            const tarefaData = {
+              titulo: taskTitle,
+              descricao: taskDescription || null,
+              visitaId: visitaData.id,
+              entidadeId: form.getValues("entidadeId"),
+              createdByUserId: currentUser.id,
+              assignedUserId: currentUser.id,
+              dueDate: taskDueDate || null,
+              repeatInterval: "none" as const,
+              status: "pending" as const,
+            };
+            
+            await apiRequest("POST", "/api/tarefas", tarefaData);
+            queryClient.invalidateQueries({ queryKey: ["/api/tarefas"] });
+            
+            toast({
+              title: "Sucesso",
+              description: "Visita e tarefa criadas com sucesso! A processar IA...",
+            });
+          } catch (error) {
+            console.error("Failed to create task:", error);
+            toast({
+              title: "Atenção",
+              description: "Visita criada mas falhou a criação da tarefa.",
+              variant: "destructive",
+            });
+          }
         }
       } else {
         toast({

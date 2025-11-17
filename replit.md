@@ -25,7 +25,7 @@ The database uses PostgreSQL with Drizzle ORM for type-safe schema management. T
 - **Entidades**: A universal entity system replacing legacy "Gabinetes," supporting types like Gabinete, Cliente, Distribuidor, Obra, Parceiro, Outro, with fields for NIF, address, and GPS coordinates.
 - **Contactos**: Contacts linked to entities.
 - **Visitas**: Visit records with dates, notes, media attachments, audio transcriptions, AI summaries, and geolocation.
-- **Tarefas**: A comprehensive task management system with status, repeat intervals, and optional links to entities/visits.
+- **Tarefas**: A comprehensive task management system with status, repeat intervals, optional links to entities/visits, and rich text descriptions with HTML support. Descriptions support TipTap editor features including checkboxes (task lists), bold, italic, ordered/unordered lists, and headings. All HTML content is sanitized with DOMPurify to prevent XSS attacks.
 - **Lembretes**: Intelligent reminder system tracking three types: visit follow-ups (7 days after last visit), overdue tasks, and AI-suggested reminders. Fully RBAC-aware with watertight security.
 - **Marcas**: Product brands.
 - **Sessions**: For authentication state.
@@ -33,6 +33,13 @@ Relationships are managed via foreign keys, and data integrity is maintained wit
 
 ### System Design Choices
 
+- **Rich Text Task Descriptions**: TipTap-based rich text editor for task descriptions with comprehensive formatting support:
+  1. **TipTap Editor**: Interactive WYSIWYG editor with toolbar controls for bold, italic, lists, task lists (checkboxes), undo/redo functionality
+  2. **HTML Storage**: Task descriptions stored as sanitized HTML in the database, supporting complex formatting
+  3. **XSS Prevention**: DOMPurify sanitization with forbid-list approach blocking dangerous tags (script, iframe, form) and event handlers while allowing all formatting tags
+  4. **Empty Content Normalization**: Automatic conversion of empty `<p></p>` paragraphs to empty strings to prevent storage bloat
+  5. **Task Creation in Visits**: Users can optionally create associated tasks when registering visits, with rich text descriptions
+  6. **Legacy Data Migration**: Automatic normalization of legacy `<p></p>` values when editing existing tasks
 - **Offline Capabilities**: Comprehensive offline support with IndexedDB for data caching and storage. Automatic synchronization of created entities, contacts, and tasks when online. Query caching allows offline access to previously fetched data.
 - **Geolocation Integration**: Automatic GPS capture during visit creation, displayed with map links.
 - **Calendar Integration**: Backend-generated, RFC 5545 compliant `.ics` files for visits and tasks, including detailed event data, deep links, and reminders.
@@ -80,7 +87,7 @@ Relationships are managed via foreign keys, and data integrity is maintained wit
 ## External Dependencies
 
 - **Neon Database**: Serverless PostgreSQL hosting for production data persistence.
-- **OpenAI API**: Utilized for AI-powered features, including Whisper for audio transcription and GPT for visit summary generation.
+- **OpenAI API**: Utilized for AI-powered features, including Whisper for audio transcription and GPT-4o-mini for visit summary generation, email generation, and executive summaries in PDF reports.
 - **Replit Authentication**: OAuth/OIDC provider for user authentication and profile management.
 - **Email Integration**: Prepared for services like Resend or SendGrid for automated email notifications (currently console logging in development).
 - **UI Component Dependencies**: Radix UI primitives, Lucide React for iconography, date-fns for date manipulation.
