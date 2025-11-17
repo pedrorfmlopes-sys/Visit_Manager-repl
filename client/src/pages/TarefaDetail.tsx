@@ -49,20 +49,25 @@ export default function TarefaDetail() {
     queryKey: ["/api/microsoft/auth/status"],
   });
 
-  const { data: groups = [] } = useQuery<Array<{ id: string; displayName: string }>>({
+  const { data: groups = [], isError: groupsError, error: groupsErrorObj } = useQuery<Array<{ id: string; displayName: string }>>({
     queryKey: ["/api/microsoft/planner/groups"],
     enabled: showPlannerDialog && !!msStatus?.authenticated,
+    retry: false,
   });
 
   const { data: plans = [] } = useQuery<Array<{ id: string; title: string }>>({
     queryKey: ["/api/microsoft/planner/plans", selectedGroupId],
     enabled: !!selectedGroupId && showPlannerDialog,
+    retry: false,
   });
 
   const { data: buckets = [] } = useQuery<Array<{ id: string; name: string }>>({
     queryKey: ["/api/microsoft/planner/buckets", selectedPlanId],
     enabled: !!selectedPlanId && showPlannerDialog,
+    retry: false,
   });
+
+  const plannerHasPermissions = !groupsError || !(groupsErrorObj as any)?.message?.includes('Insufficient permissions');
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -124,17 +129,29 @@ export default function TarefaDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tarefas", params?.id] });
       setShowPlannerDialog(false);
+      setSelectedGroupId("");
+      setSelectedPlanId("");
+      setSelectedBucketId("");
       toast({
         title: "Sucesso",
         description: "Tarefa exportada para o Microsoft Planner",
       });
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
+      const isPermissionError = error?.message?.includes('Sem permissões') || error?.message?.includes('Insufficient');
       toast({
-        title: "Erro",
-        description: error.message || "Não foi possível exportar para o Planner",
+        title: isPermissionError ? "Sem Permissões para Planner" : "Erro",
+        description: isPermissionError 
+          ? "A sua conta Microsoft não tem permissões para o Planner. Use o Microsoft To-Do."
+          : error.message || "Não foi possível exportar para o Planner",
         variant: "destructive",
       });
+      if (isPermissionError) {
+        setShowPlannerDialog(false);
+        setSelectedGroupId("");
+        setSelectedPlanId("");
+        setSelectedBucketId("");
+      }
     },
   });
 
@@ -362,39 +379,10 @@ export default function TarefaDetail() {
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <p className="font-medium text-sm">Microsoft Planner</p>
-                    <p className="text-xs text-muted-foreground">
-                      {tarefa.plannerTaskId 
-                        ? `Exportada em ${format(new Date(tarefa.lastPlannerSyncAt!), "PP", { locale: pt })}`
-                        : "Não exportada"}
+                    <p className="font-medium text-sm flex items-center gap-2">
+                      Microsoft To-Do
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">Principal</Badge>
                     </p>
-                  </div>
-                  <Button
-                    variant={tarefa.plannerTaskId ? "outline" : "default"}
-                    size="sm"
-                    onClick={handlePlannerExport}
-                    disabled={exportToPlannerMutation.isPending}
-                    data-testid="button-export-planner"
-                  >
-                    {exportToPlannerMutation.isPending ? (
-                      "A exportar..."
-                    ) : tarefa.plannerTaskId ? (
-                      <>
-                        <Send className="h-4 w-4 mr-2" />
-                        Exportar novamente
-                      </>
-                    ) : (
-                      <>
-                        <Send className="h-4 w-4 mr-2" />
-                        Exportar
-                      </>
-                    )}
-                  </Button>
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">Microsoft To-Do</p>
                     <p className="text-xs text-muted-foreground">
                       {tarefa.todoTaskId 
                         ? `Exportada em ${format(new Date(tarefa.lastTodoSyncAt!), "PP", { locale: pt })}`
@@ -412,7 +400,7 @@ export default function TarefaDetail() {
                       "A exportar..."
                     ) : tarefa.todoTaskId ? (
                       <>
-                        <Send className="h-4 w-4 mr-2" />
+                        <CheckCheck className="h-4 w-4 mr-2" />
                         Exportar novamente
                       </>
                     ) : (
@@ -423,12 +411,63 @@ export default function TarefaDetail() {
                     )}
                   </Button>
                 </div>
+                
+                {plannerHasPermissions && (
+                  <>
+                    <Separator />
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <p className="font-medium text-sm flex items-center gap-2">
+                          Microsoft Planner
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">Opcional</Badge>
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {tarefa.plannerTaskId 
+                            ? `Exportada em ${format(new Date(tarefa.lastPlannerSyncAt!), "PP", { locale: pt })}`
+                            : "Não exportada"}
+                        </p>
+                      </div>
+                      <Button
+                        variant={tarefa.plannerTaskId ? "outline" : "secondary"}
+                        size="sm"
+                        onClick={handlePlannerExport}
+                        disabled={exportToPlannerMutation.isPending}
+                        data-testid="button-export-planner"
+                      >
+                        {exportToPlannerMutation.isPending ? (
+                          "A exportar..."
+                        ) : tarefa.plannerTaskId ? (
+                          <>
+                            <Send className="h-4 w-4 mr-2" />
+                            Exportar novamente
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4 mr-2" />
+                            Exportar
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </>
+                )}
+                
+                {!plannerHasPermissions && (
+                  <>
+                    <Separator />
+                    <div className="bg-muted/50 rounded-md p-3">
+                      <p className="text-xs text-muted-foreground">
+                        A sua conta Microsoft não tem permissões para o Planner. Pode exportar normalmente para o Microsoft To-Do.
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
             </>
           ) : (
             <>
               <p className="text-sm text-muted-foreground mb-4">
-                Faça login com Microsoft 365 para exportar tarefas para Planner e To-Do
+                Faça login com Microsoft 365 para exportar tarefas para To-Do
               </p>
               <Button
                 variant="default"
