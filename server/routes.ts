@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { transcribeAudio, generateVisitSummary } from "./openai";
+import { transcribeAudio, generateVisitSummary, extractBusinessCardData } from "./openai";
 import { sendVisitEmail } from "./email";
 import multer from "multer";
 import path from "path";
@@ -51,6 +51,178 @@ async function getUserContext(req: any): Promise<{ userId: string; userRole: 'ad
   const user = await storage.getUser(userId);
   const userRole = user?.role || 'agent'; // Default to 'agent' if not set
   return { userId, userRole };
+}
+
+/**
+ * Detect image MIME type from binary header (magic bytes)
+ */
+function getImageMimeType(buffer: Buffer): string | null {
+  // Check magic bytes for common image formats
+  if (buffer.length < 4) return null;
+  
+  // JPEG: FF D8 FF
+  if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+    return 'image/jpeg';
+  }
+  
+  // PNG: 89 50 4E 47
+  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
+    return 'image/png';
+  }
+  
+  // WebP: 52 49 46 46 ... 57 45 42 50
+  if (buffer.length >= 12 &&
+      buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
+      buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) {
+    return 'image/webp';
+  }
+  
+  // HEIC/HEIF: check for ftyp box at bytes 4-7 and major_brand at bytes 8-11
+  if (buffer.length >= 12) {
+    const ftypBox = buffer.toString('ascii', 4, 8);
+    if (ftypBox === 'ftyp') {
+      // Read ftyp box size from bytes 0-3 (big-endian)
+      const ftypSize = buffer.readUInt32BE(0);
+      
+      // Validate ftyp size is reasonable and within buffer bounds
+      if (ftypSize < 12 || ftypSize > buffer.length) {
+        // Invalid or truncated ftyp box, cannot reliably detect
+        return null;
+      }
+      
+      // The major_brand is a 4-byte value at bytes 8-11 (case-insensitive)
+      const majorBrand = buffer.toString('ascii', 8, 12).toLowerCase();
+      
+      // Direct HEIC brands (specific variants)
+      const directHeicBrands = ['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'hevm', 'hevs'];
+      if (directHeicBrands.includes(majorBrand)) {
+        return 'image/heic';
+      }
+      
+      // Generic container brands (mif1, msf1) - check ALL compatible brands within ftyp box
+      const genericBrands = ['mif1', 'msf1'];
+      if (genericBrands.includes(majorBrand)) {
+        // Compatible brands start at byte 16 and continue until ftyp box ends
+        // Safely iterate only within the validated ftyp box bounds
+        for (let i = 16; i + 4 <= ftypSize && i + 4 <= buffer.length; i += 4) {
+          const compatibleBrand = buffer.toString('ascii', i, i + 4).toLowerCase();
+          if (directHeicBrands.includes(compatibleBrand)) {
+            return 'image/heic';
+          }
+        }
+      }
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Universal entity + contact auto-creation helper with RBAC enforcement
+ * 
+ * RBAC MODEL:
+ * - Both agents and admins can CREATE entities and contacts
+ * - Agents can only READ entities/contacts they created or are assigned to
+ * - Admins can READ all entities/contacts
+ * - When auto-creating from scanned business cards:
+ *   - Created entity is assigned to the scanning user (createdByUserId = assignedUserId)
+ *   - This is intentional: the user who discovers the entity becomes its owner
+ *   - No privilege escalation: agents can always create entities for themselves
+ * 
+ * VALIDATION:
+ * - Uses Zod schema validation (insertEntidadeSchema, insertContactoSchema)
+ * - Ensures data integrity and prevents invalid field values
+ * - Same validation as normal REST endpoints
+ */
+async function createContactWithUniversalLogic(data: {
+  name: string;
+  organization?: string;
+  email?: string;
+  phone?: string;
+  jobTitle?: string;
+  address?: string;
+  website?: string;
+  domain?: string;
+  userId: string;
+  userRole: 'admin' | 'agent';
+}): Promise<{
+  contacto: any;
+  entidade: { id: string; nome: string; status: 'existing' | 'created' | 'none' } | null;
+  message: string;
+}> {
+  let entidadeId: string | undefined;
+  let entidadeStatus: 'existing' | 'created' | 'none' = 'none';
+  let entidadeNome: string | undefined;
+
+  // UNIVERSAL ENTITY AUTO-CREATION LOGIC WITH RBAC
+  // Step 1: Try to find existing entity by organization name
+  if (data.organization) {
+    const existingByName = await storage.findEntidadeByNome(data.organization, data.userId, data.userRole);
+    if (existingByName) {
+      entidadeId = existingByName.id;
+      entidadeNome = existingByName.nome;
+      entidadeStatus = 'existing';
+    }
+  }
+
+  // Step 2: If not found and we have domain, try to find by domain
+  if (!entidadeId && data.domain) {
+    const existingByDomain = await storage.findEntidadeByDomain(data.domain, data.userId, data.userRole);
+    if (existingByDomain) {
+      entidadeId = existingByDomain.id;
+      entidadeNome = existingByDomain.nome;
+      entidadeStatus = 'existing';
+    }
+  }
+
+  // Step 3: If still not found but we have clues, create new entity
+  if (!entidadeId && (data.organization || data.domain)) {
+    const entityName = data.organization || data.domain || 'Entidade Desconhecida';
+    
+    // Validate and create entity using schema validation
+    const validatedEntityData = insertEntidadeSchema.parse({
+      nome: entityName,
+      tipoEntidade: 'Outro',
+      domain: data.domain || undefined,
+      website: data.website || undefined,
+      morada: data.address || undefined,
+      createdByUserId: data.userId,
+      // assignedUserId can be set later through normal assignment flow
+      // For auto-created entities, we assign to the creator for convenience
+      assignedUserId: data.userId,
+    });
+    
+    const newEntidade = await storage.createEntidade(validatedEntityData);
+    entidadeId = newEntidade.id;
+    entidadeNome = newEntidade.nome;
+    entidadeStatus = 'created';
+  }
+
+  // Step 4: Always create contacto with validation
+  const validatedContactData = insertContactoSchema.parse({
+    nome: data.name,
+    email: data.email || undefined,
+    telemovel: data.phone || undefined,
+    funcao: data.jobTitle || undefined,
+    entidadeId: entidadeId,
+    createdByUserId: data.userId,
+  });
+  
+  const contacto = await storage.createContacto(validatedContactData);
+
+  return {
+    contacto,
+    entidade: entidadeId ? {
+      id: entidadeId,
+      nome: entidadeNome!,
+      status: entidadeStatus,
+    } : null,
+    message: entidadeStatus === 'created' 
+      ? `Contacto e entidade "${entidadeNome}" criados automaticamente`
+      : entidadeStatus === 'existing'
+      ? `Contacto criado e associado à entidade "${entidadeNome}"`
+      : "Contacto criado sem entidade associada",
+  };
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -341,6 +513,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Business Card Vision endpoint
+  app.post('/api/tools/vision-card', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole } = await getUserContext(req);
+      const { base64Image } = req.body;
+
+      if (!base64Image) {
+        return res.status(400).json({ message: "Image data is required" });
+      }
+
+      // Extract pure base64 if data URL is provided (case-insensitive)
+      let pureBase64 = base64Image;
+      if (base64Image.startsWith('data:')) {
+        const matches = base64Image.match(/^data:image\/(jpeg|jpg|png|webp|heic);base64,(.+)$/i);
+        if (!matches) {
+          return res.status(400).json({ message: "Invalid image data URL. Only JPEG, PNG, WebP, and HEIC images are supported" });
+        }
+        pureBase64 = matches[2];
+      }
+
+      // Validate base64 format (allows padding and whitespace)
+      const cleanBase64 = pureBase64.replace(/\s/g, '');
+      if (!/^[A-Za-z0-9+/]+=*$/.test(cleanBase64)) {
+        return res.status(400).json({ message: "Invalid base64 image data format" });
+      }
+
+      // Decode and validate actual binary data
+      let imageBuffer: Buffer;
+      try {
+        imageBuffer = Buffer.from(cleanBase64, 'base64');
+      } catch (error) {
+        return res.status(400).json({ message: "Failed to decode base64 image data" });
+      }
+
+      // Validate decoded size (5MB limit for safety)
+      if (imageBuffer.length > 5 * 1024 * 1024) {
+        return res.status(400).json({ message: "Image too large. Maximum decoded size is 5MB" });
+      }
+
+      // Verify actual MIME type from binary headers
+      const mimeType = getImageMimeType(imageBuffer);
+      console.log(`[Vision Card] Detected MIME type: ${mimeType}, Size: ${imageBuffer.length} bytes`);
+      
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
+      if (!mimeType || !allowedTypes.includes(mimeType)) {
+        console.warn(`[Vision Card] Rejected image with MIME: ${mimeType}`);
+        return res.status(400).json({ message: "Invalid or unsupported image format. Only JPEG, PNG, WebP, and HEIC are allowed" });
+      }
+
+      // Build proper data URL with detected MIME type for OpenAI
+      const dataUrl = `data:${mimeType};base64,${cleanBase64}`;
+      
+      // Extract data using OpenAI Vision
+      const extracted = await extractBusinessCardData(dataUrl);
+
+      // Determine name from fullName or firstName/lastName
+      const name = extracted.fullName || 
+                   (extracted.firstName && extracted.lastName ? `${extracted.firstName} ${extracted.lastName}` : "") ||
+                   extracted.firstName || 
+                   extracted.lastName || "";
+
+      if (!name) {
+        return res.status(400).json({ message: "Could not extract contact name from business card" });
+      }
+
+      // Extract domain from email or website (same logic as vCard)
+      let domain: string | undefined;
+      if (extracted.email && extracted.email.includes('@')) {
+        const emailDomain = extracted.email.split('@')[1].toLowerCase();
+        const genericProviders = ['gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com', 'icloud.com', 'live.com', 'aol.com', 'protonmail.com'];
+        if (!genericProviders.includes(emailDomain)) {
+          domain = emailDomain;
+        }
+      }
+
+      if (!domain && extracted.website) {
+        try {
+          const url = extracted.website.startsWith('http') ? extracted.website : `https://${extracted.website}`;
+          const urlObj = new URL(url);
+          domain = urlObj.hostname.replace(/^www\./, '').toLowerCase();
+        } catch (e) {
+          // Invalid URL, ignore
+        }
+      }
+
+      // Use universal auto-creation logic with RBAC
+      const result = await createContactWithUniversalLogic({
+        name,
+        organization: extracted.organization,
+        email: extracted.email,
+        phone: extracted.phone,
+        jobTitle: extracted.jobTitle,
+        address: extracted.address,
+        website: extracted.website,
+        domain,
+        userId,
+        userRole,
+      });
+
+      // Return comprehensive response including extracted data
+      res.json({
+        ...result,
+        extracted: {
+          fullName: name,
+          jobTitle: extracted.jobTitle,
+          organization: extracted.organization,
+          email: extracted.email,
+          phone: extracted.phone,
+          website: extracted.website,
+          address: extracted.address,
+          socialLinks: {
+            linkedin: extracted.linkedin,
+            instagram: extracted.instagram,
+            facebook: extracted.facebook,
+            twitter: extracted.twitter,
+          }
+        },
+      });
+    } catch (error) {
+      console.error("Error processing business card:", error);
+      res.status(500).json({ message: "Failed to process business card image" });
+    }
+  });
+
   // vCard import endpoint with universal entity auto-creation
   app.post('/api/tools/vcard-import', isAuthenticated, async (req: any, res) => {
     try {
@@ -351,71 +647,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Contact name is required" });
       }
 
-      let entidadeId: string | undefined;
-      let entidadeStatus: 'existing' | 'created' | 'none' = 'none';
-      let entidadeNome: string | undefined;
-
-      // UNIVERSAL ENTITY AUTO-CREATION LOGIC
-      // Step 1: Try to find existing entity by organization name
-      if (organization) {
-        const existingByName = await storage.findEntidadeByNome(organization, userId, userRole);
-        if (existingByName) {
-          entidadeId = existingByName.id;
-          entidadeNome = existingByName.nome;
-          entidadeStatus = 'existing';
-        }
-      }
-
-      // Step 2: If not found and we have domain, try to find by domain
-      if (!entidadeId && domain) {
-        const existingByDomain = await storage.findEntidadeByDomain(domain, userId, userRole);
-        if (existingByDomain) {
-          entidadeId = existingByDomain.id;
-          entidadeNome = existingByDomain.nome;
-          entidadeStatus = 'existing';
-        }
-      }
-
-      // Step 3: If still not found but we have clues, create new entity
-      if (!entidadeId && (organization || domain)) {
-        const entityName = organization || domain || 'Entidade Desconhecida';
-        const newEntidade = await storage.createEntidade({
-          nome: entityName,
-          tipoEntidade: 'Outro',
-          domain: domain || undefined,
-          website: url || undefined,
-          createdByUserId: userId,
-          assignedUserId: userId,
-        });
-        entidadeId = newEntidade.id;
-        entidadeNome = newEntidade.nome;
-        entidadeStatus = 'created';
-      }
-
-      // Step 4: Always create contacto
-      const contacto = await storage.createContacto({
-        nome: name,
-        email: email || undefined,
-        telemovel: phone || undefined,
-        funcao: title || undefined,
-        entidadeId: entidadeId,
-        createdByUserId: userId,
+      // Use universal auto-creation logic with RBAC
+      const result = await createContactWithUniversalLogic({
+        name,
+        organization,
+        email,
+        phone,
+        jobTitle: title,
+        address,
+        website: url,
+        domain,
+        userId,
+        userRole,
       });
 
-      // Return comprehensive response
-      res.json({
-        contacto,
-        entidade: entidadeId ? {
-          id: entidadeId,
-          nome: entidadeNome,
-          status: entidadeStatus,
-        } : null,
-        message: entidadeStatus === 'created' 
-          ? `Contacto e entidade "${entidadeNome}" criados automaticamente`
-          : entidadeStatus === 'existing'
-          ? `Contacto criado e associado à entidade "${entidadeNome}"`
-          : "Contacto criado sem entidade associada",
-      });
+      res.json(result);
     } catch (error) {
       console.error("Error importing vCard:", error);
       res.status(500).json({ message: "Failed to import vCard" });

@@ -34,6 +34,80 @@ export async function transcribeAudio(audioFilePath: string): Promise<{ text: st
   }
 }
 
+export interface BusinessCardData {
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
+  jobTitle?: string;
+  organization?: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  address?: string;
+  linkedin?: string;
+  instagram?: string;
+  facebook?: string;
+  twitter?: string;
+}
+
+export async function extractBusinessCardData(imageDataUrl: string): Promise<BusinessCardData> {
+  if (!openai) {
+    console.warn("OpenAI not configured. Skipping business card extraction.");
+    throw new Error("OpenAI API key not configured");
+  }
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert at extracting structured data from business cards. Extract all visible contact information accurately. Return empty string for missing fields.`
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Extract all contact information from this business card image and return it in JSON format with these fields: fullName, firstName, lastName, jobTitle, organization, email, phone, website, address, linkedin, instagram, facebook, twitter. Use empty strings for missing fields."
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: imageDataUrl // Accept full data URL with correct MIME type
+              }
+            }
+          ]
+        }
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 1000
+    });
+
+    const result = response.choices[0].message.content;
+    const parsedData = JSON.parse(result || "{}");
+    
+    return {
+      fullName: parsedData.fullName || parsedData.full_name || "",
+      firstName: parsedData.firstName || parsedData.first_name || "",
+      lastName: parsedData.lastName || parsedData.last_name || "",
+      jobTitle: parsedData.jobTitle || parsedData.job_title || "",
+      organization: parsedData.organization || parsedData.company || parsedData.company_name || "",
+      email: parsedData.email || "",
+      phone: parsedData.phone || parsedData.phone_number || "",
+      website: parsedData.website || parsedData.url || "",
+      address: parsedData.address || "",
+      linkedin: parsedData.linkedin || "",
+      instagram: parsedData.instagram || "",
+      facebook: parsedData.facebook || "",
+      twitter: parsedData.twitter || parsedData.x || ""
+    };
+  } catch (error) {
+    console.error("Error extracting business card data:", error);
+    throw new Error("Failed to extract business card data");
+  }
+}
+
 export async function generateVisitSummary(data: {
   notas?: string;
   transcricaoAudio?: string;

@@ -4,12 +4,12 @@ import QrScanner from "qr-scanner";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
-import { Flashlight, FlashlightOff, X, Copy, Search, CheckCircle2 } from "lucide-react";
+import { Flashlight, FlashlightOff, X, Copy, Search, CheckCircle2, Camera, QrCode, CreditCard } from "lucide-react";
 import { parseVCard, isVCard } from "@/lib/vcardParser";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { ContactCreationDialog } from "@/components/ContactCreationDialog";
-import { queueVCardImport, getPendingVCardImports, updateVCardImportStatus, deleteVCardImport } from "@/lib/offlineQueue";
+import { queueVCardImport, queueVisionCardImport, getPendingVCardImports, updateVCardImportStatus, deleteVCardImport, getDeadVCardImports, clearDeadVCardImports, retryDeadVCardImport } from "@/lib/offlineQueue";
 
 export default function QRScanner() {
   const [, setLocation] = useLocation();
@@ -25,6 +25,9 @@ export default function QRScanner() {
   const [isProcessing, setIsProcessing] = useState(false);
   const lastScanTime = useRef<number>(0);
   
+  // Scanner mode
+  const [scannerMode, setScannerMode] = useState<'qr' | 'businesscard'>('qr');
+  
   // Contact creation dialog state
   const [showContactDialog, setShowContactDialog] = useState(false);
   const [pendingContact, setPendingContact] = useState<{
@@ -32,9 +35,28 @@ export default function QRScanner() {
     name: string;
   } | null>(null);
 
+  // Business card capture state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Offline sync state
   const [isSyncing, setIsSyncing] = useState(false);
   const prevOnlineStatus = useRef<boolean | null>(null);
+
+  // Dead queue state
+  const [deadItemsCount, setDeadItemsCount] = useState(0);
+
+  // Check for dead items periodically
+  useEffect(() => {
+    const checkDeadItems = async () => {
+      const deadItems = await getDeadVCardImports();
+      setDeadItemsCount(deadItems.length);
+    };
+
+    checkDeadItems();
+    const interval = setInterval(checkDeadItems, 5000); // Check every 5 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Auto-sync when connection is restored OR on initial mount if online
   useEffect(() => {
@@ -70,7 +92,14 @@ export default function QRScanner() {
         try {
           await updateVCardImportStatus(item.id, 'syncing');
 
-          const res = await apiRequest("POST", "/api/tools/vcard-import", item.vcardData);
+          let res: Response;
+          if (item.type === 'vcard' && item.vcardData) {
+            res = await apiRequest("POST", "/api/tools/vcard-import", item.vcardData);
+          } else if (item.type === 'vision' && item.visionData) {
+            res = await apiRequest("POST", "/api/tools/vision-card", item.visionData);
+          } else {
+            throw new Error("Invalid queue item type");
+          }
 
           if (!res.ok) {
             throw new Error("Failed to import");
@@ -79,7 +108,7 @@ export default function QRScanner() {
           await deleteVCardImport(item.id);
           successCount++;
         } catch (error) {
-          console.error("Error syncing vCard:", error);
+          console.error("Error syncing item:", error);
           await updateVCardImportStatus(item.id, 'failed', String(error));
           failCount++;
         }
@@ -514,6 +543,115 @@ export default function QRScanner() {
     setLocation(`/contactos/${pendingContact.id}`);
   };
 
+  // Business card handlers
+  const handleBusinessCardCapture = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const processBusinessCardImage = async (file: File) => {
+    setIsProcessing(true);
+
+    try {
+      // Convert file to base64
+      const reader = new FileReader();
+      
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onload = () => {
+          const result = reader.result as string;
+          // Extract base64 data (remove data:image/...;base64, prefix)
+          const base64 = result.split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+      });
+
+      reader.readAsDataURL(file);
+      const base64Image = await base64Promise;
+
+      // If offline, queue the import
+      if (!isOnline) {
+        await queueVisionCardImport(base64Image);
+
+        toast({
+          title: "Em fila",
+          description: "Cartão guardado. Será processado quando recuperar a ligação.",
+        });
+
+        setIsProcessing(false);
+        return;
+      }
+
+      // Process with Vision API
+      const res = await apiRequest("POST", "/api/tools/vision-card", {
+        base64Image,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: "Failed to process business card" }));
+        toast({
+          title: "Erro ao processar",
+          description: errorData.message || "Erro ao processar cartão de visita.",
+          variant: "destructive",
+        });
+        setIsProcessing(false);
+        return;
+      }
+
+      const response = await res.json() as {
+        contacto: { id: string };
+        entidade: {
+          id: string;
+          nome: string;
+          status: 'existing' | 'created' | 'none';
+        } | null;
+        extracted: any;
+        message: string;
+      };
+
+      // Invalidate caches
+      await queryClient.invalidateQueries({ queryKey: ["/api/contactos"] });
+      if (response.entidade) {
+        await queryClient.invalidateQueries({ queryKey: ["/api/entidades"] });
+      }
+
+      // Show appropriate toast
+      toast({
+        title: response.entidade?.status === 'created' ? "Criados automaticamente" : "Contacto criado",
+        description: response.message,
+      });
+
+      // If contact was created without entity, show dialog
+      if (!response.entidade) {
+        setPendingContact({
+          id: response.contacto.id,
+          name: response.extracted.fullName || "Contacto",
+        });
+        setShowContactDialog(true);
+        setIsProcessing(false);
+      } else {
+        // Navigate to contact detail
+        setLocation(`/contactos/${response.contacto.id}`);
+      }
+    } catch (error) {
+      console.error("Error processing business card:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao processar cartão de visita.",
+        variant: "destructive",
+      });
+      setIsProcessing(false);
+    }
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      processBusinessCardImage(file);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col">
       {/* Video container */}
@@ -542,33 +680,73 @@ export default function QRScanner() {
       </div>
 
       {/* Controls */}
-      <div className="absolute top-4 left-4 right-4 flex justify-between items-center gap-2">
-        <Button
-          size="icon"
-          variant="secondary"
-          onClick={() => setLocation("/")}
-          data-testid="button-close-scanner"
-          className="bg-black/50 backdrop-blur-sm hover:bg-black/70"
-        >
-          <X className="w-5 h-5" />
-        </Button>
-
-        {hasFlash && (
+      <div className="absolute top-4 left-4 right-4 space-y-3">
+        {/* Top row: close and flash */}
+        <div className="flex justify-between items-center gap-2">
           <Button
             size="icon"
             variant="secondary"
-            onClick={toggleFlash}
-            data-testid="button-toggle-flash"
+            onClick={() => setLocation("/")}
+            data-testid="button-close-scanner"
             className="bg-black/50 backdrop-blur-sm hover:bg-black/70"
           >
-            {flashOn ? (
-              <Flashlight className="w-5 h-5 text-yellow-400" />
-            ) : (
-              <FlashlightOff className="w-5 h-5" />
-            )}
+            <X className="w-5 h-5" />
           </Button>
-        )}
+
+          {hasFlash && scannerMode === 'qr' && (
+            <Button
+              size="icon"
+              variant="secondary"
+              onClick={toggleFlash}
+              data-testid="button-toggle-flash"
+              className="bg-black/50 backdrop-blur-sm hover:bg-black/70"
+            >
+              {flashOn ? (
+                <Flashlight className="w-5 h-5 text-yellow-400" />
+              ) : (
+                <FlashlightOff className="w-5 h-5" />
+              )}
+            </Button>
+          )}
+        </div>
+
+        {/* Mode switcher */}
+        <div className="flex gap-2">
+          <Button
+            variant={scannerMode === 'qr' ? 'default' : 'secondary'}
+            onClick={() => setScannerMode('qr')}
+            data-testid="button-mode-qr"
+            className="flex-1 bg-black/50 backdrop-blur-sm hover:bg-black/70"
+          >
+            <QrCode className="w-4 h-4 mr-2" />
+            Código QR
+          </Button>
+          <Button
+            variant={scannerMode === 'businesscard' ? 'default' : 'secondary'}
+            onClick={() => {
+              setScannerMode('businesscard');
+              handleBusinessCardCapture();
+            }}
+            disabled={isProcessing}
+            data-testid="button-mode-businesscard"
+            className="flex-1 bg-black/50 backdrop-blur-sm hover:bg-black/70"
+          >
+            <CreditCard className="w-4 h-4 mr-2" />
+            Cartão de Visita
+          </Button>
+        </div>
       </div>
+
+      {/* Hidden file input for business card */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleFileChange}
+        className="hidden"
+        data-testid="input-businesscard-file"
+      />
 
       {/* Scanning status */}
       {isScanning && (
@@ -638,6 +816,75 @@ export default function QRScanner() {
         onAssociateLater={handleAssociateLater}
         onKeepWithoutEntity={handleKeepWithoutEntity}
       />
+
+      {/* Dead queue notification */}
+      {deadItemsCount > 0 && !isProcessing && !scannedResult && (
+        <Card className="absolute bottom-4 left-4 right-4 p-4 bg-destructive/10 backdrop-blur-sm border-destructive/50">
+          <div className="space-y-3">
+            <div>
+              <h3 className="font-semibold text-destructive mb-1">Importações falhadas</h3>
+              <p className="text-sm text-muted-foreground">
+                {deadItemsCount} cartão(ões) falharam após 3 tentativas. Pode tentar novamente ou limpar.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={async () => {
+                  try {
+                    const deadItems = await getDeadVCardImports();
+                    
+                    // Reset all dead items to pending
+                    for (const item of deadItems) {
+                      await retryDeadVCardImport(item.id);
+                    }
+                    
+                    toast({
+                      title: "A tentar novamente",
+                      description: `${deadItems.length} cartão(ões) marcado(s) para nova tentativa.`,
+                    });
+                    
+                    // Immediately trigger sync if online
+                    if (isOnline) {
+                      await syncOfflineQueue();
+                    }
+                    
+                    // Refresh dead items count after sync
+                    const updatedDeadItems = await getDeadVCardImports();
+                    setDeadItemsCount(updatedDeadItems.length);
+                  } catch (error) {
+                    console.error("Error retrying dead items:", error);
+                    toast({
+                      title: "Erro",
+                      description: "Não foi possível tentar novamente. Tente mais tarde.",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+                variant="outline"
+                className="flex-1"
+                data-testid="button-retry-dead"
+              >
+                Tentar Novamente
+              </Button>
+              <Button
+                onClick={async () => {
+                  const count = await clearDeadVCardImports();
+                  setDeadItemsCount(0);
+                  toast({
+                    title: "Limpeza concluída",
+                    description: `${count} cartão(ões) falhado(s) removido(s).`,
+                  });
+                }}
+                variant="destructive"
+                className="flex-1"
+                data-testid="button-clear-dead"
+              >
+                Limpar
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

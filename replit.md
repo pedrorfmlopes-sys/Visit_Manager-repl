@@ -39,6 +39,11 @@ Relationships are managed via foreign keys, and data integrity is maintained wit
 - **Advanced Analytics**: RBAC-aware analytics dashboard providing key performance indicators (KPIs) and visualizations for visits, tasks, entities, and brands, with filtering capabilities.
 - **Multi-Agent System with RBAC**: Granular control over data access based on user roles (Admin/Agent), ensuring agents only access their owned or assigned data across entities, contacts, visits, and tasks.
 - **Universal Entidades System**: Migration from a "Gabinetes"-only model to a flexible "Entidades" system supporting various business entity types.
+- **Universal Contact Recognition Module**: Comprehensive contact import system with three methods:
+  1. **QR Code Scanner**: Scans QR codes containing vCard data
+  2. **vCard Parser**: Imports .vcf files with full vCard 3.0/4.0 support
+  3. **Business Card Vision Scanner**: AI-powered extraction from business card photos using OpenAI gpt-4o vision API
+  All three methods utilize universal auto-creation logic that intelligently matches or creates entities based on organization name and domain, with full RBAC enforcement and offline queue support.
 
 ## External Dependencies
 
