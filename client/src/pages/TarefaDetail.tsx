@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, Calendar, Trash2, Edit, Download, CheckCircle2, Circle, Building2, FileText } from "lucide-react";
+import { ArrowLeft, Calendar, Trash2, Edit, Download, CheckCircle2, Circle, Building2, FileText, Send, CheckCheck } from "lucide-react";
+import { SiMicrosoftoffice } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,15 +14,55 @@ import { pt } from "date-fns/locale";
 import { isUnauthorizedError } from "@/lib/errors";
 import { exportTarefaAsICS } from "@/lib/icsExport";
 import { RichTextViewer } from "@/components/RichTextViewer";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useState } from "react";
+import { Separator } from "@/components/ui/separator";
 
 export default function TarefaDetail() {
   const [, setLocation] = useLocation();
   const [, params] = useRoute("/tarefas/:id");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [showPlannerDialog, setShowPlannerDialog] = useState(false);
+  const [selectedGroupId, setSelectedGroupId] = useState<string>("");
+  const [selectedPlanId, setSelectedPlanId] = useState<string>("");
+  const [selectedBucketId, setSelectedBucketId] = useState<string>("");
 
   const { data: tarefa, isLoading } = useQuery<TarefaWithRelations>({
     queryKey: ["/api/tarefas", params?.id],
+  });
+
+  const { data: msStatus } = useQuery<{ authenticated: boolean }>({
+    queryKey: ["/api/microsoft/auth/status"],
+  });
+
+  const { data: groups = [] } = useQuery<Array<{ id: string; displayName: string }>>({
+    queryKey: ["/api/microsoft/planner/groups"],
+    enabled: showPlannerDialog && !!msStatus?.authenticated,
+  });
+
+  const { data: plans = [] } = useQuery<Array<{ id: string; title: string }>>({
+    queryKey: ["/api/microsoft/planner/plans", selectedGroupId],
+    enabled: !!selectedGroupId && showPlannerDialog,
+  });
+
+  const { data: buckets = [] } = useQuery<Array<{ id: string; name: string }>>({
+    queryKey: ["/api/microsoft/planner/buckets", selectedPlanId],
+    enabled: !!selectedPlanId && showPlannerDialog,
   });
 
   const deleteMutation = useMutation({
@@ -71,6 +112,53 @@ export default function TarefaDetail() {
     },
   });
 
+  const exportToPlannerMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedPlanId || !selectedBucketId) {
+        throw new Error("Selecione um plano e bucket");
+      }
+      await apiRequest("POST", `/api/microsoft/planner/export/${params?.id}`, {
+        planId: selectedPlanId,
+        bucketId: selectedBucketId,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tarefas", params?.id] });
+      setShowPlannerDialog(false);
+      toast({
+        title: "Sucesso",
+        description: "Tarefa exportada para o Microsoft Planner",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Não foi possível exportar para o Planner",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const exportToTodoMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", `/api/microsoft/todo/export/${params?.id}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tarefas", params?.id] });
+      toast({
+        title: "Sucesso",
+        description: "Tarefa exportada para o Microsoft To-Do",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Não foi possível exportar para o To-Do",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleExportICS = () => {
     if (!tarefa) return;
     try {
@@ -86,6 +174,30 @@ export default function TarefaDetail() {
         variant: "destructive",
       });
     }
+  };
+
+  const handlePlannerExport = () => {
+    if (!msStatus?.authenticated) {
+      toast({
+        title: "Autenticação Necessária",
+        description: "Faça login no Microsoft 365 em Integrações",
+        variant: "destructive",
+      });
+      return;
+    }
+    setShowPlannerDialog(true);
+  };
+
+  const handleTodoExport = () => {
+    if (!msStatus?.authenticated) {
+      toast({
+        title: "Autenticação Necessária",
+        description: "Faça login no Microsoft 365 em Integrações",
+        variant: "destructive",
+      });
+      return;
+    }
+    exportToTodoMutation.mutate();
   };
 
   if (isLoading) {
@@ -169,6 +281,18 @@ export default function TarefaDetail() {
                  tarefa.repeatInterval === 'weekly' ? 'Semanal' : ''}
               </Badge>
             )}
+            {tarefa.plannerTaskId && (
+              <Badge variant="secondary" className="gap-1" data-testid="badge-planner">
+                <CheckCheck className="h-3 w-3" />
+                Exportada para Planner
+              </Badge>
+            )}
+            {tarefa.todoTaskId && (
+              <Badge variant="secondary" className="gap-1" data-testid="badge-todo">
+                <CheckCheck className="h-3 w-3" />
+                Exportada para To-Do
+              </Badge>
+            )}
           </div>
 
           <div className="space-y-3 text-sm">
@@ -221,7 +345,158 @@ export default function TarefaDetail() {
             </div>
           </Card>
         )}
+
+        {msStatus?.authenticated && (
+          <Card className="p-6" data-testid="card-microsoft-export">
+            <div className="flex items-center gap-2 mb-4">
+              <SiMicrosoftoffice className="h-5 w-5 text-blue-600" />
+              <h3 className="font-semibold">Exportações Microsoft 365</h3>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Exporte esta tarefa para as suas ferramentas Microsoft
+            </p>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="font-medium text-sm">Microsoft Planner</p>
+                  <p className="text-xs text-muted-foreground">
+                    {tarefa.plannerTaskId 
+                      ? `Exportada em ${format(new Date(tarefa.lastPlannerSyncAt!), "PP", { locale: pt })}`
+                      : "Não exportada"}
+                  </p>
+                </div>
+                <Button
+                  variant={tarefa.plannerTaskId ? "outline" : "default"}
+                  size="sm"
+                  onClick={handlePlannerExport}
+                  disabled={exportToPlannerMutation.isPending}
+                  data-testid="button-export-planner"
+                >
+                  {exportToPlannerMutation.isPending ? (
+                    "A exportar..."
+                  ) : tarefa.plannerTaskId ? (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Exportar novamente
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Exportar
+                    </>
+                  )}
+                </Button>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="font-medium text-sm">Microsoft To-Do</p>
+                  <p className="text-xs text-muted-foreground">
+                    {tarefa.todoTaskId 
+                      ? `Exportada em ${format(new Date(tarefa.lastTodoSyncAt!), "PP", { locale: pt })}`
+                      : "Não exportada"}
+                  </p>
+                </div>
+                <Button
+                  variant={tarefa.todoTaskId ? "outline" : "default"}
+                  size="sm"
+                  onClick={handleTodoExport}
+                  disabled={exportToTodoMutation.isPending}
+                  data-testid="button-export-todo"
+                >
+                  {exportToTodoMutation.isPending ? (
+                    "A exportar..."
+                  ) : tarefa.todoTaskId ? (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Exportar novamente
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Exportar
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </Card>
+        )}
       </main>
+
+      <Dialog open={showPlannerDialog} onOpenChange={setShowPlannerDialog}>
+        <DialogContent data-testid="dialog-planner-export">
+          <DialogHeader>
+            <DialogTitle>Exportar para Microsoft Planner</DialogTitle>
+            <DialogDescription>
+              Selecione o grupo, plano e bucket onde deseja criar a tarefa
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Grupo</label>
+              <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
+                <SelectTrigger data-testid="select-group">
+                  <SelectValue placeholder="Selecione um grupo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {groups.map((group) => (
+                    <SelectItem key={group.id} value={group.id}>
+                      {group.displayName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {selectedGroupId && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Plano</label>
+                <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
+                  <SelectTrigger data-testid="select-plan">
+                    <SelectValue placeholder="Selecione um plano" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {plans.map((plan) => (
+                      <SelectItem key={plan.id} value={plan.id}>
+                        {plan.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {selectedPlanId && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Bucket</label>
+                <Select value={selectedBucketId} onValueChange={setSelectedBucketId}>
+                  <SelectTrigger data-testid="select-bucket">
+                    <SelectValue placeholder="Selecione um bucket" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {buckets.map((bucket) => (
+                      <SelectItem key={bucket.id} value={bucket.id}>
+                        {bucket.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPlannerDialog(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => exportToPlannerMutation.mutate()}
+              disabled={!selectedBucketId || exportToPlannerMutation.isPending}
+              data-testid="button-confirm-export"
+            >
+              {exportToPlannerMutation.isPending ? "A exportar..." : "Exportar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
