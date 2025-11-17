@@ -72,6 +72,16 @@ export interface IStorage {
   createTarefa(tarefa: InsertTarefa): Promise<Tarefa>;
   updateTarefa(id: string, tarefa: Partial<InsertTarefa>, userId?: string, userRole?: 'admin' | 'agent'): Promise<Tarefa | undefined>;
   deleteTarefa(id: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void>;
+  getTarefasByVisitaId(visitaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<TarefaWithRelations[]>;
+  getTarefasByEntidadeId(entidadeId: string, userId: string, userRole: 'admin' | 'agent'): Promise<TarefaWithRelations[]>;
+  getTarefasInPeriod(startDate: Date, endDate: Date, userId: string, userRole: 'admin' | 'agent'): Promise<TarefaWithRelations[]>;
+  
+  // Visitas helpers
+  getVisitasByEntidade(entidadeId: string, userId: string, userRole: 'admin' | 'agent'): Promise<VisitaWithRelations[]>;
+  getVisitasInPeriod(startDate: Date, endDate: Date, userId: string, userRole: 'admin' | 'agent'): Promise<VisitaWithRelations[]>;
+  
+  // Entidades helpers
+  getAllEntidades(userId: string, userRole: 'admin' | 'agent'): Promise<EntidadeWithRelations[]>;
   
   // Marcas
   getMarcas(): Promise<Marca[]>;
@@ -648,6 +658,134 @@ export class DatabaseStorage implements IStorage {
       : eq(tarefas.id, id);
     
     await db.delete(tarefas).where(whereClause);
+  }
+
+  async getTarefasByVisitaId(visitaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<TarefaWithRelations[]> {
+    // SQL-level filtering with RBAC
+    const baseQuery = db.select().from(tarefas)
+      .where(eq(tarefas.visitaId, visitaId));
+    
+    const whereClause = userRole === 'agent'
+      ? and(
+          eq(tarefas.visitaId, visitaId),
+          or(
+            eq(tarefas.createdByUserId, userId),
+            eq(tarefas.assignedUserId, userId)
+          )
+        )
+      : eq(tarefas.visitaId, visitaId);
+    
+    const results = await db.select().from(tarefas)
+      .leftJoin(entidades, eq(tarefas.entidadeId, entidades.id))
+      .where(whereClause)
+      .orderBy(desc(tarefas.createdAt));
+    
+    return results.map(row => ({
+      ...row.tarefas,
+      entidade: row.entidades || undefined,
+    }));
+  }
+
+  async getTarefasByEntidadeId(entidadeId: string, userId: string, userRole: 'admin' | 'agent'): Promise<TarefaWithRelations[]> {
+    // SQL-level filtering with RBAC
+    const whereClause = userRole === 'agent'
+      ? and(
+          eq(tarefas.entidadeId, entidadeId),
+          or(
+            eq(tarefas.createdByUserId, userId),
+            eq(tarefas.assignedUserId, userId)
+          )
+        )
+      : eq(tarefas.entidadeId, entidadeId);
+    
+    const results = await db.select().from(tarefas)
+      .leftJoin(entidades, eq(tarefas.entidadeId, entidades.id))
+      .where(whereClause)
+      .orderBy(desc(tarefas.createdAt));
+    
+    return results.map(row => ({
+      ...row.tarefas,
+      entidade: row.entidades || undefined,
+    }));
+  }
+
+  async getTarefasInPeriod(startDate: Date, endDate: Date, userId: string, userRole: 'admin' | 'agent'): Promise<TarefaWithRelations[]> {
+    // SQL-level filtering with RBAC and date range
+    const whereClause = userRole === 'agent'
+      ? and(
+          or(
+            eq(tarefas.createdByUserId, userId),
+            eq(tarefas.assignedUserId, userId)
+          ),
+          sql`${tarefas.dueDate} >= ${startDate}`,
+          sql`${tarefas.dueDate} <= ${endDate}`
+        )
+      : and(
+          sql`${tarefas.dueDate} >= ${startDate}`,
+          sql`${tarefas.dueDate} <= ${endDate}`
+        );
+    
+    const results = await db.select().from(tarefas)
+      .leftJoin(entidades, eq(tarefas.entidadeId, entidades.id))
+      .where(whereClause)
+      .orderBy(desc(tarefas.dueDate));
+    
+    return results.map(row => ({
+      ...row.tarefas,
+      entidade: row.entidades || undefined,
+    }));
+  }
+
+  async getVisitasByEntidade(entidadeId: string, userId: string, userRole: 'admin' | 'agent'): Promise<VisitaWithRelations[]> {
+    // SQL-level filtering with RBAC
+    const whereClause = userRole === 'agent'
+      ? and(
+          or(eq(visitas.gabineteId, entidadeId), eq(visitas.entidadeId, entidadeId)),
+          eq(visitas.createdByUserId, userId)
+        )
+      : or(eq(visitas.gabineteId, entidadeId), eq(visitas.entidadeId, entidadeId));
+    
+    const results = await db.select().from(visitas)
+      .leftJoin(entidades, eq(visitas.entidadeId, entidades.id))
+      .leftJoin(gabinetes, eq(visitas.gabineteId, gabinetes.id))
+      .where(whereClause)
+      .orderBy(desc(visitas.dataVisita));
+    
+    return results.map(row => ({
+      ...row.visitas,
+      entidade: row.entidades || undefined,
+      gabinete: row.gabinetes || undefined,
+    }));
+  }
+
+  async getVisitasInPeriod(startDate: Date, endDate: Date, userId: string, userRole: 'admin' | 'agent'): Promise<VisitaWithRelations[]> {
+    // SQL-level filtering with RBAC and date range
+    const whereClause = userRole === 'agent'
+      ? and(
+          eq(visitas.createdByUserId, userId),
+          sql`${visitas.dataVisita} >= ${startDate}`,
+          sql`${visitas.dataVisita} <= ${endDate}`
+        )
+      : and(
+          sql`${visitas.dataVisita} >= ${startDate}`,
+          sql`${visitas.dataVisita} <= ${endDate}`
+        );
+    
+    const results = await db.select().from(visitas)
+      .leftJoin(entidades, eq(visitas.entidadeId, entidades.id))
+      .leftJoin(gabinetes, eq(visitas.gabineteId, gabinetes.id))
+      .where(whereClause)
+      .orderBy(desc(visitas.dataVisita));
+    
+    return results.map(row => ({
+      ...row.visitas,
+      entidade: row.entidades || undefined,
+      gabinete: row.gabinetes || undefined,
+    }));
+  }
+
+  async getAllEntidades(userId: string, userRole: 'admin' | 'agent'): Promise<EntidadeWithRelations[]> {
+    return this.getEntidades(userId, userRole);
   }
 
   async updateTarefaMicrosoftFields(
