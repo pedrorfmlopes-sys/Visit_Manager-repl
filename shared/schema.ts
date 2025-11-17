@@ -126,7 +126,7 @@ export const entidades = pgTable("entidades", {
   latitude: varchar("latitude", { length: 50 }),
   longitude: varchar("longitude", { length: 50 }),
   nif: varchar("nif", { length: 50 }),
-  // Enrichment fields (from Clearbit/AI)
+  // Enrichment fields (from PT-Intelligent Search / AI)
   logoUrl: varchar("logo_url", { length: 500 }),
   domain: varchar("domain", { length: 255 }),
   industry: varchar("industry", { length: 255 }),
@@ -138,7 +138,7 @@ export const entidades = pgTable("entidades", {
   xUrl: varchar("x_url", { length: 500 }),
   // Enrichment metadata
   lastEnrichedAt: timestamp("last_enriched_at"),
-  enrichmentSource: varchar("enrichment_source", { length: 50 }), // 'clearbit', 'ai', 'combined'
+  enrichmentSource: varchar("enrichment_source", { length: 50 }), // 'fuzzy', 'webscan', 'ai', 'combined', 'none'
   pendingEnrichment: boolean("pending_enrichment").default(false),
   // User Ownership Fields (nullable during migration, will be made required later)
   createdByUserId: varchar("created_by_user_id", { length: 255 }),

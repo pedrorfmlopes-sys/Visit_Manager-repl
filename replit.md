@@ -45,6 +45,11 @@ Relationships are managed via foreign keys, and data integrity is maintained wit
   2. **vCard Parser**: Imports .vcf files with full vCard 3.0/4.0 support
   3. **Business Card Vision Scanner**: AI-powered extraction from business card photos using OpenAI gpt-4o vision API
   All three methods utilize universal auto-creation logic that intelligently matches or creates entities based on organization name and domain, with full RBAC enforcement and offline queue support.
+- **PT-Intelligent Search Module**: Portugal-first company enrichment system replacing legacy Clearbit integration with three-stage intelligent search:
+  1. **IA-Normalizer**: GPT-4o-mini generates normalized variants of Portuguese company names (singular/plural, abbreviations, full names, common misspellings) to improve matching accuracy
+  2. **Fuzzy Match Engine**: Multi-algorithm matching against local database using weighted scoring: 50% Jaro-Winkler (sequential similarity), 30% Damerau-Levenshtein with transpositions (edit distance), 20% Metaphone-PT (Portuguese phonetic matching). Threshold ≥0.60 for matches.
+  3. **PT-WebScan Finder**: AI-powered online search triggered when best local match scores <0.80. Uses GPT-4o-mini to search for Portuguese companies, extract structured data (nome, telefone, morada, email, website, cidade), and return enrichment results.
+  Endpoint: `POST /api/enrichment/pt-intelligent-search` with full RBAC enforcement. Returns `PTEnrichmentResult` with `fuzzyMatches[]`, `webScanData`, and `enrichmentSource` ('fuzzy', 'webscan', 'combined', 'none'). Frontend integration via `PTCompanySearch` component (replaces `CompanyAutocomplete`) with debounced suggestions, `fillEntityForm` utility for universal auto-fill, and manual enrichment button in `EntidadeDetail`. Includes comprehensive offline queue support with automatic sync when connection restored via `syncPTEnrichmentQueue()` integrated in `App.tsx`. Legacy Clearbit functions deprecated but kept for backwards compatibility.
 - **Intelligent Reminder System**: Proactive reminder engine generating three types of notifications:
   1. **Visit Follow-ups**: Automatically suggests follow-up visits 7 days after the last visit to an entity
   2. **Overdue Tasks**: Alerts users about pending tasks past their due date

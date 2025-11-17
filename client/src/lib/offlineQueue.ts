@@ -27,10 +27,8 @@ interface EnrichmentQueueItem {
   timestamp: number;
   entityId: string;
   enrichmentData: {
-    name: string;
-    domain?: string;
-    website?: string;
-    visionText?: string;
+    nome: string;
+    existingEntityId?: string;
   };
   status: 'pending' | 'syncing' | 'completed' | 'failed' | 'dead';
   error?: string;
@@ -367,4 +365,95 @@ export async function retryDeadEnrichmentRequest(id: string): Promise<void> {
     // Reinsert with updated status
     await database.add('enrichmentQueue', retriedItem);
   }
+}
+
+// ============================================
+// PT-INTELLIGENT SEARCH SYNC FUNCTION
+// ============================================
+
+/**
+ * Sync pending PT enrichment requests when online
+ * Call this function when the app detects online connection
+ * Returns { success: number, failed: number }
+ */
+export async function syncPTEnrichmentQueue(): Promise<{ success: number; failed: number }> {
+  const pending = await getPendingEnrichmentRequests();
+  
+  if (pending.length === 0) {
+    return { success: 0, failed: 0 };
+  }
+  
+  console.log(`[PT Enrichment Sync] Processing ${pending.length} pending enrichment(s)`);
+  
+  let successCount = 0;
+  let failCount = 0;
+  
+  for (const item of pending) {
+    try {
+      await updateEnrichmentRequestStatus(item.id, 'syncing');
+      
+      // Call PT-Intelligent Search endpoint
+      const response = await fetch('/api/enrichment/pt-intelligent-search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(item.enrichmentData),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const enrichmentResult = await response.json();
+      
+      // Only update entity if we got valid enrichment data
+      if (enrichmentResult && enrichmentResult.enrichmentSource !== 'none') {
+        // Apply enrichment to entity
+        const updateResponse = await fetch(`/api/entidades/${item.entityId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            lastEnrichedAt: new Date().toISOString(),
+            enrichmentSource: enrichmentResult.enrichmentSource,
+            ...(enrichmentResult.fuzzyMatches?.[0] && {
+              website: enrichmentResult.fuzzyMatches[0].website,
+              telefone: enrichmentResult.fuzzyMatches[0].telefone,
+              morada: enrichmentResult.fuzzyMatches[0].morada,
+              cidade: enrichmentResult.fuzzyMatches[0].cidade,
+              email: enrichmentResult.fuzzyMatches[0].email,
+              nif: enrichmentResult.fuzzyMatches[0].nif,
+            }),
+            ...(enrichmentResult.webScanData && {
+              website: enrichmentResult.webScanData.website || undefined,
+              telefone: enrichmentResult.webScanData.telefone || undefined,
+              morada: enrichmentResult.webScanData.morada || undefined,
+              email: enrichmentResult.webScanData.email || undefined,
+            }),
+          }),
+        });
+        
+        if (!updateResponse.ok) {
+          throw new Error('Failed to update entity with enrichment data');
+        }
+      }
+      
+      await updateEnrichmentRequestStatus(item.id, 'completed');
+      successCount++;
+    } catch (error) {
+      console.error(`[PT Enrichment Sync] Error syncing item ${item.id}:`, error);
+      await updateEnrichmentRequestStatus(
+        item.id,
+        'failed',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+      failCount++;
+    }
+  }
+  
+  console.log(`[PT Enrichment Sync] Complete: ${successCount} success, ${failCount} failed`);
+  
+  return { success: successCount, failed: failCount };
 }

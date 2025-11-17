@@ -78,85 +78,27 @@ export interface EnrichedEntityData {
 }
 
 // ============================================
-// CLEARBIT INTEGRATION
+// DEPRECATED CLEARBIT INTEGRATION
+// Legacy functions kept for backwards compatibility only
+// All enrichment now uses PT-Intelligent Search (enrichmentPT.ts)
 // ============================================
 
 /**
- * Query Clearbit's free autocomplete API with timeout
- * Returns company data including logo, description, domain, etc.
+ * @deprecated Use PT-Intelligent Search instead (enrichmentPT.ts)
+ * Legacy function kept for backwards compatibility
  */
 async function queryClearbit(query: string): Promise<ClearbitResult | null> {
-  try {
-    const encodedQuery = encodeURIComponent(query);
-    const url = `https://autocomplete.clearbit.com/v1/companies/suggest?query=${encodedQuery}`;
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
-    
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; CommercialVisitsPWA/1.0)',
-      },
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      console.warn(`[Clearbit] API returned ${response.status} for query: ${query}`);
-      return null;
-    }
-    
-    const results = await response.json() as Array<{
-      name: string;
-      domain: string;
-      logo?: string;
-    }>;
-    
-    if (!results || results.length === 0) {
-      console.log(`[Clearbit] No results for: ${query}`);
-      return null;
-    }
-    
-    // Return best match (first result)
-    const match = results[0];
-    
-    return {
-      name: match.name,
-      domain: match.domain,
-      logo: match.logo || `https://logo.clearbit.com/${match.domain}`,
-      url: `https://${match.domain}`,
-    };
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      console.warn(`[Clearbit] API timeout for query: ${query}`);
-    } else {
-      console.error('[Clearbit] API error:', error);
-    }
-    return null;
-  }
+  console.log('[Enrichment] Clearbit integration deprecated - use PT-Intelligent Search');
+  return null;
 }
 
 /**
- * Legacy function for backwards compatibility
+ * @deprecated Use PT-Intelligent Search instead (enrichmentPT.ts)
+ * Legacy function kept for backwards compatibility
  */
 export async function fetchClearbitAutocomplete(query: string): Promise<ClearbitCompany[]> {
-  try {
-    const response = await fetch(
-      `https://autocomplete.clearbit.com/v1/companies/suggest?query=${encodeURIComponent(query)}`
-    );
-    
-    if (!response.ok) {
-      console.error('[Clearbit] API error:', response.status);
-      return [];
-    }
-    
-    const results = await response.json() as ClearbitCompany[];
-    return results;
-  } catch (error) {
-    console.error('[Clearbit] Autocomplete error:', error);
-    return [];
-  }
+  console.log('[Enrichment] Clearbit autocomplete deprecated - use PT-Intelligent Search');
+  return [];
 }
 
 // ============================================
@@ -256,7 +198,8 @@ Only include fields you can confidently extract or infer. Return empty object {}
 }
 
 /**
- * Legacy function for backwards compatibility
+ * @deprecated Use PT-Intelligent Search instead (enrichmentPT.ts)
+ * Legacy function kept for backwards compatibility
  */
 export async function enrichEntityWithAI(
   entityName: string,
@@ -414,11 +357,9 @@ export function validateNIF(nif: string): { valid: boolean; formatted?: string; 
 // ============================================
 
 /**
- * Full enrichment pipeline:
- * 1. Try Clearbit autocomplete
- * 2. Fall back to AI if Clearbit fails or returns partial data
- * 3. Merge results
- * 4. Normalize URLs and generate logo
+ * @deprecated Use PT-Intelligent Search instead (enrichmentPT.ts)
+ * Legacy enrichment pipeline kept for backwards compatibility
+ * Now uses AI-only enrichment (Clearbit removed)
  */
 export async function enrichEntity(input: EnrichmentInput): Promise<EnrichmentResult>;
 export async function enrichEntity(name: string, clearbitDomain?: string): Promise<EnrichedEntityData>;
@@ -426,6 +367,8 @@ export async function enrichEntity(
   inputOrName: EnrichmentInput | string,
   clearbitDomain?: string
 ): Promise<EnrichmentResult | EnrichedEntityData> {
+  console.log('[Enrichment] Legacy enrichment deprecated - use PT-Intelligent Search (enrichmentPT.ts)');
+  
   // Legacy signature support
   if (typeof inputOrName === 'string') {
     const enrichedData: EnrichedEntityData = {
@@ -435,80 +378,45 @@ export async function enrichEntity(
     if (clearbitDomain) {
       enrichedData.domain = clearbitDomain;
       enrichedData.website = `https://${clearbitDomain}`;
-      enrichedData.logoUrl = `https://logo.clearbit.com/${clearbitDomain}`;
     }
     
     const aiEnriched = await enrichEntityWithAI(inputOrName, enrichedData);
     return aiEnriched;
   }
   
-  // New comprehensive implementation
+  // New implementation - AI only
   const input = inputOrName;
-  console.log(`[Enrichment] Starting enrichment for: ${input.name}`);
   
   // Skip enrichment for personal emails
   if (input.domain && isPersonalEmailDomain(input.domain)) {
-    console.log(`[Enrichment] Skipping personal email domain: ${input.domain}`);
     return {
       enrichmentSource: 'none',
     };
   }
   
-  let clearbitData: ClearbitResult | null = null;
-  let aiData: AIEnrichmentResult = {};
+  // Use AI enrichment only
+  const aiData = await enrichWithAI(input);
   
-  // Step 1: Try Clearbit
-  const searchQuery = input.domain || input.name;
-  clearbitData = await queryClearbit(searchQuery);
-  
-  // Step 2: Determine if we need AI fallback
-  const needsAIEnrichment =
-    !clearbitData ||
-    !clearbitData.description ||
-    !clearbitData.industry;
-  
-  if (needsAIEnrichment) {
-    console.log('[Enrichment] Running AI fallback enrichment');
-    aiData = await enrichWithAI(input);
-  }
-  
-  // Step 3: Merge results
-  const domain = clearbitData?.domain || input.domain || extractDomainFromUrl(input.website || '');
-  const website = input.website || clearbitData?.url || aiData.website;
+  // Merge results
+  const domain = input.domain || extractDomainFromUrl(input.website || '');
+  const website = input.website || aiData.website;
   
   const result: EnrichmentResult = {
-    name: clearbitData?.name || input.name,
+    name: input.name,
     domain: domain || undefined,
     website: website || undefined,
-    logoUrl: clearbitData?.logo || (domain ? `https://logo.clearbit.com/${domain}` : undefined),
-    description: clearbitData?.description || aiData.description,
-    industry: clearbitData?.industry || aiData.industry,
+    logoUrl: undefined,
+    description: aiData.description,
+    industry: aiData.industry,
     linkedinUrl: aiData.linkedinUrl,
     facebookUrl: aiData.facebookUrl,
     instagramUrl: aiData.instagramUrl,
     xUrl: aiData.xUrl,
     telefone: aiData.phone,
     morada: aiData.address,
-    enrichmentSource: determineEnrichmentSource(clearbitData, aiData),
+    enrichmentSource: Object.keys(aiData).length > 0 ? 'ai' : 'none',
   };
-  
-  console.log(`[Enrichment] Complete. Source: ${result.enrichmentSource}`);
   
   return result;
 }
 
-/**
- * Determine which enrichment source(s) provided data
- */
-function determineEnrichmentSource(
-  clearbitData: ClearbitResult | null,
-  aiData: AIEnrichmentResult
-): 'clearbit' | 'ai' | 'combined' | 'none' {
-  const hasClearbit = clearbitData && Object.keys(clearbitData).length > 0;
-  const hasAI = Object.keys(aiData).length > 0;
-  
-  if (hasClearbit && hasAI) return 'combined';
-  if (hasClearbit) return 'clearbit';
-  if (hasAI) return 'ai';
-  return 'none';
-}

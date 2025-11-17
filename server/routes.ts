@@ -876,7 +876,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Entity enrichment endpoint with Clearbit + AI fallback
+  // @deprecated Legacy enrichment endpoint (use PT-Intelligent Search instead)
+  // Kept for backwards compatibility only
   app.post('/api/enrichment/full', isAuthenticated, async (req: any, res) => {
     try {
       const { userId, userRole } = await getUserContext(req);
@@ -1503,7 +1504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Entity Enrichment Endpoints
-  // POST /api/enrichment/autocomplete - Clearbit company autocomplete
+  // @deprecated Legacy autocomplete endpoint (use PT-Intelligent Search instead)
   app.post('/api/enrichment/autocomplete', isAuthenticated, async (req, res) => {
     try {
       const { query } = req.body;

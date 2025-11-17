@@ -5,6 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
+/**
+ * @deprecated Legacy autocomplete component (use PTCompanySearch instead)
+ * This component is kept for backwards compatibility only
+ * All new implementations should use PTCompanySearch from @/components/PTCompanySearch
+ */
+
 interface ClearbitCompany {
   name: string;
   domain: string;
@@ -19,6 +25,9 @@ interface CompanyAutocompleteProps {
   disabled?: boolean;
 }
 
+/**
+ * @deprecated Use PTCompanySearch instead
+ */
 export function CompanyAutocomplete({
   value,
   onChange,

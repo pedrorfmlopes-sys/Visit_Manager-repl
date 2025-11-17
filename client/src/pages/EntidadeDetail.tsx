@@ -128,7 +128,7 @@ export default function EntidadeDetail() {
     },
   });
 
-  // Legacy Clearbit enrichment mutation (deprecated)
+  // @deprecated Legacy enrichment mutation (use ptEnrichMutation instead)
   const enrichMutation = useMutation({
     mutationFn: async () => {
       if (!entidadeId) throw new Error("Entity ID is required");

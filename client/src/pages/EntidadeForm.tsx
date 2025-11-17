@@ -253,9 +253,10 @@ export default function EntidadeForm() {
     }
   };
 
+  // @deprecated Legacy autocomplete handler (use handlePTCompanySelect instead)
   const handleCompanySelect = async (company: { name: string; domain: string; logo: string }) => {
     form.setValue("domain", company.domain);
-    form.setValue("logoUrl", `https://logo.clearbit.com/${company.domain}`);
+    form.setValue("logoUrl", undefined);
     form.setValue("website", `https://${company.domain}`);
     
     if (!isOnline) {
@@ -279,7 +280,6 @@ export default function EntidadeForm() {
         const enrichedData = await response.json();
         
         // Auto-fill additional fields from AI enrichment
-        // (website, domain, logoUrl already set from Clearbit above)
         if (enrichedData.email) form.setValue("email", enrichedData.email);
         if (enrichedData.telefone) form.setValue("telefone", enrichedData.telefone);
         if (enrichedData.morada) form.setValue("morada", enrichedData.morada);
@@ -296,7 +296,7 @@ export default function EntidadeForm() {
           description: `Informações de ${company.name} preenchidas automaticamente.`,
         });
       } else {
-        // Enrichment failed, but we still have basic Clearbit data
+        // Enrichment failed
         toast({
           title: "Dados básicos preenchidos",
           description: "Enriquecimento adicional falhou, mas informações básicas foram preenchidas.",
@@ -304,7 +304,6 @@ export default function EntidadeForm() {
       }
     } catch (error) {
       console.error('[Enrichment] Error:', error);
-      // Still show success for basic Clearbit data
       toast({
         title: "Dados básicos preenchidos",
         description: "Informações básicas da empresa foram preenchidas.",

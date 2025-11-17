@@ -7,7 +7,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { BottomNav } from "@/components/BottomNav";
 import { SyncIndicator } from "@/components/SyncIndicator";
 import { offlineStorage } from "@/lib/offlineStorage";
-import { useEffect } from "react";
+import { syncPTEnrichmentQueue } from "@/lib/offlineQueue";
+import { useEffect, useRef, useState } from "react";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
@@ -83,10 +84,40 @@ function Router() {
 
 function AppContent() {
   const { isAuthenticated } = useAuth();
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const prevOnlineStatus = useRef<boolean | null>(null);
 
   useEffect(() => {
     offlineStorage.init().catch(console.error);
   }, []);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isOnline && prevOnlineStatus.current === false && isAuthenticated) {
+      console.log('[App] Connection restored, syncing PT enrichment queue...');
+      syncPTEnrichmentQueue()
+        .then(({ success, failed }) => {
+          if (success > 0 || failed > 0) {
+            console.log(`[App] PT Enrichment sync complete: ${success} success, ${failed} failed`);
+            queryClient.invalidateQueries({ queryKey: ['/api/entidades'] });
+          }
+        })
+        .catch(console.error);
+    }
+    prevOnlineStatus.current = isOnline;
+  }, [isOnline, isAuthenticated]);
 
   return (
     <div className="relative">
