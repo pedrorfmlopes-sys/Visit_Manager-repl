@@ -335,9 +335,13 @@ export async function ptIntelligentSearch(
     const allVariants = [normalized, ...variantsResult.variants];
     
     console.log(`[PT-Search] Generated ${allVariants.length} normalized variants (including base)`);
+    console.log(`[PT-Search] Variants:`, allVariants);
     
     const allEntidades = await storage.getEntidades(userId, userRole);
     const allContactos = await storage.getContactos(userId, userRole);
+    
+    console.log(`[PT-Search] Found ${allEntidades.length} entities in database`);
+    console.log(`[PT-Search] First 5 entity names:`, allEntidades.slice(0, 5).map(e => e.nome));
     
     const fuzzyMatches: FuzzyMatch[] = [];
     
@@ -347,6 +351,8 @@ export async function ptIntelligentSearch(
       }
       
       const score = calculateMaxFuzzyScore(allVariants, entidade.nome);
+      
+      console.log(`[PT-Search] Comparing "${nome}" with "${entidade.nome}": score=${score.toFixed(3)}`);
       
       if (score >= 0.60) {
         fuzzyMatches.push({
