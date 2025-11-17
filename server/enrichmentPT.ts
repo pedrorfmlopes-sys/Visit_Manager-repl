@@ -30,6 +30,8 @@ export interface IANormalizerResult {
 export interface PTWebScanResult {
   nomeOficial?: string;
   morada?: string;
+  cidade?: string;
+  codigoPostal?: string;
   telefone?: string;
   email?: string;
   website?: string;
@@ -257,7 +259,9 @@ export async function ptWebScanFinder(nome: string): Promise<PTWebScanResult> {
 Devolve um objeto JSON com:
 {
   "nomeOficial": "Nome oficial completo da empresa",
-  "morada": "Morada completa",
+  "morada": "Apenas rua e número (ex: 'Rua da Indústria, 123' ou 'Av. da República, 45, 1º')",
+  "cidade": "Apenas nome da cidade (ex: 'Porto', 'Lisboa')",
+  "codigoPostal": "Código postal português no formato 1234-567",
   "email": "Email geral da empresa",
   "telefone": "Número de telefone",
   "website": "URL do website",
@@ -269,6 +273,11 @@ Devolve um objeto JSON com:
   "nif": "NIF se estiver publicamente disponível",
   "industry": "Setor/indústria (ex: Construção, Arquitetura)"
 }
+
+IMPORTANTE: Separa sempre a morada completa em três campos:
+- "morada": Apenas rua e número (pode incluir andar/fração)
+- "cidade": Apenas nome da cidade
+- "codigoPostal": Código postal no formato XXXX-XXX
 
 Apenas inclui campos que conseguires encontrar com certeza. Se não encontrares informação, devolve apenas os campos que tiveres.`;
 

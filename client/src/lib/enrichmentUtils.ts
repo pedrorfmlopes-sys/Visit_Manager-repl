@@ -18,6 +18,8 @@ export interface WebScanData {
   domain?: string;
   website?: string;
   morada?: string;
+  cidade?: string;
+  codigoPostal?: string;
   telefone?: string;
   email?: string;
   logoUrl?: string;
@@ -72,10 +74,16 @@ export function fillEntityForm(
   setFieldIfEmpty('domain', dataSource.domain);
   setFieldIfEmpty('website', dataSource.website);
   
-  const parsedAddress = parsePortugueseAddress(dataSource.morada);
-  setFieldIfEmpty('morada', parsedAddress.morada);
-  setFieldIfEmpty('codigoPostal', parsedAddress.codigoPostal);
-  setFieldIfEmpty('cidade', parsedAddress.cidade);
+  if ('cidade' in dataSource && dataSource.cidade) {
+    setFieldIfEmpty('morada', dataSource.morada);
+    setFieldIfEmpty('cidade', dataSource.cidade);
+    setFieldIfEmpty('codigoPostal', dataSource.codigoPostal);
+  } else {
+    const parsedAddress = parsePortugueseAddress(dataSource.morada);
+    setFieldIfEmpty('morada', parsedAddress.morada);
+    setFieldIfEmpty('codigoPostal', parsedAddress.codigoPostal);
+    setFieldIfEmpty('cidade', parsedAddress.cidade);
+  }
   
   setFieldIfEmpty('telefone', dataSource.telefone);
   setFieldIfEmpty('email', dataSource.email);
