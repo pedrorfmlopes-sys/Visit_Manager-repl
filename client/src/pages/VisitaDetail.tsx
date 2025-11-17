@@ -30,6 +30,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 export default function VisitaDetail() {
   const [, params] = useRoute("/visitas/:id");
@@ -40,6 +42,14 @@ export default function VisitaDetail() {
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [pdfProDialogOpen, setPdfProDialogOpen] = useState(false);
+  const [pdfProOptions, setPdfProOptions] = useState({
+    includePhotos: true,
+    includeTasks: true,
+    includeIA: true,
+    includeCharts: true,
+    type: 'interno' as 'interno' | 'cliente'
+  });
   const { data: currentUser } = useCurrentUser();
   const isAdmin = useIsAdmin();
   
@@ -204,6 +214,63 @@ export default function VisitaDetail() {
       toast({
         title: "Erro",
         description: "Falha ao gerar PDF. Por favor, tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleExportPDFPro = async () => {
+    if (!visita) return;
+
+    if (!isOnline) {
+      toast({
+        title: "Offline",
+        description: "A exportação PDF PRO só está disponível quando estiver online.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const queryParams = new URLSearchParams({
+        includePhotos: pdfProOptions.includePhotos.toString(),
+        includeTasks: pdfProOptions.includeTasks.toString(),
+        includeIA: pdfProOptions.includeIA.toString(),
+        includeCharts: pdfProOptions.includeCharts.toString(),
+        type: pdfProOptions.type
+      });
+
+      const response = await fetch(`/api/pdf/visita/${visitaId}/pro?${queryParams}`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF PRO');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      
+      const fileName = `Visita-PRO-${visita.gabinete?.nome || visita.entidade?.nome || visita.id}-${format(new Date(visita.dataVisita), 'yyyy-MM-dd')}.pdf`;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Exportado",
+        description: "Relatório PDF PRO descarregado com sucesso!",
+      });
+      setPdfProDialogOpen(false);
+    } catch (error) {
+      console.error('Error downloading PDF PRO:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao gerar PDF PRO. Por favor, tente novamente.",
         variant: "destructive",
       });
     }
@@ -558,6 +625,15 @@ export default function VisitaDetail() {
             Exportar PDF
           </Button>
           <Button
+            variant="default"
+            onClick={() => setPdfProDialogOpen(true)}
+            disabled={!isOnline || !visita}
+            data-testid="button-export-pdf-pro"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            PDF PRO
+          </Button>
+          <Button
             variant="outline"
             onClick={() => setEmailDialogOpen(true)}
             data-testid="button-generate-email"
@@ -727,6 +803,96 @@ export default function VisitaDetail() {
         visitaId={visitaId ? parseInt(visitaId) : undefined}
         defaultTemplate="followup_pos_visita"
       />
+
+      <Dialog open={pdfProDialogOpen} onOpenChange={setPdfProDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Exportar PDF PRO</DialogTitle>
+            <CardDescription>Configure as opções do relatório profissional</CardDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="pdf-photos" className="flex flex-col gap-1">
+                <span>Incluir Fotos</span>
+                <span className="text-sm text-muted-foreground">Adicionar imagens ao relatório</span>
+              </Label>
+              <Switch
+                id="pdf-photos"
+                checked={pdfProOptions.includePhotos}
+                onCheckedChange={(checked) => setPdfProOptions(prev => ({ ...prev, includePhotos: checked }))}
+                data-testid="switch-pdf-photos"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="pdf-tasks" className="flex flex-col gap-1">
+                <span>Incluir Tarefas</span>
+                <span className="text-sm text-muted-foreground">Listar tarefas relacionadas</span>
+              </Label>
+              <Switch
+                id="pdf-tasks"
+                checked={pdfProOptions.includeTasks}
+                onCheckedChange={(checked) => setPdfProOptions(prev => ({ ...prev, includeTasks: checked }))}
+                data-testid="switch-pdf-tasks"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="pdf-ia" className="flex flex-col gap-1">
+                <span>Resumo IA</span>
+                <span className="text-sm text-muted-foreground">Gerar sumário inteligente</span>
+              </Label>
+              <Switch
+                id="pdf-ia"
+                checked={pdfProOptions.includeIA}
+                onCheckedChange={(checked) => setPdfProOptions(prev => ({ ...prev, includeIA: checked }))}
+                data-testid="switch-pdf-ia"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="pdf-charts" className="flex flex-col gap-1">
+                <span>Gráficos</span>
+                <span className="text-sm text-muted-foreground">Incluir visualizações</span>
+              </Label>
+              <Switch
+                id="pdf-charts"
+                checked={pdfProOptions.includeCharts}
+                onCheckedChange={(checked) => setPdfProOptions(prev => ({ ...prev, includeCharts: checked }))}
+                data-testid="switch-pdf-charts"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pdf-type">Tipo de Relatório</Label>
+              <Select 
+                value={pdfProOptions.type} 
+                onValueChange={(value: 'interno' | 'cliente') => setPdfProOptions(prev => ({ ...prev, type: value }))}
+              >
+                <SelectTrigger id="pdf-type" data-testid="select-pdf-type">
+                  <SelectValue placeholder="Selecione o tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="interno">Interno (completo)</SelectItem>
+                  <SelectItem value="cliente">Cliente (simplificado)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setPdfProDialogOpen(false)}
+              data-testid="button-pdf-pro-cancel"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleExportPDFPro}
+              data-testid="button-pdf-pro-export"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Exportar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

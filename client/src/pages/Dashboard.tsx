@@ -1,12 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Building2, Users, FileText, Package, Calendar, LogOut, BarChart, Link2 } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { Building2, Users, FileText, Package, Calendar, LogOut, BarChart, Link2, Download } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useToast } from "@/hooks/use-toast";
 import type { VisitaWithRelations } from "@shared/schema";
 
 interface DashboardStats {
@@ -21,6 +24,8 @@ interface DashboardStats {
 export default function Dashboard() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const isAdmin = useIsAdmin();
+  const { toast } = useToast();
   
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard"],
@@ -28,6 +33,42 @@ export default function Dashboard() {
 
   const handleLogout = () => {
     window.location.href = "/api/logout";
+  };
+
+  const handleDownloadReport = async (reportType: 'monthly' | 'weekly', scope: 'agent' | 'company') => {
+    try {
+      const response = await fetch(`/api/pdf/reports/${reportType}/${scope}`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate report');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const fileName = `Relatorio-${reportType === 'monthly' ? 'Mensal' : 'Semanal'}-${scope === 'company' ? 'Empresa' : 'Pessoal'}-${new Date().toISOString().split('T')[0]}.pdf`;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Relatório Exportado",
+        description: "PDF descarregado com sucesso!",
+      });
+    } catch (error) {
+      console.error('Error downloading report:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao gerar relatório. Tente novamente.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -131,6 +172,64 @@ export default function Dashboard() {
                 </div>
                 <div className="text-muted-foreground">→</div>
               </div>
+            </Card>
+
+            <Card data-testid="card-reports">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Download className="h-5 w-5" />
+                  Relatórios PDF PRO
+                </CardTitle>
+                <CardDescription>Exporte relatórios detalhados com gráficos e análise IA</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownloadReport('monthly', 'agent')}
+                    data-testid="button-report-monthly-agent"
+                  >
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Mensal
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownloadReport('weekly', 'agent')}
+                    data-testid="button-report-weekly-agent"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Semanal
+                  </Button>
+                </div>
+                {isAdmin && (
+                  <>
+                    <Separator />
+                    <p className="text-sm text-muted-foreground">Relatórios da Empresa (Admin)</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownloadReport('monthly', 'company')}
+                        data-testid="button-report-monthly-company"
+                      >
+                        <Building2 className="h-4 w-4 mr-2" />
+                        Mensal Empresa
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownloadReport('weekly', 'company')}
+                        data-testid="button-report-weekly-company"
+                      >
+                        <BarChart className="h-4 w-4 mr-2" />
+                        Semanal Empresa
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </CardContent>
             </Card>
 
             {stats.marcasMaisEntregues.length > 0 && (
