@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, Calendar, Trash2, Edit, Download, CheckCircle2, Circle, Building2, FileText, Send, CheckCheck } from "lucide-react";
-import { SiMicrosoftoffice } from "react-icons/si";
+import { ArrowLeft, Calendar, Trash2, Edit, Download, CheckCircle2, Circle, Building2, FileText, Send, CheckCheck, Cloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -185,6 +184,9 @@ export default function TarefaDetail() {
       });
       return;
     }
+    setSelectedGroupId("");
+    setSelectedPlanId("");
+    setSelectedBucketId("");
     setShowPlannerDialog(true);
   };
 
@@ -349,7 +351,7 @@ export default function TarefaDetail() {
         {msStatus?.authenticated && (
           <Card className="p-6" data-testid="card-microsoft-export">
             <div className="flex items-center gap-2 mb-4">
-              <SiMicrosoftoffice className="h-5 w-5 text-blue-600" />
+              <Cloud className="h-5 w-5 text-blue-600" />
               <h3 className="font-semibold">Exportações Microsoft 365</h3>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
@@ -435,7 +437,11 @@ export default function TarefaDetail() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Grupo</label>
-              <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
+              <Select value={selectedGroupId} onValueChange={(value) => {
+                setSelectedGroupId(value);
+                setSelectedPlanId("");
+                setSelectedBucketId("");
+              }}>
                 <SelectTrigger data-testid="select-group">
                   <SelectValue placeholder="Selecione um grupo" />
                 </SelectTrigger>
@@ -451,7 +457,10 @@ export default function TarefaDetail() {
             {selectedGroupId && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">Plano</label>
-                <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
+                <Select value={selectedPlanId} onValueChange={(value) => {
+                  setSelectedPlanId(value);
+                  setSelectedBucketId("");
+                }}>
                   <SelectTrigger data-testid="select-plan">
                     <SelectValue placeholder="Selecione um plano" />
                   </SelectTrigger>

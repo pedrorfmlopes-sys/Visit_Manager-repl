@@ -21,17 +21,19 @@ import { RichTextEditor } from "@/components/RichTextEditor";
 
 export default function TarefaForm() {
   const [, setLocation] = useLocation();
-  const [, params] = useRoute("/tarefas/:id");
+  const [, editParams] = useRoute("/tarefas/:id/editar");
+  const [, createParams] = useRoute("/tarefas/nova");
+  const tarefaId = editParams?.id;
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isOnline = useOnlineStatus();
   const { data: currentUser } = useCurrentUser();
   const { data: allUsers = [] } = useAllUsers();
   const isAdmin = useIsAdmin();
-  const isEdit = params?.id && params.id !== "nova";
+  const isEdit = !!tarefaId;
 
   const { data: tarefa } = useQuery<Tarefa>({
-    queryKey: ["/api/tarefas", params?.id],
+    queryKey: ["/api/tarefas", tarefaId],
     enabled: !!isEdit,
   });
 
@@ -98,16 +100,16 @@ export default function TarefaForm() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: InsertTarefa) => {
-      await apiRequest("PATCH", `/api/tarefas/${params?.id}`, data);
+      await apiRequest("PATCH", `/api/tarefas/${tarefaId}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tarefas"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/tarefas", params?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tarefas", tarefaId] });
       toast({
         title: "Sucesso",
         description: "Tarefa atualizada com sucesso",
       });
-      setLocation(`/tarefas/${params?.id}`);
+      setLocation(`/tarefas/${tarefaId}`);
     },
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
@@ -124,12 +126,22 @@ export default function TarefaForm() {
   });
 
   const onSubmit = (data: InsertTarefa) => {
-    const cleanedData = {
+    let dueDateValue: string | undefined = undefined;
+    if (data.dueDate) {
+      if (data.dueDate instanceof Date) {
+        dueDateValue = data.dueDate.toISOString();
+      } else if (typeof data.dueDate === 'string') {
+        dueDateValue = new Date(data.dueDate).toISOString();
+      }
+    }
+    
+    const cleanedData: InsertTarefa = {
       ...data,
       entidadeId: data.entidadeId || undefined,
       visitaId: data.visitaId || undefined,
       assignedUserId: data.assignedUserId || undefined,
-      dueDate: data.dueDate || undefined,
+      dueDate: dueDateValue as any,
+      createdByUserId: data.createdByUserId || currentUser?.id || "",
     };
     
     if (isEdit) {
