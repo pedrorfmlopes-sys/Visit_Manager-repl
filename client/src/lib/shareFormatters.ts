@@ -7,33 +7,33 @@ import { getDeepLink } from "@/components/ShareDialog";
 export function formatContactForSharing(contacto: ContactoWithRelations): string {
   const lines: string[] = [];
   
-  lines.push(`📇 ${contacto.nome}`);
+  lines.push(`CONTACTO: ${contacto.nome}`);
   lines.push('');
   
   if (contacto.funcao) {
-    lines.push(`💼 ${contacto.funcao}`);
+    lines.push(`Função: ${contacto.funcao}`);
   }
   
   if (contacto.entidade) {
-    lines.push(`🏢 ${contacto.entidade.nome}`);
+    lines.push(`Entidade: ${contacto.entidade.nome}`);
   }
   
   if (contacto.email) {
-    lines.push(`📧 ${contacto.email}`);
+    lines.push(`Email: ${contacto.email}`);
   }
   
   if (contacto.telemovel) {
-    lines.push(`📱 ${contacto.telemovel}`);
+    lines.push(`Telemóvel: ${contacto.telemovel}`);
   }
   
   if (contacto.entidade?.website) {
-    lines.push(`🌐 ${contacto.entidade.website}`);
+    lines.push(`Website: ${contacto.entidade.website}`);
   }
   
   if (contacto.entidade?.morada) {
-    lines.push(`📍 ${contacto.entidade.morada}`);
+    lines.push(`Morada: ${contacto.entidade.morada}`);
     if (contacto.entidade.cidade || contacto.entidade.codigoPostal) {
-      lines.push(`   ${contacto.entidade.codigoPostal || ''} ${contacto.entidade.cidade || ''}`.trim());
+      lines.push(`${contacto.entidade.codigoPostal || ''} ${contacto.entidade.cidade || ''}`.trim());
     }
   }
   
@@ -46,13 +46,13 @@ export function formatContactForSharing(contacto: ContactoWithRelations): string
   
   if (socialLinks.length > 0) {
     lines.push('');
-    lines.push('🔗 Redes Sociais:');
-    socialLinks.forEach(link => lines.push(`   ${link}`));
+    lines.push('Redes Sociais:');
+    socialLinks.forEach(link => lines.push(`  ${link}`));
   }
   
   // Deep link
   lines.push('');
-  lines.push(`🔗 Ver no sistema: ${getDeepLink('contact', contacto.id)}`);
+  lines.push(`Ver no sistema: ${getDeepLink('contact', contacto.id)}`);
   
   return lines.join('\n');
 }
@@ -63,34 +63,34 @@ export function formatContactForSharing(contacto: ContactoWithRelations): string
 export function formatEntityForSharing(entidade: EntidadeWithRelations): string {
   const lines: string[] = [];
   
-  lines.push(`🏢 ${entidade.nome}`);
+  lines.push(`ENTIDADE: ${entidade.nome}`);
   lines.push('');
   
   if (entidade.descricao) {
-    lines.push(`📝 ${entidade.descricao}`);
+    lines.push(`Descrição: ${entidade.descricao}`);
     lines.push('');
   }
   
   if (entidade.industry) {
-    lines.push(`🏭 ${entidade.industry}`);
+    lines.push(`Indústria: ${entidade.industry}`);
   }
   
   if (entidade.website) {
-    lines.push(`🌐 ${entidade.website}`);
+    lines.push(`Website: ${entidade.website}`);
   }
   
   if (entidade.email) {
-    lines.push(`📧 ${entidade.email}`);
+    lines.push(`Email: ${entidade.email}`);
   }
   
   if (entidade.telefone) {
-    lines.push(`📱 ${entidade.telefone}`);
+    lines.push(`Telefone: ${entidade.telefone}`);
   }
   
   if (entidade.morada) {
-    lines.push(`📍 ${entidade.morada}`);
+    lines.push(`Morada: ${entidade.morada}`);
     if (entidade.cidade || entidade.codigoPostal) {
-      lines.push(`   ${entidade.codigoPostal || ''} ${entidade.cidade || ''}`.trim());
+      lines.push(`${entidade.codigoPostal || ''} ${entidade.cidade || ''}`.trim());
     }
   }
   
@@ -103,23 +103,23 @@ export function formatEntityForSharing(entidade: EntidadeWithRelations): string 
   
   if (socialLinks.length > 0) {
     lines.push('');
-    lines.push('🔗 Redes Sociais:');
-    socialLinks.forEach(link => lines.push(`   ${link}`));
+    lines.push('Redes Sociais:');
+    socialLinks.forEach(link => lines.push(`  ${link}`));
   }
   
   // Statistics
   if (entidade.contactos && entidade.contactos.length > 0) {
     lines.push('');
-    lines.push(`👥 ${entidade.contactos.length} contacto(s) registado(s)`);
+    lines.push(`Contactos: ${entidade.contactos.length} contacto(s) registado(s)`);
   }
   
   if (entidade.visitas && entidade.visitas.length > 0) {
-    lines.push(`📅 ${entidade.visitas.length} visita(s) realizada(s)`);
+    lines.push(`Visitas: ${entidade.visitas.length} visita(s) realizada(s)`);
   }
   
   // Deep link
   lines.push('');
-  lines.push(`🔗 Ver no sistema: ${getDeepLink('entity', entidade.id)}`);
+  lines.push(`Ver no sistema: ${getDeepLink('entity', entidade.id)}`);
   
   return lines.join('\n');
 }
@@ -130,7 +130,7 @@ export function formatEntityForSharing(entidade: EntidadeWithRelations): string 
 export function formatVisitForSharing(visita: VisitaWithRelations): string {
   const lines: string[] = [];
   
-  lines.push(`📅 VISITA - ${new Date(visita.dataVisita).toLocaleDateString('pt-PT', {
+  lines.push(`VISITA - ${new Date(visita.dataVisita).toLocaleDateString('pt-PT', {
     day: '2-digit',
     month: 'long',
     year: 'numeric'
@@ -138,13 +138,13 @@ export function formatVisitForSharing(visita: VisitaWithRelations): string {
   lines.push('');
   
   if (visita.entidade) {
-    lines.push(`🏢 Entidade: ${visita.entidade.nome}`);
+    lines.push(`Entidade: ${visita.entidade.nome}`);
   }
   
   if (visita.contacto) {
-    lines.push(`👤 Contacto: ${visita.contacto.nome}`);
+    lines.push(`Contacto: ${visita.contacto.nome}`);
     if (visita.contacto.funcao) {
-      lines.push(`   ${visita.contacto.funcao}`);
+      lines.push(`  ${visita.contacto.funcao}`);
     }
   }
   
@@ -152,37 +152,37 @@ export function formatVisitForSharing(visita: VisitaWithRelations): string {
   
   // AI Summary
   if (visita.resumoIa) {
-    lines.push('📝 RESUMO:');
+    lines.push('RESUMO:');
     lines.push(visita.resumoIa);
     lines.push('');
   }
   
   // Written notes
   if (visita.notas) {
-    lines.push('✍️ NOTAS:');
+    lines.push('NOTAS:');
     lines.push(visita.notas);
     lines.push('');
   }
   
   // Audio transcription (if available and no AI summary)
   if (!visita.resumoIa && visita.transcricaoAudio) {
-    lines.push('🎤 TRANSCRIÇÃO:');
+    lines.push('TRANSCRIÇÃO:');
     lines.push(visita.transcricaoAudio);
     lines.push('');
   }
   
   // Delivered brands
   if (visita.marcasEntregues && visita.marcasEntregues.length > 0) {
-    lines.push('📦 MARCAS ENTREGUES:');
+    lines.push('MARCAS ENTREGUES:');
     visita.marcasEntregues.forEach(marca => {
-      lines.push(`   • ${marca}`);
+      lines.push(`  • ${marca}`);
     });
     lines.push('');
   }
   
   // Next visit scheduled
   if (visita.proximaVisita) {
-    lines.push(`📅 PRÓXIMA VISITA: ${new Date(visita.proximaVisita).toLocaleDateString('pt-PT', {
+    lines.push(`PRÓXIMA VISITA: ${new Date(visita.proximaVisita).toLocaleDateString('pt-PT', {
       day: '2-digit',
       month: 'long',
       year: 'numeric'
@@ -191,7 +191,7 @@ export function formatVisitForSharing(visita: VisitaWithRelations): string {
   }
   
   // Deep link
-  lines.push(`🔗 Ver detalhes: ${getDeepLink('visit', visita.id)}`);
+  lines.push(`Ver detalhes: ${getDeepLink('visit', visita.id)}`);
   
   return lines.join('\n');
 }

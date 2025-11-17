@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Share2, MessageCircle, Mail, Copy, Link as LinkIcon, FileText, Download } from "lucide-react";
 import {
   Dialog,
@@ -71,7 +71,7 @@ export function useShareActions() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   // Update online status
-  useState(() => {
+  useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
     
@@ -82,7 +82,7 @@ export function useShareActions() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  });
+  }, []);
 
   const shareViaWhatsApp = (text: string) => {
     if (!isOnline) {
