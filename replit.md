@@ -26,6 +26,7 @@ The database uses PostgreSQL with Drizzle ORM for type-safe schema management. T
 - **Contactos**: Contacts linked to entities.
 - **Visitas**: Visit records with dates, notes, media attachments, audio transcriptions, AI summaries, and geolocation.
 - **Tarefas**: A comprehensive task management system with status, repeat intervals, and optional links to entities/visits.
+- **Lembretes**: Intelligent reminder system tracking three types: visit follow-ups (7 days after last visit), overdue tasks, and AI-suggested reminders. Fully RBAC-aware with watertight security.
 - **Marcas**: Product brands.
 - **Sessions**: For authentication state.
 Relationships are managed via foreign keys, and data integrity is maintained with timestamp tracking and JSONB fields for flexible data storage.
@@ -44,6 +45,11 @@ Relationships are managed via foreign keys, and data integrity is maintained wit
   2. **vCard Parser**: Imports .vcf files with full vCard 3.0/4.0 support
   3. **Business Card Vision Scanner**: AI-powered extraction from business card photos using OpenAI gpt-4o vision API
   All three methods utilize universal auto-creation logic that intelligently matches or creates entities based on organization name and domain, with full RBAC enforcement and offline queue support.
+- **Intelligent Reminder System**: Proactive reminder engine generating three types of notifications:
+  1. **Visit Follow-ups**: Automatically suggests follow-up visits 7 days after the last visit to an entity
+  2. **Overdue Tasks**: Alerts users about pending tasks past their due date
+  3. **AI-Suggested Reminders**: Future capability for intelligent reminder suggestions
+  Reminders are RBAC-aware with watertight security - agents see only reminders for their assigned entities and tasks. Features include snooze (1, 3, 7 days), resolve, and reminder banners integrated into entity and visit detail pages. Real-time badge counts in navigation bell icon.
 
 ## External Dependencies
 
