@@ -1,0 +1,303 @@
+TASK:
+Implement a complete replacement for the Clearbit-based enrichment system using a new Portugal-Optimized Company Search Engine based on:
+
+IA-Normalizer (GPT)
+
+Fuzzy Matching Engine
+
+Portuguese WebScan Finder (AI-based web search)
+
+Auto-field-population in React Hook Form
+
+Full offline + sync compatibility
+
+RBAC-safe backend
+
+No external paid APIs
+
+Full removal of Clearbit without breaking existing flows
+
+This module must integrate seamlessly with:
+
+Manual Entity creation
+
+vCard import
+
+QR code scanning
+
+Business Card Vision Scanner
+
+Contact creation dialogs
+
+EntidadeDetail enrichment button
+
+Offline queue
+
+Sync manager
+
+Odoo future sync fields
+
+🔷 1) REMOVE CLEARBIT FROM THE CODEBASE (NON-BREAKING)
+
+Requirements:
+
+Remove all imports, functions, and calls to Clearbit.
+
+Maintain the same function signatures so nothing else breaks.
+
+enrichEntity must become the new unified enrichment entry point.
+
+Any Clearbit fallback logic must be removed or replaced by IA logic.
+
+Clean the code but don’t break TypeScript types already generated.
+
+🔷 2) IMPLEMENT IA-NORMALIZER
+
+When the user writes a company name:
+Example: "Joaquim e Sousa, Lda"
+
+Call GPT-4o-mini to generate a list of normalized variants:
+
+Expected Output (array of strings):
+
+[
+  "joaquim e sousa lda",
+  "joaquim & sousa lda",
+  "joaquim sousa lda",
+  "joaquim e sousa limitada",
+  "joaquim sousa",
+  "j sousa lda"
+]
+
+
+Normalization rules provided to GPT:
+
+remove punctuation
+
+remove Lda / Limitada variations
+
+replace “e” with “&” and vice versa
+
+create “short forms” (J. Sousa)
+
+lowercase all
+
+remove accents
+
+include 5–10 variants
+
+Use streaming disabled. Tiny models are fine.
+
+🔷 3) IMPLEMENT FUZZY MATCH ENGINE (LOCAL, NO API)
+
+Create a local fuzzy matching system combining:
+
+Jaro-Winkler
+
+Damerau-Levenshtein
+
+Portuguese phonetic algorithm (Metaphone PT)
+
+Steps:
+
+Normalize user input
+
+Generate variants using IA-Normalizer
+
+Generate a candidate list by searching:
+
+Known entities already in the database
+
+Known contacts’ entity names
+
+Optional: local cache of previously created entities
+
+Score each candidate:
+
+score = 0.50 * jaroWinkler + 0.30 * levenshtein + 0.20 * metaphone
+
+
+Only show results with score ≥ 0.60
+Sort descending.
+
+Output:
+
+{
+  candidate: "Joaquim Sousa & Filhos Lda",
+  score: 0.92,
+  id: "123",
+  type: "entidade"
+}
+
+🔷 4) IMPLEMENT PT-WEBSCAN FINDER (ONLINE, AI-POWERED)
+
+If fuzzy search returns no strong matches, call GPT:
+
+PROMPT:
+
+“Pesquisa online empresas portuguesas cujo nome se aproxime de ‘{nome}’.
+Devolve: nome oficial completo, morada, email geral, telefone, website, redes sociais, descrição e NIF se estiver público online.
+Formato JSON.”
+
+Model can be GPT-4o-mini.
+
+Extract:
+
+nome_oficial
+
+morada
+
+telefone
+
+email
+
+website
+
+facebookUrl
+
+linkedinUrl
+
+instagramUrl
+
+descricao
+
+logo (se tiver URL pública)
+
+nif (se detetado em website oficial)
+
+This replaces Clearbit enrichment completely.
+
+🔷 5) AUTO-FILL REACT FORM FIELDS (IMPORTANT)
+
+All enrichment flows must use a universal helper:
+
+fillEntityForm(form, enrichmentResult)
+
+This function must set:
+
+form.setValue("nome", ...)
+form.setValue("morada", ...)
+form.setValue("email", ...)
+form.setValue("telefone", ...)
+form.setValue("website", ...)
+form.setValue("nif", ...)
+form.setValue("descricao", ...)
+form.setValue("logoUrl", ...)
+form.setValue("facebookUrl", ...)
+form.setValue("linkedinUrl", ...)
+form.setValue("instagramUrl", ...)
+
+
+Only fill empty fields.
+Never overwrite user-entered values.
+
+This must be called from:
+
+Entity creation form
+
+Business card scanning flow
+
+QR scanning flow
+
+vCard import flow
+
+Manual enrichment button (“Atualizar dados da entidade”)
+
+🔷 6) OFFLINE SUPPORT + SYNC
+
+Requirements:
+
+Enrichment should queue when offline
+
+Should retry automatically when online
+
+Must not break the vCard or QR offline creation flow
+
+Temporary IDs replaced when syncing
+
+🔷 7) BACKEND CHANGES
+
+Add a new endpoint:
+
+POST /api/enrichment/pt-intelligent-search
+
+
+Parameters:
+
+nome
+
+userId (for RBAC)
+
+optional: existingEntityId
+
+Backend responsibilities:
+
+RBAC: Agents only enrich their own entities
+
+IA normalization
+
+Fuzzy matching against DB
+
+If fuzzy good → return match
+
+If fuzzy weak → run PT-WebScan (GPT)
+
+Return enriched structured data
+
+🔷 8) FRONTEND CHANGES
+
+Where to integrate new search:
+
+EntityForm (search bar)
+
+ContactForm (auto entity search)
+
+BusinessCardScan
+
+QRScan
+
+vCard Import
+
+Manual “Enriquecer com IA” button
+
+Must show:
+
+Sugestões encontradas:
+[ ] Joaquim Sousa & Filhos Lda (92%)
+[ ] Joaquim & Sousa Lda (88%)
+[ ] Joaquim Sousa Lda (84%)
+[ ] Sousa & Joaquim Unipessoal (61%)
+
+
+If user chooses one → auto-fill form.
+
+🔷 9) REMOVE CLEARBIT COMPLETELY
+
+Remove all references
+
+Remove leftover fields
+
+Remove dead code
+
+Keep schema untouched
+
+Keep Clearbit mapping functions if they’re referenced elsewhere (empty stub)
+
+🔥 FINAL OBJECTIVE
+
+Replace Clearbit with a Portugal-first company search engine, offering:
+
+fuzzy matching better than Odoo
+
+AI autofill better que Google Maps / Clearbit
+
+full enrichment sem APIs pagas
+
+completamente offline ready
+
+totalmente seguro com RBAC
+
+100% integrado no fluxo da app
+
+End of Prompt.
+Execute step-by-step and validate each module.

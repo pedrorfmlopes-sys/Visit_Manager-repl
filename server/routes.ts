@@ -6,6 +6,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { transcribeAudio, generateVisitSummary, extractBusinessCardData, generateEmailDraft } from "./openai";
 import { sendVisitEmail } from "./email";
 import { enrichEntity, type EnrichmentInput, extractDomainFromEmail, isPersonalEmailDomain } from "./enrichment";
+import { ptIntelligentSearch, type PTEnrichmentInput } from "./enrichmentPT";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -1556,6 +1557,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('[Enrichment] NIF validation error:', error);
       res.status(500).json({ message: 'NIF validation failed' });
+    }
+  });
+
+  // POST /api/enrichment/pt-intelligent-search - Portugal-optimized company search with fuzzy matching + AI WebScan
+  app.post('/api/enrichment/pt-intelligent-search', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole } = await getUserContext(req);
+      const { nome, existingEntityId, domain, website, email } = req.body;
+      
+      if (!nome || typeof nome !== 'string') {
+        return res.status(400).json({ message: 'Nome parameter required' });
+      }
+      
+      const input: PTEnrichmentInput = {
+        nome,
+        userId,
+        existingEntityId,
+        domain,
+        website,
+        email,
+      };
+      
+      const result = await ptIntelligentSearch(input, storage, userRole);
+      
+      res.json(result);
+    } catch (error) {
+      console.error('[PT-Search] Intelligent search error:', error);
+      res.status(500).json({ message: 'PT intelligent search failed' });
     }
   });
 
