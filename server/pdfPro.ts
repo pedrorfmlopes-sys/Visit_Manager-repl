@@ -1,4 +1,4 @@
-import jsPDF from "jspdf";
+import { jsPDF } from "jspdf";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
 import { pt } from "date-fns/locale";
 import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
