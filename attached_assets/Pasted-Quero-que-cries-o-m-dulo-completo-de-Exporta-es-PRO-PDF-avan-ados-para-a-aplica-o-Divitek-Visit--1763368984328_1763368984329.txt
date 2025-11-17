@@ -1,0 +1,346 @@
+Quero que cries o módulo completo de Exportações PRO (PDF avançados) para a aplicação Divitek Visit Manager, com funcionalidades de relatório profissional, múltiplos tipos de exportação, gráficos, tabelas, IA e personalização.
+
+Segue TODAS as instruções abaixo sem atalho, sem simplificação e sem assumir comportamentos não descritos.
+
+📌 1. OBJETIVO DO MÓDULO
+
+Implementar um sistema de geração de PDFs profissionais, incluindo:
+
+Relatório PDF de visita (versão PRO)
+
+Relatório PDF de entidade (completo, incluindo histórico de visitas e tarefas)
+
+Relatório PDF mensal/semanal por agente
+
+Relatório PDF para cliente (limpo, sem dados internos)
+
+Relatório PDF interno (com notas, IA, tarefas e métricas)
+
+Exportações multi-visita
+
+Exportações com gráficos
+
+Exportações com personalização de conteúdo
+
+📌 2. TIPOS DE EXPORTAÇÃO (DEVEM FICAR NAS AÇÕES DO FRONTEND)
+2.1 VISITA (PDF PRO)
+
+Adicionar no VisitaDetail:
+
+Exportar PDF PRO
+→ PDF completo com:
+
+Cabeçalho com logo da empresa (já existe no enriquecimento)
+
+Identificação completa da visita
+
+Dados da entidade
+
+Dados do contacto
+
+Notas
+
+Resumo IA
+
+Transcrição audio
+
+Marcas entregues
+
+Tarefas associadas
+
+Localização GPS
+
+Fotos e vídeos (fotos embed, vídeos como links)
+
+Gráfico de “pipeline do cliente”
+
+Tabela de histórico de visitas anteriores
+
+Secção “ações recomendadas” gerada por IA
+
+2.2 ENTIDADE (PDF PRO)
+
+No EntidadeDetail:
+
+Exportar Relatório da Entidade (PDF PRO)
+
+Conteúdo:
+
+Logo da entidade (se existir)
+
+Dados completos da entidade
+
+Dados de todos os contactos
+
+Histórico de todas as visitas → tabela
+
+Tarefas por estado → tabelas
+
+Gráficos:
+
+Visitas por mês
+
+Marcas entregues
+
+Tarefas pendentes vs concluídas
+
+Resumo IA da relação comercial (gerado na hora)
+
+Tabela de materiais entregues
+
+Imagens de visitas
+
+Secção "Próximos passos" com IA
+
+2.3 RELATÓRIOS MENSAIS/SEMANAIS
+
+Na página Dashboard:
+
+Exportar Relatório Mensal (PDF PRO)
+
+Exportar Relatório Semanal (PDF PRO)
+
+Inclui:
+
+KPIs (visitas, tarefas, entidades criadas)
+
+Ranking de agentes (admin only)
+
+Gráficos de:
+
+Visitas por período
+
+Distribuição de entidades
+
+Performance de tarefas
+
+Marcas mais utilizadas
+
+Tabela de visitas (resumo)
+
+Tabela de tarefas
+
+“Análise IA do mês” (resumo executivo profissional)
+
+📌 3. BACKEND — IMPLEMENTAÇÃO PDF PRO
+
+Criar novos endpoints:
+
+GET /api/pdf/visita/:id/pro
+GET /api/pdf/entidade/:id/pro
+GET /api/pdf/agente/:id/relatorio-mensal
+GET /api/pdf/agente/:id/relatorio-semanal
+GET /api/pdf/empresa/relatorio-mensal
+
+
+Todas as rotas devem:
+
+aplicar RBAC (admin para relatórios globais)
+
+enviar PDF como application/pdf
+
+gerar ficheiros com nomes consistentes
+
+3.1 TECNOLOGIA PDF
+
+Usar:
+
+jsPDF + NodeCanvas
+
+Suporte para:
+
+texto
+
+estilos
+
+imagens
+
+gráficos convertidos para imagem
+
+tabelas
+
+📌 4. GRÁFICOS NO PDF
+
+Implementar um utilitário:
+
+renderChartToImage(chartConfig)
+
+Usando:
+
+Chart.js + Canvas em Node
+
+exportar para PNG
+
+inserir no PDF via addImage
+
+Gráficos obrigatórios:
+
+Visitas por mês
+
+Marcas entregues
+
+Tarefas pendentes vs concluídas
+
+Evolução da entidade
+
+Histórico de interações
+
+📌 5. IA DENTRO DOS RELATÓRIOS
+
+Criar módulo interno:
+
+generatePdfAISummary(type, data)
+
+
+Produz textos profissionais:
+
+Resumo executivo
+
+Análise da relação comercial
+
+Próximos passos sugeridos
+
+Pontos críticos
+
+Oportunidades de venda
+
+Sem emojis.
+Português de Portugal.
+
+📌 6. PERSONALIZAÇÃO
+
+Criar formulário de preferências (futuro):
+
+Mas já preparar o backend para aceitar parâmetros:
+
+?includePhotos=true
+?includeTasks=true
+?includeIA=true
+?includeCharts=true
+?type=interno|cliente
+
+📌 7. OFFLINE + SYNC
+
+Se offline:
+
+mostrar toast “Exportação PRO apenas disponível online”
+
+Não guardar PDFs em cache.
+Os PDFs PRO são sempre gerados no servidor.
+
+📌 8. UI / UX (Frontend)
+
+Adicionar novos botões:
+
+No VisitaDetail:
+
+Exportar PDF (já existe)
+
+Exportar PDF PRO (novo!)
+
+No EntidadeDetail:
+
+Exportar Relatório da Entidade (PDF PRO)
+
+No Dashboard:
+
+Exportar Relatório Mensal/ Semanal
+
+Na página Tarefas:
+
+Exportar Relatório do Agente (mensal/semanal)
+
+Dialog antes da exportação:
+
+campos para escolher:
+
+período
+
+incluir fotos?
+
+incluir IA?
+
+incluir tarefas?
+
+versão interna/externa?
+
+📌 9. SEGURANÇA E RBAC
+
+Agentes: podem gerar relatórios das suas visitas/tarefas
+
+Admins: podem gerar todos os relatórios, incluindo:
+
+relatório global da equipa
+
+relatórios comparativos
+
+Se não tiver permissão → 403.
+
+📌 10. TESTES (OBRIGATÓRIO)
+
+Testar:
+
+PDF com e sem imagens
+
+PDF com IA
+
+PDF com gráficos
+
+PDF de entidade com muito histórico
+
+PDF mensal de agente
+
+PDF global admin
+
+PDF em mobile
+
+PDF com dados faltantes
+
+RBAC (agente vs admin)
+
+Exportar 20+ páginas
+
+📌 11. DOCUMENTAÇÃO
+
+Atualizar:
+
+📄 replit.md
+Com:
+
+novos endpoints
+
+exemplos de uso
+
+screenshots dos PDFs
+
+limitações
+
+guia de personalização
+
+notas de performance
+
+📌 12. ENTREGAR POR FASES
+
+Executa na ordem:
+
+Backend estrutura PDF PRO
+
+Endpoint visita PDF PRO
+
+Endpoint entidade PDF PRO
+
+Gráficos no PDF
+
+Relatórios mensais/semanal
+
+IA dentro dos PDFs
+
+UI/UX e botões
+
+RBAC final
+
+Testes completos
+
+Documentação
+
+✔ Podes iniciar.

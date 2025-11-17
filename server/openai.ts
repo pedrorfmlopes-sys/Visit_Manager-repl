@@ -11,6 +11,13 @@ const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
+export function getOpenAIClient(): OpenAI {
+  if (!openai) {
+    throw new Error('OpenAI API key not configured');
+  }
+  return openai;
+}
+
 export async function transcribeAudio(audioFilePath: string): Promise<{ text: string }> {
   if (!openai) {
     console.warn("OpenAI not configured. Skipping audio transcription.");
