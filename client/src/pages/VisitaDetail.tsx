@@ -1,17 +1,18 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles } from "lucide-react";
+import { ArrowLeft, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles, Bell } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { pt } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import type { VisitaWithRelations, Tarefa, InsertTarefa } from "@shared/schema";
+import type { VisitaWithRelations, Tarefa, InsertTarefa, Lembrete } from "@shared/schema";
 import { downloadNextVisitICS } from "@/lib/calendarExport";
 import { LocationPreview } from "@/components/LocationPreview";
 import { TarefaCard } from "@/components/TarefaCard";
@@ -53,6 +54,14 @@ export default function VisitaDetail() {
     queryKey: ["/api/tarefas"],
     select: (data) => data.filter((t) => t.visitaId === visitaId),
   });
+
+  const { data: allLembretes } = useQuery<Lembrete[]>({
+    queryKey: ['/api/lembretes'],
+  });
+
+  const visitReminders = allLembretes?.filter(l => 
+    l.entidadeId === visita?.entidadeId || l.visitaId === visitaId
+  ) || [];
 
   const tomorrow = addDays(new Date(), 1);
   
@@ -328,6 +337,29 @@ export default function VisitaDetail() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-4">
+        {/* Reminder Banner */}
+        {visitReminders.length > 0 && (
+          <Alert data-testid="alert-visit-reminders">
+            <Bell className="h-4 w-4" />
+            <AlertTitle>Existem lembretes pendentes</AlertTitle>
+            <AlertDescription className="flex items-center justify-between gap-2">
+              <span>
+                {visitReminders.length === 1 
+                  ? 'Existe um lembrete pendente para esta entidade.' 
+                  : `Existem ${visitReminders.length} lembretes pendentes para esta entidade.`}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setLocation('/lembretes')}
+                data-testid="button-view-reminders"
+              >
+                Ver Lembretes
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Card>
           <CardHeader>
             <div className="flex items-start justify-between">

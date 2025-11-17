@@ -1,11 +1,12 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, MapPin, Phone, Mail, Globe, Edit, Building2, Users, UserCircle, Calendar, Sparkles, Linkedin, Facebook, Instagram, Share2, MessageCircle, Link as LinkIcon, Copy, FileText } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, Mail, Globe, Edit, Building2, Users, UserCircle, Calendar, Sparkles, Linkedin, Facebook, Instagram, Share2, MessageCircle, Link as LinkIcon, Copy, FileText, Bell, AlertCircle } from "lucide-react";
 import { SiX } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ContactoCard } from "@/components/ContactoCard";
 import { VisitaCard } from "@/components/VisitaCard";
 import { LocationPreview } from "@/components/LocationPreview";
@@ -15,7 +16,7 @@ import { QuickActionButton } from "@/components/QuickActionButton";
 import { formatEntityForSharing } from "@/lib/shareFormatters";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { EntidadeWithRelations } from "@shared/schema";
+import type { EntidadeWithRelations, Lembrete } from "@shared/schema";
 import { useState } from "react";
 
 const tipoLabels: Record<string, string> = {
@@ -41,6 +42,12 @@ export default function EntidadeDetail() {
     queryKey: ["/api/entidades", entidadeId],
     enabled: !!entidadeId,
   });
+  
+  const { data: allLembretes } = useQuery<Lembrete[]>({
+    queryKey: ['/api/lembretes'],
+  });
+
+  const entityReminders = allLembretes?.filter(l => l.entidadeId === entidadeId) || [];
   
   // Enrichment mutation
   const enrichMutation = useMutation({
@@ -230,6 +237,29 @@ export default function EntidadeDetail() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+        {/* Reminder Banner */}
+        {entityReminders.length > 0 && (
+          <Alert data-testid="alert-entity-reminders">
+            <Bell className="h-4 w-4" />
+            <AlertTitle>Existem lembretes pendentes</AlertTitle>
+            <AlertDescription className="flex items-center justify-between gap-2">
+              <span>
+                {entityReminders.length === 1 
+                  ? 'Existe um lembrete pendente para esta entidade.' 
+                  : `Existem ${entityReminders.length} lembretes pendentes para esta entidade.`}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setLocation('/lembretes')}
+                data-testid="button-view-reminders"
+              >
+                Ver Lembretes
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Basic Information */}
         <Card>
           <CardHeader>
