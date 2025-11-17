@@ -306,6 +306,8 @@ Apenas inclui campos que conseguires encontrar com certeza. Se não encontrares 
 
     const result = JSON.parse(content) as PTWebScanResult;
     
+    console.log(`[PT-WebScan] Result for "${nome}":`, JSON.stringify(result, null, 2));
+    
     if (result.website && !result.website.startsWith('http')) {
       result.website = `https://${result.website}`;
     }
