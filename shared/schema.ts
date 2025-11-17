@@ -128,6 +128,11 @@ export const entidades = pgTable("entidades", {
   facebookUrl: varchar("facebook_url", { length: 500 }),
   twitterUrl: varchar("twitter_url", { length: 500 }),
   instagramUrl: varchar("instagram_url", { length: 500 }),
+  xUrl: varchar("x_url", { length: 500 }),
+  // Enrichment metadata
+  lastEnrichedAt: timestamp("last_enriched_at"),
+  enrichmentSource: varchar("enrichment_source", { length: 50 }), // 'clearbit', 'ai', 'combined'
+  pendingEnrichment: boolean("pending_enrichment").default(false),
   // User Ownership Fields (nullable during migration, will be made required later)
   createdByUserId: varchar("created_by_user_id", { length: 255 }),
   assignedUserId: varchar("assigned_user_id", { length: 255 }),
@@ -177,6 +182,9 @@ export const insertEntidadeSchema = createInsertSchema(entidades).omit({
   syncStatus: true,
   lastSyncAt: true,
   syncError: true,
+  lastEnrichedAt: true,
+  enrichmentSource: true,
+  pendingEnrichment: true,
 }).extend({
   // Add validation for coordinates (empty string treated as null)
   latitude: z.string().regex(/^-?([0-9]{1,2}|1[0-7][0-9]|180)(\.[0-9]+)?$/).or(z.literal("")).optional().nullable(),

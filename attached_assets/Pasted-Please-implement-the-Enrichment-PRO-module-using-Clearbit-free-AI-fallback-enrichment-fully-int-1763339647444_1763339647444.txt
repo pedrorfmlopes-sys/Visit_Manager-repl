@@ -1,0 +1,217 @@
+Please implement the Enrichment PRO module using Clearbit (free) + AI fallback enrichment, fully integrated with the existing universal entity/contact creation pipeline, offline system, and RBAC.
+
+1. When the app detects a potential company
+
+Sources that should trigger enrichment automatically:
+
+Business card Vision scan result
+
+QR code result
+
+vCard result
+
+Manual entity creation when name or domain is provided
+
+Any contact creation where email domain is business (not gmail/outlook/etc.)
+
+2. Clearbit FREE Autocomplete API
+
+Use:
+
+https://autocomplete.clearbit.com/v1/companies/suggest?query=${query}
+
+
+Return fields from the best match:
+
+name
+
+domain
+
+logo (if null → generate as https://logo.clearbit.com/${domain})
+
+description
+
+industry
+
+url (website)
+
+Handle timeouts and empty results gracefully.
+
+3. AI Fallback Enrichment
+
+If Clearbit returns partial or empty data:
+
+call OpenAI (gpt-4o-mini or similar)
+
+give it:
+
+entity name
+
+domain (if extracted)
+
+Vision OCR text (when available)
+
+website URL (if available)
+
+AI should return structured fields:
+
+{
+  "industry": "...",
+  "description": "...",
+  "website": "...",
+  "linkedinUrl": "...",
+  "facebookUrl": "...",
+  "instagramUrl": "...",
+  "xUrl": "...",
+  "phone": "...",
+  "address": "..."
+}
+
+
+All fields optional.
+
+4. Backend Implementation
+
+Add endpoint:
+
+POST /api/enrichment/full
+
+
+Body:
+
+name
+
+domain (optional)
+
+website (optional)
+
+visionText (optional)
+
+Pipeline:
+
+Try Clearbit autocomplete
+
+Merge AI fallback if missing fields
+
+Normalize domain + website
+
+Generate logo URL if missing
+
+Return unified enriched object
+
+Handle offline queue (pendingEnrichment flag)
+
+5. Entity Auto-Fill Logic
+
+When enrichment runs:
+
+auto-populate entity fields that are empty or undefined
+
+never overwrite existing user-entered values
+
+write to DB only if new info is available
+
+store:
+
+name
+
+domain
+
+website
+
+description
+
+industry
+
+logoUrl
+
+social links
+
+phone
+
+address
+
+Add fields if missing from schema.
+
+6. Manual Enrichment Button
+
+On EntidadeDetail page:
+
+Button: Atualizar Dados Automaticamente
+Behaviour:
+
+calls POST /api/enrichment/full
+
+merges updated fields
+
+shows toast about what was updated
+
+RBAC:
+
+Admin → always allowed
+
+Agent → only allowed for entities they created or are assigned to
+
+Status field:
+
+lastEnrichedAt
+
+enrichmentSource (clearbit / ai / combined)
+
+7. Offline Support
+
+If offline during enrichment:
+
+add request to IndexedDB queue
+
+mark entity as pendingEnrichment = true
+
+auto-execute when online
+
+after sync:
+
+update entity fields
+
+clear temp flag
+
+show toast to user if they are active
+
+8. Important Rules
+
+never create duplicate entities
+
+use fuzzy match for company name
+
+use domain match to merge entities
+
+do NOT enrich entities with @gmail.com / @outlook.com / @hotmail.com
+
+must be fully integrated with already existing pipeline
+
+maintain all RBAC restrictions
+
+no TypeScript errors
+
+no breaking changes
+
+9. Testing checklist
+
+Vision scan → contact + entity auto-enriched
+
+QR code with domain → enriched
+
+vCard import with ORG → enriched
+
+Manual creation with only “name” → partial enrichment
+
+Manual creation with email domain → domain enrichment
+
+Manual button → works for admin and proper agents
+
+Offline → queued + processed
+
+No duplicate entities
+
+No overwriting user-entered fields
+
+Proceed.
