@@ -10,6 +10,7 @@ import { ContactoCard } from "@/components/ContactoCard";
 import { VisitaCard } from "@/components/VisitaCard";
 import { LocationPreview } from "@/components/LocationPreview";
 import { ShareDialog, useShareActions } from "@/components/ShareDialog";
+import { QuickActionButton } from "@/components/QuickActionButton";
 import { formatEntityForSharing } from "@/lib/shareFormatters";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -106,6 +107,69 @@ export default function EntidadeDetail() {
         timestamp: new Date(entidade.createdAt || Date.now()).getTime(),
       }
     : null;
+
+  // Helper functions for quick actions
+  const handleWebsite = () => {
+    if (!isOnline) {
+      toast({
+        title: "Sem internet",
+        description: "Esta ação requer ligação à internet.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (entidade.website) {
+      window.open(entidade.website, '_blank');
+    }
+  };
+
+  const handlePhoneCall = () => {
+    if (entidade.telefone) {
+      window.location.href = `tel:${entidade.telefone}`;
+    }
+  };
+
+  const handleEmail = () => {
+    if (!isOnline) {
+      toast({
+        title: "Sem internet",
+        description: "Esta ação requer ligação à internet.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (entidade.email) {
+      window.location.href = `mailto:${entidade.email}`;
+    }
+  };
+
+  const handleMaps = () => {
+    if (!isOnline) {
+      toast({
+        title: "Sem internet",
+        description: "Esta ação requer ligação à internet.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (entidade.morada) {
+      const address = `${entidade.morada}, ${entidade.cidade || ''} ${entidade.codigoPostal || ''}`.trim();
+      const encodedAddress = encodeURIComponent(address);
+      window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, '_blank');
+    }
+  };
+
+  const handleSocialLink = (url: string) => {
+    if (!isOnline) {
+      toast({
+        title: "Sem internet",
+        description: "Esta ação requer ligação à internet.",
+        variant: "destructive",
+      });
+      return;
+    }
+    window.open(url, '_blank');
+  };
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -251,6 +315,88 @@ export default function EntidadeDetail() {
                 </div>
               </>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Quick Actions */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Ações Rápidas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {entidade.website && (
+                <QuickActionButton
+                  icon={Globe}
+                  label="Website"
+                  onClick={handleWebsite}
+                  disabled={!isOnline}
+                  testId="button-quick-website"
+                />
+              )}
+              {entidade.telefone && (
+                <QuickActionButton
+                  icon={Phone}
+                  label="Ligar"
+                  onClick={handlePhoneCall}
+                  testId="button-quick-phone"
+                />
+              )}
+              {entidade.email && (
+                <QuickActionButton
+                  icon={Mail}
+                  label="Email"
+                  onClick={handleEmail}
+                  disabled={!isOnline}
+                  testId="button-quick-email"
+                />
+              )}
+              {entidade.morada && (
+                <QuickActionButton
+                  icon={MapPin}
+                  label="Morada"
+                  onClick={handleMaps}
+                  disabled={!isOnline}
+                  testId="button-quick-maps"
+                />
+              )}
+              {entidade.linkedinUrl && (
+                <QuickActionButton
+                  icon={Linkedin}
+                  label="LinkedIn"
+                  onClick={() => handleSocialLink(entidade.linkedinUrl!)}
+                  disabled={!isOnline}
+                  testId="button-quick-linkedin"
+                />
+              )}
+              {entidade.instagramUrl && (
+                <QuickActionButton
+                  icon={Instagram}
+                  label="Instagram"
+                  onClick={() => handleSocialLink(entidade.instagramUrl!)}
+                  disabled={!isOnline}
+                  testId="button-quick-instagram"
+                />
+              )}
+              {entidade.facebookUrl && (
+                <QuickActionButton
+                  icon={Facebook}
+                  label="Facebook"
+                  onClick={() => handleSocialLink(entidade.facebookUrl!)}
+                  disabled={!isOnline}
+                  testId="button-quick-facebook"
+                />
+              )}
+              {entidade.xUrl && (
+                <QuickActionButton
+                  icon={SiX}
+                  label="X"
+                  onClick={() => handleSocialLink(entidade.xUrl!)}
+                  disabled={!isOnline}
+                  testId="button-quick-x"
+                />
+              )}
+            </div>
           </CardContent>
         </Card>
 

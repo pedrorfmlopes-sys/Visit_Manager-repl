@@ -1,9 +1,9 @@
 import { Button } from "@/components/ui/button";
-import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { ComponentType } from "react";
 
 interface QuickActionButtonProps {
-  icon: LucideIcon;
+  icon: ComponentType<{ className?: string }>;
   label: string;
   onClick: () => void;
   disabled?: boolean;
