@@ -187,9 +187,10 @@ async function createContactWithUniversalLogic(data: {
     const entityName = data.organization || data.domain || 'Entidade Desconhecida';
     
     // Validate and create entity using schema validation
+    // Default to 'Gabinete' for auto-created entities (user can change type later)
     const validatedEntityData = insertEntidadeSchema.parse({
       nome: entityName,
-      tipoEntidade: 'Contato Pessoal',
+      tipoEntidade: 'Gabinete',
       domain: data.domain || undefined,
       website: data.website || undefined,
       morada: data.address || undefined,
@@ -1580,15 +1581,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      if (tipoEntidade === 'Contato Pessoal') {
-        console.log('[PT-Search] Skipping search for personal contact');
-        return res.json({
-          fuzzyMatches: [],
-          googleResults: [],
-          enrichmentSource: 'disabled',
-        });
-      }
-      
       const input: PTEnrichmentInput = {
         nome,
         userId,
@@ -1597,7 +1589,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const result = await ptIntelligentSearch(input, storage, userRole);
       
-      if (result.fuzzyMatches.length === 0 && tipoEntidade !== 'Contato Pessoal') {
+      if (result.fuzzyMatches.length === 0) {
         console.log(`[PT-Search] No fuzzy matches for "${nome}", attempting Google Search (user: ${userId}, role: ${userRole}, type: ${tipoEntidade})`);
         const { searchCompanyData } = await import('./googleSearch');
         const googleResults = await searchCompanyData(nome);
