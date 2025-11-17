@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, MapPin, Phone, Mail, Globe, Edit, Building2, Users, UserCircle, Calendar } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, Mail, Globe, Edit, Building2, Users, UserCircle, Calendar, Sparkles, Linkedin, Facebook, Instagram } from "lucide-react";
+import { SiX } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +9,10 @@ import { Separator } from "@/components/ui/separator";
 import { ContactoCard } from "@/components/ContactoCard";
 import { VisitaCard } from "@/components/VisitaCard";
 import { LocationPreview } from "@/components/LocationPreview";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { EntidadeWithRelations } from "@shared/schema";
+import { useState } from "react";
 
 const tipoLabels: Record<string, string> = {
   Gabinete: "Gabinete",
@@ -23,10 +27,46 @@ export default function EntidadeDetail() {
   const [, params] = useRoute("/entidades/:id");
   const [, setLocation] = useLocation();
   const entidadeId = params?.id;
+  const { toast } = useToast();
 
   const { data: entidade, isLoading } = useQuery<EntidadeWithRelations>({
     queryKey: ["/api/entidades", entidadeId],
     enabled: !!entidadeId,
+  });
+  
+  // Enrichment mutation
+  const enrichMutation = useMutation({
+    mutationFn: async () => {
+      if (!entidadeId) throw new Error("Entity ID is required");
+      
+      const response = await apiRequest('POST', '/api/enrichment/full', {
+        entityId: entidadeId,
+      });
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/entidades", entidadeId] });
+      
+      if (data.enrichmentSource === 'none') {
+        toast({
+          title: "Sem enriquecimento",
+          description: "Não foram encontrados dados adicionais para esta entidade.",
+        });
+      } else {
+        toast({
+          title: "Entidade enriquecida",
+          description: `Dados atualizados com informações de ${data.enrichmentSource}.`,
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao enriquecer",
+        description: error.message || "Não foi possível enriquecer a entidade.",
+        variant: "destructive",
+      });
+    },
   });
 
   if (isLoading) {
@@ -82,14 +122,30 @@ export default function EntidadeDetail() {
               </Badge>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setLocation(`/entidades/${entidadeId}/editar`)}
-            data-testid="button-editar"
-          >
-            <Edit className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => enrichMutation.mutate()}
+              disabled={enrichMutation.isPending}
+              data-testid="button-enrich"
+              title="Enriquecer dados"
+            >
+              {enrichMutation.isPending ? (
+                <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Sparkles className="h-5 w-5" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setLocation(`/entidades/${entidadeId}/editar`)}
+              data-testid="button-editar"
+            >
+              <Edit className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -183,6 +239,121 @@ export default function EntidadeDetail() {
             )}
           </CardContent>
         </Card>
+
+        {/* Enriched Data */}
+        {(entidade.description || entidade.industry || entidade.logoUrl || 
+          entidade.linkedinUrl || entidade.facebookUrl || entidade.instagramUrl || 
+          entidade.xUrl || entidade.enrichmentSource) && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5" />
+                  Dados Enriquecidos
+                </CardTitle>
+                {entidade.enrichmentSource && (
+                  <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate" data-testid="badge-enrichment-source">
+                    {entidade.enrichmentSource}
+                  </Badge>
+                )}
+              </div>
+              {entidade.lastEnrichedAt && (
+                <CardDescription data-testid="text-last-enriched">
+                  Última atualização: {new Date(entidade.lastEnrichedAt).toLocaleDateString('pt-PT')}
+                </CardDescription>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {entidade.logoUrl && (
+                <div className="flex items-center justify-center p-4 bg-muted rounded-md">
+                  <img 
+                    src={entidade.logoUrl} 
+                    alt={`${entidade.nome} logo`}
+                    className="max-h-20 max-w-full object-contain"
+                    data-testid="img-logo"
+                  />
+                </div>
+              )}
+              
+              {entidade.description && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Descrição</p>
+                  <p className="text-sm" data-testid="text-description">{entidade.description}</p>
+                </div>
+              )}
+              
+              {entidade.industry && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Indústria</p>
+                  <p className="text-sm font-medium" data-testid="text-industry">{entidade.industry}</p>
+                </div>
+              )}
+              
+              {(entidade.linkedinUrl || entidade.facebookUrl || entidade.instagramUrl || entidade.xUrl) && (
+                <>
+                  <Separator />
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">Redes Sociais</p>
+                    <div className="flex flex-wrap gap-2">
+                      {entidade.linkedinUrl && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          asChild
+                          data-testid="link-linkedin"
+                        >
+                          <a href={entidade.linkedinUrl} target="_blank" rel="noopener noreferrer">
+                            <Linkedin className="h-4 w-4 mr-2" />
+                            LinkedIn
+                          </a>
+                        </Button>
+                      )}
+                      {entidade.facebookUrl && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          asChild
+                          data-testid="link-facebook"
+                        >
+                          <a href={entidade.facebookUrl} target="_blank" rel="noopener noreferrer">
+                            <Facebook className="h-4 w-4 mr-2" />
+                            Facebook
+                          </a>
+                        </Button>
+                      )}
+                      {entidade.instagramUrl && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          asChild
+                          data-testid="link-instagram"
+                        >
+                          <a href={entidade.instagramUrl} target="_blank" rel="noopener noreferrer">
+                            <Instagram className="h-4 w-4 mr-2" />
+                            Instagram
+                          </a>
+                        </Button>
+                      )}
+                      {entidade.xUrl && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          asChild
+                          data-testid="link-x"
+                        >
+                          <a href={entidade.xUrl} target="_blank" rel="noopener noreferrer">
+                            <SiX className="h-4 w-4 mr-2" />
+                            X
+                          </a>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Geolocation */}
         {gpsLocation && (
