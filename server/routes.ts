@@ -1597,6 +1597,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/microsoft/auth/callback', isAuthenticated, async (req, res) => {
     try {
       const { userId } = await getUserContext(req);
+      console.log('[Microsoft Auth] Callback started for user:', userId);
       
       const { code, state, error, error_description } = req.query;
       
@@ -1606,16 +1607,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       if (!code || !state || state !== req.session.msOAuthState) {
+        console.error('[Microsoft Auth] State validation failed. Expected:', req.session.msOAuthState, 'Got:', state);
         return res.redirect('/#/integracoes/microsoft?error=invalid_state');
       }
+      
+      console.log('[Microsoft Auth] State validated successfully');
       
       const clientId = process.env.MICROSOFT_CLIENT_ID;
       const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
       const redirectUri = `${req.protocol}://${req.get('host')}/api/microsoft/auth/callback`;
       
       if (!clientId || !clientSecret) {
+        console.error('[Microsoft Auth] Missing client credentials');
         return res.status(500).json({ message: 'Microsoft OAuth not configured' });
       }
+      
+      console.log('[Microsoft Auth] Exchanging code for tokens...');
       
       const tokenEndpoint = 'https://login.microsoftonline.com/organizations/oauth2/v2.0/token';
       const params = new URLSearchParams({
@@ -1639,8 +1646,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const tokenData = await response.json();
+      console.log('[Microsoft Auth] Tokens received, storing in database...');
       
-      const { storeMicrosoftTokens } = await import('./microsoft');
+      const { storeMicrosoftTokens, getMicrosoftTokens } = await import('./microsoft');
       
       await storeMicrosoftTokens(userId, {
         accessToken: tokenData.access_token,
@@ -1649,9 +1657,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
       });
       
+      const storedTokens = await getMicrosoftTokens(userId);
+      if (!storedTokens) {
+        console.error('[Microsoft Auth] Failed to verify token storage');
+        return res.redirect('/#/integracoes/microsoft?error=token_storage_failed');
+      }
+      
+      console.log('[Microsoft Auth] Tokens stored successfully');
+      
       delete req.session.msOAuthState;
       
-      res.redirect('/#/integracoes/microsoft?success=true');
+      req.session.save((err) => {
+        if (err) {
+          console.error('[Microsoft Auth] Session save error:', err);
+          return res.redirect('/#/integracoes/microsoft?error=session_save_failed');
+        }
+        
+        console.log('[Microsoft Auth] Session saved, redirecting to success page');
+        res.redirect('/#/integracoes/microsoft?success=true');
+      });
     } catch (error) {
       console.error('[Microsoft Auth] Callback error:', error);
       res.redirect('/#/integracoes/microsoft?error=callback_failed');
