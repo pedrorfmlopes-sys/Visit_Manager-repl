@@ -1,0 +1,92 @@
+Perfeito, obrigado pelo resumo da FASE 2 — está muito claro.
+Quero agora que completes exatamente o que tu próprio assinalaste como “Endpoints Ainda Por Completar”.
+
+Objetivo desta continuação da FASE 2
+
+Aplicar o mesmo padrão de multi-empresa (empresaId) e de contexto de utilizador que já implementaste para entidades/contactos/dashboard/analytics, aos restantes endpoints que mexem em dados de negócio, nomeadamente:
+
+/api/visitas, /api/visitas/:id, /api/visitas/:id/pdf, /api/visitas/:id/ics
+
+/api/tarefas, /api/tarefas/:id
+
+/api/lembretes, /api/lembretes/snooze, /api/lembretes/resolve, /api/lembretes/generate
+
+/api/tools/vision-card, /api/tools/generate-email, /api/tools/vcard-import
+
+/api/enrichment/full
+
+e quaisquer outros endpoints que estejam a ler/escrever dados associados a entidades/contactos/visitas/tarefas/lembretes/marcas.
+
+O que quero que faças agora
+
+Usar sempre o contexto de utilizador centralizado
+
+Em todas essas rotas, usa a função que já criaste (getUserContext / ensureAuthenticated) para obter:
+
+userId
+
+empresaId
+
+userRole (role)
+
+Se empresaId estiver ausente, devolve um erro adequado (400), tal como já fizeste no exemplo de visitas.
+
+Aplicar o padrão de empresaId nas chamadas ao storage
+
+Para cada endpoint:
+
+Garante que a chamada ao storage recebe empresaId como primeiro parâmetro (ou de forma consistente com o padrão que definiste).
+
+Em qualquer helper/consulta que derive de visitas/tarefas/lembretes/etc., certifica-te de que está também a ser filtrada por empresaId.
+
+Visitas e PDFs/ICS
+
+Nas rotas de:
+
+GET /api/visitas
+
+GET /api/visitas/:id
+
+GET /api/visitas/:id/pdf
+
+GET /api/visitas/:id/ics
+
+Garante que:
+
+Só se acedem visitas da empresa do utilizador.
+
+Quaisquer dados derivados (tarefas associadas, etc.) respeitam o mesmo empresaId.
+
+Tarefas e Lembretes
+
+Em todas as rotas de tarefas e lembretes, garante que:
+
+as queries, updates e deletes estão sempre condicionados por empresaId.
+
+se uma tarefa/lembrete estiver relacionado com uma visita/entidade de outra empresa, o código não permite o acesso.
+
+Tools & enrichment
+
+Para as rotas de tools (/api/tools/*) e /api/enrichment/full que interajam com dados de visitas/entidades/contactos:
+
+garante que qualquer leitura ou escrita passa pelo empresaId correto.
+
+Se estiver a gerar conteúdo baseado numa visita ou entidade, valida que essa visita/entidade pertence à empresa do utilizador.
+
+Resumo e testes
+
+No fim, por favor:
+
+lista todos os endpoints que alteraste.
+
+mostra 1 exemplo de cada padrão aplicado (por ex., uma rota de visitas, uma de tarefas, uma de lembretes, uma de tools).
+
+indica como posso testar rapidamente:
+
+criar visita/tarefa/lembrete e confirmar empresaId correto na BD.
+
+chamar rota de PDF/ICS para uma visita e garantir que não é possível aceder a visitas de outra empresa.
+
+chamar uma rota de tools/enrichment baseada numa visita/entidade e confirmar que há sempre validação pelo empresaId.
+
+Não mexas ainda na UI do frontend nesta fase, quero primeiro o backend completamente consistente com o modelo multi-empresa.

@@ -571,10 +571,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Business Card Vision endpoint
+  // Business Card Vision endpoint - FASE 2: filtered by empresaId
   app.post('/api/tools/vision-card', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const { base64Image } = req.body;
 
       if (!base64Image) {
@@ -656,7 +657,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Use universal auto-creation logic with RBAC
+      // Use universal auto-creation logic with RBAC - FASE 2: pass empresaId
       const result = await createContactWithUniversalLogic({
         name,
         organization: extracted.organization,
@@ -668,6 +669,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         domain,
         userId,
         userRole,
+        empresaId,
       });
 
       // Return comprehensive response including extracted data
@@ -695,10 +697,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Email generation endpoint with AI
+  // Email generation endpoint with AI - FASE 2: filtered by empresaId
   app.post('/api/tools/generate-email', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       
       // Validate request
       const validationResult = generateEmailRequestSchema.safeParse(req.body);
@@ -722,37 +725,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let recentVisits: any[] = [];
 
       if (visitaId) {
-        visita = await storage.getVisita(visitaId, userId, userRole);
+        visita = await storage.getVisita(visitaId, empresaId, userId, userRole);
         if (!visita) {
           return res.status(404).json({ message: "Visit not found or unauthorized" });
         }
 
-        // Get related data from visit
+        // Get related data from visit - FASE 2: pass empresaId
         if (visita.contactoId) {
-          contacto = await storage.getContacto(visita.contactoId, userId, userRole);
+          contacto = await storage.getContacto(visita.contactoId, empresaId, userId, userRole);
         }
         if (visita.entidadeId) {
-          entidade = await storage.getEntidade(visita.entidadeId, userId, userRole);
+          entidade = await storage.getEntidade(visita.entidadeId, empresaId, userId, userRole);
         }
 
-        // Get recent visits for context (last 3)
+        // Get recent visits for context (last 3) - FASE 2: pass empresaId
         if (visita.entidadeId) {
-          const allVisits = await storage.getVisitas(userId, userRole);
+          const allVisits = await storage.getVisitas(empresaId, userId, userRole);
           recentVisits = allVisits
             .filter((v: any) => v.entidadeId === visita.entidadeId && v.id !== visitaId)
             .sort((a: any, b: any) => new Date(b.dataVisita).getTime() - new Date(a.dataVisita).getTime())
             .slice(0, 3);
         }
       } else if (contactoId) {
-        contacto = await storage.getContacto(contactoId, userId, userRole);
+        contacto = await storage.getContacto(contactoId, empresaId, userId, userRole);
         if (!contacto) {
           return res.status(404).json({ message: "Contact not found or unauthorized" });
         }
         if (contacto.entidadeId) {
-          entidade = await storage.getEntidade(contacto.entidadeId, userId, userRole);
+          entidade = await storage.getEntidade(contacto.entidadeId, empresaId, userId, userRole);
         }
       } else if (entidadeId) {
-        entidade = await storage.getEntidade(entidadeId, userId, userRole);
+        entidade = await storage.getEntidade(entidadeId, empresaId, userId, userRole);
         if (!entidade) {
           return res.status(404).json({ message: "Entity not found or unauthorized" });
         }
@@ -761,11 +764,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get user info for signature
       user = await storage.getUser(userId);
 
-      // Prepare visit data if available
+      // Prepare visit data if available - FASE 2: pass empresaId
       let visitData;
       if (visita) {
         // Get tasks related to visit
-        const allTasks = await storage.getTarefas(userId, userRole);
+        const allTasks = await storage.getTarefas(empresaId, userId, userRole);
         const visitTasks = allTasks.filter(t => t.visitaId === visitaId);
 
         visitData = {
@@ -804,17 +807,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // vCard import endpoint with universal entity auto-creation
+  // vCard import endpoint with universal entity auto-creation - FASE 2: filtered by empresaId
   app.post('/api/tools/vcard-import', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const { name, organization, email, phone, title, address, url, domain } = req.body;
 
       if (!name) {
         return res.status(400).json({ message: "Contact name is required" });
       }
 
-      // Use universal auto-creation logic with RBAC
+      // Use universal auto-creation logic with RBAC - FASE 2: pass empresaId
       const result = await createContactWithUniversalLogic({
         name,
         organization,
@@ -826,6 +830,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         domain,
         userId,
         userRole,
+        empresaId,
       });
 
       res.json(result);
@@ -836,15 +841,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // @deprecated Legacy enrichment endpoint (use PT-Intelligent Search instead)
-  // Kept for backwards compatibility only
+  // Kept for backwards compatibility only - FASE 2: filtered by empresaId
   app.post('/api/enrichment/full', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const { entityId, name, domain, website, visionText } = req.body;
 
-      // If enriching existing entity, check RBAC access
+      // If enriching existing entity, check RBAC access - FASE 2: pass empresaId
       if (entityId) {
-        const existingEntity = await storage.getEntidade(entityId, userId, userRole);
+        const existingEntity = await storage.getEntidade(entityId, empresaId, userId, userRole);
         if (!existingEntity) {
           return res.status(404).json({ message: "Entity not found or unauthorized" });
         }
@@ -918,8 +924,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updateData.morada = enrichmentResult.morada;
         }
 
-        // Update entity
-        const updatedEntity = await storage.updateEntidade(entityId, updateData, userId, userRole);
+        // Update entity - FASE 2: pass empresaId
+        const updatedEntity = await storage.updateEntidade(entityId, updateData, empresaId, userId, userRole);
 
         // Return what was updated
         const updatedFields = Object.keys(updateData).filter(k => k !== 'lastEnrichedAt' && k !== 'enrichmentSource');
@@ -965,10 +971,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Lembretes (Reminders) endpoints
+  // Lembretes (Reminders) endpoints - FASE 2: filtered by empresaId
   app.get('/api/lembretes', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       
       const { generateAllReminders } = await import('./reminders');
       const user = await storage.getUser(userId);
@@ -999,7 +1006,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/lembretes/snooze', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId } = await getUserContext(req);
+      const { userId, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const { reminderId, duration } = req.body;
 
       if (!reminderId || !duration) {
@@ -1037,7 +1045,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/lembretes/resolve', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId } = await getUserContext(req);
+      const { userId, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const { reminderId } = req.body;
 
       if (!reminderId) {
@@ -1071,7 +1080,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/lembretes/generate', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId } = await getUserContext(req);
+      const { userId, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const user = await storage.getUser(userId);
       
       if (!user) {
@@ -1091,11 +1101,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Visitas endpoints
+  // Visitas endpoints - FASE 2: filtered by empresaId
   app.get('/api/visitas', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
-      const visitas = await storage.getVisitas(userId, userRole);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      const visitas = await storage.getVisitas(empresaId, userId, userRole);
       res.json(visitas);
     } catch (error) {
       console.error("Error fetching visitas:", error);
@@ -1105,8 +1116,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/visitas/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
-      const visita = await storage.getVisita(req.params.id, userId, userRole);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      const visita = await storage.getVisita(req.params.id, empresaId, userId, userRole);
       if (!visita) {
         return res.status(404).json({ message: "Visita not found" });
       }
@@ -1119,15 +1131,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/visitas/:id/pdf', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
-      const visita = await storage.getVisita(req.params.id, userId, userRole);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      const visita = await storage.getVisita(req.params.id, empresaId, userId, userRole);
       
       if (!visita) {
         return res.status(404).json({ message: "Visita not found" });
       }
 
-      // Fetch related tarefas
-      const allTarefas = await storage.getTarefas(userId, userRole);
+      // Fetch related tarefas - FASE 2: filtered by empresaId
+      const allTarefas = await storage.getTarefas(empresaId, userId, userRole);
       const visitaTarefas = allTarefas.filter(t => t.visitaId === req.params.id);
 
       // Generate PDF using jsPDF
@@ -1151,8 +1164,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/visitas/:id/ics', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
-      const visita = await storage.getVisita(req.params.id, userId, userRole);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      const visita = await storage.getVisita(req.params.id, empresaId, userId, userRole);
       
       if (!visita) {
         return res.status(404).json({ message: "Visita not found" });
@@ -1178,7 +1192,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     { name: 'media', maxCount: 10 }
   ]), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const files = req.files as { audio?: Express.Multer.File[], media?: Express.Multer.File[] };
       
       // Parse form data with safe JSON parsing
@@ -1248,12 +1263,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         visitaData.mediaUrls = files.media.map(file => `/uploads/${file.filename}`);
       }
 
-      // Create visita
-      const visita = await storage.createVisita(visitaData);
+      // Create visita - FASE 2: auto-set empresaId
+      const visita = await storage.createVisita({ ...visitaData, empresaId });
 
       // Generate AI summary asynchronously
-      const { userRole } = await getUserContext(req);
-      const visitaComplete = await storage.getVisita(visita.id, userId, userRole);
+      const visitaComplete = await storage.getVisita(visita.id, empresaId, userId, userRole);
       if (visitaComplete) {
         try {
           const summary = await generateVisitSummary({
@@ -1294,8 +1308,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/visitas/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
-      await storage.deleteVisita(req.params.id, userId, userRole);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      await storage.deleteVisita(req.params.id, empresaId, userId, userRole);
       res.json({ message: "Visita deleted" });
     } catch (error) {
       console.error("Error deleting visita:", error);
@@ -1303,17 +1318,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Tarefas (Tasks) endpoints
+  // Tarefas (Tasks) endpoints - FASE 2: filtered by empresaId
   app.get('/api/tarefas', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const filters = {
         status: req.query.status as string | undefined,
         assignedUserId: req.query.assignedUserId as string | undefined,
         entidadeId: req.query.entidadeId as string | undefined,
         overdue: req.query.overdue === 'true',
       };
-      const tarefas = await storage.getTarefas(userId, userRole, filters);
+      const tarefas = await storage.getTarefas(empresaId, userId, userRole, filters);
       res.json(tarefas);
     } catch (error) {
       console.error("Error fetching tarefas:", error);
@@ -1323,8 +1339,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/tarefas/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
-      const tarefa = await storage.getTarefa(req.params.id, userId, userRole);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      const tarefa = await storage.getTarefa(req.params.id, empresaId, userId, userRole);
       if (!tarefa) {
         return res.status(404).json({ message: "Tarefa not found" });
       }
@@ -1337,7 +1354,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/tarefas', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId } = await getUserContext(req);
+      const { userId, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const validatedData = insertTarefaSchema.parse(req.body);
       
       const cleanedData = {
@@ -1347,6 +1365,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignedUserId: validatedData.assignedUserId || null,
         dueDate: validatedData.dueDate || null,
         createdByUserId: userId,
+        empresaId,
       };
       
       const tarefa = await storage.createTarefa(cleanedData);
@@ -1359,7 +1378,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/tarefas/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const validatedData = insertTarefaSchema.partial().parse(req.body);
       
       const cleanedData = {
@@ -1370,7 +1390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...(validatedData.dueDate !== undefined && { dueDate: validatedData.dueDate || null }),
       };
       
-      const tarefa = await storage.updateTarefa(req.params.id, cleanedData, userId, userRole);
+      const tarefa = await storage.updateTarefa(req.params.id, cleanedData, empresaId, userId, userRole);
       if (!tarefa) {
         return res.status(404).json({ message: "Tarefa not found or unauthorized" });
       }
@@ -1383,8 +1403,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/tarefas/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
-      await storage.deleteTarefa(req.params.id, userId, userRole);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      await storage.deleteTarefa(req.params.id, empresaId, userId, userRole);
       res.json({ message: "Tarefa deleted" });
     } catch (error) {
       console.error("Error deleting tarefa:", error);
