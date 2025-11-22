@@ -69,7 +69,14 @@ export default function VisitaForm() {
   });
 
   const { data: marcas = [] } = useQuery<Marca[]>({
-    queryKey: ["/api/marcas"],
+    queryKey: ["/api/marcas", "onlyAtivas"],
+    queryFn: async () => {
+      const response = await fetch("/api/marcas?onlyAtivas=true", {
+        credentials: "include"
+      });
+      if (!response.ok) throw new Error("Failed to fetch marcas");
+      return response.json();
+    },
     enabled: empresa?.mostrarMarcasEmVisitas ?? false,
   });
 
