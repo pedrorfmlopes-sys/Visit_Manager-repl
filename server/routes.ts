@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { getUserContext, ensureAuthenticated, requireAdmin } from "./authContext";
 import { transcribeAudio, generateVisitSummary, extractBusinessCardData, generateEmailDraft } from "./openai";
 import { sendVisitEmail } from "./email";
 import { enrichEntity, type EnrichmentInput, extractDomainFromEmail, isPersonalEmailDomain } from "./enrichment";
@@ -51,15 +52,6 @@ const upload = multer({
     cb(new Error('Invalid file type. Only images, videos, and audio files are allowed.'));
   },
 });
-
-// Helper function to get user ID, role, and empresa from request
-async function getUserContext(req: any): Promise<{ userId: string; userRole: 'admin' | 'agent'; empresaId?: string }> {
-  const userId = req.user.claims.sub;
-  const user = await storage.getUser(userId);
-  const userRole = user?.role || 'agent'; // Default to 'agent' if not set
-  const empresaId = user?.empresaId; // Get empresaId from user
-  return { userId, userRole, empresaId };
-}
 
 /**
  * Detect image MIME type from binary header (magic bytes)
@@ -329,11 +321,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Dashboard endpoint
+  // Dashboard endpoint - FASE 2: filtered by empresaId
   app.get('/api/dashboard', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
-      const stats = await storage.getDashboardStats(userId, userRole);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      const stats = await storage.getDashboardStats(empresaId, userId, userRole);
       res.json(stats);
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
@@ -341,10 +334,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Analytics endpoint
+  // Analytics endpoint - FASE 2: filtered by empresaId
   app.get('/api/analytics', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       
       // Parse query params for filters
       const filters: {
@@ -365,7 +359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filters.tipoEntidade = req.query.tipoEntidade as string;
       }
 
-      const analytics = await storage.getAnalytics(userId, userRole, filters);
+      const analytics = await storage.getAnalytics(empresaId, userId, userRole, filters);
       res.json(analytics);
     } catch (error) {
       console.error("Error fetching analytics:", error);
@@ -373,11 +367,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Entidades endpoints (Universal Entities)
+  // Admin test endpoint - FASE 2: Test middleware requireAdmin
+  app.get('/api/admin/ping', requireAdmin, async (req: any, res) => {
+    res.json({ 
+      message: 'Admin access confirmed',
+      userRole: req.userContext?.userRole,
+      empresaId: req.userContext?.empresaId
+    });
+  });
+
+  // Entidades endpoints (Universal Entities) - FASE 2: filtered by empresaId
   app.get('/api/entidades', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
-      const entidades = await storage.getEntidades(userId, userRole);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      const entidades = await storage.getEntidades(empresaId, userId, userRole);
       res.json(entidades);
     } catch (error) {
       console.error("Error fetching entidades:", error);
@@ -387,8 +391,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/entidades/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
-      const entidade = await storage.getEntidade(req.params.id, userId, userRole);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      const entidade = await storage.getEntidade(req.params.id, empresaId, userId, userRole);
       if (!entidade) {
         return res.status(404).json({ message: "Entidade not found" });
       }
@@ -401,13 +406,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/entidades', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId } = await getUserContext(req);
+      const { userId, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const validatedData = insertEntidadeSchema.parse(req.body);
-      // Set createdByUserId to current user
+      // Set createdByUserId to current user - FASE 2: empresaId set by createEntidade
       const entidade = await storage.createEntidade({
         ...validatedData,
         createdByUserId: userId,
-      });
+      }, empresaId);
       
       // Auto-enrich newly created entity (non-blocking)
       (async () => {
@@ -440,7 +446,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (enrichmentResult.telefone && !entidade.telefone) enrichedData.telefone = enrichmentResult.telefone;
             if (enrichmentResult.morada && !entidade.morada) enrichedData.morada = enrichmentResult.morada;
             
-            await storage.updateEntidade(entidade.id, enrichedData);
+            await storage.updateEntidade(entidade.id, enrichedData, empresaId);
             console.log(`[Auto-Enrichment] Successfully enriched entity ${entidade.id} (source: ${enrichmentResult.enrichmentSource})`);
           }
         } catch (enrichmentError) {
@@ -457,9 +463,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/entidades/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const validatedData = insertEntidadeSchema.partial().parse(req.body);
-      const entidade = await storage.updateEntidade(req.params.id, validatedData, userId, userRole);
+      const entidade = await storage.updateEntidade(req.params.id, validatedData, empresaId, userId, userRole);
       if (!entidade) {
         return res.status(404).json({ message: "Entidade not found or unauthorized" });
       }
@@ -472,7 +479,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/entidades/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       
       // Check if entidade has related contacts or visits
       const hasRelations = await storage.checkEntidadeHasRelations(req.params.id);
@@ -482,7 +490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      await storage.deleteEntidade(req.params.id, userId, userRole);
+      await storage.deleteEntidade(req.params.id, empresaId, userId, userRole);
       res.json({ message: "Entidade deleted" });
     } catch (error) {
       console.error("Error deleting entidade:", error);
@@ -490,11 +498,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Contactos endpoints
+  // Contactos endpoints - FASE 2: filtered by empresaId
   app.get('/api/contactos', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
-      const contactos = await storage.getContactos(userId, userRole);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      const contactos = await storage.getContactos(empresaId, userId, userRole);
       res.json(contactos);
     } catch (error) {
       console.error("Error fetching contactos:", error);
@@ -504,8 +513,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/contactos/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
-      const contacto = await storage.getContacto(req.params.id, userId, userRole);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      const contacto = await storage.getContacto(req.params.id, empresaId, userId, userRole);
       if (!contacto) {
         return res.status(404).json({ message: "Contacto not found" });
       }
@@ -518,13 +528,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/contactos', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId } = await getUserContext(req);
+      const { userId, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const validatedData = insertContactoSchema.parse(req.body);
-      // Set createdByUserId to current user
+      // Set createdByUserId to current user - FASE 2: empresaId set by createContacto
       const contacto = await storage.createContacto({
         ...validatedData,
         createdByUserId: userId,
-      });
+      }, empresaId);
       res.json(contacto);
     } catch (error) {
       console.error("Error creating contacto:", error);
@@ -534,9 +545,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/contactos/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const validatedData = insertContactoSchema.partial().parse(req.body);
-      const contacto = await storage.updateContacto(req.params.id, validatedData, userId, userRole);
+      const contacto = await storage.updateContacto(req.params.id, validatedData, empresaId, userId, userRole);
       if (!contacto) {
         return res.status(404).json({ message: "Contacto not found or unauthorized" });
       }
@@ -549,8 +561,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/contactos/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
-      await storage.deleteContacto(req.params.id, userId, userRole);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      await storage.deleteContacto(req.params.id, empresaId, userId, userRole);
       res.json({ message: "Contacto deleted" });
     } catch (error) {
       console.error("Error deleting contacto:", error);

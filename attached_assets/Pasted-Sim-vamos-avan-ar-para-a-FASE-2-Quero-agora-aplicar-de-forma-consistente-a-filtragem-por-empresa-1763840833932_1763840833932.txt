@@ -1,0 +1,130 @@
+Sim, vamos avançar para a FASE 2.
+Quero agora aplicar, de forma consistente, a filtragem por empresaId em toda a lógica de dados e preparar a autorização por role (admin/user), ainda sem mexer na UI.
+
+FASE 2 – Adaptar storage + rotas para multi-empresa e roles
+
+Objetivo desta fase:
+
+Garantir que TODAS as operações de leitura/escrita de dados de negócio são sempre filtradas pelo empresaId do utilizador autenticado.
+
+Criar um middleware simples para controlar acessos de admin (requireAdmin), para ser usado nas rotas de backoffice nas fases seguintes.
+
+Não mexer ainda no frontend.
+
+Com base no estado atual que já implementaste (tabelas com empresaId, getUserContext() a devolver empresaId, tabela empresas e marcas criadas, seed inicial para “Divitek” já aplicado), faz agora o seguinte:
+
+1) Contexto de utilizador (confirmar e usar)
+
+Garante que existe uma função/utilitário central (por exemplo getUserContext(req)) que devolve:
+
+userId
+
+empresaId
+
+role (ou userRole)
+
+Confirma onde esta função está definida (pelo teu resumo parece estar em server/routes.ts) e deixa-a pronta para ser reutilizada nas rotas.
+
+Se for melhor, extrai esta função para um ficheiro utilitário (ex.: server/authContext.ts) e importa-a nas rotas – mas só se fizer sentido e não complicar.
+
+2) Adaptar o storage para usar empresaId
+
+No server/storage.ts:
+
+Para todas as funções que trabalham com dados de negócio, quero que passem a usar empresaId de forma explícita. Nomeadamente:
+
+Entidades
+
+Contactos
+
+Visitas
+
+Tarefas
+
+Lembretes
+
+Marcas (quando for o caso)
+
+Para cada função:
+
+SELECT: acrescentar filtro por empresaId.
+
+INSERT: preencher o campo empresaId com o valor vindo do contexto do utilizador.
+
+UPDATE/DELETE: garantir que a operação só atua em registos com o empresaId correto.
+
+Exemplo do que quero em termos de padrão (não é código exato, é só o conceito):
+
+Antes (exemplo conceptual):
+
+getVisitas() → fazia select * from visitas sem filtrar empresa.
+
+Depois:
+
+getVisitas(empresaId: string, ...) → faz sempre where visitas.empresaId = empresaId.
+
+Peço-te que vás função a função, de forma sistemática, e ajustes as assinaturas e os where em conformidade.
+
+3) Adaptar as rotas para passar o empresaId ao storage
+
+No server/routes.ts:
+
+Em todas as rotas que trabalham com:
+
+entidades (/api/entidades*)
+
+contactos (/api/contactos*)
+
+visitas (/api/visitas*)
+
+tarefas (/api/tarefas*)
+
+lembretes (/api/lembretes*)
+
+marcas (quando existir rota pública)
+
+Faz o seguinte:
+
+Usa getUserContext(req) (ou função equivalente) para obter:
+
+userId
+
+empresaId
+
+role
+
+Passa o empresaId para as funções do storage que forem chamadas nessa rota.
+
+Garante que não fica nenhuma rota de dados de negócio sem filtro por empresaId.
+
+Objetivo: um utilizador de uma empresa nunca consegue listar/editar/apagar dados de outra empresa.
+
+4) Middleware de autorização por role (admin)
+
+Ainda nesta fase, quero deixar pronto um middleware de autorização para admin, mas sem o aplicar em muitos sítios ainda (isso será mais usado nas rotas de backoffice da fase 3).
+
+Cria algo do género requireAdmin:
+
+Lê o contexto do utilizador (getUserContext).
+
+Se role !== "admin", devolve 403 com uma mensagem simples (ex.: "Acesso reservado a administradores").
+
+Se for admin, chama next().
+
+Aplica este middleware apenas em 1 ou 2 rotas de teste (por exemplo, uma rota “/api/admin/ping” ou algo muito simples), só para garantir que está funcional e pronto para ser reutilizado na fase seguinte.
+
+5) Como testar
+
+No fim, quero que me expliques como posso testar esta fase, por exemplo:
+
+Criar uma nova entidade/visita/tarefa e verificar na BD que o empresaId está a ser preenchido corretamente.
+
+Verificar que um utilizador autenticado só vê dados da sua empresa (para já só tens “Divitek”, mas o importante é que o filtro esteja no código).
+
+Chamar uma rota protegida com requireAdmin e confirmar que:
+
+funciona para admin,
+
+devolve 403 para não-admin.
+
+Por favor, segue estes pontos por ordem, indica os ficheiros que vais alterar e mostra os blocos de código finais de cada alteração. Não alteres ainda o frontend nesta fase.
