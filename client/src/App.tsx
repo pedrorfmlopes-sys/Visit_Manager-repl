@@ -29,7 +29,7 @@ import TarefaDetail from "@/pages/TarefaDetail";
 import Lembretes from "@/pages/Lembretes";
 import Analytics from "@/pages/Analytics";
 import QRScanner from "@/pages/QRScanner";
-import MicrosoftIntegration from "@/pages/MicrosoftIntegration";
+// import MicrosoftIntegration from "@/pages/MicrosoftIntegration"; // Disabled: requires valid Azure credentials
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -75,7 +75,7 @@ function Router() {
           <Route path="/analytics" component={Analytics} />
           <Route path="/qr" component={QRScanner} />
           <Route path="/qr-scanner" component={QRScanner} />
-          <Route path="/integracoes/microsoft" component={MicrosoftIntegration} />
+          {/* <Route path="/integracoes/microsoft" component={MicrosoftIntegration} /> */}
         </>
       )}
       <Route component={NotFound} />

@@ -1554,9 +1554,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================
-  // MICROSOFT 365 INTEGRATION ROUTES
+  // MICROSOFT 365 INTEGRATION ROUTES (DISABLED)
   // ============================================
-
+  // Disabled: Requires valid Azure App Registration with correct Client Secret value
+  // Re-enable when proper credentials are configured
+  
+  /*
+  
   // Microsoft OAuth Login
   app.get('/api/microsoft/auth/login', isAuthenticated, async (req, res) => {
     try {
@@ -2114,6 +2118,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: 'Failed to export to Outlook Calendar' });
     }
   });
+  
+  */
 
   // ============================================
   // PDF PRO EXPORTS ROUTES
