@@ -1,133 +1,41 @@
 # Commercial Visits Management PWA
 
 ## Overview
-
-This Progressive Web Application (PWA) facilitates commercial visit management for field sales professionals targeting architecture offices (gabinetes) and other entities. It enables efficient tracking of entities, contacts, and visits, incorporating features like audio transcription, AI-powered visit summaries, automated email notifications, geolocation capture, calendar integration, PDF export, and comprehensive analytics. The application is built as a full-stack TypeScript solution with a React frontend, Express backend, and PostgreSQL with Drizzle ORM, emphasizing mobile-first design, Material Design principles, and robust user data security through isolation and Role-Based Access Control (RBAC). The project aims to provide a comprehensive tool for sales teams to streamline their operations, enhance data quality, and gain actionable insights.
+This Progressive Web Application (PWA) streamlines commercial visit management for field sales professionals. It tracks entities, contacts, and visits, offering features like audio transcription, AI-powered summaries, automated email notifications, geolocation, calendar integration, PDF export, and analytics. The application aims to enhance sales team efficiency, data quality, and provide actionable insights. It is a full-stack TypeScript solution with a React frontend, Express backend, and PostgreSQL with Drizzle ORM, built with a mobile-first approach and robust security including user data isolation and Role-Based Access Control (RBAC). The project supports multi-tenant architecture to ensure company isolation.
 
 ## User Preferences
-
 Preferred communication style: Simple, everyday language.
-
-## Current Implementation Status
-
-### FASE 1: Multi-empresa Architecture (✅ Completed - Nov 22, 2025)
-**Objective**: Implement multi-tenant (multi-empresa) support with company isolation and user roles.
-
-**Completed:**
-1. ✅ Created `empresas` table (id, nome, nif, email, telefone, logoUrl, mostrarMarcasEmVisitas, createdAt, updatedAt)
-2. ✅ Added `empresaId` FK to `users` table (links users to company)
-3. ✅ Added `empresaId` FK to all business tables:
-   - entidades, contactos, visitas, tarefas, lembretes, marcas
-4. ✅ Refactored `marcas` table:
-   - Added `empresaId` FK (company-specific brands)
-   - Added `codigo` field (brand code)
-   - Added `ativa` boolean flag (active/inactive status)
-   - Added timestamps (createdAt, updatedAt)
-5. ✅ Updated `storage.ts` interface:
-   - Added `getEmpresa()`, `createEmpresa()`, `getAllEmpresas()` operations
-   - Added `getMarcasByEmpresa()`, `getMarcasByEmpresaAtiva()` operations
-6. ✅ Improved `getUserContext()` function in `server/routes.ts`:
-   - Now returns `empresaId` along with userId and userRole
-7. ✅ Created migration seed script (`server/seed-enterprise.ts`):
-   - Creates initial "Divitek" company (tenant)
-   - Associates all 23 existing users to Divitek
-   - Associates all existing business data to Divitek
-   - Successfully migrated without data loss
-
-**Database Changes:**
-- Schema updated via `npm run db:push --force`
-- Seed script run: `npx tsx server/seed-enterprise.ts` 
-- Result: 23 users + all entities/contacts/visits/tasks/reminders/brands now linked to Divitek company
-
-**Next Steps (FASE 2+):**
-- Apply empresaId filtering in all CRUD operations (currently not filtering yet)
-- Update frontend pages to display company-specific data
-- Implement brand management UI (company-specific marcas list)
-- Add empresa configuration page (logo, mostrarMarcasEmVisitas setting)
-- Implement user invitation system (add users to company)
 
 ## System Architecture
 
 ### Frontend Architecture
-
-The frontend is a mobile-first React 18 application built with TypeScript, utilizing Wouter for routing and Vite for development and bundling. It employs Shadcn/ui (New York style) with Radix UI primitives and Tailwind CSS for styling, adhering to Material Design principles. State management is handled by TanStack React Query for server state and React Hook Form with Zod for form validation. Key UI patterns include card-based layouts, search-first interfaces, and Floating Action Buttons (FABs).
+A mobile-first React 18 application using TypeScript, Wouter for routing, and Vite for bundling. It leverages Shadcn/ui (New York style) with Radix UI and Tailwind CSS, adhering to Material Design principles. State management is handled by TanStack React Query and React Hook Form with Zod for validation. UI patterns emphasize card-based layouts, search-first interfaces, and Floating Action Buttons (FABs).
 
 ### Backend Architecture
-
-The backend is an Express.js application written in TypeScript. It uses session-based authentication with Replit Auth (OpenID Connect) and Passport.js, storing sessions in PostgreSQL. API endpoints are RESTful, covering authentication, universal entities (`/api/entidades`), contacts, visits (including file uploads), tasks, and analytics. Multer handles file uploads (audio/images) with temporary storage. A robust RBAC system differentiates between Admin (all data access) and Agent (owner/assigned data access) roles, enforcing ownership checks for all data operations.
+An Express.js application in TypeScript, employing session-based authentication with Replit Auth (OpenID Connect) and Passport.js, storing sessions in PostgreSQL. It provides RESTful APIs for authentication, universal entities, contacts, visits (including file uploads), tasks, and analytics. Multer handles file uploads. A robust RBAC system differentiates Admin (all data access) and Agent (owner/assigned data access) roles, enforcing ownership checks across all data operations.
 
 ### Database Architecture
-
-The database uses PostgreSQL with Drizzle ORM for type-safe schema management. The core data model includes:
-- **Users**: Authentication and profile information, integrated with Replit Auth.
-- **Entidades**: A universal entity system replacing legacy "Gabinetes," supporting types like Gabinete, Cliente, Distribuidor, Obra, Parceiro, Outro, with fields for NIF, address, and GPS coordinates.
-- **Contactos**: Contacts linked to entities.
-- **Visitas**: Visit records with dates, notes, media attachments, audio transcriptions, AI summaries, and geolocation.
-- **Tarefas**: A comprehensive task management system with status, repeat intervals, optional links to entities/visits, and rich text descriptions with HTML support. Descriptions support TipTap editor features including checkboxes (task lists), bold, italic, ordered/unordered lists, and headings. All HTML content is sanitized with DOMPurify to prevent XSS attacks.
-- **Lembretes**: Intelligent reminder system tracking three types: visit follow-ups (7 days after last visit), overdue tasks, and AI-suggested reminders. Fully RBAC-aware with watertight security.
-- **Marcas**: Product brands.
-- **Sessions**: For authentication state.
-Relationships are managed via foreign keys, and data integrity is maintained with timestamp tracking and JSONB fields for flexible data storage.
+PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities include Users, a universal Entidades system (replacing "Gabinetes" with types like Gabinete, Cliente, Distribuidor, Obra, Parceiro, Outro), Contactos, Visitas (with media, audio, AI summaries, geolocation), Tarefas (rich text, HTML support, XSS prevention), Lembretes (intelligent reminders for follow-ups, overdue tasks, AI suggestions), Marcas (product brands), and Sessions. Relationships are managed via foreign keys, and data integrity is maintained with timestamp tracking.
 
 ### System Design Choices
 
-- **Rich Text Task Descriptions**: TipTap-based rich text editor for task descriptions with comprehensive formatting support:
-  1. **TipTap Editor**: Interactive WYSIWYG editor with toolbar controls for bold, italic, lists, task lists (checkboxes), undo/redo functionality
-  2. **HTML Storage**: Task descriptions stored as sanitized HTML in the database, supporting complex formatting
-  3. **XSS Prevention**: DOMPurify sanitization with forbid-list approach blocking dangerous tags (script, iframe, form) and event handlers while allowing all formatting tags
-  4. **Empty Content Normalization**: Automatic conversion of empty `<p></p>` paragraphs to empty strings to prevent storage bloat
-  5. **Task Creation in Visits**: Users can optionally create associated tasks when registering visits, with rich text descriptions
-  6. **Legacy Data Migration**: Automatic normalization of legacy `<p></p>` values when editing existing tasks
-- **Offline Capabilities**: Comprehensive offline support with IndexedDB for data caching and storage. Automatic synchronization of created entities, contacts, and tasks when online. Query caching allows offline access to previously fetched data.
-- **Geolocation Integration**: Automatic GPS capture during visit creation, displayed with map links.
-- **Calendar Integration**: Backend-generated, RFC 5545 compliant `.ics` files for visits and tasks, including detailed event data, deep links, and reminders.
-- **PDF Export**: Backend-generated PDF reports for visits, including logos, embedded photos, AI summaries, and linked tasks, with smart pagination.
-- **Advanced Analytics**: RBAC-aware analytics dashboard providing key performance indicators (KPIs) and visualizations for visits, tasks, entities, and brands, with filtering capabilities.
-- **Multi-Agent System with RBAC**: Granular control over data access based on user roles (Admin/Agent), ensuring agents only access their owned or assigned data across entities, contacts, visits, and tasks.
-- **Universal Entidades System**: Migration from a "Gabinetes"-only model to a flexible "Entidades" system supporting various business entity types.
-- **Universal Contact Recognition Module**: Comprehensive contact import system with three methods:
-  1. **QR Code Scanner**: Scans QR codes containing vCard data
-  2. **vCard Parser**: Imports .vcf files with full vCard 3.0/4.0 support
-  3. **Business Card Vision Scanner**: AI-powered extraction from business card photos using OpenAI gpt-4o vision API
-  All three methods utilize universal auto-creation logic that intelligently matches or creates entities based on organization name and domain, with full RBAC enforcement and offline queue support.
-- **Google Custom Search Enrichment Module**: Company enrichment system using Google Custom Search API with AI-powered data extraction:
-  1. **Fuzzy Match Engine**: Multi-algorithm matching against local database using weighted scoring: 50% Jaro-Winkler (sequential similarity), 30% Damerau-Levenshtein with transpositions (edit distance), 20% Metaphone-PT (Portuguese phonetic matching). Threshold ≥0.60 for matches.
-  2. **Google Custom Search**: When no local fuzzy matches found, triggers Google Custom Search API (for Gabinete, Distribuidor, Parceiro, Construtor types only) with caching (24h TTL), rate limiting (20 req/min, 200/day), and spend logging.
-  3. **GPT Data Extraction**: Uses GPT-4o-mini to extract structured company data from search results (nome, telefone, morada, email, website, cidade) with confidence scoring and source URL attribution.
-  4. **tipoEntidade Security**: Multi-layer blocking system prevents Google Search for "Contato Pessoal" entities:
-     - Frontend: GoogleCompanySearch component hidden, search queries disabled, UI shows manual entry message
-     - Backend: Mandatory tipoEntidade validation, immediate rejection for "Contato Pessoal", double-check in Google fallback logic
-     - **Known limitation**: Backend trusts client-supplied tipoEntidade parameter without DB validation when existingEntityId provided. Acceptable for internal authenticated use; production deployment against untrusted clients should add DB lookup to verify persisted tipoEntidade.
-  Endpoint: `POST /api/enrichment/pt-intelligent-search` with full RBAC enforcement and tipoEntidade validation (blocks "Contato Pessoal"). Returns `PTEnrichmentResult` with `fuzzyMatches[]`, `googleResults[]`, and `enrichmentSource` ('fuzzy', 'google', 'disabled', 'none'). Frontend integration via `GoogleCompanySearch` component (formerly PTCompanySearch) with debounced suggestions, source URL visibility, mandatory user confirmation before data persistence, and `fillEntityForm` utility for universal auto-fill. Includes comprehensive offline queue support. Legacy IA-Normalizer and PT-WebScan completely disabled (were generating hallucinated data).
-- **Intelligent Reminder System**: Proactive reminder engine generating three types of notifications:
-  1. **Visit Follow-ups**: Automatically suggests follow-up visits 7 days after the last visit to an entity
-  2. **Overdue Tasks**: Alerts users about pending tasks past their due date
-  3. **AI-Suggested Reminders**: Future capability for intelligent reminder suggestions
-  Reminders are RBAC-aware with watertight security - agents see only reminders for their assigned entities and tasks. Features include snooze (1, 3, 7 days), resolve, and reminder banners integrated into entity and visit detail pages. Real-time badge counts in navigation bell icon.
-- **Microsoft 365 Integration Module (Admin-Only)**: Seamless integration with Microsoft 365 services for task and visit export:
-  1. **OAuth 2.0 Authentication**: Secure OAuth flow with state validation and encrypted token storage in `microsoft_tokens` table. Automatic token refresh via Microsoft Graph API client.
-  2. **Microsoft Planner Export**: Export tasks to Planner with full group/plan/bucket selection, automatic assignment, and bidirectional sync tracking (`plannerTaskId`, `lastPlannerSyncAt` fields).
-  3. **Microsoft To-Do Export**: One-click task creation in To-Do with categories, due dates, and deep links back to the PWA.
-  4. **Outlook Calendar Export**: Create calendar events for visits with AI summaries, location data, automatic reminders, and sync tracking (`outlookEventId`, `lastCalendarSyncAt` fields).
-  5. **RBAC Enforcement**: All Microsoft integration endpoints (auth, data retrieval, export) enforce admin-only access with 403 responses for agents. Tokens are user-specific and isolated per admin account.
-  6. **Frontend Integration Page**: Accessible at `/integracoes/microsoft` with connection status, scopes display, connect/disconnect functionality, and feature overview. Linked prominently from Dashboard.
-  Features full RBAC enforcement, comprehensive error handling, and follows OAuth 2.0 best practices with encrypted credential storage.
-  
-  **STATUS (Nov 22, 2025)**: Temporarily disabled - backend routes commented out in `server/routes.ts` (lines 1559-2125), frontend route disabled in `client/src/App.tsx` (line 35, 81). Reason: Azure App Registration requires valid Client Secret VALUE (not Secret ID). Device Flow implementation added but requires proper tenant configuration. Re-enable when correct Azure credentials are available.
-- **PRO Exports Module**: Advanced PDF generation system with comprehensive analytics, charts, and AI-powered summaries:
-  1. **Visit PDF PRO Export**: Detailed visit reports with embedded photos, AI summaries, linked tasks, GPS coordinates with map links, and optional performance charts. Accessible via `/api/pdf/visita/:id/pro` with query params for options (includePhotos, includeTasks, includeIA, includeCharts). Frontend dialog in VisitaDetail page.
-  2. **Entity PDF PRO Export**: Complete entity history reports including all visits, contact list, task summary, visit frequency charts, brand distribution analytics, and AI-powered executive summaries. Accessible via `/api/pdf/entidade/:id/pro`. Frontend dialog in EntidadeDetail page.
-  3. **Periodic Reports (Monthly/Weekly)**: Agent-specific and company-wide (admin-only) performance reports with KPI metrics, visit trends, task completion rates, brand analytics, and AI-generated insights. Endpoints: `/api/pdf/reports/monthly` and `/api/pdf/reports/weekly` with `scope` param (agent/company). Frontend buttons in Dashboard Reports section.
-  4. **Chart Rendering**: Server-side chart generation using chartjs-node-canvas for embedding bar charts, line charts, and pie charts in PDFs. Supports visit frequency analysis, brand distribution, and task completion metrics.
-  5. **AI-Powered Summaries**: Professional Portuguese (PT-PT) executive summaries generated via OpenAI GPT-4o-mini, providing actionable insights and key highlights for each report type.
-  6. **RBAC Enforcement**: SQL-level filtering ensures agents access only their owned/assigned data; admins access all data. Company-wide reports restricted to admin role.
-  7. **Frontend Implementation**: PDF PRO buttons with dialogs in VisitaDetail, EntidadeDetail, and Dashboard pages. Options include toggles for photos, tasks, AI summaries, charts, and report type selection.
-  Features comprehensive error handling, graceful degradation for missing data, smart pagination for large reports, and offline usage guards.
+-   **Multi-tenant Architecture**: Supports multiple companies with complete data isolation for entities, contacts, visits, tasks, reminders, and brands.
+-   **Rich Text Task Descriptions**: Utilizes TipTap editor for comprehensive formatting, stored as sanitized HTML in the database (DOMPurify for XSS prevention).
+-   **Offline Capabilities**: Comprehensive support with IndexedDB for data caching and automatic synchronization for created entities, contacts, and tasks.
+-   **Geolocation Integration**: Automatic GPS capture for visits with map links.
+-   **Calendar Integration**: Generates RFC 5545 compliant `.ics` files for visits and tasks.
+-   **PDF Export**: Backend-generated PDF reports for visits and entities, including photos, AI summaries, tasks, and smart pagination.
+-   **Advanced Analytics**: RBAC-aware dashboard with KPIs and visualizations for visits, tasks, entities, and brands.
+-   **Universal Entidades System**: Flexible system supporting various business entity types.
+-   **Universal Contact Recognition Module**: Supports contact import via QR code scanning, vCard parsing, and AI-powered business card vision scanning (OpenAI gpt-4o vision API). Includes universal auto-creation logic and offline queue support.
+-   **Google Custom Search Enrichment Module**: Uses Google Custom Search and GPT-4o-mini for company data enrichment, with fuzzy matching against local data, caching, and rate limiting. Includes robust `tipoEntidade` validation to prevent searching for personal contacts.
+-   **Intelligent Reminder System**: Proactive engine generating reminders for visit follow-ups, overdue tasks, and future AI-suggested reminders, all RBAC-aware.
+-   **PRO Exports Module**: Advanced PDF generation with analytics, charts, and AI-powered summaries for visits, entities, and periodic reports (monthly/weekly). Features server-side chart rendering (chartjs-node-canvas) and professional PT-PT executive summaries via OpenAI GPT-4o-mini.
 
 ## External Dependencies
 
-- **Neon Database**: Serverless PostgreSQL hosting for production data persistence.
-- **OpenAI API**: Utilized for AI-powered features, including Whisper for audio transcription and GPT-4o-mini for visit summary generation, email generation, and executive summaries in PDF reports.
-- **Replit Authentication**: OAuth/OIDC provider for user authentication and profile management.
-- **Email Integration**: Prepared for services like Resend or SendGrid for automated email notifications (currently console logging in development).
-- **UI Component Dependencies**: Radix UI primitives, Lucide React for iconography, date-fns for date manipulation.
+-   **Neon Database**: Serverless PostgreSQL hosting.
+-   **OpenAI API**: Used for Whisper (audio transcription), GPT-4o-mini (visit summaries, email generation, executive PDF summaries).
+-   **Replit Authentication**: OAuth/OIDC provider for user authentication.
+-   **Email Integration**: Planned for services like Resend or SendGrid for automated notifications.
+-   **UI Component Dependencies**: Radix UI, Lucide React (iconography), date-fns (date manipulation).
