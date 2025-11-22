@@ -1,0 +1,45 @@
+Temos agora o campo "Marcas Faladas Nesta Visita" a aparecer no VisitaForm, mas a lista de marcas vem sempre vazia, mesmo tendo marcas ativas configuradas em /admin/marcas.
+
+Estado atual:
+- Em /admin/empresa → mostrarMarcasEmVisitas = true.
+- Em /admin/marcas → tenho várias marcas com ativa = true.
+- O VisitaForm faz fetch para "/api/marcas?onlyAtivas=true" com credentials: "include".
+- No Network do browser, o response de /api/marcas?onlyAtivas=true é [] (array vazio).
+
+Preciso que faças debug e corrijas o endpoint /api/marcas para que:
+
+1) Quando chamo:
+   GET /api/marcas?onlyAtivas=true
+   autenticado como user da empresa Divitek,
+   o backend:
+   - use empresaId do user (getUserContext);
+   - devolva TODAS as marcas da tabela "marcas" com:
+     - marcas.empresaId = empresaId
+     - marcas.ativa = true
+
+2) Quando chamo:
+   GET /api/marcas
+   sem query onlyAtivas,
+   o backend pode devolver:
+   - todas as marcas da empresa (ativas e inativas).
+
+Passos que quero que sigas:
+
+A. Mostra-me o código atual da rota GET /api/marcas em server/routes.ts e da função respetiva em server/storage.ts (por ex. getMarcasByEmpresa / getMarcasByEmpresaAtiva).
+
+B. Ajusta a função "getMarcasByEmpresaAtiva" (ou equivalente) em storage.ts para garantir que:
+   - faz sempre where marcas.empresaId = empresaId
+   - faz sempre where marcas.ativa = true
+   - não está a filtrar por nenhum outro campo errado.
+
+C. Ajusta a rota GET /api/marcas em routes.ts para:
+   - usar getUserContext(req) para obter empresaId
+   - se req.query.onlyAtivas === "true", chamar getMarcasByEmpresaAtiva(empresaId)
+   - caso contrário, chamar getMarcasByEmpresa(empresaId)
+
+D. No fim:
+   - corre npm run build para garantir que tudo compila.
+   - indica-me um exemplo de resposta real de GET /api/marcas?onlyAtivas=true (com uma ou duas marcas de exemplo).
+   - confirma que, no VisitaForm, a lista de marcas deixa de vir vazia.
+
+Não alteres o VisitaForm nesta fase — apenas o backend (/api/marcas).

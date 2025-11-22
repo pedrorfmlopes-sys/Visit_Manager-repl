@@ -1445,26 +1445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Marcas endpoints
-  app.get('/api/marcas', isAuthenticated, async (req, res) => {
-    try {
-      const marcas = await storage.getMarcas();
-      res.json(marcas);
-    } catch (error) {
-      console.error("Error fetching marcas:", error);
-      res.status(500).json({ message: "Failed to fetch marcas" });
-    }
-  });
-
-  app.post('/api/marcas', isAuthenticated, async (req, res) => {
-    try {
-      const marca = await storage.createMarca(req.body);
-      res.json(marca);
-    } catch (error) {
-      console.error("Error creating marca:", error);
-      res.status(400).json({ message: "Failed to create marca" });
-    }
-  });
+  // Marcas endpoints (legacy - removed duplicate, using FASE 3+ endpoints below)
 
   // Odoo Integration Placeholder Endpoints
   // POST /api/sync/odoo - Manual sync trigger
