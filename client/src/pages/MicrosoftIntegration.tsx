@@ -1,12 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CheckCircle2, XCircle, Link2, Unlink } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Link2, Unlink, Copy } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface MicrosoftStatus {
   connected: boolean;
@@ -14,9 +23,20 @@ interface MicrosoftStatus {
   expiresAt?: string;
 }
 
+interface DeviceFlowResponse {
+  deviceCode: string;
+  userCode: string;
+  verificationUri: string;
+  expiresIn: number;
+  pollInterval: number;
+}
+
 export default function MicrosoftIntegration() {
   const { toast } = useToast();
   const [isConnecting, setIsConnecting] = useState(false);
+  const [showAuthOptions, setShowAuthOptions] = useState(false);
+  const [deviceFlow, setDeviceFlow] = useState<DeviceFlowResponse | null>(null);
+  const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
 
   const { data: status, isLoading } = useQuery<MicrosoftStatus>({
     queryKey: ['/api/microsoft/auth/status'],
@@ -49,9 +69,84 @@ export default function MicrosoftIntegration() {
     },
   });
 
-  const handleConnect = () => {
+  const handleConnectOAuth = () => {
     setIsConnecting(true);
     window.location.href = '/api/microsoft/auth/login';
+  };
+
+  const handleConnectDeviceFlow = async () => {
+    try {
+      setIsConnecting(true);
+      const response = await fetch('/api/microsoft/auth/device-flow/start', {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!response.ok) throw new Error('Failed to start device flow');
+
+      const data: DeviceFlowResponse = await response.json();
+      setDeviceFlow(data);
+
+      startPolling(data.deviceCode, data.pollInterval);
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível iniciar o Device Flow.',
+        variant: 'destructive',
+      });
+      setIsConnecting(false);
+    }
+  };
+
+  const startPolling = (deviceCode: string, interval: number) => {
+    if (pollInterval) clearInterval(pollInterval);
+
+    const newInterval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/microsoft/auth/device-flow/poll/${deviceCode}`, {
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          clearInterval(newInterval);
+          setPollInterval(null);
+          setDeviceFlow(null);
+          setIsConnecting(false);
+          setShowAuthOptions(false);
+          queryClient.invalidateQueries({ queryKey: ['/api/microsoft/auth/status'] });
+          toast({
+            title: 'Sucesso',
+            description: 'Conta Microsoft ligada com sucesso!',
+          });
+        } else if (response.status === 400) {
+          return;
+        } else if (response.status === 410) {
+          clearInterval(newInterval);
+          setPollInterval(null);
+          setDeviceFlow(null);
+          setIsConnecting(false);
+          toast({
+            title: 'Expirado',
+            description: 'Código expirou. Tente novamente.',
+            variant: 'destructive',
+          });
+        }
+      } catch (error) {
+        console.error('Polling error:', error);
+      }
+    }, interval * 1000);
+
+    setPollInterval(newInterval as any);
+  };
+
+  const handleCopyCode = () => {
+    if (deviceFlow) {
+      navigator.clipboard.writeText(deviceFlow.userCode);
+      toast({
+        title: 'Copiado',
+        description: 'Código copiado para a área de transferência.',
+      });
+    }
   };
 
   const handleDisconnect = () => {
@@ -59,6 +154,12 @@ export default function MicrosoftIntegration() {
       disconnectMutation.mutate();
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [pollInterval]);
 
   if (isLoading) {
     return (
@@ -140,24 +241,95 @@ export default function MicrosoftIntegration() {
                 </Button>
               </>
             ) : (
-              <Button
-                onClick={handleConnect}
-                disabled={isConnecting}
-                data-testid="button-connect"
-              >
-                {isConnecting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    A redirecionar...
-                  </>
-                ) : (
-                  <>
-                    <Link2 className="mr-2 h-4 w-4" />
-                    Ligar Conta Microsoft
-                  </>
+              <>
+                <Button
+                  onClick={() => setShowAuthOptions(true)}
+                  disabled={isConnecting}
+                  data-testid="button-connect"
+                >
+                  {isConnecting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      A processar...
+                    </>
+                  ) : (
+                    <>
+                      <Link2 className="mr-2 h-4 w-4" />
+                      Ligar Conta Microsoft
+                    </>
+                  )}
+                </Button>
+
+                {deviceFlow && (
+                  <div className="mt-4 p-4 border rounded-lg bg-blue-50 dark:bg-blue-900/20">
+                    <h3 className="font-medium mb-3">Código de Autorização</h3>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Copie o código abaixo e visite {' '}
+                      <a 
+                        href={deviceFlow.verificationUri} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        {deviceFlow.verificationUri}
+                      </a>
+                    </p>
+                    <div className="flex gap-2">
+                      <div className="flex-1 bg-white dark:bg-slate-900 p-3 rounded border text-center font-mono text-2xl font-bold tracking-widest">
+                        {deviceFlow.userCode}
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={handleCopyCode}
+                        data-testid="button-copy-code"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-3">
+                      À espera de autorização... (expira em {deviceFlow.expiresIn}s)
+                    </p>
+                  </div>
                 )}
-              </Button>
+              </>
             )}
+
+            <AlertDialog open={showAuthOptions} onOpenChange={setShowAuthOptions}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Escolha o método de autenticação</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Selecione como quer ligar a sua conta Microsoft
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="space-y-3 py-4">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={handleConnectDeviceFlow}
+                    data-testid="button-device-flow"
+                  >
+                    <span className="flex flex-col items-start">
+                      <span className="font-medium">Device Flow (Recomendado)</span>
+                      <span className="text-xs text-muted-foreground">Insira um código no seu browser</span>
+                    </span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={handleConnectOAuth}
+                    data-testid="button-oauth"
+                  >
+                    <span className="flex flex-col items-start">
+                      <span className="font-medium">OAuth Redirect</span>
+                      <span className="text-xs text-muted-foreground">Login tradicional com redirect</span>
+                    </span>
+                  </Button>
+                </div>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              </AlertDialogContent>
+            </AlertDialog>
           </CardContent>
         </Card>
 

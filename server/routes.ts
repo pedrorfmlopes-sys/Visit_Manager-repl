@@ -1686,6 +1686,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Microsoft Device Flow - Start
+  app.post('/api/microsoft/auth/device-flow/start', isAuthenticated, async (req, res) => {
+    try {
+      const clientId = process.env.MICROSOFT_CLIENT_ID;
+      if (!clientId) {
+        return res.status(500).json({ message: 'Microsoft OAuth not configured' });
+      }
+
+      const scopes = ['User.Read', 'Tasks.ReadWrite', 'offline_access'];
+      
+      const params = new URLSearchParams({
+        client_id: clientId,
+        scope: scopes.join(' '),
+      });
+
+      const response = await fetch('https://login.microsoftonline.com/organizations/oauth2/v2.0/devicecode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString(),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to initiate device flow');
+      }
+
+      const data = await response.json();
+      res.json({
+        deviceCode: data.device_code,
+        userCode: data.user_code,
+        verificationUri: data.verification_uri,
+        expiresIn: data.expires_in,
+        pollInterval: data.interval || 5,
+      });
+    } catch (error) {
+      console.error('[Microsoft Auth] Device flow start error:', error);
+      res.status(500).json({ message: 'Device flow initiation failed' });
+    }
+  });
+
+  // Microsoft Device Flow - Poll
+  app.get('/api/microsoft/auth/device-flow/poll/:deviceCode', isAuthenticated, async (req, res) => {
+    try {
+      const { userId } = await getUserContext(req);
+      const { deviceCode } = req.params;
+
+      const clientId = process.env.MICROSOFT_CLIENT_ID;
+      const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
+      
+      if (!clientId || !clientSecret) {
+        return res.status(500).json({ message: 'Microsoft OAuth not configured' });
+      }
+
+      const params = new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        device_code: deviceCode,
+        grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+      });
+
+      const response = await fetch('https://login.microsoftonline.com/organizations/oauth2/v2.0/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString(),
+      });
+
+      if (response.status === 400) {
+        const error = await response.json();
+        if (error.error === 'authorization_pending') {
+          return res.status(400).json({ message: 'Authorization pending' });
+        }
+        if (error.error === 'slow_down') {
+          return res.status(429).json({ message: 'Slow down' });
+        }
+        if (error.error === 'expired_token') {
+          return res.status(410).json({ message: 'Device code expired' });
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error('Token request failed');
+      }
+
+      const tokenData = await response.json();
+
+      const { storeMicrosoftTokens, getMicrosoftTokens } = await import('./microsoft');
+      
+      await storeMicrosoftTokens(userId, {
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token,
+        scopes: tokenData.scope ? tokenData.scope.split(' ') : [],
+        expiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
+      });
+
+      const storedTokens = await getMicrosoftTokens(userId);
+      if (!storedTokens) {
+        return res.status(500).json({ message: 'Token storage failed' });
+      }
+
+      console.log('[Microsoft Auth] Device Flow successful for user:', userId);
+      res.json({ connected: true });
+    } catch (error) {
+      console.error('[Microsoft Auth] Device flow poll error:', error);
+      res.status(500).json({ message: 'Device flow poll failed' });
+    }
+  });
+
   // Microsoft Disconnect
   app.post('/api/microsoft/auth/disconnect', isAuthenticated, async (req, res) => {
     try {
