@@ -1708,10 +1708,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to initiate device flow');
+        const errorText = await response.text();
+        console.error('[Microsoft Auth] Device code request failed:', response.status, errorText);
+        return res.status(500).json({ message: 'Failed to initiate device flow', error: errorText });
       }
 
       const data = await response.json();
+      console.log('[Microsoft Auth] Device flow initiated successfully');
+      
       res.json({
         deviceCode: data.device_code,
         userCode: data.user_code,
