@@ -1,10 +1,14 @@
 import {
+  empresas,
   users,
   entidades,
   contactos,
   visitas,
   tarefas,
   marcas,
+  lembretes,
+  type Empresa,
+  type InsertEmpresa,
   type User,
   type UpsertUser,
   type Entidade,
@@ -26,6 +30,11 @@ import { db } from "./db";
 import { eq, desc, gte, sql, or, and } from "drizzle-orm";
 
 export interface IStorage {
+  // Empresas (Multi-tenant)
+  getEmpresa(id: string): Promise<Empresa | undefined>;
+  createEmpresa(empresa: InsertEmpresa): Promise<Empresa>;
+  getAllEmpresas(): Promise<Empresa[]>;
+
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
@@ -72,10 +81,14 @@ export interface IStorage {
   // Entidades helpers
   getAllEntidades(userId: string, userRole: 'admin' | 'agent'): Promise<EntidadeWithRelations[]>;
   
-  // Marcas
-  getMarcas(): Promise<Marca[]>;
+  // Marcas (by empresa)
+  getMarcasByEmpresa(empresaId: string): Promise<Marca[]>;
+  getMarcasByEmpresaAtiva(empresaId: string): Promise<Marca[]>;
   getMarca(id: string): Promise<Marca | undefined>;
   createMarca(marca: InsertMarca): Promise<Marca>;
+  
+  // Legacy Marcas (deprecated - for migration)
+  getMarcas(): Promise<Marca[]>;
   
   // Dashboard stats
   getDashboardStats(userId: string, userRole: 'admin' | 'agent'): Promise<{
@@ -123,6 +136,24 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  // Empresas
+  async getEmpresa(id: string): Promise<Empresa | undefined> {
+    const [empresa] = await db.select().from(empresas).where(eq(empresas.id, id));
+    return empresa;
+  }
+
+  async createEmpresa(empresaData: InsertEmpresa): Promise<Empresa> {
+    const [empresa] = await db
+      .insert(empresas)
+      .values(empresaData)
+      .returning();
+    return empresa;
+  }
+
+  async getAllEmpresas(): Promise<Empresa[]> {
+    return db.select().from(empresas).orderBy(empresas.nome);
+  }
+
   // User operations
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -764,9 +795,17 @@ export class DatabaseStorage implements IStorage {
     return visita;
   }
 
-  // Marcas
-  async getMarcas(): Promise<Marca[]> {
-    return db.select().from(marcas).orderBy(marcas.nome);
+  // Marcas (by empresa)
+  async getMarcasByEmpresa(empresaId: string): Promise<Marca[]> {
+    return db.select().from(marcas)
+      .where(eq(marcas.empresaId, empresaId))
+      .orderBy(marcas.nome);
+  }
+
+  async getMarcasByEmpresaAtiva(empresaId: string): Promise<Marca[]> {
+    return db.select().from(marcas)
+      .where(and(eq(marcas.empresaId, empresaId), eq(marcas.ativa, true)))
+      .orderBy(marcas.nome);
   }
 
   async getMarca(id: string): Promise<Marca | undefined> {
@@ -780,6 +819,11 @@ export class DatabaseStorage implements IStorage {
       .values(marca)
       .returning();
     return newMarca;
+  }
+
+  // Legacy Marcas (deprecated - for migration purposes)
+  async getMarcas(): Promise<Marca[]> {
+    return db.select().from(marcas).orderBy(marcas.nome);
   }
 
   // Dashboard stats

@@ -52,12 +52,13 @@ const upload = multer({
   },
 });
 
-// Helper function to get user ID and role from request
-async function getUserContext(req: any): Promise<{ userId: string; userRole: 'admin' | 'agent' }> {
+// Helper function to get user ID, role, and empresa from request
+async function getUserContext(req: any): Promise<{ userId: string; userRole: 'admin' | 'agent'; empresaId?: string }> {
   const userId = req.user.claims.sub;
   const user = await storage.getUser(userId);
   const userRole = user?.role || 'agent'; // Default to 'agent' if not set
-  return { userId, userRole };
+  const empresaId = user?.empresaId; // Get empresaId from user
+  return { userId, userRole, empresaId };
 }
 
 /**

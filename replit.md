@@ -8,6 +8,44 @@ This Progressive Web Application (PWA) facilitates commercial visit management f
 
 Preferred communication style: Simple, everyday language.
 
+## Current Implementation Status
+
+### FASE 1: Multi-empresa Architecture (✅ Completed - Nov 22, 2025)
+**Objective**: Implement multi-tenant (multi-empresa) support with company isolation and user roles.
+
+**Completed:**
+1. ✅ Created `empresas` table (id, nome, nif, email, telefone, logoUrl, mostrarMarcasEmVisitas, createdAt, updatedAt)
+2. ✅ Added `empresaId` FK to `users` table (links users to company)
+3. ✅ Added `empresaId` FK to all business tables:
+   - entidades, contactos, visitas, tarefas, lembretes, marcas
+4. ✅ Refactored `marcas` table:
+   - Added `empresaId` FK (company-specific brands)
+   - Added `codigo` field (brand code)
+   - Added `ativa` boolean flag (active/inactive status)
+   - Added timestamps (createdAt, updatedAt)
+5. ✅ Updated `storage.ts` interface:
+   - Added `getEmpresa()`, `createEmpresa()`, `getAllEmpresas()` operations
+   - Added `getMarcasByEmpresa()`, `getMarcasByEmpresaAtiva()` operations
+6. ✅ Improved `getUserContext()` function in `server/routes.ts`:
+   - Now returns `empresaId` along with userId and userRole
+7. ✅ Created migration seed script (`server/seed-enterprise.ts`):
+   - Creates initial "Divitek" company (tenant)
+   - Associates all 23 existing users to Divitek
+   - Associates all existing business data to Divitek
+   - Successfully migrated without data loss
+
+**Database Changes:**
+- Schema updated via `npm run db:push --force`
+- Seed script run: `npx tsx server/seed-enterprise.ts` 
+- Result: 23 users + all entities/contacts/visits/tasks/reminders/brands now linked to Divitek company
+
+**Next Steps (FASE 2+):**
+- Apply empresaId filtering in all CRUD operations (currently not filtering yet)
+- Update frontend pages to display company-specific data
+- Implement brand management UI (company-specific marcas list)
+- Add empresa configuration page (logo, mostrarMarcasEmVisitas setting)
+- Implement user invitation system (add users to company)
+
 ## System Architecture
 
 ### Frontend Architecture
