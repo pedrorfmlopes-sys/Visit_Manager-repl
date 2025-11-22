@@ -1,0 +1,70 @@
+Perfeito, FASE 2 concluída 👍  
+A app já está multi-empresa no backend, por isso quero agora começar o BACKOFFICE de configuração.
+
+⚙️ NOVO OBJECTIVO – FASE 3: API de administração (empresa, utilizadores, marcas)
+
+Quero implementar as seguintes coisas, apenas em backend nesta fase (sem UI ainda):
+
+1) Rotas de configuração da EMPRESA
+   - Criar endpoints:
+     - GET /api/admin/empresa
+       → devolve os dados da empresa do utilizador autenticado (usando empresaId do contexto).
+     - PATCH /api/admin/empresa
+       → atualiza dados da empresa:
+         - nome
+         - nif
+         - email
+         - telefone
+         - logoUrl (string para já; o upload tratamos depois)
+         - mostrarMarcasEmVisitas (boolean que controla se o campo "marcas" aparece na página de visitas)
+   - Estes endpoints devem:
+     - usar getUserContext / ensureAuthenticated
+     - estar protegidos com requireAdmin (apenas admins podem aceder)
+
+2) Rotas de gestão de UTILIZADORES da empresa
+   - Criar endpoints:
+     - GET /api/admin/utilizadores
+       → lista todos os utilizadores da MESMA empresa do utilizador autenticado.
+     - POST /api/admin/utilizadores
+       → cria um novo utilizador associado à empresa do admin que está a chamar (empresaId vem sempre do contexto, nunca do body).
+     - PATCH /api/admin/utilizadores/:id
+       → permite:
+         - alterar o role (admin / user)
+         - ativar/desativar utilizador (se já existir esse campo na tabela; se não existir, podes adicionar um booleano "ativo" com default true).
+   - Todos protegidos com requireAdmin.
+
+3) Rotas de gestão de MARCAS da empresa
+   - Aproveitar a tabela marcas que já criaste (empresaId, nome, codigo, ativa, etc.).
+   - Criar endpoints:
+     - GET /api/admin/marcas
+       → lista todas as marcas da empresa do utilizador autenticado (incluindo ativas e inativas).
+     - POST /api/admin/marcas
+       → cria uma nova marca:
+         - empresaId = empresaId do contexto (não vem do body)
+         - campos: nome (obrigatório), codigo (opcional), ativa (default true)
+     - PATCH /api/admin/marcas/:id
+       → permite:
+         - alterar nome/codigo
+         - ativar/desativar (campo ativa)
+   - Criar também uma rota NÃO-admin para uso normal da app:
+     - GET /api/marcas?onlyAtivas=true
+       → devolve apenas marcas ATIVAS da empresa do utilizador autenticado.
+       → esta rota é autenticada mas não precisa de requireAdmin.
+
+4) Requisitos gerais:
+   - Todos estes endpoints devem:
+     - usar o contexto de utilizador (userId, empresaId, userRole)
+     - nunca permitir mexer em dados de outra empresa
+     - reutilizar o padrão que já implementaste (empresaId como 1.º parâmetro no storage).
+   - Garante que o storage tem funções adequadas para:
+     - obter/atualizar a empresa atual
+     - listar/criar/editar utilizadores dessa empresa
+     - listar/criar/editar marcas dessa empresa
+     - obter marcas ativas para o endpoint público /api/marcas
+
+5) No final da FASE 3, preciso que:
+   - listes todos os novos endpoints criados
+   - expliques rapidamente como os testar (exemplos com curl ou similar)
+   - garantes que a app continua a compilar e arrancar normalmente (npm run build / npm run dev)
+
+Não alteres ainda o frontend. Nesta fase quero só o backend de administração pronto.

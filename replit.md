@@ -6,6 +6,22 @@ This Progressive Web Application (PWA) streamlines commercial visit management f
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
+## Project Status
+
+### FASE Completion
+- FASE 1: Multi-empresa architecture (completed)
+- FASE 2: 24 API endpoints with empresaId filtering (completed)
+- FASE 3: Backoffice Admin API - 9 endpoints for empresa, utilizadores, marcas (completed)
+
+### FASE 3 Implementation
+Added field `ativo: boolean` to users table for activation control. Implemented 9 backend endpoints (requireAdmin middleware enforced):
+- GET/PATCH /api/admin/empresa (company settings)
+- GET/POST/PATCH /api/admin/utilizadores (user management with role + ativo)
+- GET/POST/PATCH /api/admin/marcas (brand management)
+- GET /api/marcas?onlyAtivas=true (public endpoint, authenticated non-admin users)
+
+All admin endpoints enforce multi-tenant security: extract empresaId from context, validate existence, pass as first storage parameter.
+
 ## System Architecture
 
 ### Frontend Architecture

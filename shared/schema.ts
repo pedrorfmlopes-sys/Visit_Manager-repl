@@ -107,6 +107,7 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   role: userRoleEnum("role").notNull().default('agent'),
+  ativo: boolean("ativo").default(true).notNull(), // FASE 3: User activation toggle
   empresaId: varchar("empresa_id").references(() => empresas.id, { onDelete: 'cascade' }), // NOVO: FK para empresas
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

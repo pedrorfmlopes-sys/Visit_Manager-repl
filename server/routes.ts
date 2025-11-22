@@ -2600,6 +2600,212 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // FASE 3: Backoffice Admin API
+  // ============================================
+
+  // GET /api/admin/empresa - Get current company config
+  app.get('/api/admin/empresa', requireAdmin, async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const empresa = await storage.getEmpresa(empresaId);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa not found" });
+      }
+      res.json(empresa);
+    } catch (error) {
+      console.error("Error fetching empresa:", error);
+      res.status(500).json({ message: "Failed to fetch empresa" });
+    }
+  });
+
+  // PATCH /api/admin/empresa - Update company config
+  app.patch('/api/admin/empresa', requireAdmin, async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const { nome, nif, email, telefone, logoUrl, mostrarMarcasEmVisitas } = req.body;
+      
+      const updateData: Partial<Empresa> = {};
+      if (nome !== undefined) updateData.nome = nome;
+      if (nif !== undefined) updateData.nif = nif;
+      if (email !== undefined) updateData.email = email;
+      if (telefone !== undefined) updateData.telefone = telefone;
+      if (logoUrl !== undefined) updateData.logoUrl = logoUrl;
+      if (mostrarMarcasEmVisitas !== undefined) updateData.mostrarMarcasEmVisitas = mostrarMarcasEmVisitas;
+      
+      const updated = await storage.updateEmpresa(empresaId, updateData);
+      if (!updated) {
+        return res.status(404).json({ message: "Empresa not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating empresa:", error);
+      res.status(500).json({ message: "Failed to update empresa" });
+    }
+  });
+
+  // GET /api/admin/utilizadores - List all users in company
+  app.get('/api/admin/utilizadores', requireAdmin, async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const utilizadores = await storage.getUtilizadoresByEmpresa(empresaId);
+      res.json(utilizadores);
+    } catch (error) {
+      console.error("Error fetching utilizadores:", error);
+      res.status(500).json({ message: "Failed to fetch utilizadores" });
+    }
+  });
+
+  // POST /api/admin/utilizadores - Create new user
+  app.post('/api/admin/utilizadores', requireAdmin, async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const { email, firstName, lastName, role } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+      
+      // FASE 3: Create user with company
+      const newUser = await storage.createUtilizador({
+        email,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        role: role || 'agent',
+        empresaId,
+        ativo: true,
+      });
+      
+      res.json(newUser);
+    } catch (error) {
+      console.error("Error creating utilizador:", error);
+      res.status(400).json({ message: "Failed to create utilizador" });
+    }
+  });
+
+  // PATCH /api/admin/utilizadores/:id - Update user
+  app.patch('/api/admin/utilizadores/:id', requireAdmin, async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const { role, ativo } = req.body;
+      
+      const updateData: Partial<User> = {};
+      if (role !== undefined && ['admin', 'agent'].includes(role)) {
+        updateData.role = role;
+      }
+      if (ativo !== undefined) {
+        updateData.ativo = ativo;
+      }
+      
+      const updated = await storage.updateUtilizador(req.params.id, updateData, empresaId);
+      if (!updated) {
+        return res.status(404).json({ message: "Utilizador not found or unauthorized" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating utilizador:", error);
+      res.status(500).json({ message: "Failed to update utilizador" });
+    }
+  });
+
+  // GET /api/admin/marcas - List all brands (admin only)
+  app.get('/api/admin/marcas', requireAdmin, async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const marcas = await storage.getMarcasByEmpresa(empresaId);
+      res.json(marcas);
+    } catch (error) {
+      console.error("Error fetching marcas:", error);
+      res.status(500).json({ message: "Failed to fetch marcas" });
+    }
+  });
+
+  // POST /api/admin/marcas - Create new brand
+  app.post('/api/admin/marcas', requireAdmin, async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const { nome, codigo, descricao, logoUrl, ativa } = req.body;
+      
+      if (!nome) {
+        return res.status(400).json({ message: "Brand name is required" });
+      }
+      
+      // FASE 3: Create marca with company
+      const newMarca = await storage.createMarca({
+        empresaId,
+        nome,
+        codigo: codigo || null,
+        descricao: descricao || null,
+        logoUrl: logoUrl || null,
+        ativa: ativa !== false, // default true
+      });
+      
+      res.json(newMarca);
+    } catch (error) {
+      console.error("Error creating marca:", error);
+      res.status(400).json({ message: "Failed to create marca" });
+    }
+  });
+
+  // PATCH /api/admin/marcas/:id - Update brand
+  app.patch('/api/admin/marcas/:id', requireAdmin, async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const { nome, codigo, descricao, logoUrl, ativa } = req.body;
+      
+      const updateData: Partial<Marca> = {};
+      if (nome !== undefined) updateData.nome = nome;
+      if (codigo !== undefined) updateData.codigo = codigo;
+      if (descricao !== undefined) updateData.descricao = descricao;
+      if (logoUrl !== undefined) updateData.logoUrl = logoUrl;
+      if (ativa !== undefined) updateData.ativa = ativa;
+      
+      const updated = await storage.updateMarca(req.params.id, updateData, empresaId);
+      if (!updated) {
+        return res.status(404).json({ message: "Marca not found or unauthorized" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating marca:", error);
+      res.status(500).json({ message: "Failed to update marca" });
+    }
+  });
+
+  // GET /api/marcas - List active brands (public endpoint, authenticated but no admin required)
+  app.get('/api/marcas', isAuthenticated, async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const onlyAtivas = req.query.onlyAtivas === 'true';
+      
+      const marcas = onlyAtivas 
+        ? await storage.getMarcasByEmpresaAtiva(empresaId)
+        : await storage.getMarcasByEmpresa(empresaId);
+      
+      res.json(marcas);
+    } catch (error) {
+      console.error("Error fetching marcas:", error);
+      res.status(500).json({ message: "Failed to fetch marcas" });
+    }
+  });
+
   // Serve uploaded files
   app.use('/uploads', isAuthenticated, (req, res, next) => {
     const filePath = path.join('/tmp/uploads', req.path);

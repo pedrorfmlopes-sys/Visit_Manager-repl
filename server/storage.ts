@@ -86,7 +86,14 @@ export interface IStorage {
   getMarcasByEmpresaAtiva(empresaId: string): Promise<Marca[]>;
   getMarca(id: string): Promise<Marca | undefined>;
   createMarca(marca: InsertMarca): Promise<Marca>;
+  updateMarca(id: string, marca: Partial<InsertMarca>, empresaId: string): Promise<Marca | undefined>;
   
+  // FASE 3: Empresa & Users management
+  updateEmpresa(id: string, empresa: Partial<InsertEmpresa>): Promise<Empresa | undefined>;
+  getUtilizadoresByEmpresa(empresaId: string): Promise<User[]>;
+  createUtilizador(userData: UpsertUser): Promise<User>;
+  updateUtilizador(id: string, userData: Partial<UpsertUser>, empresaId: string): Promise<User | undefined>;
+
   // Legacy Marcas (deprecated - for migration)
   getMarcas(): Promise<Marca[]>;
   
@@ -908,6 +915,49 @@ export class DatabaseStorage implements IStorage {
       .values(marca)
       .returning();
     return newMarca;
+  }
+
+  async updateMarca(id: string, marca: Partial<InsertMarca>, empresaId: string): Promise<Marca | undefined> {
+    const [updated] = await db
+      .update(marcas)
+      .set({ ...marca, updatedAt: new Date() })
+      .where(and(eq(marcas.id, id), eq(marcas.empresaId, empresaId)))
+      .returning();
+    return updated;
+  }
+
+  // FASE 3: Empresa management
+  async updateEmpresa(id: string, empresa: Partial<InsertEmpresa>): Promise<Empresa | undefined> {
+    const [updated] = await db
+      .update(empresas)
+      .set({ ...empresa, updatedAt: new Date() })
+      .where(eq(empresas.id, id))
+      .returning();
+    return updated;
+  }
+
+  // FASE 3: User management by empresa
+  async getUtilizadoresByEmpresa(empresaId: string): Promise<User[]> {
+    return db.select().from(users)
+      .where(eq(users.empresaId, empresaId))
+      .orderBy(users.email);
+  }
+
+  async createUtilizador(userData: UpsertUser): Promise<User> {
+    const [newUser] = await db
+      .insert(users)
+      .values(userData)
+      .returning();
+    return newUser;
+  }
+
+  async updateUtilizador(id: string, userData: Partial<UpsertUser>, empresaId: string): Promise<User | undefined> {
+    const [updated] = await db
+      .update(users)
+      .set({ ...userData, updatedAt: new Date() })
+      .where(and(eq(users.id, id), eq(users.empresaId, empresaId)))
+      .returning();
+    return updated;
   }
 
   // Legacy Marcas (deprecated - for migration purposes)
