@@ -77,6 +77,28 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
+// NOVO: Empresas (Companies/Tenants) table
+export const empresas = pgTable("empresas", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  nome: varchar("nome", { length: 255 }).notNull(),
+  nif: varchar("nif", { length: 50 }),
+  email: varchar("email", { length: 255 }),
+  telefone: varchar("telefone", { length: 50 }),
+  logoUrl: varchar("logo_url", { length: 500 }),
+  mostrarMarcasEmVisitas: boolean("mostrar_marcas_em_visitas").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEmpresaSchema = createInsertSchema(empresas).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertEmpresa = z.infer<typeof insertEmpresaSchema>;
+export type Empresa = typeof empresas.$inferSelect;
+
 // User storage table (required for Replit Auth)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -85,25 +107,50 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   role: userRoleEnum("role").notNull().default('agent'),
+  empresaId: varchar("empresa_id").references(() => empresas.id, { onDelete: 'cascade' }), // NOVO: FK para empresas
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const usersRelations = relations(users, ({ one, many }) => ({
+  empresa: one(empresas, {
+    fields: [users.empresaId],
+    references: [empresas.id],
+  }),
+  entidades: many(entidades),
+  contactos: many(contactos),
+  visitas: many(visitas),
+  tarefas: many(tarefas),
+  lembretes: many(lembretes),
+}));
+
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
-// Marcas (Brands) table
+// REFAITA: Marcas (Brands) table - agora com empresaId, codigo, ativa
 export const marcas = pgTable("marcas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: 'cascade' }), // NOVO
   nome: varchar("nome", { length: 255 }).notNull(),
+  codigo: varchar("codigo", { length: 100 }),
   descricao: text("descricao"),
   logoUrl: varchar("logo_url", { length: 500 }),
+  ativa: boolean("ativa").default(true).notNull(), // NOVO
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+export const marcasRelations = relations(marcas, ({ one }) => ({
+  empresa: one(empresas, {
+    fields: [marcas.empresaId],
+    references: [empresas.id],
+  }),
+}));
 
 export const insertMarcaSchema = createInsertSchema(marcas).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
 export type InsertMarca = z.infer<typeof insertMarcaSchema>;
@@ -112,6 +159,7 @@ export type Marca = typeof marcas.$inferSelect;
 // Entidades (Universal Entities) table - replaces Gabinetes
 export const entidades = pgTable("entidades", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: 'cascade' }), // NOVO
   tipoEntidade: tipoEntidadeEnum("tipo_entidade").notNull().default('Gabinete'),
   nome: varchar("nome", { length: 255 }).notNull(),
   morada: text("morada"),
@@ -232,6 +280,7 @@ export type Gabinete = typeof gabinetes.$inferSelect;
 // Contactos (Contacts) table
 export const contactos = pgTable("contactos", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: 'cascade' }), // NOVO
   nome: varchar("nome", { length: 255 }).notNull(),
   funcao: varchar("funcao", { length: 255 }),
   telemovel: varchar("telemovel", { length: 50 }),
@@ -254,6 +303,10 @@ export const contactos = pgTable("contactos", {
 });
 
 export const contactosRelations = relations(contactos, ({ one }) => ({
+  empresa: one(empresas, {
+    fields: [contactos.empresaId],
+    references: [empresas.id],
+  }),
   entidade: one(entidades, {
     fields: [contactos.entidadeId],
     references: [entidades.id],
@@ -269,6 +322,10 @@ export const contactosRelations = relations(contactos, ({ one }) => ({
 }));
 
 export const entidadesRelations = relations(entidades, ({ one, many }) => ({
+  empresa: one(empresas, {
+    fields: [entidades.empresaId],
+    references: [empresas.id],
+  }),
   contactos: many(contactos),
   visitas: many(visitas),
   assignedUser: one(users, {
@@ -299,6 +356,7 @@ export type Contacto = typeof contactos.$inferSelect;
 // Visitas (Visits) table
 export const visitas = pgTable("visitas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: 'cascade' }), // NOVO
   entidadeId: varchar("entidade_id").references(() => entidades.id, { onDelete: 'set null' }),
   gabineteId: varchar("gabinete_id").references(() => gabinetes.id, { onDelete: 'set null' }), // DEPRECATED
   contactoId: varchar("contacto_id").references(() => contactos.id, { onDelete: 'set null' }),
@@ -332,6 +390,10 @@ export const visitas = pgTable("visitas", {
 });
 
 export const visitasRelations = relations(visitas, ({ one }) => ({
+  empresa: one(empresas, {
+    fields: [visitas.empresaId],
+    references: [empresas.id],
+  }),
   entidade: one(entidades, {
     fields: [visitas.entidadeId],
     references: [entidades.id],
@@ -377,6 +439,7 @@ export type Visita = typeof visitas.$inferSelect;
 // Tarefas (Tasks) table
 export const tarefas = pgTable("tarefas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: 'cascade' }), // NOVO
   titulo: varchar("titulo", { length: 500 }).notNull(),
   descricao: text("descricao"),
   visitaId: varchar("visita_id").references(() => visitas.id, { onDelete: 'set null' }),
@@ -405,6 +468,10 @@ export const tarefas = pgTable("tarefas", {
 });
 
 export const tarefasRelations = relations(tarefas, ({ one }) => ({
+  empresa: one(empresas, {
+    fields: [tarefas.empresaId],
+    references: [empresas.id],
+  }),
   visita: one(visitas, {
     fields: [tarefas.visitaId],
     references: [visitas.id],
@@ -450,6 +517,7 @@ export type Tarefa = typeof tarefas.$inferSelect;
 // Lembretes (Reminders) table
 export const lembretes = pgTable("lembretes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: 'cascade' }), // NOVO
   userId: varchar("user_id", { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
   entidadeId: varchar("entidade_id").references(() => entidades.id, { onDelete: 'cascade' }),
   visitaId: varchar("visita_id").references(() => visitas.id, { onDelete: 'cascade' }),
@@ -464,6 +532,10 @@ export const lembretes = pgTable("lembretes", {
 });
 
 export const lembretesRelations = relations(lembretes, ({ one }) => ({
+  empresa: one(empresas, {
+    fields: [lembretes.empresaId],
+    references: [empresas.id],
+  }),
   user: one(users, {
     fields: [lembretes.userId],
     references: [users.id],
@@ -519,7 +591,18 @@ export type InsertMicrosoftToken = z.infer<typeof insertMicrosoftTokenSchema>;
 export type MicrosoftToken = typeof microsoftTokens.$inferSelect;
 
 // Extended types for relations
+export type EmpresaWithRelations = Empresa & {
+  users?: User[];
+  marcas?: Marca[];
+  entidades?: Entidade[];
+  contactos?: Contacto[];
+  visitas?: Visita[];
+  tarefas?: Tarefa[];
+  lembretes?: Lembrete[];
+};
+
 export type EntidadeWithRelations = Entidade & {
+  empresa?: Empresa;
   contactos?: Contacto[];
   visitas?: Visita[];
   assignedUser?: User | null;
@@ -532,6 +615,7 @@ export type GabineteWithRelations = Gabinete & {
 };
 
 export type ContactoWithRelations = Contacto & {
+  empresa?: Empresa;
   entidade?: Entidade | null;
   gabinete?: Gabinete | null;
   assignedUser?: User | null;
@@ -539,6 +623,7 @@ export type ContactoWithRelations = Contacto & {
 };
 
 export type VisitaWithRelations = Visita & {
+  empresa?: Empresa;
   entidade?: Entidade | null;
   gabinete?: Gabinete | null;
   contacto?: Contacto | null;
@@ -548,6 +633,7 @@ export type VisitaWithRelations = Visita & {
 };
 
 export type TarefaWithRelations = Tarefa & {
+  empresa?: Empresa;
   visita?: Visita | null;
   entidade?: Entidade | null;
   assignedUser?: User | null;
@@ -555,6 +641,7 @@ export type TarefaWithRelations = Tarefa & {
 };
 
 export type LembreteWithRelations = Lembrete & {
+  empresa?: Empresa;
   user?: User;
   entidade?: Entidade | null;
   visita?: Visita | null;

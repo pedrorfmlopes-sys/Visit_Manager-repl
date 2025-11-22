@@ -1,0 +1,65 @@
+FASE 1 – Multi-empresa + roles + tabela de marcas + config base da empresa
+
+Objetivo desta fase:
+- Introduzir o conceito de EMPRESA (tenant).
+- Ligar utilizadores e dados de negócio a uma empresa.
+- Introduzir roles de utilizador (admin / user).
+- Criar tabela de MARCAS por empresa, com flag de ativo/inativo.
+- Preparar configuração base da empresa (incluindo opção de mostrar ou não o campo de marcas e um campo para guardar o logo).
+
+O que quero que faças nesta fase (SEM ainda mexer na UI do frontend):
+
+1) Tabela EMPRESAS
+   - Cria uma tabela "empresas" no schema (Drizzle) com, pelo menos:
+     - id
+     - nome
+     - nif (opcional)
+     - email (opcional)
+     - telefone (opcional)
+     - logoUrl (string opcional) → para guardarmos o caminho/URL do logótipo da empresa
+     - mostrarMarcasEmVisitas (boolean, default false) → se true, o campo “marcas” aparece nas visitas
+     - createdAt, updatedAt
+
+2) Users com empresa e role
+   - Na tabela "users":
+     - adiciona um campo empresaId (FK para empresas).
+     - adiciona um campo role (string ou enum) com pelo menos "admin" e "user".
+   - Garante que isto bate certo com o resto do código (tipos TypeScript, etc.).
+
+3) Dados de negócio com empresa
+   - Nas tabelas principais de negócio (entidades, contactos, visitas, tarefas, lembretes e marcas se já existir):
+     - adiciona um campo empresaId.
+   - O objetivo é: todos os registos passam a pertencer a uma empresa.
+
+4) Tabela MARCAS
+   - Cria uma tabela "marcas" separada, que representa as marcas configuráveis por empresa, com:
+     - id
+     - empresaId (FK para empresas)
+     - nome
+     - codigo (opcional)
+     - ativa (boolean, default true)
+     - createdAt, updatedAt
+   - Esta tabela vai ser usada mais tarde para configurar as marcas que aparecem nas visitas.
+
+5) Migração / compatibilidade
+   - Propõe uma forma simples de migrar os dados existentes:
+     - criar uma empresa inicial (por exemplo "Divitek").
+     - associar todos os utilizadores existentes a essa empresa.
+     - associar todos os registos existentes (entidades, contactos, visitas, tarefas, etc.) a essa empresa.
+   - Indica:
+     - quais os comandos Drizzle/migração a executar (ex.: npm run db:push).
+     - se precisares de um script de seed/migração, mostra o código desse script e explica onde o coloco e como o executo.
+
+6) Contexto de utilizador (ainda sem mexer nas rotas)
+   - Garante que existe uma função/utilitário de contexto de utilizador que consiga devolver:
+     - userId
+     - empresaId
+     - role
+   - Se já existe algo semelhante, ajusta-o para incluir empresaId e role, mas nesta fase NÃO alteres ainda as rotas para usar isso.
+
+IMPORTANTE:
+- Não mexas ainda no frontend nesta fase.
+- Não mudes ainda a lógica das rotas/storage para filtrar por empresaId (isso será na Fase 2).
+- No fim, quero conseguir correr a app (npm run dev) sem erros de build.
+
+Começa por listar os ficheiros que vais alterar e depois mostra o código dos blocos finais de cada alteração.
