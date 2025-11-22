@@ -1617,6 +1617,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
       const redirectUri = `${req.protocol}://${req.get('host')}/api/microsoft/auth/callback`;
       
+      console.log('[Microsoft Auth] Client ID:', clientId ? clientId.substring(0, 10) + '...' : 'MISSING');
+      console.log('[Microsoft Auth] Client Secret length:', clientSecret?.length || 0);
+      console.log('[Microsoft Auth] Client Secret:', clientSecret ? clientSecret.substring(0, 10) + '...' : 'MISSING');
+      
       if (!clientId || !clientSecret) {
         console.error('[Microsoft Auth] Missing client credentials');
         return res.status(500).json({ message: 'Microsoft OAuth not configured' });
