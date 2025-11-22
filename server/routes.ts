@@ -1701,7 +1701,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         scope: scopes.join(' '),
       });
 
-      const response = await fetch('https://login.microsoftonline.com/organizations/oauth2/v2.0/devicecode', {
+      const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/devicecode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: params.toString(),
@@ -1749,7 +1749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
       });
 
-      const response = await fetch('https://login.microsoftonline.com/organizations/oauth2/v2.0/token', {
+      const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: params.toString(),
