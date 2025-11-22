@@ -1,0 +1,154 @@
+FASE 5 – Campo “marcas” nas visitas + uso do logo da empresa na app e nos PDFs
+
+Contexto rápido do estado atual (não precisas repetir, é só para te orientar):
+- Backend já está multi-empresa (empresaId em todas as tabelas).
+- RBAC e requireAdmin já implementados.
+- Backoffice backend pronto:
+  - /api/admin/empresa (GET/PATCH)
+  - /api/admin/utilizadores (GET/POST/PATCH)
+  - /api/admin/marcas (GET/POST/PATCH)
+  - /api/marcas?onlyAtivas=true (marcas ativas da empresa)
+- Frontend backoffice pronto:
+  - Páginas AdminEmpresa, AdminUsers, AdminMarcas
+  - /api/auth/user já devolve empresa (nome, logoUrl, mostrarMarcasEmVisitas)
+  - useAuth expõe user, empresa e isAdmin
+
+Agora quero implementar 3 coisas:
+
+1) **Campo “Marcas faladas” nas visitas** (backend + frontend).  
+2) **Uso de `logoUrl` da empresa no layout da app** (frontend).  
+3) **Uso de `logoUrl` no cabeçalho dos PDFs de visita** (backend).
+
+Quero que faças isto em 3 blocos, nesta ordem:
+
+----------------------------------------------------
+🧩 BLOCO 1 – Modelo + backend: associar marcas às visitas
+----------------------------------------------------
+
+Objetivo: ter uma forma robusta de saber “em que visita se falou de que marcas”.
+
+1. Modelo de dados
+   - Implementa a associação entre visitas e marcas.
+   - Podes optar por uma destas abordagens (escolhe a que fizer mais sentido em cima do schema atual):
+     A) Tabela de relação `visitas_marcas` com:
+        - id
+        - visitaId
+        - marcaId
+        - empresaId
+        - timestamps
+     B) Ou, se fizer mesmo mais sentido pela estrutura atual, um campo array/json na tabela visitas (ex: lista de IDs de marca).
+   - Preferência: se não complicar demasiado, usa a tabela de relação (é o padrão mais limpo para N:M).
+
+2. Atualizar schema + storage + rotas
+   - Atualiza o schema (shared/schema.ts) com:
+     - nova tabela de relação OU novo campo em visitas (conforme a abordagem escolhida).
+   - Atualiza as funções de storage relacionadas com visitas:
+     - createVisita
+     - updateVisita (se existir)
+     - getVisita
+     - getVisitas (se fizer sentido)
+   - Quando criar/atualizar uma visita, o backend deve:
+     - aceitar uma lista de IDs de marcas (por ex. `marcasIds`).
+     - validar que essas marcas pertencem à mesma empresa do utilizador.
+     - gravar a associação (tabela de relação ou campo).
+   - No GET /api/visitas/:id:
+     - devolver também a lista de marcas associadas, pelo menos:
+       - id
+       - nome
+     - Pode ser algo como `marcas: Array<{ id: string; nome: string; codigo?: string }>`.
+
+3. Endpoints que interagem com visitas e marcas devem:
+   - seguir sempre o padrão multi-empresa:
+     - obter empresaId via getUserContext
+     - usar empresaId no storage
+   - garantir que uma visita nunca pode ser associada a marcas de outra empresa.
+
+No final deste bloco:
+- Diz exatamente que campos/tabela nova criaste.
+- Mostra como é que o payload de uma visita fica (input e output) em termos de marcas.
+
+----------------------------------------------------
+🧩 BLOCO 2 – Frontend: campo “Marcas faladas” em Visitas
+----------------------------------------------------
+
+Objetivo: no formulário de visita, escolher marcas; no detalhe, vê-las como etiquetas.
+
+1. Regras de visibilidade
+   - O campo “Marcas faladas” só deve aparecer se:
+     - `empresa.mostrarMarcasEmVisitas === true`
+     - ou seja, se o admin tiver ativado esta opção em /admin/empresa.
+   - Usa a info que já vem de /api/auth/user / useAuth para saber se mostrar ou não.
+
+2. Formulário de criação/edição de visita (VisitaForm)
+   - Ao montar o form:
+     - fazer `GET /api/marcas?onlyAtivas=true` para obter as marcas ativas da empresa.
+   - Adicionar um campo “Marcas faladas nesta visita” que:
+     - permita selecionar **várias** marcas.
+     - mostre as selecionadas como tags/etiquetas (chips).
+   - Integração com react-hook-form:
+     - o campo deve ser um array de ids de marca (ex: `marcasIds: string[]`).
+   - Ao submeter:
+     - enviar as marcas selecionadas para o backend de acordo com o modelo do BLOCO 1.
+
+3. Detalhe da visita (VisitaDetail)
+   - No GET /api/visitas/:id já teremos a lista de marcas associadas.
+   - Mostrar secção do tipo:
+     - Título: “Marcas faladas nesta visita”
+     - Se não houver nenhuma:
+       - texto tipo “Nenhuma marca registada nesta visita.”
+     - Se houver:
+       - mostrar tags com o nome da marca (por ex. `[Ritmonio] [Revestech] [Profiltek]`).
+
+No final deste bloco:
+- Diz que ficheiros mexeste no frontend (pages de visita, hooks, etc.).
+- Explica como testar:
+  - criar marca ativa
+  - ativar mostrarMarcasEmVisitas
+  - criar visita com marcas
+  - ver no detalhe.
+
+----------------------------------------------------
+🧩 BLOCO 3 – Logo da empresa na app e nos PDFs
+----------------------------------------------------
+
+Objetivo: usar o `logoUrl` já configurado em /admin/empresa para personalizar a app e os PDFs.
+
+1. Logo no frontend (layout da app)
+   - Usa os dados que já vêm de /api/auth/user (empresa.logoUrl).
+   - No layout principal (header ou zona superior da app, onde fizer mais sentido visualmente):
+     - se `empresa.logoUrl` existir:
+       - mostrar `<img>` com esse logo (com tamanho razoável, ex.: altura 32–48px).
+     - se não existir:
+       - manter comportamento atual (nome da app / empresa em texto).
+   - Garante que:
+     - o layout continua a funcionar bem em mobile (bottom nav, etc.).
+     - em caso de logo inválido (url quebrado), a app não rebenta (pode simplesmente não mostrar img).
+
+2. Logo nos PDFs de visita
+   - No gerador de PDFs de visita (ficheiro server/… responsável por PDF das visitas):
+     - obtém os dados da empresa associada à visita (usando empresaId da visita/user).
+     - se `logoUrl` estiver definido:
+       - carrega a imagem e coloca o logótipo no cabeçalho do PDF (por exemplo, canto superior esquerdo ou centrado).
+     - mantém o resto do layout do PDF igual ao atual.
+   - Se o logo não estiver configurado, gera o PDF como atualmente (sem logo).
+
+3. Testes finais que quero que descrevas
+   - Como testar no frontend:
+     - definir um logoUrl válido em /admin/empresa.
+     - fazer login e confirmar que:
+       - o logo aparece na app.
+   - Como testar no PDF:
+     - criar/usar uma visita existente.
+     - gerar o PDF dessa visita.
+     - confirmar que o logo aparece no cabeçalho.
+   - E o mesmo cenário com:
+     - empresa sem logo → PDF sem logo, app sem imagem.
+
+----------------------------------------------------
+Reforço final:
+- Mantém as alterações o mais isoladas possível em cada bloco.
+- Continua a usar o padrão multi-tenant (empresaId em tudo).
+- Mostra sempre:
+  - ficheiros alterados
+  - blocos de código finais relevantes
+  - passos de teste no fim da fase.

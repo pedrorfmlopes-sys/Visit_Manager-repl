@@ -20,18 +20,21 @@ import { useToast } from "@/hooks/use-toast";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useCurrentUser, useAllUsers, useIsAdmin } from "@/hooks/use-user-context";
+import { useAuth } from "@/hooks/useAuth";
 import { LocationPreview } from "@/components/LocationPreview";
-import { insertVisitaSchema, type InsertVisita, type Entidade, type Contacto, type InsertTarefa } from "@shared/schema";
+import { insertVisitaSchema, type InsertVisita, type Entidade, type Contacto, type InsertTarefa, type Marca } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { syncManager } from "@/lib/syncManager";
 import { offlineStorage } from "@/lib/offlineStorage";
 import { RichTextEditor } from "@/components/RichTextEditor";
+import { Badge } from "@/components/ui/badge";
 import { z } from "zod";
 
 const visitaFormSchema = insertVisitaSchema.extend({
   entidadeId: z.string().min(1, "Selecione uma entidade"),
   dataVisita: z.date(),
+  marcasIds: z.array(z.string()).optional(),
 });
 
 type VisitaFormData = z.infer<typeof visitaFormSchema>;
@@ -55,6 +58,7 @@ export default function VisitaForm() {
   const { data: currentUser } = useCurrentUser();
   const { data: allUsers = [] } = useAllUsers();
   const isAdmin = useIsAdmin();
+  const { empresa } = useAuth();
 
   const { data: entidades } = useQuery<Entidade[]>({
     queryKey: ["/api/entidades"],
@@ -62,6 +66,11 @@ export default function VisitaForm() {
 
   const { data: contactos } = useQuery<Contacto[]>({
     queryKey: ["/api/contactos"],
+  });
+
+  const { data: marcas = [] } = useQuery<Marca[]>({
+    queryKey: ["/api/marcas"],
+    enabled: empresa?.mostrarMarcasEmVisitas ?? false,
   });
 
   const form = useForm<VisitaFormData>({
@@ -72,6 +81,7 @@ export default function VisitaForm() {
       dataVisita: new Date(),
       notas: "",
       marcasEntregues: [],
+      marcasIds: [],
       proximaVisita: undefined,
       userId: "",
       createdByUserId: currentUser?.id,
@@ -80,6 +90,7 @@ export default function VisitaForm() {
   });
 
   const selectedEntidadeId = form.watch("entidadeId");
+  const selectedMarcasIds = form.watch("marcasIds") || [];
   const filteredContactos = contactos?.filter(c => c.entidadeId === selectedEntidadeId);
 
   const createMutation = useMutation({
@@ -230,6 +241,7 @@ export default function VisitaForm() {
     if (data.notas) formData.append("notas", data.notas);
     if (data.proximaVisita) formData.append("proximaVisita", data.proximaVisita.toISOString());
     if (data.marcasEntregues) formData.append("marcasEntregues", JSON.stringify(data.marcasEntregues));
+    if (data.marcasIds && data.marcasIds.length > 0) formData.append("marcasIds", JSON.stringify(data.marcasIds));
     
     // Add ownership fields
     if (createdByUserId) formData.append("createdByUserId", createdByUserId);
@@ -437,6 +449,50 @@ export default function VisitaForm() {
                 </FormItem>
               )}
             />
+
+            {/* FASE 5: Marcas Faladas */}
+            {empresa?.mostrarMarcasEmVisitas && (
+              <FormField
+                control={form.control}
+                name="marcasIds"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Marcas Faladas Nesta Visita</FormLabel>
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        {marcas.map((marca) => {
+                          const isSelected = selectedMarcasIds.includes(marca.id);
+                          return (
+                            <button
+                              key={marca.id}
+                              type="button"
+                              onClick={() => {
+                                const newIds = isSelected
+                                  ? selectedMarcasIds.filter(id => id !== marca.id)
+                                  : [...selectedMarcasIds, marca.id];
+                                field.onChange(newIds);
+                              }}
+                              data-testid={`button-marca-${marca.id}`}
+                            >
+                              <Badge 
+                                variant={isSelected ? "default" : "outline"}
+                                className="cursor-pointer"
+                              >
+                                {marca.nome}
+                              </Badge>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {marcas.length === 0 && (
+                        <p className="text-sm text-muted-foreground">Nenhuma marca disponível</p>
+                      )}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <div className="space-y-2">
               <FormLabel>Áudio da Visita</FormLabel>

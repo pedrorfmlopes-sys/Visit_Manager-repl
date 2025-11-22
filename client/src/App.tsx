@@ -116,7 +116,7 @@ function Router() {
 }
 
 function AppContent() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, empresa } = useAuth();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const prevOnlineStatus = useRef<boolean | null>(null);
 
@@ -154,6 +154,21 @@ function AppContent() {
 
   return (
     <div className="relative">
+      {/* FASE 5: App header with logo */}
+      {isAuthenticated && empresa?.logoUrl && (
+        <header className="sticky top-0 z-20 bg-background border-b border-border px-4 py-2">
+          <div className="flex items-center justify-center h-12">
+            <img 
+              src={empresa.logoUrl} 
+              alt={empresa.nome} 
+              className="h-full max-h-12 object-contain"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          </div>
+        </header>
+      )}
       <Router />
       {isAuthenticated && <BottomNav />}
       {isAuthenticated && <SyncIndicator />}

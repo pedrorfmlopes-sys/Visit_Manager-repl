@@ -21,6 +21,7 @@ import { EmailAIDialog } from "@/components/EmailAIDialog";
 import { formatVisitForSharing } from "@/lib/shareFormatters";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
 import { syncManager } from "@/lib/syncManager";
 import { insertTarefaSchema } from "@shared/schema";
@@ -509,6 +510,24 @@ export default function VisitaDetail() {
               <div className="flex flex-wrap gap-2">
                 {visita.marcasEntregues.map((marca, idx) => (
                   <Badge key={idx} variant="secondary">{marca}</Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* FASE 5: Marcas Faladas */}
+        {visita.marcas && visita.marcas.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Marcas Faladas Nesta Visita</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {visita.marcas.map((visitaMarca) => (
+                  <Badge key={visitaMarca.id} variant="default">
+                    {visitaMarca.marca.nome}
+                  </Badge>
                 ))}
               </div>
             </CardContent>

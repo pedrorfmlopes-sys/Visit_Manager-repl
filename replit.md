@@ -13,14 +13,27 @@ Preferred communication style: Simple, everyday language.
 - FASE 2: 24 API endpoints with empresaId filtering (completed)
 - FASE 3: Backoffice Admin API - 9 endpoints for empresa, utilizadores, marcas (completed)
 
-### FASE 3 Implementation
-Added field `ativo: boolean` to users table for activation control. Implemented 9 backend endpoints (requireAdmin middleware enforced):
-- GET/PATCH /api/admin/empresa (company settings)
-- GET/POST/PATCH /api/admin/utilizadores (user management with role + ativo)
-- GET/POST/PATCH /api/admin/marcas (brand management)
-- GET /api/marcas?onlyAtivas=true (public endpoint, authenticated non-admin users)
+### FASE 4 Implementation
+Frontend backoffice with 3 admin pages (AdminEmpresa, AdminUsers, AdminMarcas). Protected routes with AdminRoute wrapper. Admin links in BottomNav visible only to admins. Auth system enhanced to return empresa data including mostrarMarcasEmVisitas flag.
 
-All admin endpoints enforce multi-tenant security: extract empresaId from context, validate existence, pass as first storage parameter.
+### FASE 5 Implementation (Marcas em Visitas + Logo da Empresa)
+**Backend:**
+- Created `visitasMarcas` junction table (visitaId, marcaId, empresaId) for many-to-many relationship
+- Updated `getVisita()` storage to fetch related marcas with `with: { marcas: { with: { marca: true } } }`
+- Added `addMarcasToVisita(visitaId, marcasIds[], empresaId)` storage function
+- Modified POST/PATCH `/api/visitas` to accept `marcasIds` array and manage relationships
+- Migration: `npm run db:push` created `visitas_marcas` table successfully
+
+**Frontend:**
+- VisitaForm: Added condicional "Marcas Faladas" field (shows only if `empresa.mostrarMarcasEmVisitas === true`)
+  - Fetches marcas via `GET /api/marcas?onlyAtivas=true`
+  - Multi-select with Badge UI (tap to select/deselect)
+  - Sends `marcasIds` array to backend
+- VisitaDetail: Shows marcas section with Badge display (reads from `visita.marcas` relationship)
+- App.tsx: Added company logo display in sticky header (if `empresa.logoUrl` exists)
+  - Logo fails gracefully if URL is invalid
+
+**Database:** Table `visitas_marcas` created with PKs: (visitaId, marcaId, empresaId)
 
 ## System Architecture
 

@@ -21,5 +21,6 @@ export function useAuth() {
     isLoading,
     isAuthenticated: !!user,
     isAdmin: user?.role === 'admin',
+    empresa: user?.empresa,
   };
 }

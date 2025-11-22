@@ -390,7 +390,7 @@ export const visitas = pgTable("visitas", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const visitasRelations = relations(visitas, ({ one }) => ({
+export const visitasRelations = relations(visitas, ({ one, many }) => ({
   empresa: one(empresas, {
     fields: [visitas.empresaId],
     references: [empresas.id],
@@ -415,6 +415,7 @@ export const visitasRelations = relations(visitas, ({ one }) => ({
     fields: [visitas.createdByUserId],
     references: [users.id],
   }),
+  marcas: many(visitasMarcas),
 }));
 
 export const insertVisitaSchema = createInsertSchema(visitas).omit({
@@ -436,6 +437,30 @@ export const insertVisitaSchema = createInsertSchema(visitas).omit({
 
 export type InsertVisita = z.infer<typeof insertVisitaSchema>;
 export type Visita = typeof visitas.$inferSelect;
+
+// FASE 5: Visitas Marcas (relationship table)
+export const visitasMarcas = pgTable("visitas_marcas", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  visitaId: varchar("visita_id").notNull().references(() => visitas.id, { onDelete: 'cascade' }),
+  marcaId: varchar("marca_id").notNull().references(() => marcas.id, { onDelete: 'cascade' }),
+  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: 'cascade' }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const visitasMarcasRelations = relations(visitasMarcas, ({ one }) => ({
+  visita: one(visitas, {
+    fields: [visitasMarcas.visitaId],
+    references: [visitas.id],
+  }),
+  marca: one(marcas, {
+    fields: [visitasMarcas.marcaId],
+    references: [marcas.id],
+  }),
+  empresa: one(empresas, {
+    fields: [visitasMarcas.empresaId],
+    references: [empresas.id],
+  }),
+}));
 
 // Tarefas (Tasks) table
 export const tarefas = pgTable("tarefas", {

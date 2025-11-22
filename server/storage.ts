@@ -6,6 +6,7 @@ import {
   visitas,
   tarefas,
   marcas,
+  visitasMarcas,
   lembretes,
   type Empresa,
   type InsertEmpresa,
@@ -530,6 +531,11 @@ export class DatabaseStorage implements IStorage {
         entidade: true,
         contacto: true,
         user: true,
+        marcas: {
+          with: {
+            marca: true,
+          },
+        },
       },
     });
   }
@@ -541,6 +547,24 @@ export class DatabaseStorage implements IStorage {
       .values({ ...visita, empresaId })
       .returning();
     return newVisita;
+  }
+
+  // FASE 5: Add marcas to visita
+  async addMarcasToVisita(visitaId: string, marcasIds: string[], empresaId: string): Promise<void> {
+    if (!marcasIds || marcasIds.length === 0) return;
+    
+    // Delete existing marcas for this visita
+    await db.delete(visitasMarcas).where(eq(visitasMarcas.visitaId, visitaId));
+    
+    // Insert new marcas
+    if (marcasIds.length > 0) {
+      const marcasData = marcasIds.map(marcaId => ({
+        visitaId,
+        marcaId,
+        empresaId,
+      }));
+      await db.insert(visitasMarcas).values(marcasData);
+    }
   }
 
   async updateVisita(id: string, visita: Partial<Visita>, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<Visita | undefined> {

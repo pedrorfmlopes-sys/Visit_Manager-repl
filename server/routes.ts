@@ -1281,6 +1281,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create visita - FASE 2: auto-set empresaId
       const visita = await storage.createVisita({ ...visitaData, empresaId });
 
+      // FASE 5: Add marcas to visita if provided
+      if (req.body.marcasIds) {
+        try {
+          let marcasIds: string[] = [];
+          if (typeof req.body.marcasIds === 'string') {
+            marcasIds = JSON.parse(req.body.marcasIds);
+          } else if (Array.isArray(req.body.marcasIds)) {
+            marcasIds = req.body.marcasIds;
+          }
+          if (Array.isArray(marcasIds) && marcasIds.length > 0) {
+            await storage.addMarcasToVisita(visita.id, marcasIds, empresaId);
+          }
+        } catch (error) {
+          console.error("Error adding marcas to visita:", error);
+        }
+      }
+
       // Generate AI summary asynchronously
       const visitaComplete = await storage.getVisita(visita.id, empresaId, userId, userRole);
       if (visitaComplete) {
