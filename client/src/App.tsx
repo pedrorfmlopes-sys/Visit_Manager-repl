@@ -29,10 +29,34 @@ import TarefaDetail from "@/pages/TarefaDetail";
 import Lembretes from "@/pages/Lembretes";
 import Analytics from "@/pages/Analytics";
 import QRScanner from "@/pages/QRScanner";
+import AdminEmpresa from "@/pages/AdminEmpresa";
+import AdminUsers from "@/pages/AdminUsers";
+import AdminMarcas from "@/pages/AdminMarcas";
 // import MicrosoftIntegration from "@/pages/MicrosoftIntegration"; // Disabled: requires valid Azure credentials
 
+// Protected admin route component
+function AdminRoute({ component: Component }: { component: typeof AdminEmpresa }) {
+  const { isAdmin, isLoading } = useAuth();
+  
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse">
+          <div className="w-16 h-16 bg-primary rounded-2xl"></div>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!isAdmin) {
+    return <NotFound />;
+  }
+  
+  return <Component />;
+}
+
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, isAdmin } = useAuth();
 
   if (isLoading) {
     return (
@@ -75,6 +99,14 @@ function Router() {
           <Route path="/analytics" component={Analytics} />
           <Route path="/qr" component={QRScanner} />
           <Route path="/qr-scanner" component={QRScanner} />
+          {/* Admin routes - FASE 4 */}
+          {isAdmin && (
+            <>
+              <Route path="/admin/empresa" component={() => <AdminRoute component={AdminEmpresa} />} />
+              <Route path="/admin/utilizadores" component={() => <AdminRoute component={AdminUsers} />} />
+              <Route path="/admin/marcas" component={() => <AdminRoute component={AdminMarcas} />} />
+            </>
+          )}
           {/* <Route path="/integracoes/microsoft" component={MicrosoftIntegration} /> */}
         </>
       )}

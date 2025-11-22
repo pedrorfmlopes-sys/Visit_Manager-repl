@@ -296,7 +296,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      res.json(user);
+      
+      // FASE 4: Include empresa data in auth response
+      let empresa = null;
+      if (user?.empresaId) {
+        empresa = await storage.getEmpresa(user.empresaId);
+      }
+      
+      res.json({
+        ...user,
+        empresa: empresa ? {
+          id: empresa.id,
+          nome: empresa.nome,
+          logoUrl: empresa.logoUrl,
+          mostrarMarcasEmVisitas: empresa.mostrarMarcasEmVisitas,
+        } : null,
+      });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });

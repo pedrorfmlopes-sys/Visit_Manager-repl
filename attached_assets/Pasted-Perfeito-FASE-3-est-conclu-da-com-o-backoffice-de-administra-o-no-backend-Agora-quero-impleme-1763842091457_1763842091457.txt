@@ -1,0 +1,167 @@
+Perfeito, FASE 3 está concluída com o backoffice de administração no backend.
+
+Agora quero implementar a FASE 4: UI de backoffice no frontend, sem mexer em mais nada no backend.
+
+🎯 OBJETIVO FASE 4 – FRONTEND BACKOFFICE
+
+Criar páginas de administração no frontend para:
+1. Configuração da empresa (dados + mostrarMarcasEmVisitas + logoUrl como string)
+2. Gestão de utilizadores
+3. Gestão de marcas
+
+E garantir que:
+- Só utilizadores com role "admin" conseguem ver e aceder a estas páginas.
+- As páginas usam os endpoints que já implementaste em Fase 3:
+  - GET/PATCH /api/admin/empresa
+  - GET/POST/PATCH /api/admin/utilizadores
+  - GET/POST/PATCH /api/admin/marcas
+  - GET /api/marcas?onlyAtivas=true (para uso futuro na página de visitas)
+
+⚙️ REGRAS GERAIS
+
+- Mantém o estilo atual da app:
+  - React + TypeScript
+  - React Query para chamadas à API
+  - react-hook-form + zod para formulários, quando fizer sentido
+  - wouter para routing
+- Faz alterações em blocos pequenos e claros:
+  - Diz sempre que ficheiros estás a editar (caminho relativo).
+  - Para cada ficheiro, mostra o bloco final relevante (não apenas diffs incompletos).
+  - No fim da fase, explica como testar cada página.
+
+---
+
+### 1) Expor role e empresa no frontend
+
+1. Garante que a resposta de /api/auth/user já devolve:
+   - role (admin/user/agent)
+   - dados básicos da empresa:
+     - id
+     - nome
+     - logoUrl
+     - mostrarMarcasEmVisitas
+2. Atualiza o hook/contexto de autenticação no frontend (por exemplo useAuth) para:
+   - guardar esta informação
+   - expor algo como:
+     - user (id, email, role, etc.)
+     - empresa (id, nome, logoUrl, mostrarMarcasEmVisitas)
+
+Se for preciso mexer no backend apenas para incluir estes campos na resposta de /api/auth/user, podes fazê-lo, mas mantém as alterações mínimas.
+
+---
+
+### 2) Navegação / rotas de administração
+
+1. No App.tsx (ou onde estiveres a definir as rotas do wouter):
+   - Adiciona rotas:
+     - /admin/empresa
+     - /admin/utilizadores
+     - /admin/marcas
+   - Estas rotas devem:
+     - só ser acessíveis se user.role === "admin"
+     - se um não-admin tentar entrar diretamente, deve ver:
+       - ou um redirect para a homepage
+       - ou uma mensagem simples de “Acesso reservado a administradores” (o que for mais simples de integrar com o padrão atual).
+
+2. Na navegação principal (menu, bottom nav, etc.):
+   - Adiciona uma secção “Administração” ou itens “Empresa”, “Utilizadores”, “Marcas” visíveis apenas para admins.
+
+Explica onde colocaste estes links e como fizeste a proteção de rotas no frontend.
+
+---
+
+### 3) Página de Configuração da Empresa – /admin/empresa
+
+Criar uma página React (por exemplo em client/src/pages/AdminEmpresaPage.tsx) que:
+
+1. Ao montar:
+   - faz GET /api/admin/empresa via React Query.
+2. Mostra um formulário simples com:
+   - nome
+   - nif
+   - email
+   - telefone
+   - logoUrl (input texto por agora; o upload de ficheiro fica para uma fase futura)
+   - mostrarMarcasEmVisitas (checkbox)
+3. Ao submeter:
+   - faz PATCH /api/admin/empresa com os campos alterados.
+4. Tratamento:
+   - loading e erro básicos (mensagens simples).
+   - snackbar/alert ou feedback simples de sucesso (por exemplo, “Configuração guardada com sucesso”).
+
+Usa react-hook-form + zod, se possível, alinhado com o estilo atual da app.
+
+---
+
+### 4) Página de Gestão de Utilizadores – /admin/utilizadores
+
+Criar uma página React (ex.: AdminUsersPage.tsx) que:
+
+1. Ao montar:
+   - faz GET /api/admin/utilizadores.
+2. Mostra:
+   - uma lista/tab de utilizadores da empresa, com pelo menos:
+     - email
+     - nome (firstName/lastName, se existirem)
+     - role
+     - ativo (true/false)
+3. Funcionalidades:
+   - Formulário simples para criar um novo utilizador:
+     - campos: email (obrigatório), firstName (opcional), lastName (opcional), role (admin/agent/user).
+     - envia POST /api/admin/utilizadores.
+     - após criação, refaz o fetch da lista.
+   - Possibilidade de alterar role e ativo de um utilizador:
+     - PATCH /api/admin/utilizadores/:id
+     - pode ser via dropdown + botão “Guardar” ou através de botões simples (ex.: “Tornar admin”, “Desativar”).
+
+Mantém a UI simples mas funcional; não é preciso ser bonito, só claro e coerente.
+
+---
+
+### 5) Página de Gestão de Marcas – /admin/marcas
+
+Criar uma página React (ex.: AdminMarcasPage.tsx) que:
+
+1. Ao montar:
+   - faz GET /api/admin/marcas.
+2. Mostra:
+   - lista de marcas da empresa com:
+     - nome
+     - codigo (se houver)
+     - ativa (true/false)
+3. Funcionalidades:
+   - Formulário para criar nova marca:
+     - nome (obrigatório)
+     - codigo (opcional)
+     - ativa (checkbox, default true)
+     - POST /api/admin/marcas
+   - Edição de marca existente:
+     - PATCH /api/admin/marcas/:id para:
+       - alterar nome/codigo
+       - ativar/desativar (ativa true/false)
+
+Esta página é a base para o campo “marcas” nas visitas na próxima fase.
+
+---
+
+### 6) Testes que quero no final da Fase 4
+
+No final, explica como posso testar, por exemplo:
+
+1. Entrar como admin, ver o menu de Administração aparecer.
+2. Abrir /admin/empresa:
+   - ler dados atuais
+   - alterar nome e mostrarMarcasEmVisitas
+   - ver se o PATCH funciona.
+3. Abrir /admin/utilizadores:
+   - ver lista de utilizadores
+   - criar um novo utilizador
+   - mudar role/ativo de um utilizador.
+4. Abrir /admin/marcas:
+   - ver lista de marcas
+   - criar nova marca
+   - ativar/desativar uma marca.
+5. Tentar aceder a /admin/* com um utilizador não-admin:
+   - confirmar que o frontend bloqueia (redirect ou mensagem).
+
+Por favor, faz esta Fase 4 de forma incremental, mas apresenta-me já os ficheiros finais relevantes (rotas, hooks e novas páginas). Não mexas ainda na página de visitas nesta fase.
