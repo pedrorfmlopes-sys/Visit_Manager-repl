@@ -35,6 +35,40 @@ Frontend backoffice with 3 admin pages (AdminEmpresa, AdminUsers, AdminMarcas). 
 
 **Database:** Table `visitas_marcas` created with PKs: (visitaId, marcaId, empresaId)
 
+### FASE 6 Implementation (Áudio em Visitas com Transcrição por IA)
+**Database:**
+- Created `visitasAudio` table: id (PK), visitaId (FK), empresaId (FK), fileUrl, transcricao (optional), createdAt
+- Enforces multi-tenant isolation: empresaId always validated
+
+**Backend Storage Functions:**
+- `addAudioToVisita(visitaId, fileUrl, empresaId)` - Add audio clip
+- `getVisitasAudio(visitaId, empresaId)` - List all audio clips for visit (ordered by newest first)
+- `deleteVisitasAudio(audioId, empresaId)` - Delete audio clip (with empresaId validation)
+- `updateVisitasAudioTranscription(audioId, transcricao)` - Update transcription text
+
+**Backend Endpoints:**
+- POST `/api/visitas/:id/audio` - Upload audio file (multipart, uses Multer)
+- GET `/api/visitas/:id/audio` - List audio clips for visit
+- DELETE `/api/visitas/:id/audio/:audioId` - Delete specific audio clip
+- POST `/api/visitas/:id/audio/:audioId/transcrever` - Transcribe audio via OpenAI Whisper (PT language)
+
+**Frontend:**
+- VisitaForm: Existing "Áudio da Visita" file input (uploads during visit creation via POST /api/visitas)
+- VisitaDetail: Added "Áudio da Visita" section (FASE 6) showing:
+  - List of audio clips with dates
+  - "Ouvir" link to download/play audio
+  - "Transcrever" button (AI-powered, only if not yet transcribed)
+  - "Transcrito" badge (shows when transcription done)
+  - Delete button with confirmation
+  - Transcription text display (if available)
+  - All mutations with loading states and success/error toasts
+
+**Architecture:**
+- Audio clips stored separately from visita (1-to-many relationship via visitasAudio table)
+- Multi-visit support: Can add/manage multiple audio clips per visit after creation
+- Transcription is async via OpenAI Whisper API (requires OPENAI_API_KEY)
+- User must have access to visita to manage its audio (empresaId + role validation)
+
 ## System Architecture
 
 ### Frontend Architecture

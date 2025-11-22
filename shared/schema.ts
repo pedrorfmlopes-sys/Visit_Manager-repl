@@ -416,6 +416,7 @@ export const visitasRelations = relations(visitas, ({ one, many }) => ({
     references: [users.id],
   }),
   marcas: many(visitasMarcas),
+  audio: many(visitasAudio),
 }));
 
 export const insertVisitaSchema = createInsertSchema(visitas).omit({
@@ -461,6 +462,36 @@ export const visitasMarcasRelations = relations(visitasMarcas, ({ one }) => ({
     references: [empresas.id],
   }),
 }));
+
+// FASE 6: Visitas Audio (multiple audio clips per visit with transcription)
+export const visitasAudio = pgTable("visitas_audio", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  visitaId: varchar("visita_id").notNull().references(() => visitas.id, { onDelete: 'cascade' }),
+  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: 'cascade' }),
+  fileUrl: varchar("file_url", { length: 500 }).notNull(),
+  transcricao: text("transcricao"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const visitasAudioRelations = relations(visitasAudio, ({ one }) => ({
+  visita: one(visitas, {
+    fields: [visitasAudio.visitaId],
+    references: [visitas.id],
+  }),
+  empresa: one(empresas, {
+    fields: [visitasAudio.empresaId],
+    references: [empresas.id],
+  }),
+}));
+
+export const insertVisitasAudioSchema = createInsertSchema(visitasAudio).omit({
+  id: true,
+  empresaId: true,
+  createdAt: true,
+});
+
+export type InsertVisitasAudio = z.infer<typeof insertVisitasAudioSchema>;
+export type VisitasAudio = typeof visitasAudio.$inferSelect;
 
 // Tarefas (Tasks) table
 export const tarefas = pgTable("tarefas", {

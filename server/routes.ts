@@ -1202,6 +1202,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // FASE 6: Audio endpoints
+  app.post('/api/visitas/:id/audio', isAuthenticated, upload.single('audio'), async (req: any, res) => {
+    try {
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const visita = await storage.getVisita(req.params.id, empresaId, userId, userRole);
+      if (!visita) return res.status(404).json({ message: "Visita not found" });
+      
+      if (!req.file) return res.status(400).json({ message: "No audio file provided" });
+      
+      const fileUrl = `/uploads/${req.file.filename}`;
+      const audioRecord = await storage.addAudioToVisita(req.params.id, fileUrl, empresaId);
+      res.json(audioRecord);
+    } catch (error) {
+      console.error("Error uploading audio:", error);
+      res.status(400).json({ message: "Failed to upload audio" });
+    }
+  });
+
+  app.get('/api/visitas/:id/audio', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const visita = await storage.getVisita(req.params.id, empresaId, userId, userRole);
+      if (!visita) return res.status(404).json({ message: "Visita not found" });
+      
+      const audioClips = await storage.getVisitasAudio(req.params.id, empresaId);
+      res.json(audioClips);
+    } catch (error) {
+      console.error("Error fetching audio:", error);
+      res.status(500).json({ message: "Failed to fetch audio" });
+    }
+  });
+
+  app.delete('/api/visitas/:id/audio/:audioId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const visita = await storage.getVisita(req.params.id, empresaId, userId, userRole);
+      if (!visita) return res.status(404).json({ message: "Visita not found" });
+      
+      await storage.deleteVisitasAudio(req.params.audioId, empresaId);
+      res.json({ message: "Audio deleted" });
+    } catch (error) {
+      console.error("Error deleting audio:", error);
+      res.status(400).json({ message: "Failed to delete audio" });
+    }
+  });
+
+  app.post('/api/visitas/:id/audio/:audioId/transcrever', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const visita = await storage.getVisita(req.params.id, empresaId, userId, userRole);
+      if (!visita) return res.status(404).json({ message: "Visita not found" });
+      
+      const openaiApiKey = process.env.OPENAI_API_KEY;
+      if (!openaiApiKey) return res.status(500).json({ message: "OpenAI not configured" });
+      
+      const { OpenAI } = await import('openai');
+      const client = new OpenAI({ apiKey: openaiApiKey });
+      
+      const audioRecord = await storage.getVisitasAudio(req.params.id, empresaId);
+      const targetAudio = audioRecord.find(a => a.id === req.params.audioId);
+      
+      if (!targetAudio || !targetAudio.fileUrl) {
+        return res.status(404).json({ message: "Audio not found" });
+      }
+      
+      const transcription = await client.audio.transcriptions.create({
+        file: await fetch(`http://localhost:5000${targetAudio.fileUrl}`).then(r => r.blob()),
+        model: "whisper-1",
+        language: "pt",
+      });
+      
+      const updated = await storage.updateVisitasAudioTranscription(req.params.audioId, transcription.text);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error transcribing audio:", error);
+      res.status(400).json({ message: "Failed to transcribe audio" });
+    }
+  });
+
   app.post('/api/visitas', isAuthenticated, upload.fields([
     { name: 'audio', maxCount: 1 },
     { name: 'media', maxCount: 10 }

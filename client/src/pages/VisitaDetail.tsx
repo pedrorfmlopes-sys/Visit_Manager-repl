@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles, Bell } from "lucide-react";
+import { ArrowLeft, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles, Bell, Volume2, Trash2, Loader2 } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { pt } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import type { VisitaWithRelations, Tarefa, InsertTarefa, Lembrete } from "@shared/schema";
+import type { VisitaWithRelations, Tarefa, InsertTarefa, Lembrete, VisitasAudio } from "@shared/schema";
 import { downloadNextVisitICS } from "@/lib/calendarExport";
 import { LocationPreview } from "@/components/LocationPreview";
 import { TarefaCard } from "@/components/TarefaCard";
@@ -70,9 +70,51 @@ export default function VisitaDetail() {
     queryKey: ['/api/lembretes'],
   });
 
+  // FASE 6: Audio clips
+  const { data: audioClips = [] } = useQuery<VisitasAudio[]>({
+    queryKey: ["/api/visitas", visitaId, "audio"],
+    enabled: !!visitaId,
+  });
+
   const visitReminders = allLembretes?.filter(l => 
     l.entidadeId === visita?.entidadeId || l.visitaId === visitaId
   ) || [];
+
+  const deleteAudioMutation = useMutation({
+    mutationFn: async (audioId: string) => {
+      const response = await fetch(`/api/visitas/${visitaId}/audio/${audioId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to delete audio');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId, "audio"] });
+      toast({ title: "Áudio removido", description: "O clip de áudio foi removido com sucesso." });
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Falha ao remover áudio.", variant: "destructive" });
+    },
+  });
+
+  const transcribeMutation = useMutation({
+    mutationFn: async (audioId: string) => {
+      const response = await fetch(`/api/visitas/${visitaId}/audio/${audioId}/transcrever`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to transcribe audio');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId, "audio"] });
+      toast({ title: "Sucesso", description: "Áudio transcrito com sucesso!" });
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Falha na transcrição.", variant: "destructive" });
+    },
+  });
 
   const tomorrow = addDays(new Date(), 1);
   
@@ -528,6 +570,78 @@ export default function VisitaDetail() {
                   <Badge key={visitaMarca.id} variant="default">
                     {visitaMarca.marca.nome}
                   </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* FASE 6: Áudio da Visita */}
+        {audioClips.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Volume2 className="h-4 w-4" />
+                Áudio da Visita
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {audioClips.map((clip) => (
+                  <div key={clip.id} className="p-3 border rounded-md bg-muted/30">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <a
+                        href={clip.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-2"
+                        data-testid={`link-audio-${clip.id}`}
+                      >
+                        <Volume2 className="h-3 w-3" />
+                        Ouvir
+                      </a>
+                      <div className="flex items-center gap-2">
+                        {!clip.transcricao && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => transcribeMutation.mutate(clip.id)}
+                            disabled={transcribeMutation.isPending}
+                            data-testid={`button-transcribe-${clip.id}`}
+                          >
+                            {transcribeMutation.isPending ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Sparkles className="h-3 w-3" />
+                            )}
+                            <span className="ml-1 text-xs">Transcrever</span>
+                          </Button>
+                        )}
+                        {clip.transcricao && (
+                          <Badge variant="secondary" className="text-xs">Transcrito</Badge>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => deleteAudioMutation.mutate(clip.id)}
+                          disabled={deleteAudioMutation.isPending}
+                          data-testid={`button-delete-audio-${clip.id}`}
+                          className="h-7 w-7"
+                        >
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                    {clip.transcricao && (
+                      <div className="text-xs text-muted-foreground p-2 bg-background rounded">
+                        <p className="font-medium mb-1">Transcrição:</p>
+                        <p className="whitespace-pre-wrap">{clip.transcricao}</p>
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {new Date(clip.createdAt).toLocaleDateString('pt-PT')}
+                    </p>
+                  </div>
                 ))}
               </div>
             </CardContent>

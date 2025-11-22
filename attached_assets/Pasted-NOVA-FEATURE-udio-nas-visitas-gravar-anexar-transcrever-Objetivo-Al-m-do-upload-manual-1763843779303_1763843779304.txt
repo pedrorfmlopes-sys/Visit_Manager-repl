@@ -1,0 +1,54 @@
+NOVA FEATURE – Áudio nas visitas (gravar + anexar + transcrever)
+
+Objetivo:
+Além do upload manual de ficheiros áudio que já existe, quero:
+1) Gravar áudio diretamente no formulário da visita (no browser).
+2) Permitir múltiplos clips de áudio por visita.
+3) Poder pedir transcrição por IA para esses clips (reutilizando a lógica/endpoint de transcrição que já tens).
+
+Requisitos de UX:
+
+A) No VisitaForm:
+- Secção "Áudio da visita" com:
+  - Botão com ícone de microfone:
+    - 1º clique → começa a gravar (mostrar estado “A gravar” + contador simples).
+    - 2º clique → pára gravação e adiciona um clip à lista.
+  - Lista de clips desta visita/sessão:
+    - botão Reproduzir/Parar
+    - botão Remover
+    - checkbox “Marcar para transcrição por IA”.
+- Permitir mais do que um ficheiro por visita.
+
+B) No VisitaDetail:
+- Secção "Áudio da visita":
+  - Lista os clips guardados no backend para essa visita.
+  - Permite ouvir.
+  - Indica se já têm transcrição (ex.: badge “Transcrito”).
+
+Implementação técnica (ajusta ao código real):
+
+1) Frontend:
+- Em VisitaForm:
+  - Usar MediaRecorder API (getUserMedia({ audio: true })) para gravar.
+  - Manter estado local com os blobs de áudio.
+  - Ao guardar a visita:
+    - Se for criação: criar a visita primeiro, depois enviar os áudios para um endpoint tipo POST /api/visitas/:id/audio.
+    - Se for edição: enviar só os novos clips.
+- Usar FormData para enviar os ficheiros, seguindo o padrão dos uploads que já existem.
+
+2) Backend:
+- Se já existir tabela/estrutura para anexos de visita, reutiliza.
+- Se não existir, criar algo do género "visitas_audio" ou "visitas_attachments" com:
+  - id, visitaId, empresaId, fileUrl, tipo ("audio"), transcricao (texto opcional), createdAt.
+- Endpoints:
+  - POST /api/visitas/:id/audio → recebe ficheiro(s) áudio, guarda e associa à visita.
+  - POST /api/visitas/:id/audio/:audioId/transcrever → usa o mesmo motor/fluxo de transcrição atual para criar texto e guardar em transcricao.
+- Garantir:
+  - multi-tenant: empresaId do user = empresaId da visita.
+  - só utilizadores da empresa podem ver/gerir áudios da sua visita.
+
+No fim, mostra:
+- schema/tabelas usadas/criadas.
+- os novos endpoints de áudio.
+- blocos principais de VisitaForm e VisitaDetail para esta secção.
+- como testar (passos concretos).

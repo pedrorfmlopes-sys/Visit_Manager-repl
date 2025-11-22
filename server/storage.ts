@@ -7,6 +7,7 @@ import {
   tarefas,
   marcas,
   visitasMarcas,
+  visitasAudio,
   lembretes,
   type Empresa,
   type InsertEmpresa,
@@ -26,6 +27,8 @@ import {
   type ContactoWithRelations,
   type VisitaWithRelations,
   type TarefaWithRelations,
+  type VisitasAudio,
+  type InsertVisitasAudio,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, gte, sql, or, and } from "drizzle-orm";
@@ -88,6 +91,12 @@ export interface IStorage {
   getMarca(id: string): Promise<Marca | undefined>;
   createMarca(marca: InsertMarca): Promise<Marca>;
   updateMarca(id: string, marca: Partial<InsertMarca>, empresaId: string): Promise<Marca | undefined>;
+  
+  // FASE 6: Audio management
+  addAudioToVisita(visitaId: string, fileUrl: string, empresaId: string): Promise<VisitasAudio>;
+  getVisitasAudio(visitaId: string, empresaId: string): Promise<VisitasAudio[]>;
+  deleteVisitasAudio(audioId: string, empresaId: string): Promise<void>;
+  updateVisitasAudioTranscription(audioId: string, transcricao: string): Promise<VisitasAudio | undefined>;
   
   // FASE 3: Empresa & Users management
   updateEmpresa(id: string, empresa: Partial<InsertEmpresa>): Promise<Empresa | undefined>;
@@ -565,6 +574,47 @@ export class DatabaseStorage implements IStorage {
       }));
       await db.insert(visitasMarcas).values(marcasData);
     }
+  }
+
+  // FASE 6: Audio management
+  async addAudioToVisita(visitaId: string, fileUrl: string, empresaId: string): Promise<VisitasAudio> {
+    const [newAudio] = await db
+      .insert(visitasAudio)
+      .values({
+        visitaId,
+        fileUrl,
+        empresaId,
+      })
+      .returning();
+    return newAudio;
+  }
+
+  async getVisitasAudio(visitaId: string, empresaId: string): Promise<VisitasAudio[]> {
+    return db.query.visitasAudio.findMany({
+      where: and(
+        eq(visitasAudio.visitaId, visitaId),
+        eq(visitasAudio.empresaId, empresaId)
+      ),
+      orderBy: desc(visitasAudio.createdAt),
+    });
+  }
+
+  async deleteVisitasAudio(audioId: string, empresaId: string): Promise<void> {
+    await db.delete(visitasAudio).where(
+      and(
+        eq(visitasAudio.id, audioId),
+        eq(visitasAudio.empresaId, empresaId)
+      )
+    );
+  }
+
+  async updateVisitasAudioTranscription(audioId: string, transcricao: string): Promise<VisitasAudio | undefined> {
+    const [updated] = await db
+      .update(visitasAudio)
+      .set({ transcricao })
+      .where(eq(visitasAudio.id, audioId))
+      .returning();
+    return updated;
   }
 
   async updateVisita(id: string, visita: Partial<Visita>, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<Visita | undefined> {
