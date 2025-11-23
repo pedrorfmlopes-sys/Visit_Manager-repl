@@ -69,6 +69,17 @@ Frontend backoffice with 3 admin pages (AdminEmpresa, AdminUsers, AdminMarcas). 
 - Transcription is async via OpenAI Whisper API (requires OPENAI_API_KEY)
 - User must have access to visita to manage its audio (empresaId + role validation)
 
+### FASE 9 Implementation (Tema por Empresa)
+
+**FASE 9.1 Implementada (23/11/2025):**
+- Adicionado campo `theme` à tabela `empresas`: varchar(50), default "light-business", NOT NULL
+- Schema: tema com enum ["light-business", "dark-pro"]
+- API `PATCH /api/admin/empresa`: Aceita e valida campo `theme`
+- Frontend: AdminEmpresa.tsx com Select de tema (2 opções)
+- Migração DB: Campo criado com default "light-business"
+- Funcionalidade: Temas guardados e recuperados corretamente
+- Próximo: FASE 9.2 implementará os estilos/cores reais por tema
+
 ## System Architecture
 
 ### Frontend Architecture
