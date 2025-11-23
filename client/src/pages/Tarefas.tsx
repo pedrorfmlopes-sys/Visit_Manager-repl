@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2 } from "lucide-react";
 import { TarefaCard } from "@/components/TarefaCard";
-import { FAB } from "@/components/FAB";
 import { EmptyState } from "@/components/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
@@ -105,12 +104,6 @@ export default function Tarefas() {
           />
         )}
       </main>
-
-      <FAB
-        onClick={() => setLocation("/tarefas/nova")}
-        label="Nova Tarefa"
-        testId="button-criar-tarefa"
-      />
     </div>
   );
 }

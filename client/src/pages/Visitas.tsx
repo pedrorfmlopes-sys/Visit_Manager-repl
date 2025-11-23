@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { FileText } from "lucide-react";
 import { VisitaCard } from "@/components/VisitaCard";
-import { FAB } from "@/components/FAB";
 import { EmptyState } from "@/components/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
@@ -76,12 +75,6 @@ export default function Visitas() {
           />
         )}
       </main>
-
-      <FAB
-        onClick={() => setLocation("/visitas/nova")}
-        label="Nova Visita"
-        testId="button-criar-visita"
-      />
     </div>
   );
 }
