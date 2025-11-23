@@ -112,7 +112,9 @@ export function FABMenu() {
   return (
     <div
       ref={fabRef}
-      className={`fixed z-50 flex relative transition-all ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+      className={`fixed z-50 flex gap-2 transition-all ${isDragging ? "cursor-grabbing" : "cursor-grab"} ${
+        shouldOpenUp ? "flex-col-reverse" : "flex-col"
+      }`}
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
@@ -120,47 +122,42 @@ export function FABMenu() {
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
     >
-      {/* Container for menu items and main button */}
-      <div
-        className={`flex gap-2 items-center ${shouldOpenUp ? "flex-col-reverse" : "flex-col"}`}
+      {/* Main FAB button */}
+      <Button
+        size="icon"
+        variant="default"
+        onClick={() => !isDragging && setIsOpen(!isOpen)}
+        className={`h-14 w-14 rounded-full shadow-lg transition-transform ${
+          isOpen ? "rotate-45" : "rotate-0"
+        } ${isDragging ? "opacity-75 scale-125" : ""}`}
+        data-testid={isOpen ? "fab-close" : "fab-open"}
+        disabled={isDragging}
+        title={isDragging ? "Arrasta para mover o botão" : "Segura 3 segundos para mover"}
       >
-        {/* Main FAB button */}
-        <Button
-          size="icon"
-          variant="default"
-          onClick={() => !isDragging && setIsOpen(!isOpen)}
-          className={`h-14 w-14 rounded-full shadow-lg transition-transform flex-shrink-0 ${
-            isOpen ? "rotate-45" : "rotate-0"
-          } ${isDragging ? "opacity-75 scale-125" : ""}`}
-          data-testid={isOpen ? "fab-close" : "fab-open"}
-          disabled={isDragging}
-          title={isDragging ? "Arrasta para mover o botão" : "Segura 3 segundos para mover"}
-        >
-          <Plus className="h-6 w-6" />
-        </Button>
+        <Plus className="h-6 w-6" />
+      </Button>
 
-        {/* Menu items */}
-        {isOpen && !isDragging && (
-          <>
-            {menuItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Button
-                  key={item.testId}
-                  size="icon"
-                  variant="default"
-                  onClick={() => handleMenuItemClick(item.action)}
-                  className="h-14 w-14 rounded-full shadow-lg flex-shrink-0"
-                  data-testid={item.testId}
-                  title={item.label}
-                >
-                  <Icon className="h-6 w-6" />
-                </Button>
-              );
-            })}
-          </>
-        )}
-      </div>
+      {/* Menu items */}
+      {isOpen && !isDragging && (
+        <>
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Button
+                key={item.testId}
+                size="icon"
+                variant="default"
+                onClick={() => handleMenuItemClick(item.action)}
+                className="h-14 w-14 rounded-full shadow-lg"
+                data-testid={item.testId}
+                title={item.label}
+              >
+                <Icon className="h-6 w-6" />
+              </Button>
+            );
+          })}
+        </>
+      )}
     </div>
   );
 }
