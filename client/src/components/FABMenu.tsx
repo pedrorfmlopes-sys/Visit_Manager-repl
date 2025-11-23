@@ -12,7 +12,6 @@ const DEFAULT_POSITION: FABPosition = { x: 16, y: 96 };
 const FAB_STORAGE_KEY = "fab-position";
 const FAB_SIZE = 56;
 const BUTTON_HEIGHT = 56;
-const MENU_ITEMS_COUNT = 4;
 
 export function FABMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -29,7 +28,6 @@ export function FABMenu() {
   const calculateGap = () => {
     const halfScreen = window.innerHeight / 2;
     const gap = (halfScreen - (5 * BUTTON_HEIGHT)) / 4;
-    console.log("calculateGap - New gap value:", gap);
     setDynamicGap(gap);
   };
 
@@ -44,7 +42,6 @@ export function FABMenu() {
       }
     }
     
-    // Calculate initial dynamic gap
     calculateGap();
     window.addEventListener("resize", calculateGap);
     return () => window.removeEventListener("resize", calculateGap);
@@ -53,7 +50,6 @@ export function FABMenu() {
   // Determine if menu should open upwards
   useEffect(() => {
     const totalMenuHeight = 5 * BUTTON_HEIGHT + 4 * dynamicGap;
-    console.log("useEffect - shouldOpenUp:", { dynamicGap, totalMenuHeight });
     setShouldOpenUp(position.y + totalMenuHeight > window.innerHeight);
   }, [position, dynamicGap]);
 
@@ -96,7 +92,6 @@ export function FABMenu() {
     const rect = buttonRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    // Start long press timer for drag activation
     longPressTimer.current = setTimeout(() => {
       setIsDragging(true);
       setDragOffset({
@@ -107,12 +102,9 @@ export function FABMenu() {
   };
 
   const handleMainButtonMouseUp = () => {
-    // If timer is still active, it means user didn't hold for 3 seconds
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
-      
-      // This is a regular click - toggle menu
       setIsOpen(!isOpen);
     }
   };
@@ -122,54 +114,35 @@ export function FABMenu() {
     setLocation(action);
   };
 
-  // Calculate menu item position with dynamic gap
-  const getMenuItemStyle = (index: number) => {
+  // Calculate menu item position in viewport coordinates
+  const getMenuItemPosition = (index: number) => {
     const spacing = BUTTON_HEIGHT + dynamicGap;
-    const itemOffset = index * spacing;
-    const positionValue = BUTTON_HEIGHT + dynamicGap + itemOffset;
-    
-    console.log("getMenuItemStyle rendering:", { index, dynamicGap, spacing, itemOffset, positionValue, shouldOpenUp });
+    const itemOffset = (index + 1) * spacing;
     
     if (shouldOpenUp) {
-      // Menu opens upwards - items positioned above the main button
-      return {
-        bottom: `${positionValue}px`,
-        left: "0",
-      };
+      // Menu opens upwards - items go UP from the main button
+      return position.y - itemOffset;
     } else {
-      // Menu opens downwards - items positioned below the main button
-      return {
-        top: `${positionValue}px`,
-        left: "0",
-      };
+      // Menu opens downwards - items go DOWN from the main button
+      return position.y + itemOffset;
     }
   };
 
-  console.log("FABMenu render:", { isOpen, isDragging, shouldOpenUp, dynamicGap });
-
   return (
-    <div
-      className="fixed z-50"
-      style={{
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        width: "56px",
-        height: "56px",
-      }}
-    >
-      {/* Main FAB button - always at position (0,0) within container */}
+    <>
+      {/* Main FAB button - fixed positioning */}
       <Button
         ref={buttonRef}
         size="icon"
         variant="default"
         onMouseDown={handleMainButtonMouseDown}
         onMouseUp={handleMainButtonMouseUp}
-        className={`h-14 w-14 rounded-full shadow-lg transition-transform absolute ${
+        className={`fixed z-50 h-14 w-14 rounded-full shadow-lg transition-transform ${
           isOpen ? "rotate-45" : "rotate-0"
         } ${isDragging ? "opacity-75 scale-125" : ""}`}
         style={{
-          left: "0",
-          top: "0",
+          left: `${position.x}px`,
+          top: `${position.y}px`,
           cursor: isDragging ? "grabbing" : "grab",
         }}
         data-testid={isOpen ? "fab-close" : "fab-open"}
@@ -179,21 +152,22 @@ export function FABMenu() {
         <Plus className="h-6 w-6" />
       </Button>
 
-      {/* Menu items - positioned absolutely */}
+      {/* Menu items - fixed positioning in viewport */}
       {isOpen && !isDragging && (
         <>
           {menuItems.map((item, index) => {
             const Icon = item.icon;
-            const style = getMenuItemStyle(index);
-            console.log(`MenuItem ${index}:`, style);
             return (
               <Button
                 key={item.testId}
                 size="icon"
                 variant="default"
                 onClick={() => handleMenuItemClick(item.action)}
-                className="h-14 w-14 rounded-full shadow-lg absolute"
-                style={style}
+                className="fixed z-50 h-14 w-14 rounded-full shadow-lg"
+                style={{
+                  left: `${position.x}px`,
+                  top: `${getMenuItemPosition(index)}px`,
+                }}
                 data-testid={item.testId}
                 title={item.label}
               >
@@ -203,6 +177,6 @@ export function FABMenu() {
           })}
         </>
       )}
-    </div>
+    </>
   );
 }
