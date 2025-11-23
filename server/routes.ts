@@ -310,6 +310,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           nome: empresa.nome,
           logoUrl: empresa.logoUrl,
           mostrarMarcasEmVisitas: empresa.mostrarMarcasEmVisitas,
+          theme: empresa.theme,
         } : null,
       });
     } catch (error) {
