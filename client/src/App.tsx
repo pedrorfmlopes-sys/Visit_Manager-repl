@@ -24,9 +24,11 @@ import Contactos from "@/pages/Contactos";
 import ContactoForm from "@/pages/ContactoForm";
 import ContactoDetail from "@/pages/ContactoDetail";
 import Visitas from "@/pages/Visitas";
+import AdminVisitas from "@/pages/AdminVisitas";
 import VisitaForm from "@/pages/VisitaForm";
 import VisitaDetail from "@/pages/VisitaDetail";
 import Tarefas from "@/pages/Tarefas";
+import AdminTarefas from "@/pages/AdminTarefas";
 import TarefaForm from "@/pages/TarefaForm";
 import TarefaDetail from "@/pages/TarefaDetail";
 import Lembretes from "@/pages/Lembretes";
@@ -105,12 +107,12 @@ function Router() {
         <Route path="/contactos/:id" component={ContactoForm} />
         
         {/* Visitas routes */}
-        <Route path="/visitas" component={Visitas} />
+        <Route path="/visitas" component={isAdmin ? AdminVisitas : Visitas} />
         <Route path="/visitas/nova" component={VisitaForm} />
         <Route path="/visitas/:id" component={VisitaDetail} />
         
         {/* Tarefas routes */}
-        <Route path="/tarefas" component={Tarefas} />
+        <Route path="/tarefas" component={isAdmin ? AdminTarefas : Tarefas} />
         <Route path="/tarefas/nova" component={TarefaForm} />
         <Route path="/tarefas/:id" component={TarefaDetail} />
         <Route path="/tarefas/:id/editar" component={TarefaForm} />
