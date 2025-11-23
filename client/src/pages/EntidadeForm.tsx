@@ -30,12 +30,14 @@ const tipoOptions = [
 
 export default function EntidadeForm() {
   const [, setLocation] = useLocation();
-  const [, params] = useRoute("/entidades/:id");
+  const [, editParams] = useRoute("/entidades/:id/editar");
+  const [, createParams] = useRoute("/entidades/nova");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isOnline = useOnlineStatus();
   const { location: gpsLocation, isLoading: gpsLoading, requestLocation } = useGeolocation();
-  const isEdit = params?.id && params.id !== "nova" && params.id !== "editar";
+  const isEdit = !!editParams?.id;
+  const entidadeId = editParams?.id;
   
   // User context for multi-agent system
   const { data: currentUser } = useCurrentUser();
@@ -46,8 +48,8 @@ export default function EntidadeForm() {
   const [isEnriching, setIsEnriching] = useState(false);
 
   const { data: entidade } = useQuery<Entidade>({
-    queryKey: ["/api/entidades", params?.id],
-    enabled: !!isEdit,
+    queryKey: ["/api/entidades", entidadeId],
+    enabled: !!entidadeId,
   });
 
   const form = useForm<InsertEntidade>({
@@ -133,16 +135,16 @@ export default function EntidadeForm() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: InsertEntidade) => {
-      await apiRequest("PATCH", `/api/entidades/${params?.id}`, data);
+      await apiRequest("PATCH", `/api/entidades/${entidadeId}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/entidades"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/entidades", params?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/entidades", entidadeId] });
       toast({
         title: "Sucesso",
         description: "Entidade atualizada com sucesso",
       });
-      setLocation(`/entidades/${params?.id}`);
+      setLocation(`/entidades/${entidadeId}`);
     },
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
