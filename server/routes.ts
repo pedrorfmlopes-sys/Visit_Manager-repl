@@ -43,7 +43,7 @@ const upload = multer({
   },
   fileFilter: (req, file, cb) => {
     // Accept audio, images, and videos
-    const allowedMimes = /jpeg|jpg|png|gif|mp4|mov|avi|mp3|wav|ogg|m4a/;
+    const allowedMimes = /jpeg|jpg|png|gif|mp4|mov|avi|mp3|wav|ogg|m4a|webm/;
     const extname = allowedMimes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedMimes.test(file.mimetype);
     if (mimetype && extname) {
