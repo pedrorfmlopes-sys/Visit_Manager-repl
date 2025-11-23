@@ -90,6 +90,74 @@ Frontend backoffice with 3 admin pages (AdminEmpresa, AdminUsers, AdminMarcas). 
 - Resultado: Mudança visual imediata (cores, backgrounds, texto) ao alternar entre temas
 - Temas persistem na BD e aplicam automaticamente ao recarregar a app
 
+### FASE 10 Implementation (Layouts e Navegação por Role)
+
+**Implementada (23/11/2025):**
+
+**Backend (sem alterações):**
+- Mantém todos os endpoints, storage e business logic existentes
+- Não quebrou compatibilidade com FASE 1-9
+
+**Frontend - Novo Sistema de Layouts:**
+
+**1. MainLayout (client/src/layouts/MainLayout.tsx):**
+- Componente wrapper que adapta o layout baseado em `user.role`
+- Se `isAdmin`: Renderiza sidebar esquerda + conteúdo principal + header com logo
+- Se agent: Renderiza mobile-first com bottom nav + conteúdo + sync indicator
+
+**2. AdminSidebar (client/src/components/AdminSidebar.tsx):**
+- Fixed sidebar esquerda (w-64) com navegação estruturada em 2 seções:
+  - NAVEGAÇÃO: Dashboard, Entidades, Contactos, Visitas, Tarefas, Lembretes
+  - ADMIN: Empresa, Utilizadores, Marcas
+- Logo da empresa no topo (se existir)
+- Email + botão "Sair" no footer
+- Estados ativos com bg-primary/10 + text-primary
+- Responsivo: oculta em mobile (hidden lg:block)
+
+**3. AdminDashboard (client/src/pages/AdminDashboard.tsx):**
+- Dashboard exclusivo para admins
+- KPIs em grid 1-4 colunas: Visitas Hoje, Visitas Semana, Tarefas Por Concluir, Tarefas em Atraso
+- Cards resumo: Total Entidades, Total Contactos, Total Visitas
+- Secção "Últimas Visitas" com lista de 10 visitas mais recentes:
+  - Nome da entidade, data/hora, notas
+  - Status badge (apenas "Registada" já que não existe campo status nas visitas)
+- Dados reais consumidos via API: `/api/dashboard`, `/api/visitas`, `/api/tarefas`
+- Cálculos em frontend: contagem por semana, por hoje, por vencimento, etc.
+
+**4. Router Integration (App.tsx):**
+- Removidas rotas desprotegidas do agent dashboard
+- Todas as rotas autenticadas agora rendidas dentro de `<MainLayout>`
+- Dashboard home (/) renderiza `AdminDashboard` se isAdmin, caso contrário `Dashboard` (agent)
+- Landing page continua fora do MainLayout (para login)
+
+**5. BottomNav Updates (client/src/components/BottomNav.tsx):**
+- Removidos admin items (Empresa, Utilizadores, Marcas)
+- Mantém apenas 6 tabs para agents: Dashboard, Entidades, Contactos, Visitas, Tarefas, Lembretes
+- Admin acessa admin features via sidebar
+
+**6. SyncIndicator Repositioning:**
+- Removido de AppContent global
+- Integrado apenas no MainLayout para agents (mobile-first)
+- Admin layout não mostra badge de sincronização
+
+**Ficheiros Criados:**
+- `client/src/components/AdminSidebar.tsx`
+- `client/src/layouts/MainLayout.tsx`
+- `client/src/pages/AdminDashboard.tsx`
+
+**Ficheiros Modificados:**
+- `client/src/App.tsx` - router com MainLayout + AdminDashboard
+- `client/src/components/BottomNav.tsx` - removidos admin items
+- `client/src/pages/AdminDashboard.tsx` - tipos corrigidos para schema
+
+**Resultado Final:**
+- ✅ Agent: layout mobile-first com bottom nav (6 tabs)
+- ✅ Admin: sidebar desktop com navegação estruturada + admin tools
+- ✅ AdminDashboard com KPIs e dados reais
+- ✅ Sem quebra de compatibilidade com endpoints existentes
+- ✅ Tema company-wide funciona em ambos layouts
+- ✅ Navegação fluida entre roles
+
 ## System Architecture
 
 ### Frontend Architecture
