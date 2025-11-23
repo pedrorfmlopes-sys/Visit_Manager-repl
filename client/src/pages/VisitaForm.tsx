@@ -557,16 +557,15 @@ export default function VisitaForm() {
                 <FormItem>
                   <FormLabel>Notas da Visita</FormLabel>
                   <FormControl>
-                    <Textarea
-                      {...field}
-                      value={field.value || ""}
+                    <RichTextEditor
+                      content={field.value || ""}
+                      onChange={field.onChange}
                       placeholder="Descreva os pontos principais da visita..."
-                      className="min-h-32 resize-none"
-                      data-testid="input-notas"
+                      className="border-input"
                     />
                   </FormControl>
                   <FormDescription className="text-xs">
-                    A IA irá analisar estas notas para gerar um resumo
+                    Podes formatar o texto, adicionar listas e checklists. A IA irá analisar estas notas para gerar um resumo
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

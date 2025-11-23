@@ -1,0 +1,178 @@
+FASE 8 – Editor Rico para o campo "notas" das visitas
+
+Objetivo:
+Transformar o campo de notas de visita (atualmente um textarea simples) num editor rico WYSIWYG com:
+- negrito, itálico, sublinhado
+- listas (bullet e numeradas)
+- se possível, "checklists" / tarefas com checkbox
+- títulos / subtítulos simples
+- links
+
+Armazenamento:
+- NÃO quero mudar o schema da base de dados nesta fase.
+- O campo visitas.notas (tipo text) passa a guardar o conteúdo em HTML.
+- Notas antigas (texto simples) continuam a funcionar – serão renderizadas como texto normal (sem crash).
+
+Sugestão de tecnologia:
+- Usa um editor React leve e estável, por exemplo **react-quill**.
+- Se preferires outra lib (desde que bem suportada e com TypeScript), tudo bem – o importante é:
+  - editor controlado,
+  - output em HTML,
+  - fácil de integrar com React Hook Form.
+
+==================================
+1) Dependências
+==================================
+
+1. Adiciona as dependências necessárias ao frontend:
+   - npm install react-quill
+
+2. Garante que o CSS base do editor é importado, por ex.:
+   - em client/src/main.tsx ou num ficheiro global de estilos:
+     import "react-quill/dist/quill.snow.css";
+
+Se precisares de um wrapper local (ex.: RichTextEditor.tsx), também podes criar em client/src/components/.
+
+==================================
+2) VisitaForm.tsx – usar editor rico no campo notas
+==================================
+
+Contexto:
+- O formulário de visita já usa React Hook Form + Zod.
+- Existe atualmente um campo de notas (provavelmente FormField + Textarea) ligado à propriedade "notas".
+
+Quero que:
+- Esse campo de notas seja substituído por um componente de editor rico (ReactQuill ou equivalente).
+- O valor guardado em form.values.notas seja uma **string HTML**.
+
+Requisitos concretos:
+
+1. Na secção onde hoje renderizas algo como:
+   - <FormField name="notas"> ... <Textarea ... /> ... </FormField>
+   substitui o Textarea por um componente RichTextEditor.
+
+2. Integração com React Hook Form:
+   - Usa `Controller` de react-hook-form (se necessário) para ligar o editor ao campo "notas".
+   - Quando o utilizador escreve no editor, o HTML produzido deve ir para o field `notas`.
+
+3. Toolbar mínima que quero:
+   - Bold, italic, underline
+   - Listas (bullet + numbered)
+   - Se possível, checklist / tasks (checkboxes)
+   - Headings (pelo menos H2/H3 ou "Título/Subtítulo")
+   - Links
+
+   Exemplo de config em ReactQuill (ajusta conforme a lib):
+   - modules.toolbar com botões para:
+     - ['bold', 'italic', 'underline']
+     - [{ 'list': 'ordered' }, { 'list': 'bullet' }]
+     - headings (p.ex. [{ 'header': [2, 3, false] }])
+     - 'link'
+     - se for suportado, modo "checklist" (ex: list: 'check' ou equivalente)
+
+   Se a lib não suportar checklists nativos, não há problema – usa listas normais por agora.
+
+4. Estado inicial:
+   - Quando se edita uma visita:
+     - se `notas` já tiver HTML, o editor deve ser inicializado com esse HTML.
+   - Quando se cria nova visita:
+     - editor começa vazio.
+
+5. Submissão:
+   - No onSubmit, não alteres a lógica existente.
+   - Apenas garante que o valor que vai em `notas` para o backend é o HTML do editor.
+
+==================================
+3) VisitaDetail.tsx – renderizar notas com formatação
+==================================
+
+Contexto:
+- A página de detalhe da visita (VisitaDetail.tsx) já mostra as notas como texto simples.
+
+Alterar para:
+- Se `visita.notas` existir:
+  - renderizar o conteúdo como HTML formatado num <div>.
+- Ter cuidado para não partir notas antigas.
+
+Implementação desejada:
+
+1. No local onde hoje tens algo tipo:
+   - <p>{visita.notas}</p>
+   substitui por uma lógica:
+
+   - Se `visita.notas` tiver aspeto de HTML (contém tags como `<p>`, `<strong>`, etc.):
+     - renderiza com `dangerouslySetInnerHTML={{ __html: visita.notas }}`.
+   - Se for uma nota antiga claramente plain text:
+     - podes envolver em <p> e fazer escape normal.
+   - Simplificação aceitável:
+     - renderizar SEMPRE com `dangerouslySetInnerHTML`, desde que:
+       - tenhas a certeza que o conteúdo `notas` vem apenas do teu editor (ou de dados antigos já teus).
+       - como isto é uma app interna, o risco é baixo.
+     - Se quiseres ser mais defensivo, podes adicionar um fallback simples.
+
+2. Estilos:
+   - Dá uma classe à div (por ex. "prose" se estiveres a usar algo tipo Tailwind typography) para:
+     - melhorar o aspecto das listas, headings, etc.
+   - Garante que o conteúdo é responsivo (wrap, padding, etc.).
+
+==================================
+4) Compatibilidade com dados antigos
+==================================
+
+- Não quero perder quaisquer notas antigas.
+- Cenário atual:
+  - Notas antigas são strings simples (sem HTML).
+- Liberdade:
+  - Podes assumir que essas strings vão ser colocadas dentro de um <p> ou convertidas em HTML simples.
+  - Exemplo: se `notas` não contiver `<` nem `>`, trata como texto puro e embrulha numa `<p>`.
+
+- Importante:
+  - Não fazer migração de dados agora.
+  - Apenas adaptar o frontend para:
+    - aceitar HTML novo,
+    - mostrar bem tanto o novo formato como o texto antigo.
+
+==================================
+5) Detalhes de UX que quero
+==================================
+
+- VisitaForm:
+  - Label do campo: “Notas da Visita”
+  - Mensagem de ajuda pequena por baixo, algo como:
+    - “Podes formatar o texto, adicionar listas e checklists.”
+- Editor:
+  - Altura mínima razoável (ex.: 200–250px).
+  - Fundo e bordas alinhados com o resto dos inputs (usa as mesmas classes base se possível).
+- VisitaDetail:
+  - A secção de notas deve ficar visualmente destacada:
+    - título “Notas da Visita”
+    - conteúdo formatado logo abaixo.
+
+==================================
+6) Garantias finais
+==================================
+
+No final da FASE 8 quero:
+
+1) Alterações feitas apenas no frontend (client/src):
+   - Principalmente:
+     - VisitaForm.tsx
+     - VisitaDetail.tsx
+     - + eventual componente RichTextEditor.tsx e import do CSS da lib.
+
+2) Build a passar:
+   - `npm run build` sem erros.
+
+3) Comportamento:
+   - Consigo criar nova visita usando o editor rico:
+     - guardar e, ao reabrir, ver a mesma formatação.
+   - Consigo editar uma visita existente:
+     - editor mostra o conteúdo anterior,
+     - posso alterar e guardar.
+   - Notas antigas (criadas antes do editor rico) continuam visíveis de forma legível.
+
+4) Por favor, no final:
+   - Mostra um resumo das alterações:
+     - que ficheiros mexeste,
+     - como se usa o editor,
+     - e confirma que `npm run build` passou sem erros.

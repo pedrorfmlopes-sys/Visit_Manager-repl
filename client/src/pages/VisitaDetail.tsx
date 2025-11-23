@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
+import DOMPurify from 'dompurify';
 import { ArrowLeft, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles, Bell, Volume2, Trash2, Loader2, Mic } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { pt } from "date-fns/locale";
@@ -585,10 +586,18 @@ export default function VisitaDetail() {
         {visita.notas && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Notas</CardTitle>
+              <CardTitle className="text-base">Notas da Visita</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-foreground whitespace-pre-wrap">{visita.notas}</p>
+              {visita.notas.includes('<') ? (
+                <div 
+                  className="prose prose-sm dark:prose-invert max-w-none text-sm"
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(visita.notas) }}
+                  data-testid="notas-formatted"
+                />
+              ) : (
+                <p className="text-sm text-foreground whitespace-pre-wrap">{visita.notas}</p>
+              )}
             </CardContent>
           </Card>
         )}
