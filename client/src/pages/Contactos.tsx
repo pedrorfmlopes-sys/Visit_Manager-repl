@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Users, Plus, QrCode } from "lucide-react";
 import { SearchBar } from "@/components/SearchBar";
 import { ContactoCard } from "@/components/ContactoCard";
-import { FAB } from "@/components/FAB";
 import { EmptyState } from "@/components/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -85,12 +84,6 @@ export default function Contactos() {
           />
         )}
       </main>
-
-      <FAB
-        onClick={() => setLocation("/contactos/novo")}
-        label="Criar Contacto"
-        testId="button-criar-contacto"
-      />
     </div>
   );
 }

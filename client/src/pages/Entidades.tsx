@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Building2, Plus } from "lucide-react";
 import { SearchBar } from "@/components/SearchBar";
 import { EntidadeCard } from "@/components/EntidadeCard";
-import { FAB } from "@/components/FAB";
 import { EmptyState } from "@/components/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -95,12 +94,6 @@ export default function Entidades() {
           />
         )}
       </main>
-
-      <FAB
-        onClick={() => setLocation("/entidades/nova")}
-        label="Criar Entidade"
-        testId="button-criar-entidade"
-      />
     </div>
   );
 }
