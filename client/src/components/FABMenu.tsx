@@ -10,6 +10,7 @@ interface FABPosition {
 
 const DEFAULT_POSITION: FABPosition = { x: 16, y: 96 }; // bottom-right: right-4, bottom-24
 const FAB_STORAGE_KEY = "fab-position";
+const FAB_SIZE = 56; // 14*4 = h-14 w-14 in pixels
 
 export function FABMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -32,12 +33,35 @@ export function FABMenu() {
     }
   }, []);
 
-  // Save position to localStorage when it changes
+  // Handle global mousemove and mouseup when dragging
   useEffect(() => {
-    if (isDragging) {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newX = e.clientX - dragOffset.x;
+      const newY = e.clientY - dragOffset.y;
+
+      // Keep within bounds
+      const boundedX = Math.max(0, Math.min(newX, window.innerWidth - FAB_SIZE));
+      const boundedY = Math.max(0, Math.min(newY, window.innerHeight - FAB_SIZE));
+
+      setPosition({ x: boundedX, y: boundedY });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      // Save position when drag ends
       localStorage.setItem(FAB_STORAGE_KEY, JSON.stringify(position));
-    }
-  }, [position, isDragging]);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDragging, dragOffset, position]);
 
   const menuItems = [
     { icon: CheckCircle2, label: "Tarefa", action: "/tarefas/nova", testId: "fab-new-tarefa" },
@@ -52,7 +76,7 @@ export function FABMenu() {
   };
 
   // Long press detection for drag mode
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     // Close menu if open
     setIsOpen(false);
 
@@ -62,6 +86,7 @@ export function FABMenu() {
     // Start long press timer
     longPressTimer.current = setTimeout(() => {
       setIsDragging(true);
+      // Calculate offset from mouse position to FAB's top-left corner
       setDragOffset({
         x: e.clientX - rect.left,
         y: e.clientY - rect.top,
@@ -74,23 +99,6 @@ export function FABMenu() {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
-    if (isDragging) {
-      setIsDragging(false);
-    }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return;
-
-    // Calculate new position relative to viewport
-    const newX = e.clientX - dragOffset.x;
-    const newY = e.clientY - dragOffset.y;
-
-    // Keep within bounds (rough viewport constraints)
-    const boundedX = Math.max(0, Math.min(newX, window.innerWidth - 56)); // 56px = h-14 w-14
-    const boundedY = Math.max(0, Math.min(newY, window.innerHeight - 56));
-
-    setPosition({ x: boundedX, y: boundedY });
   };
 
   return (
@@ -105,8 +113,6 @@ export function FABMenu() {
       }}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseUp}
     >
       {/* Main FAB button */}
       <Button
@@ -115,7 +121,7 @@ export function FABMenu() {
         onClick={() => !isDragging && setIsOpen(!isOpen)}
         className={`h-14 w-14 rounded-full shadow-lg transition-transform ${
           isOpen ? "rotate-45" : "rotate-0"
-        } ${isDragging ? "opacity-75 scale-110" : ""}`}
+        } ${isDragging ? "opacity-75 scale-125" : ""}`}
         data-testid={isOpen ? "fab-close" : "fab-open"}
         disabled={isDragging}
         title={isDragging ? "Arrasta para mover o botão" : "Segura 3 segundos para mover"}
