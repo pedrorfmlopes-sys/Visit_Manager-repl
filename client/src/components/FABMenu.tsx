@@ -14,7 +14,6 @@ const FAB_SIZE = 56; // 14*4 = h-14 w-14 in pixels
 const MENU_ITEM_HEIGHT = 56; // h-14 w-14
 const GAP_SIZE = 8; // gap-2 = 8px
 const MENU_ITEMS_COUNT = 4;
-const TOTAL_MENU_HEIGHT = (MENU_ITEMS_COUNT + 1) * MENU_ITEM_HEIGHT + MENU_ITEMS_COUNT * GAP_SIZE; // +1 for main button
 
 export function FABMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -40,7 +39,8 @@ export function FABMenu() {
 
   // Determine if menu should open upwards based on position
   useEffect(() => {
-    const openUp = position.y + TOTAL_MENU_HEIGHT > window.innerHeight;
+    const totalMenuHeight = (MENU_ITEMS_COUNT + 1) * MENU_ITEM_HEIGHT + MENU_ITEMS_COUNT * GAP_SIZE;
+    const openUp = position.y + totalMenuHeight > window.innerHeight;
     setShouldOpenUp(openUp);
   }, [position]);
 
@@ -112,12 +112,22 @@ export function FABMenu() {
     }
   };
 
+  // Calculate menu items positions
+  const getMenuItemPosition = (index: number) => {
+    const itemOffset = index * (MENU_ITEM_HEIGHT + GAP_SIZE);
+    if (shouldOpenUp) {
+      // Menu opens upwards - items go negative (above the button)
+      return -(itemOffset + MENU_ITEM_HEIGHT + GAP_SIZE);
+    } else {
+      // Menu opens downwards - items go positive (below the button)
+      return MENU_ITEM_HEIGHT + GAP_SIZE + itemOffset;
+    }
+  };
+
   return (
     <div
       ref={fabRef}
-      className={`fixed z-50 flex gap-2 transition-all ${
-        isDragging ? "cursor-grabbing" : "cursor-grab"
-      } ${shouldOpenUp ? "flex-col-reverse" : "flex-col"}`}
+      className={`fixed z-50 transition-all ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
@@ -125,7 +135,7 @@ export function FABMenu() {
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
     >
-      {/* Main FAB button */}
+      {/* Main FAB button - always at the same position */}
       <Button
         size="icon"
         variant="default"
@@ -140,10 +150,10 @@ export function FABMenu() {
         <Plus className="h-6 w-6" />
       </Button>
 
-      {/* Menu items */}
+      {/* Menu items - positioned absolutely above or below the button */}
       {isOpen && !isDragging && (
         <>
-          {menuItems.map((item) => {
+          {menuItems.map((item, index) => {
             const Icon = item.icon;
             return (
               <Button
@@ -151,7 +161,11 @@ export function FABMenu() {
                 size="icon"
                 variant="default"
                 onClick={() => handleMenuItemClick(item.action)}
-                className="h-14 w-14 rounded-full shadow-lg"
+                className="h-14 w-14 rounded-full shadow-lg absolute"
+                style={{
+                  left: "0",
+                  top: `${getMenuItemPosition(index)}px`,
+                }}
                 data-testid={item.testId}
                 title={item.label}
               >
