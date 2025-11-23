@@ -190,7 +190,6 @@ function AppContent() {
   return (
     <>
       <Router />
-      {isAuthenticated && <SyncIndicator />}
     </>
   );
 }

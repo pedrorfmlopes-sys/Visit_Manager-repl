@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { AdminSidebar } from "@/components/AdminSidebar";
 import { BottomNav } from "@/components/BottomNav";
+import { SyncIndicator } from "@/components/SyncIndicator";
 import { useAuth } from "@/hooks/useAuth";
 
 interface MainLayoutProps {
@@ -60,6 +61,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         {children}
       </main>
       <BottomNav />
+      <SyncIndicator />
     </div>
   );
 }
