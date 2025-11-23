@@ -1,0 +1,144 @@
+Problema atual: DEIXEI DE CONSEGUIR GRAVAR ENTIDADES E CONTACTOS
+
+Sintomas:
+- Quando tento criar uma NOVA ENTIDADE, o formulário parece funcionar mas:
+  - ou dá um toast de erro,
+  - ou simplesmente não grava (não aparece na lista).
+- O mesmo acontece ao criar NOVO CONTACTO.
+- Isto começou depois das últimas fases (multi-empresa, backoffice, marcas, áudio, editor rico).
+
+Quero que faças debug e corrigas APENAS isto, sem estragar as fases anteriores.
+
+Coisas a verificar:
+
+1) ENDPOINTS DAS ENTIDADES (server/routes.ts)
+
+Verifica o bloco de rotas de ENTIDADES:
+
+- GET  /api/entidades
+- GET  /api/entidades/:id
+- POST /api/entidades
+- PATCH /api/entidades/:id
+- DELETE /api/entidades/:id
+
+Quero que confirmes que, no POST /api/entidades:
+- Está a fazer algo do género:
+
+  const { userId, userRole, empresaId } = await getUserContext(req);
+  if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+
+  const entidade = await storage.createEntidade({
+    ...dadosValidados,
+    empresaId,
+    createdByUserId: userId,
+  });
+
+- Ou seja:
+  - Usa getUserContext(req)
+  - Valida empresaId
+  - Passa empresaId para o storage
+  - NÃO está a exigir campos que o formulário não envia.
+
+2) ENDPOINTS DOS CONTACTOS (server/routes.ts)
+
+Faz o mesmo para CONTACTOS:
+
+- GET  /api/contactos
+- GET  /api/contactos/:id
+- POST /api/contactos
+- PATCH /api/contactos/:id
+- DELETE /api/contactos/:id
+
+No POST /api/contactos:
+- Confirma que:
+  - Extrai empresaId do contexto.
+  - Passa empresaId para storage.createContacto.
+  - O schema de validação (zod) só exige os campos que o frontend realmente manda.
+
+3) STORAGE – createEntidade / createContacto (server/storage.ts)
+
+Abre server/storage.ts e verifica:
+
+- Função createEntidade(data):
+  - Está a fazer INSERT na tabela entidades com empresaId OBRIGATÓRIO.
+  - Não está a ignorar o empresaId vindo do caller.
+  - Não há novo campo obrigatório que o frontend não esteja a enviar.
+
+- Função createContacto(data):
+  - Mesma lógica: empresaId incluído no INSERT.
+  - Campos obrigatórios compatíveis com o payload do frontend.
+
+Se estiveres a usar Zod (ou outro validador) antes do INSERT, garante que:
+- O schema não exige campos extra que o VisitaForm / entidadeForm / contactoForm não envia.
+
+4) LOGIN / CONTEXTO – getUserContext
+
+Garante que getUserContext(req) continua a devolver:
+- userId
+- userRole
+- empresaId
+
+E que o utilizador com que estou a testar:
+- Tem empresaId definido.
+- Está ativo (users.ativo = true).
+
+Se o problema for “User has no company assigned”:
+- Verifica na BD se este utilizador ficou sem empresaId depois das migrações.
+- Se necessário, faz um pequeno script para voltar a associar todos os users à empresa correta.
+
+5) TESTES QUE QUERO QUE FAÇAS TU MESMO:
+
+Depois de corrigires o que estiver mal, faz tu estes testes:
+
+A) ENTIDADES
+- Criar uma entidade de teste via API:
+
+  curl -X POST http://localhost:5000/api/entidades \
+    -H "Cookie: <sessionId-admin>" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "nome": "Entidade Teste AGENT",
+      "tipoEntidade": "cliente"
+    }'
+
+- Confirmar:
+  - 200 OK
+  - A entidade aparece na lista (GET /api/entidades).
+  - Na BD, empresaId está preenchido corretamente.
+
+B) CONTACTOS
+- Criar um contacto de teste:
+
+  curl -X POST http://localhost:5000/api/contactos \
+    -H "Cookie: <sessionId-admin>" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "nome": "Contacto Teste",
+      "email": "teste@example.com"
+    }'
+
+- Confirmar:
+  - 200 OK
+  - Contacto aparece na lista.
+  - empresaId correto na BD.
+
+C) FRONTEND
+- Abrir a app normal:
+  - Criar nova ENTIDADE pelo formulário → deve gravar.
+  - Criar novo CONTACTO pelo formulário → deve gravar.
+
+6) IMPORTANTE – NÃO MEXER:
+- Não alteres nada de:
+  - multi-empresa em visitas, tarefas, lembretes
+  - backoffice (empresa, utilizadores, marcas)
+  - áudio e transcrição
+  - editor rico de notas
+  - campo marcasIds em visitas
+- Só quero que:
+  - criar/editar entidades e contactos volte a funcionar
+  - sem quebrar o resto.
+
+No fim, por favor:
+- Diz-me qual era o problema (ex: empresaId não enviado, schema demasiado restrito, etc.).
+- Que ficheiros e linhas aproximadas alteraste.
+- Confirma que `npm run build` passa e que conseguires criar entidades e contactos pela UI.

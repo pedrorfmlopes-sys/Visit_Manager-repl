@@ -229,6 +229,7 @@ function validateNIF(value: string): boolean {
 
 export const insertEntidadeSchema = createInsertSchema(entidades).omit({
   id: true,
+  empresaId: true, // Set by backend from getUserContext
   createdAt: true,
   updatedAt: true,
   odooEntityId: true,
@@ -341,6 +342,7 @@ export const entidadesRelations = relations(entidades, ({ one, many }) => ({
 
 export const insertContactoSchema = createInsertSchema(contactos).omit({
   id: true,
+  empresaId: true, // Set by backend from getUserContext
   createdAt: true,
   updatedAt: true,
   gabineteId: true, // DEPRECATED - use entidadeId
