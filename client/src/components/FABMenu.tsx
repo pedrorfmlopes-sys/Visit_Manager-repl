@@ -11,8 +11,8 @@ interface FABPosition {
 const DEFAULT_POSITION: FABPosition = { x: 16, y: 96 };
 const FAB_STORAGE_KEY = "fab-position";
 const FAB_SIZE = 56;
-const GAP_DOWN = 12; // Gap when menu opens downwards (top position)
-const GAP_UP = 24; // Gap when menu opens upwards (bottom position)
+const BUTTON_HEIGHT = 56;
+const MENU_ITEMS_COUNT = 4; // Number of menu items (not including main button)
 
 export function FABMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -20,6 +20,7 @@ export function FABMenu() {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [shouldOpenUp, setShouldOpenUp] = useState(false);
+  const [dynamicGap, setDynamicGap] = useState(12);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [, setLocation] = useLocation();
@@ -36,9 +37,19 @@ export function FABMenu() {
     }
   }, []);
 
-  // Determine if menu should open upwards
+  // Calculate dynamic gap and determine if menu should open upwards
   useEffect(() => {
-    const totalMenuHeight = 56 * 5 + GAP_UP * 4;
+    // Half of screen height
+    const halfScreen = window.innerHeight / 2;
+    
+    // Total space available for buttons + gaps: 5 buttons (1 main + 4 menu)
+    // (5 * BUTTON_HEIGHT) + (4 * gap) = halfScreen
+    // gap = (halfScreen - (5 * BUTTON_HEIGHT)) / 4
+    const gap = Math.max(8, (halfScreen - (5 * BUTTON_HEIGHT)) / 4);
+    setDynamicGap(gap);
+    
+    // Determine if menu should open upwards
+    const totalMenuHeight = 5 * BUTTON_HEIGHT + 4 * gap;
     setShouldOpenUp(position.y + totalMenuHeight > window.innerHeight);
   }, [position]);
 
@@ -109,18 +120,17 @@ export function FABMenu() {
 
   // Calculate menu item position with dynamic gap
   const getMenuItemStyle = (index: number) => {
-    const gap = shouldOpenUp ? GAP_UP : GAP_DOWN;
-    const itemOffset = index * (56 + gap); // button height + gap
+    const itemOffset = index * (BUTTON_HEIGHT + dynamicGap);
     if (shouldOpenUp) {
       // Menu opens upwards - items positioned above the main button
       return {
-        bottom: `${56 + gap + itemOffset}px`,
+        bottom: `${BUTTON_HEIGHT + dynamicGap + itemOffset}px`,
         left: "0",
       };
     } else {
       // Menu opens downwards - items positioned below the main button
       return {
-        top: `${56 + gap + itemOffset}px`,
+        top: `${BUTTON_HEIGHT + dynamicGap + itemOffset}px`,
         left: "0",
       };
     }
