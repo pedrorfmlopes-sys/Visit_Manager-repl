@@ -7,6 +7,7 @@ export interface AuthUser extends User {
     nome: string;
     logoUrl?: string;
     mostrarMarcasEmVisitas: boolean;
+    theme?: "light-business" | "dark-pro";
   } | null;
 }
 

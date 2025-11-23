@@ -2,7 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-/* LIGHT MODE */
+/* FASE 9: Theme variables */
+:root[data-theme="light-business"],
 :root {
   --button-outline: rgba(0,0,0, .10);
   --badge-outline: rgba(0,0,0, .05);
@@ -87,6 +88,7 @@
   --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 }
 
+:root[data-theme="dark-pro"],
 .dark {
   --button-outline: rgba(255,255,255, .10);
   --badge-outline: rgba(255,255,255, .05);

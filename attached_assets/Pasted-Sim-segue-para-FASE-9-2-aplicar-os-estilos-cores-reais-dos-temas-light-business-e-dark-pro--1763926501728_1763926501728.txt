@@ -1,0 +1,122 @@
+Sim, segue para FASE 9.2 – aplicar os estilos/cores reais dos temas "light-business" e "dark-pro".
+
+Objetivo:
+Quando empresa.theme === "light-business" → UI clara, estilo SaaS moderno.
+Quando empresa.theme === "dark-pro" → UI escura, estilo app pro.
+
+Importante: não mexer em lógica de negócio (visitas, tarefas, áudio, marcas, etc.). Só styling/tema.
+
+Tarefas:
+
+1) Ligar o theme da empresa ao frontend
+- Já temos /api/admin/empresa a devolver theme e /api/auth/user a devolver empresa.
+- Em client/src/hooks/useAuth.ts já devolves empresa.
+- Em client/src/App.tsx adiciona um useEffect que, sempre que empresa.theme mudar:
+  - se theme === "dark-pro":
+      - adicionar a classe "dark" ao document.documentElement
+      - definir data-theme="dark-pro" em document.documentElement
+  - se theme === "light-business":
+      - remover a classe "dark"
+      - definir data-theme="light-business"
+
+2) Definir variáveis de tema no CSS global
+No ficheiro global de estilos (por ex. client/src/index.css ou equivalente), definir:
+
+:root[data-theme="light-business"] {
+  --bg: #F5F7FB;
+  --bg-card: #FFFFFF;
+  --bg-nav: #FFFFFF;
+  --primary: #2563EB;
+  --primary-soft: #DBEAFE;
+  --text-main: #111827;
+  --text-muted: #6B7280;
+  --border-subtle: #E5E7EB;
+}
+
+:root[data-theme="dark-pro"] {
+  --bg: #020617;
+  --bg-card: #111827;
+  --bg-nav: #020617;
+  --primary: #6366F1;
+  --primary-soft: #1E293B;
+  --text-main: #E5E7EB;
+  --text-muted: #9CA3AF;
+  --border-subtle: #1F2937;
+}
+
+Depois, liga isto às classes/utilitários que a app usa, por exemplo:
+
+body {
+  background-color: var(--bg);
+  color: var(--text-main);
+}
+
+.elevated-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+}
+
+.nav-bar {
+  background-color: var(--bg-nav);
+}
+
+.btn-primary {
+  background-color: var(--primary);
+  color: white;
+}
+
+Se já houver um sistema de tokens (bg-background, text-foreground, etc.), adapta as variáveis para alimentar esses tokens em vez de criar classes novas.
+
+3) Aplicar o tema aos componentes principais
+
+Atualiza os componentes-chave para usarem as variáveis:
+
+- client/src/components/BottomNav.tsx
+  - usar uma wrapper class (ex: "nav-bar") no container da bottom nav
+  - estado ativo dos botões com background var(--primary-soft) e texto/ícone com var(--primary)
+
+- Header principal (onde aparece o logo da empresa em App.tsx)
+  - fundo ≈ var(--bg-card)
+  - borda inferior com var(--border-subtle)
+  - texto com var(--text-main)
+
+- Páginas principais:
+  - Lista de visitas
+  - Lista de tarefas
+  - Dashboard (se existir)
+  Garante que:
+  - o fundo da página usa var(--bg) (por ex. className="min-h-screen" + estilo ligado a body)
+  - os cards usam algo tipo className que aplique elevated-card
+
+4) Respeitar dark mode nativo (Tailwind dark:)
+- Quando o theme = "dark-pro", ao adicionares a classe "dark" no html, as classes Tailwind com dark: já devem entrar em ação.
+- Garante que as novas variáveis não entram em conflito com isso (devem complementar).
+
+5) Testes que quero que faças TU
+
+A) Testar "Tema claro (Business)"
+- Em /admin/empresa escolhe "Tema claro (Business)" (value: light-business), guarda.
+- Faz refresh à app.
+- Verifica:
+  - fundo claro
+  - cards brancos
+  - bottom nav branca, item ativo com realce azul
+  - texto escuro e legível
+
+B) Testar "Tema escuro (Pro)"
+- Em /admin/empresa escolhe "Tema escuro (Pro)" (value: dark-pro), guarda.
+- Faz refresh.
+- Verifica:
+  - fundo escuro (night mode)
+  - cards em cinza escuro
+  - texto claro
+  - bottom nav escura, item ativo com realce roxo/indigo
+  - qualquer componente com dark: classes deve comportar-se como dark mode.
+
+C) Confirmar persistência
+- Volta a entrar mais tarde ou faz vários refreshes,
+- Confirma que o theme aplicado é sempre o que vem da empresa.theme.
+
+No final:
+- Diz-me quais ficheiros de frontend tocaste (App.tsx, index.css, BottomNav, etc.).
+- Confirma que `npm run build` passou e que conseguias alternar visualmente entre "Tema claro (Business)" e "Tema escuro (Pro)" só mudando o valor em /admin/empresa.

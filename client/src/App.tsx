@@ -124,6 +124,21 @@ function AppContent() {
     offlineStorage.init().catch(console.error);
   }, []);
 
+  // FASE 9: Apply theme from empresa.theme
+  useEffect(() => {
+    if (isAuthenticated && empresa?.theme) {
+      const root = document.documentElement;
+      
+      if (empresa.theme === "dark-pro") {
+        root.classList.add("dark");
+        root.setAttribute("data-theme", "dark-pro");
+      } else if (empresa.theme === "light-business") {
+        root.classList.remove("dark");
+        root.setAttribute("data-theme", "light-business");
+      }
+    }
+  }, [isAuthenticated, empresa?.theme]);
+
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
