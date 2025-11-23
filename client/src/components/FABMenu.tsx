@@ -11,7 +11,7 @@ interface FABPosition {
 const DEFAULT_POSITION: FABPosition = { x: 16, y: 96 };
 const FAB_STORAGE_KEY = "fab-position";
 const FAB_SIZE = 56;
-const GAP = 16; // Increased gap between buttons
+const GAP = 24; // Gap between buttons
 
 export function FABMenu() {
   const [isOpen, setIsOpen] = useState(false);
