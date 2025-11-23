@@ -168,7 +168,6 @@ function AppContent() {
     return location === route;
   });
   
-  console.log("AppContent: FAB logic", { location, showFAB, isFABHidden, isAuthenticated });
 
   useEffect(() => {
     offlineStorage.init().catch(console.error);

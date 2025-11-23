@@ -44,14 +44,11 @@ export function FABMenu() {
         const validX = Math.max(0, Math.min(parsed.x, window.innerWidth - FAB_SIZE));
         const validY = Math.max(0, Math.min(parsed.y, maxSafeY - FAB_SIZE));
         
-        console.log("FABMenu: Loaded and validated position", { original: parsed, validated: { x: validX, y: validY }, maxSafeY });
         setPosition({ x: validX, y: validY });
       } catch {
-        console.log("FABMenu: Failed to parse stored position, using default");
         setPosition(DEFAULT_POSITION);
       }
     } else {
-      console.log("FABMenu: No stored position, using default", DEFAULT_POSITION);
       setPosition(DEFAULT_POSITION);
     }
     
@@ -106,7 +103,6 @@ export function FABMenu() {
     if (!rect) return;
 
     longPressTimer.current = setTimeout(() => {
-      console.log("FABMenu: Drag mode activated");
       setIsDragging(true);
       setDragOffset({
         x: e.clientX - rect.left,
@@ -119,13 +115,11 @@ export function FABMenu() {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
-      console.log("FABMenu: Menu toggled, isOpen now:", !isOpen);
       setIsOpen(!isOpen);
     }
   };
 
   const handleMenuItemClick = (action: string) => {
-    console.log("FABMenu: Navigating to", action);
     setIsOpen(false);
     setLocation(action);
   };
@@ -141,8 +135,6 @@ export function FABMenu() {
       return position.y + itemOffset;
     }
   };
-
-  console.log("FABMenu: Rendering with position", { x: position.x, y: position.y, isOpen });
 
   return (
     <>
