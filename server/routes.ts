@@ -2738,7 +2738,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       
-      const { nome, nif, email, telefone, logoUrl, mostrarMarcasEmVisitas } = req.body;
+      const { nome, nif, email, telefone, logoUrl, mostrarMarcasEmVisitas, theme } = req.body;
+      
+      // Validate theme if provided
+      if (theme !== undefined && !["light-business", "dark-pro"].includes(theme)) {
+        return res.status(400).json({ message: "Invalid theme. Must be 'light-business' or 'dark-pro'" });
+      }
       
       const updateData: Partial<Empresa> = {};
       if (nome !== undefined) updateData.nome = nome;
@@ -2747,6 +2752,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (telefone !== undefined) updateData.telefone = telefone;
       if (logoUrl !== undefined) updateData.logoUrl = logoUrl;
       if (mostrarMarcasEmVisitas !== undefined) updateData.mostrarMarcasEmVisitas = mostrarMarcasEmVisitas;
+      if (theme !== undefined) updateData.theme = theme;
       
       const updated = await storage.updateEmpresa(empresaId, updateData);
       if (!updated) {

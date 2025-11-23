@@ -1,0 +1,54 @@
+FASE 9.1 – Suporte a temas por empresa (light-business / dark-pro) – BACKEND + BACKOFFICE
+
+Objetivo:
+Cada empresa passa a ter um campo `theme` com duas opções:
+- "light-business" (tema claro, padrão)
+- "dark-pro" (tema escuro pro)
+
+O admin escolhe o tema em /admin/empresa. O frontend vai usar este valor na FASE 9.2.
+
+Tarefas:
+
+1) Schema da empresa (shared/schema.ts)
+- Na tabela `empresas`, adicionar um campo:
+  - theme: varchar(50), NOT NULL, default "light-business"
+
+- Atualizar o Zod schema da empresa (se existir) para incluir:
+  - theme?: "light-business" | "dark-pro"
+
+2) Migração DB
+- Criar/ou atualizar a migration para garantir que:
+  - O campo theme é criado com default "light-business".
+  - Todas as empresas existentes ficam com theme = "light-business".
+
+3) Storage (server/storage.ts)
+- Em `getEmpresa` e `updateEmpresa`, garantir que o campo `theme` é lido/escrito.
+- No update, validar que o valor é só "light-business" ou "dark-pro".
+  - Se vier outro valor, rejeitar com 400.
+
+4) API admin empresa (server/routes.ts)
+- Em `GET /api/admin/empresa`:
+  - Incluir o campo `theme` no JSON de resposta.
+- Em `PATCH /api/admin/empresa`:
+  - Permitir receber `theme` opcional (além dos campos que já existem).
+  - Validar que `theme` ∈ ["light-business","dark-pro"] se vier.
+
+5) Frontend – página /admin/empresa (client/src/pages/AdminEmpresa.tsx)
+- Adicionar um campo de seleção de tema:
+  - Label: "Tema da Aplicação"
+  - Select com 2 opções:
+    - "Tema claro (Business)" → value: "light-business"
+    - "Tema escuro (Pro)" → value: "dark-pro"
+- O select deve:
+  - Carregar o valor inicial a partir de `empresa.theme`.
+  - Atualizar o campo `theme` no PATCH /api/admin/empresa quando o admin clicar em "Guardar Configuração".
+
+6) Testes que quero que faças TU:
+- Abrir /admin/empresa:
+  - Ver se o novo campo "Tema da Aplicação" aparece com "Tema claro (Business)" selecionado por defeito.
+- Mudar para "Tema escuro (Pro)" e clicar Guardar:
+  - Ver no Network que o PATCH /api/admin/empresa envia `"theme": "dark-pro"`.
+- Reabrir /admin/empresa:
+  - Confirmar que o select mostra "Tema escuro (Pro)" (valor guardado).
+
+Não mexer ainda em estilos/cores da UI (isso fica para FASE 9.2). Aqui só quero o campo theme totalmente funcional (DB + API + backoffice).

@@ -86,6 +86,7 @@ export const empresas = pgTable("empresas", {
   telefone: varchar("telefone", { length: 50 }),
   logoUrl: varchar("logo_url", { length: 500 }),
   mostrarMarcasEmVisitas: boolean("mostrar_marcas_em_visitas").default(false).notNull(),
+  theme: varchar("theme", { length: 50 }).default("light-business").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -94,6 +95,8 @@ export const insertEmpresaSchema = createInsertSchema(empresas).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  theme: z.enum(["light-business", "dark-pro"]).optional(),
 });
 
 export type InsertEmpresa = z.infer<typeof insertEmpresaSchema>;

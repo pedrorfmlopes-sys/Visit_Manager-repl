@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Empresa } from "@shared/schema";
@@ -18,6 +19,7 @@ const updateEmpresaSchema = z.object({
   telefone: z.string().optional().nullable(),
   logoUrl: z.string().optional().nullable(),
   mostrarMarcasEmVisitas: z.boolean().default(false),
+  theme: z.enum(["light-business", "dark-pro"]).default("light-business"),
 });
 
 type UpdateEmpresaForm = z.infer<typeof updateEmpresaSchema>;
@@ -38,6 +40,7 @@ export default function AdminEmpresa() {
       telefone: empresa.telefone || "",
       logoUrl: empresa.logoUrl || "",
       mostrarMarcasEmVisitas: empresa.mostrarMarcasEmVisitas,
+      theme: empresa.theme || "light-business",
     } : undefined,
   });
 
@@ -155,6 +158,28 @@ export default function AdminEmpresa() {
                       <FormControl>
                         <Input {...field} value={field.value || ""} placeholder="https://..." data-testid="input-empresa-logoUrl" />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="theme"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tema da Aplicação</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-empresa-theme">
+                            <SelectValue placeholder="Selecione um tema" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="light-business">Tema claro (Business)</SelectItem>
+                          <SelectItem value="dark-pro">Tema escuro (Pro)</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
