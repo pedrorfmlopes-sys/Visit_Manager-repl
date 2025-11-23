@@ -5,14 +5,21 @@ import type { Lembrete } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 
-const agentNavItems = [
+type NavItem = {
+  path: string;
+  icon: typeof LayoutDashboard;
+  label: string;
+  showBadge?: boolean;
+};
+
+const agentNavItems: NavItem[] = [
   { path: "/", icon: LayoutDashboard, label: "Hoje" },
   { path: "/visitas", icon: FileText, label: "Visitas" },
   { path: "/tarefas", icon: CheckCircle2, label: "Tarefas" },
   { path: "/agente-mais", icon: MoreHorizontal, label: "Mais" },
 ];
 
-const adminNavItems = [
+const adminNavItems: NavItem[] = [
   { path: "/", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/entidades", icon: Building2, label: "Entidades" },
   { path: "/contactos", icon: Users, label: "Contactos" },
