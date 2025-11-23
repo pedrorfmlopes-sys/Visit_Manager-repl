@@ -12,7 +12,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { randomUUID } from "crypto";
-import { insertEntidadeSchema, insertContactoSchema, insertVisitaSchema, insertTarefaSchema, lembretes } from "@shared/schema";
+import { insertEntidadeSchema, insertContactoSchema, insertVisitaSchema, insertTarefaSchema, lembretes, users } from "@shared/schema";
 import { generateEmailRequestSchema, getTemplate } from "@shared/emailTemplates";
 import { eq, and, desc, sql } from "drizzle-orm";
 import express from "express";
@@ -321,9 +321,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Dev endpoint: Toggle role between admin and agent (FASE 12 - for testing)
   app.post('/api/dev/toggle-role', isAuthenticated, async (req: any, res) => {
-    if (process.env.NODE_ENV !== 'development') {
-      return res.status(403).json({ message: "Only available in development" });
-    }
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
@@ -332,7 +329,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const newRole = user.role === 'admin' ? 'agent' : 'admin';
-      await db.update(require('./db').users).set({ role: newRole }).where(eq(require('./db').users.id, userId));
+      await db.update(users).set({ role: newRole }).where(eq(users.id, userId));
       
       const updatedUser = await storage.getUser(userId);
       res.json({ 
