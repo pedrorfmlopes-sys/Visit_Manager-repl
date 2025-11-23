@@ -33,6 +33,7 @@ import QRScanner from "@/pages/QRScanner";
 import AdminEmpresa from "@/pages/AdminEmpresa";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminMarcas from "@/pages/AdminMarcas";
+import AgentMore from "@/pages/AgentMore";
 // import MicrosoftIntegration from "@/pages/MicrosoftIntegration"; // Disabled: requires valid Azure credentials
 
 // Protected admin route component
@@ -111,6 +112,9 @@ function Router() {
         <Route path="/tarefas/nova" component={TarefaForm} />
         <Route path="/tarefas/:id" component={TarefaDetail} />
         <Route path="/tarefas/:id/editar" component={TarefaForm} />
+        
+        {/* Agent-specific routes */}
+        <Route path="/agente-mais" component={AgentMore} />
         
         {/* Lembretes and Analytics */}
         <Route path="/lembretes" component={Lembretes} />

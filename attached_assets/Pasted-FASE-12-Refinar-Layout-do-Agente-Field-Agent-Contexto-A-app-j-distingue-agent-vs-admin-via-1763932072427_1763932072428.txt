@@ -1,0 +1,159 @@
+FASE 12 – Refinar Layout do Agente (“Field Agent”)
+
+Contexto:
+
+A app já distingue agent vs admin via user.role e usa um MainLayout.
+
+O agente já usa um layout mobile-first com BottomNav e dashboard inicial.
+
+Queremos alinhar isto com o conceito “Field Agent”:
+
+Bottom nav simples.
+
+Página “Hoje” focada nas próximas visitas e tarefas urgentes.
+
+Botão de ação flutuante (“+”) com atalhos rápidos.
+
+Objetivo:
+
+Ajustar o layout do agent para seguir este modelo:
+
+BottomNav com 4 tabs:
+
+Hoje
+
+Visitas
+
+Tarefas
+
+Mais (perfil / definições / extras)
+
+Página “Hoje” com:
+
+Próximas visitas do dia.
+
+Tarefas urgentes / em atraso.
+
+Atalhos rápidos (nova visita, nova tarefa, gravar áudio).
+
+Botão flutuante “+” no canto (FAB) com menu rápido:
+
+Nova visita.
+
+Nova tarefa.
+
+Tarefas técnicas:
+
+BottomNav (agent)
+
+Identificar o componente atual de BottomNav.
+
+Para user.role === "agent":
+
+Ajustar as tabs para exatamente estas 4:
+
+Hoje → rota de dashboard do agente (pode ser / ou outra rota específica).
+
+Visitas → rota de lista de visitas do agente.
+
+Tarefas → rota de lista de tarefas do agente.
+
+Mais → rota de “mais/opções” com perfil, definições, etc. (pode ser uma página simples por agora).
+
+Garantir que não aparecem itens de admin para agentes.
+
+Manter o comportamento atual para admin (admin navega pela sidebar, não pelo BottomNav).
+
+Página “Hoje” (dashboard do agente)
+
+Criar ou adaptar a página que o agente vê como “home” para ter esta estrutura:
+
+Secção 1: “Próximas visitas de hoje”
+
+Listar visitas com data = hoje, ordenadas por hora.
+
+Mostrar entidade, hora, localidade e estado básico.
+
+Secção 2: “Tarefas urgentes”
+
+Listar tarefas:
+
+Em atraso (dueDate < hoje, não concluída), ou
+
+Com prioridade alta / data de hoje, se já existir esse conceito.
+
+Secção 3: “Atalhos rápidos”
+
+Botões grandes / cards pequenos para:
+
+“Nova visita”
+
+“Nova tarefa”
+
+“Gravar áudio rápido” (se já houver componente de gravação que possa ser reutilizado para criar uma visita depois).
+
+Usar dados dos endpoints já existentes (não criar novos endpoints se não for necessário – podes usar os endpoints de listagem e filtrar no frontend).
+
+UI em linha com o tema atual (light-business / dark-pro) e com o layout mobile.
+
+Botão flutuante “+” (FAB)
+
+Para user.role === "agent", nos ecrãs principais (ex.: Hoje, Visitas, Tarefas), adicionar um botão flutuante no canto inferior direito:
+
+Posição aproximada: bottom-20 right-4 (ou semelhante).
+
+Conteúdo: ícone “+”.
+
+Ao clicar:
+
+Abrir um pequeno menu/overlay com opções:
+
+“Nova visita” → navega para o formulário de criação de visita.
+
+“Nova tarefa” → navega para o formulário de criação de tarefa.
+
+Opcional: “Gravar áudio” se for simples reutilizar o componente de gravação.
+
+Garantir que o FAB só aparece para agentes, não para admins.
+
+Página “Mais” (agent)
+
+Criar uma página simples acessível pela tab “Mais” no BottomNav:
+
+Mostrar:
+
+Nome do utilizador.
+
+Nome da empresa.
+
+Botão para terminar sessão.
+
+Pode incluir placeholders para:
+
+Definições futuras (ex.: preferências do agente).
+
+Esta página não deve mostrar opções de administração (essas continuam exclusivas do layout admin).
+
+Testes esperados
+
+Login como agent:
+
+Ver BottomNav com 4 tabs: Hoje, Visitas, Tarefas, Mais.
+
+Ver página “Hoje” como home com secções: visitas do dia, tarefas urgentes, atalhos rápidos.
+
+Ver FAB “+” nas principais páginas e conseguir criar nova visita / nova tarefa a partir daí.
+
+Login como admin:
+
+Não ver FAB de agente.
+
+Continuar a ver a sidebar admin e AdminDashboard normalmente.
+
+Restrições:
+
+Não alterar endpoints nem lógica de backend.
+
+Não mexer na lógica de multi-empresa.
+
+Manter a distinção clara entre UX de agent e admin só no frontend (via user.role).

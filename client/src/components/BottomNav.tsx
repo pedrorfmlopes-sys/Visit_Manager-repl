@@ -1,11 +1,18 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Building2, Users, FileText, CheckCircle2, QrCode, Bell, Settings } from "lucide-react";
+import { LayoutDashboard, Building2, Users, FileText, CheckCircle2, QrCode, Bell, Settings, MoreHorizontal } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { Lembrete } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 
-const navItems = [
+const agentNavItems = [
+  { path: "/", icon: LayoutDashboard, label: "Hoje" },
+  { path: "/visitas", icon: FileText, label: "Visitas" },
+  { path: "/tarefas", icon: CheckCircle2, label: "Tarefas" },
+  { path: "/agente-mais", icon: MoreHorizontal, label: "Mais" },
+];
+
+const adminNavItems = [
   { path: "/", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/entidades", icon: Building2, label: "Entidades" },
   { path: "/contactos", icon: Users, label: "Contactos" },
@@ -16,6 +23,9 @@ const navItems = [
 
 export function BottomNav() {
   const [location] = useLocation();
+  const { isAdmin } = useAuth();
+  
+  const navItems = isAdmin ? adminNavItems : agentNavItems;
   
   const { data: lembretes } = useQuery<Lembrete[]>({
     queryKey: ['/api/lembretes'],

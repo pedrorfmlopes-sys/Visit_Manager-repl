@@ -1,6 +1,8 @@
 import { ReactNode } from "react";
+import { useLocation } from "wouter";
 import { AdminSidebar } from "@/components/AdminSidebar";
 import { BottomNav } from "@/components/BottomNav";
+import { FABMenu } from "@/components/FABMenu";
 import { SyncIndicator } from "@/components/SyncIndicator";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -10,6 +12,11 @@ interface MainLayoutProps {
 
 export function MainLayout({ children }: MainLayoutProps) {
   const { isAdmin, empresa } = useAuth();
+  const [location] = useLocation();
+  
+  // Agent pages where FAB should appear
+  const agentMainPages = ["/", "/visitas", "/tarefas"];
+  const showFAB = !isAdmin && agentMainPages.some(page => location === page || location.startsWith(page + "/"));
 
   if (isAdmin) {
     return (
@@ -60,6 +67,7 @@ export function MainLayout({ children }: MainLayoutProps) {
       <main className="max-w-2xl mx-auto">
         {children}
       </main>
+      {showFAB && <FABMenu />}
       <BottomNav />
       <SyncIndicator />
     </div>
