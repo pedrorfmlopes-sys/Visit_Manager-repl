@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles, Bell, Volume2, Trash2, Loader2 } from "lucide-react";
+import { ArrowLeft, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles, Bell, Volume2, Trash2, Loader2, Mic } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { pt } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -115,6 +115,83 @@ export default function VisitaDetail() {
       toast({ title: "Erro", description: "Falha na transcrição.", variant: "destructive" });
     },
   });
+
+  // FASE 7: Audio recording
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [supportsRecording, setSupportsRecording] = useState(
+    typeof navigator !== 'undefined' && 
+    (navigator.mediaDevices?.getUserMedia !== undefined || (navigator as any).getUserMedia !== undefined) &&
+    typeof MediaRecorder !== 'undefined'
+  );
+
+  const uploadRecordedAudio = async (blob: Blob) => {
+    if (!visitaId) return;
+    try {
+      const file = new File([blob], `visita-${visitaId}-${Date.now()}.webm`, { type: 'audio/webm' });
+      const formData = new FormData();
+      formData.append('audio', file);
+      
+      const response = await fetch(`/api/visitas/${visitaId}/audio`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      
+      if (!response.ok) throw new Error('Failed to upload audio');
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId, "audio"] });
+      toast({ title: "Sucesso", description: "Áudio gravado e enviado!" });
+    } catch (error) {
+      toast({ title: "Erro", description: "Falha ao enviar áudio.", variant: "destructive" });
+    }
+  };
+
+  const startRecording = async () => {
+    if (!supportsRecording) {
+      toast({ title: "Erro", description: "Gravação de áudio não suportada neste dispositivo.", variant: "destructive" });
+      return;
+    }
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      
+      mediaRecorder.ondataavailable = (e) => {
+        audioChunksRef.current.push(e.data);
+      };
+      
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        stream.getTracks().forEach(track => track.stop());
+        await uploadRecordedAudio(audioBlob);
+      };
+      
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      
+      if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime(t => t + 1);
+      }, 1000);
+    } catch (error) {
+      toast({ title: "Erro", description: "Permissão de microfone negada ou indisponível.", variant: "destructive" });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
+    }
+  };
 
   const tomorrow = addDays(new Date(), 1);
   
@@ -554,9 +631,13 @@ export default function VisitaDetail() {
                   <Badge key={idx} variant="secondary">{marca}</Badge>
                 ))}
               </div>
+              )}
+              {audioClips.length === 0 && !isRecording && supportsRecording && (
+                <p className="text-sm text-muted-foreground">Nenhum áudio ainda. Clica em "Gravar" para começar!</p>
+              )}
             </CardContent>
           </Card>
-        )}
+        ) : null}
 
         {/* FASE 5: Marcas Faladas */}
         {visita.marcas && visita.marcas.length > 0 && (
@@ -572,20 +653,44 @@ export default function VisitaDetail() {
                   </Badge>
                 ))}
               </div>
+              )}
+              {audioClips.length === 0 && !isRecording && supportsRecording && (
+                <p className="text-sm text-muted-foreground">Nenhum áudio ainda. Clica em "Gravar" para começar!</p>
+              )}
             </CardContent>
           </Card>
-        )}
+        ) : null}
 
         {/* FASE 6: Áudio da Visita */}
-        {audioClips.length > 0 && (
+        {audioClips.length > 0 || supportsRecording ? (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Volume2 className="h-4 w-4" />
-                Áudio da Visita
-              </CardTitle>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Volume2 className="h-4 w-4" />
+                  Áudio da Visita
+                </CardTitle>
+                {supportsRecording && (
+                  <Button
+                    variant={isRecording ? "destructive" : "outline"}
+                    size="sm"
+                    onClick={isRecording ? stopRecording : startRecording}
+                    data-testid="button-record-audio"
+                  >
+                    <Mic className="h-3 w-3 mr-1" />
+                    {isRecording ? `Parar (${recordingTime}s)` : "Gravar"}
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
+              {isRecording && (
+                <div className="mb-3 p-3 bg-destructive/10 border border-destructive rounded-md flex items-center gap-2">
+                  <div className="h-2 w-2 bg-red-500 rounded-full animate-pulse" />
+                  <p className="text-sm text-destructive font-medium">A gravar... {recordingTime}s</p>
+                </div>
+              )}
+              {audioClips.length > 0 && (
               <div className="space-y-3">
                 {audioClips.map((clip) => (
                   <div key={clip.id} className="p-3 border rounded-md bg-muted/30">
@@ -644,9 +749,13 @@ export default function VisitaDetail() {
                   </div>
                 ))}
               </div>
+              )}
+              {audioClips.length === 0 && !isRecording && supportsRecording && (
+                <p className="text-sm text-muted-foreground">Nenhum áudio ainda. Clica em "Gravar" para começar!</p>
+              )}
             </CardContent>
           </Card>
-        )}
+        ) : null}
 
         {gpsLocation && (
           <Card>

@@ -1,0 +1,138 @@
+FASE 7 – Gravação de áudio diretamente na visita (MediaRecorder) usando endpoints já existentes da FASE 6
+
+Contexto (já implementado – NÃO PRECISAS VOLTAR A FAZER):
+- Backend:
+  - Tabela VISITAS_AUDIO: { id, visitaId, empresaId, fileUrl, transcricao, createdAt }
+  - Endpoints:
+    - POST   /api/visitas/:id/audio
+    - GET    /api/visitas/:id/audio
+    - DELETE /api/visitas/:id/audio/:audioId
+    - POST   /api/visitas/:id/audio/:audioId/transcrever
+- Frontend:
+  - VisitaDetail já tem:
+    - Secção “Áudio da Visita”
+    - Lista de clips (GET /api/visitas/:id/audio)
+    - Botão Ouvir
+    - Botão Transcrever (IA)
+    - Badge “Transcrito”
+    - Botão Delete
+  - VisitaForm já permite upload de ficheiro áudio (via input file) e envia para o backend.
+
+AGORA O QUE EU QUERO (FASE 7):
+Adicionar gravação direta no browser (MediaRecorder) tanto na criação como na edição da visita, reaproveitando os endpoints de upload já existentes. Ou seja, em vez de só fazer upload de ficheiro do disco, poder “Gravar áudio” no momento e anexar à visita.
+
+============================================
+1) FRONTEND – VISITA DETAIL (visita já criada)
+============================================
+
+Objetivo:
+- Na página de detalhe da visita (VisitaDetail.tsx), além de ver os áudios, quero poder GRAVAR novos clips diretamente no browser e enviá-los imediatamente para o endpoint POST /api/visitas/:id/audio.
+
+Comportamento pedido:
+- Na secção “Áudio da Visita”:
+  - Adicionar um botão com ícone de microfone, tipo:
+    - “Gravar novo áudio”
+  - Fluxo:
+    - 1º clique → pede permissão de microfone (getUserMedia({ audio: true })) e começa a gravar (usar MediaRecorder API).
+      - Mostrar estado: “A gravar…” + um pequeno indicador/contador.
+      - Texto do botão muda para “Parar gravação”.
+    - 2º clique → pára gravação, cria um Blob de áudio e:
+      - converte em File (ex.: "visita-<id>-<timestamp>.webm" ou similar),
+      - chama a MESMA função de upload que já usas hoje para o input file, enviando esse File para POST /api/visitas/:id/audio.
+  - Após upload com sucesso:
+    - Refrescar a lista de áudios (refetch da query GET /api/visitas/:id/audio).
+    - Mostrar toast de sucesso.
+  - Em caso de erro:
+    - Mostrar toast de erro.
+- IMPORTANTE:
+  - Usar MediaRecorder de forma defensiva:
+    - se o browser não suportar MediaRecorder ou getUserMedia, mostrar uma mensagem tipo:
+      “Gravação de áudio não suportada neste dispositivo” e esconder/disable o botão.
+  - Não alterar endpoints backend; apenas reutilizar o POST /api/visitas/:id/audio.
+
+Implementação concreta:
+- Em client/src/pages/VisitaDetail.tsx:
+  - Criar estado local para:
+    - `isRecording: boolean`
+    - `mediaRecorderRef` (useRef<MediaRecorder | null>)
+    - `audioChunksRef` (useRef<Blob[]>)
+  - Funções:
+    - `startRecording()`:
+      - chama navigator.mediaDevices.getUserMedia({ audio: true }),
+      - cria MediaRecorder,
+      - guarda em mediaRecorderRef,
+      - no evento dataavailable: push para audioChunksRef,
+      - no evento stop: criar Blob, depois File, depois chamar função de upload.
+    - `stopRecording()`:
+      - chama mediaRecorderRef.current.stop()
+    - Botão de UI alterna entre chamar startRecording / stopRecording consoante isRecording.
+  - Para o upload:
+    - Reutilizar o mesmo caminho que já fazes quando o utilizador escolhe um ficheiro manualmente (mesma função que faz POST /api/visitas/:id/audio com FormData).
+  - No final da gravação:
+    - Limpar audioChunksRef.
+    - Atualizar isRecording para false.
+
+============================================
+2) FRONTEND – VISITA FORM (criação / edição)
+============================================
+
+Objetivo:
+- No formulário de Nova Visita / Editar Visita (VisitaForm.tsx), quero poder gravar clips de áudio ANTES de a visita existir, e depois anexá-los à visita assim que ela for criada.
+
+Comportamento pedido:
+- Na secção “Áudio da Visita” do VisitaForm:
+  - Manter o input file atual (upload de ficheiro do disco).
+  - Adicionar também um botão “Gravar áudio” com o mesmo comportamento de gravação que no VisitaDetail, mas **em memória**.
+
+Fluxo para Nova Visita:
+- Antes de submeter:
+  - O utilizador pode:
+    - gravar 0, 1 ou vários clips,
+    - cada clip fica em memória numa lista local (array de `File` ou `Blob` + nome).
+  - Mostrar lista de clips gravados nesta sessão:
+    - nome/tempo aproximado,
+    - botão ouvir (usar URL.createObjectURL),
+    - botão remover (só remove do estado local).
+- Ao submeter a visita:
+  - Primeiro, chama o endpoint atual de criação da visita (POST /api/visitas) e obtém o id da visita criada.
+  - Só DEPOIS de obter o id:
+    - para cada clip gravado em memória:
+      - chama programaticamente POST /api/visitas/:id/audio com esse File (em FormData).
+  - Tratamento:
+    - Se o upload correr bem:
+      - opcionalmente mostrar um toast geral “Visita criada e áudios enviados com sucesso”.
+    - Se algum upload falhar:
+      - não deve impedir a criação da visita (a visita já foi criada).
+      - mostrar um toast a indicar que alguns áudios não foram enviados.
+
+Fluxo para Editar Visita:
+- Para edição, podes simplificar:
+  - ou:
+    - usar a mesma lógica da VisitaDetail (grava e envia logo para /api/visitas/:id/audio),
+  - ou:
+    - manter o mesmo comportamento de “em memória + upload no guardar”.
+- Escolhe a abordagem mais simples e consistente com o código existente (ideal é igual à VisitaDetail: grava e faz upload imediatamente, já que a visita já existe).
+
+============================================
+3) Garantias e limites
+============================================
+
+Pontos importantes:
+- NÃO alterar endpoints backend de áudio – apenas reutilizar:
+  - POST /api/visitas/:id/audio
+  - GET /api/visitas/:id/audio
+  - DELETE /api/visitas/:id/audio/:audioId
+  - POST /api/visitas/:id/audio/:audioId/transcrever
+- Garante que:
+  - Erros de permissão (microfone bloqueado) são tratados com uma mensagem amigável.
+  - Navegadores sem suporte para MediaRecorder não partem o formulário:
+    - esconder botão de gravação ou desativar com mensagem.
+- Manter a app leve:
+  - Usar apenas APIs nativas (MediaRecorder), nada de libs pesadas de gravação.
+
+No final, mostra-me:
+- Que alterações fizeste em VisitaDetail.tsx e VisitaForm.tsx.
+- O fluxo final:
+  - para gravar e anexar áudio numa visita já criada;
+  - para gravar e anexar áudio quando se cria uma nova visita.
+- Passos concretos para testar (no mínimo 4 cenários: nova visita com áudio gravado, editar visita e gravar áudio, erro de permissão de microfone, browser sem suporte).
