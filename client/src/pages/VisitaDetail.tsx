@@ -117,6 +117,25 @@ export default function VisitaDetail() {
     },
   });
 
+  // FASE 14: AI Summary mutation
+  const generateAISummaryMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/visitas/${visitaId}/ia-resumo`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to generate AI summary');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
+      toast({ title: "Sucesso", description: "Resumo IA gerado com sucesso!" });
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Falha ao gerar resumo IA.", variant: "destructive" });
+    },
+  });
+
   // FASE 7: Audio recording
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -757,6 +776,125 @@ export default function VisitaDetail() {
             </CardContent>
           </Card>
         ) : null}
+
+        {/* FASE 14: AI Summary, Key Points and Suggested Tasks */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Análise IA da Visita
+              </CardTitle>
+              {!visita.resumoIa && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => generateAISummaryMutation.mutate()}
+                  disabled={generateAISummaryMutation.isPending}
+                  data-testid="button-generate-ai-summary"
+                >
+                  {generateAISummaryMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      Gerando...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      Gerar Resumo
+                    </>
+                  )}
+                </Button>
+              )}
+              {visita.resumoIa && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => generateAISummaryMutation.mutate()}
+                  disabled={generateAISummaryMutation.isPending}
+                  data-testid="button-regenerate-ai-summary"
+                  title="Atualizar análise IA"
+                >
+                  {generateAISummaryMutation.isPending ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3 w-3" />
+                  )}
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {visita.resumoIa ? (
+              <>
+                {/* Resumo IA */}
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">Resumo Executivo</p>
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{visita.resumoIa}</p>
+                </div>
+
+                {/* Pontos-Chave */}
+                {visita.pontosChaveIA && visita.pontosChaveIA.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium text-foreground mb-2">Pontos-Chave</p>
+                    <ul className="space-y-1">
+                      {(typeof visita.pontosChaveIA === 'string' 
+                        ? JSON.parse(visita.pontosChaveIA) 
+                        : visita.pontosChaveIA
+                      ).map((ponto: string, idx: number) => (
+                        <li key={idx} className="text-sm text-foreground flex gap-2">
+                          <span className="text-primary font-bold">•</span>
+                          <span>{ponto}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Tarefas Sugeridas */}
+                {visita.tarefasSugeridasIA && visita.tarefasSugeridasIA.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium text-foreground mb-2">Tarefas Sugeridas</p>
+                    <div className="space-y-2">
+                      {(typeof visita.tarefasSugeridasIA === 'string' 
+                        ? JSON.parse(visita.tarefasSugeridasIA) 
+                        : visita.tarefasSugeridasIA
+                      ).map((tarefa: any, idx: number) => (
+                        <div key={idx} className="p-2 bg-muted/30 rounded-md border border-muted">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-medium text-foreground">{tarefa.titulo}</span>
+                            <Badge 
+                              variant="outline" 
+                              className="text-xs"
+                              data-testid={`badge-priority-${tarefa.prioridade}-${idx}`}
+                            >
+                              {tarefa.prioridade === 'alta' && 'Alta'}
+                              {tarefa.prioridade === 'normal' && 'Normal'}
+                              {tarefa.prioridade === 'baixa' && 'Baixa'}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-1">{tarefa.descricao}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Prazo sugerido: {tarefa.prazo_sugerido_dias} dias
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-6">
+                <p className="text-sm text-muted-foreground mb-3">
+                  Clique em "Gerar Resumo" para analisar automaticamente esta visita com IA
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  A análise incluirá: resumo executivo, pontos-chave e tarefas de follow-up sugeridas
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {gpsLocation && (
           <Card>

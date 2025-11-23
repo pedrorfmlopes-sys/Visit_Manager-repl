@@ -203,6 +203,106 @@ Responde apenas com o JSON, sem explicações adicionais.
   }
 }
 
+// FASE 14: Generate AI summary with key points and suggested tasks
+export interface IAResumoOutput {
+  resumoIA: string;
+  pontosChaveIA: string[];
+  tarefasSugeridasIA: Array<{
+    titulo: string;
+    descricao: string;
+    prioridade: "baixa" | "normal" | "alta";
+    prazo_sugerido_dias: number;
+  }>;
+}
+
+export async function generateAISummaryAndTasks(data: {
+  entidadeNome: string;
+  contactoNome?: string;
+  notas?: string;
+  audioTranscricoes: string[]; // Array of transcribed audio texts
+  marcasIds?: string[];
+  dataVisita: Date;
+}): Promise<IAResumoOutput> {
+  if (!openai) {
+    console.warn("OpenAI not configured. Skipping AI summary generation.");
+    return {
+      resumoIA: "[Resumo automático indisponível - API key não configurada]",
+      pontosChaveIA: [],
+      tarefasSugeridasIA: [],
+    };
+  }
+
+  try {
+    // Concatenate all audio transcriptions
+    const audioContent = data.audioTranscricoes && data.audioTranscricoes.length > 0
+      ? `**Transcrições de Áudio:**\n${data.audioTranscricoes.join('\n\n')}`
+      : "Sem transcrições de áudio";
+
+    const prompt = `
+Analisa esta visita comercial e gera um resumo profissional com pontos-chave e tarefas sugeridas em português PT-PT.
+
+**Entidade:** ${data.entidadeNome}
+${data.contactoNome ? `**Contacto:** ${data.contactoNome}` : ''}
+**Data da visita:** ${data.dataVisita.toLocaleDateString('pt-PT')}
+
+**Notas da visita:**
+${data.notas || 'Sem notas escritas'}
+
+${audioContent}
+
+Por favor, gera um JSON estruturado com os seguintes campos:
+{
+  "resumo": "Resumo executivo profissional em 2-3 parágrafos, focando nos pontos principais comerciais",
+  "pontos_chave": ["ponto 1", "ponto 2", "ponto 3", "ponto 4", "ponto 5"],
+  "tarefas_sugeridas": [
+    {
+      "titulo": "Título da tarefa de follow-up",
+      "descricao": "Descrição detalhada da ação a tomar",
+      "prioridade": "alta|normal|baixa",
+      "prazo_sugerido_dias": número de dias até prazo recomendado
+    }
+  ]
+}
+
+Instruções:
+1. O resumo deve ser profissional e comercial, em português PT-PT
+2. Pontos-chave devem ser específicos e actionáveis (máx 5)
+3. Tarefas sugeridas devem ser práticas e relacionadas com follow-up/ações de venda
+4. Prioridades: "alta" para urgente, "normal" para standard, "baixa" para informativo
+5. Prazos sugeridos em dias (ex: 3, 7, 14, 30)
+6. Responde APENAS com JSON válido, sem explicações adicionais
+`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "És um assistente especializado em análise de visitas comerciais e geração de tarefas de follow-up. Respondes sempre em português de Portugal e em formato JSON válido."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.7,
+    });
+
+    const result = response.choices[0].message.content;
+    const parsed = JSON.parse(result || "{}");
+
+    return {
+      resumoIA: parsed.resumo || "Sem resumo disponível",
+      pontosChaveIA: parsed.pontos_chave || [],
+      tarefasSugeridasIA: parsed.tarefas_sugeridas || [],
+    };
+  } catch (error) {
+    console.error("Error generating AI summary and tasks:", error);
+    throw new Error("Failed to generate AI summary and tasks");
+  }
+}
+
 export async function generateEmailDraft(data: {
   templateType: string;
   tone: string;

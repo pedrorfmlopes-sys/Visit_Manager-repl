@@ -1512,6 +1512,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // FASE 14: Generate AI summary, key points, and suggested tasks
+  app.post('/api/visitas/:id/ia-resumo', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const visita = await storage.getVisita(req.params.id, empresaId, userId, userRole);
+      if (!visita) {
+        return res.status(404).json({ message: "Visita not found" });
+      }
+
+      // Collect audio transcriptions from all audio clips
+      const audioTranscricoes: string[] = [];
+      if (visita.audios && visita.audios.length > 0) {
+        visita.audios.forEach(audio => {
+          if (audio.transcricao) {
+            audioTranscricoes.push(audio.transcricao);
+          }
+        });
+      }
+
+      // Generate AI summary using OpenAI
+      const { generateAISummaryAndTasks } = await import('./openai');
+      const aiResult = await generateAISummaryAndTasks({
+        entidadeNome: visita.entidade?.nome || 'Entidade desconhecida',
+        contactoNome: visita.contacto?.nome,
+        notas: visita.notas || undefined,
+        audioTranscricoes,
+        dataVisita: new Date(visita.dataVisita),
+      });
+
+      // Update visit with AI-generated data
+      const updated = await storage.updateVisitaAISummary(req.params.id, empresaId, {
+        resumoIA: aiResult.resumoIA,
+        pontosChaveIA: aiResult.pontosChaveIA,
+        tarefasSugeridasIA: aiResult.tarefasSugeridasIA,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error generating AI summary:", error);
+      res.status(500).json({ message: "Failed to generate AI summary" });
+    }
+  });
+
   app.delete('/api/visitas/:id', isAuthenticated, async (req: any, res) => {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);

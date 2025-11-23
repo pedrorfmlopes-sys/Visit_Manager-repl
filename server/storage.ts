@@ -98,6 +98,9 @@ export interface IStorage {
   deleteVisitasAudio(audioId: string, empresaId: string): Promise<void>;
   updateVisitasAudioTranscription(audioId: string, transcricao: string): Promise<VisitasAudio | undefined>;
   
+  // FASE 14: AI summary management
+  updateVisitaAISummary(visitaId: string, empresaId: string, data: { resumoIA: string; pontosChaveIA: string[]; tarefasSugeridasIA: any[] }): Promise<Visita | undefined>;
+  
   // FASE 3: Empresa & Users management
   updateEmpresa(id: string, empresa: Partial<InsertEmpresa>): Promise<Empresa | undefined>;
   getUtilizadoresByEmpresa(empresaId: string): Promise<User[]>;
@@ -618,6 +621,25 @@ export class DatabaseStorage implements IStorage {
       .update(visitasAudio)
       .set({ transcricao })
       .where(eq(visitasAudio.id, audioId))
+      .returning();
+    return updated;
+  }
+
+  async updateVisitaAISummary(visitaId: string, empresaId: string, data: { resumoIA: string; pontosChaveIA: string[]; tarefasSugeridasIA: any[] }): Promise<Visita | undefined> {
+    const [updated] = await db
+      .update(visitas)
+      .set({
+        resumoIa: data.resumoIA,
+        pontosChaveIA: JSON.stringify(data.pontosChaveIA),
+        tarefasSugeridasIA: JSON.stringify(data.tarefasSugeridasIA),
+        iaLastGeneratedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(visitas.id, visitaId),
+          eq(visitas.empresaId, empresaId)
+        )
+      )
       .returning();
     return updated;
   }

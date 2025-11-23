@@ -1,0 +1,278 @@
+FASE 14 – IA sobre transcrição da visita (Resumo + Sugestão de Tarefas)
+
+Contexto:
+
+Projeto: Visit Manager multi-empresa.
+
+Estado atual relevante:
+
+Tabela visitasAudio com:
+
+id, visitaId, empresaId, fileUrl, transcricao, createdAt.
+
+Endpoints:
+
+POST /api/visitas/:id/audio → upload áudio.
+
+GET /api/visitas/:id/audio → lista clips.
+
+DELETE /api/visitas/:id/audio/:audioId → apaga clip.
+
+POST /api/visitas/:id/audio/:audioId/transcrever → usa Whisper e grava texto em visitasAudio.transcricao.
+
+Frontend:
+
+VisitaDetail mostra:
+
+lista de áudios,
+
+botão “Transcrever” por clip,
+
+texto da transcrição (quando existe).
+
+Objetivo agora: usar o texto transcrito para:
+
+gerar um resumo IA da visita, e
+
+sugerir tarefas de follow-up com base nesse resumo.
+
+Requisitos gerais:
+
+Manter multi-empresa e RBAC como estão (usar empresaId do contexto).
+
+Minimizar alterações de schema (mas aceita criar 1–2 campos novos em visitas ou tabela dedicada).
+
+Não voltar a chamar a IA se já existir resumo IA recente para aquela visita (cache).
+
+1. Modelo de dados para guardar o output da IA
+
+Criar estrutura mínima para guardar:
+
+resumoIA: texto curto (1–3 parágrafos) com o essencial da visita.
+
+pontosChaveIA: lista de bullet-points (pode ser string com separador ou JSON text).
+
+tarefasSugeridasIA: lista serializada com sugestões de tarefas (ver estrutura).
+
+Sugestão A (mais simples): adicionar campos na tabela visitas
+
+Novos campos em visitas:
+
+resumoIA: text | null
+
+pontosChaveIA: text | null // pode ser markdown ou lista separada por “\n”
+
+tarefasSugeridasIA: text | null // JSON serializado
+
+iaLastGeneratedAt: timestamp | null
+
+Sugestão B (mais flexível): tabela separada visitasIA
+
+Se já existir algo parecido, reutiliza.
+
+Caso contrário, podes seguir a sugestão A para manter o esforço baixo.
+
+Pedido: escolhe a abordagem mais simples e consistente com o Drizzle/schema atual, documenta no final o que fizeste.
+
+2. Endpoint backend para gerar / atualizar o resumo IA
+
+Criar um endpoint dedicado:
+
+POST /api/visitas/:id/ia-resumo
+
+Comportamento:
+
+Autenticação e contexto:
+
+Usar getUserContext / middleware existente para obter userId, empresaId e verificar acesso à visita.
+
+Recolher dados:
+
+Carregar a visita (entidade, contacto, notas da visita, data, etc.).
+
+Carregar os áudios da visita com transcrição:
+
+visitasAudio.where(visitaId, empresaId).where(transcricao IS NOT NULL)
+
+Ordenar por createdAt (podes juntar tudo numa só string).
+
+Se não existir nenhuma transcrição, devolver 400 com mensagem clara:
+
+“Não há transcrições disponíveis para esta visita.”
+
+Construir prompt de IA (server-side):
+
+Usar:
+
+Dados da visita (entidade, data, utilizador, notas HTML simplificadas se for fácil retirar tags).
+
+Todas as transcrições concatenadas (se houver várias).
+
+Objetivo da IA:
+
+Gerar JSON com:
+
+resumo: string (1–3 parágrafos, português PT-PT, foco comercial).
+
+pontos_chave: array de strings.
+
+tarefas_sugeridas: array de objetos:
+
+{ titulo: string, descricao: string, prioridade: "baixa"|"normal"|"alta", prazo_sugerido_dias: number, tipo: string opcional }
+
+Podes usar o modelo de IA já usado noutros pontos do projeto (ou o client OpenAI existente).
+
+Chamar a IA:
+
+Fazer chamada ao client de IA (OpenAI ou outro) DE FORMA RESILIENTE:
+
+try/catch com logging de erro.
+
+Se falhar, devolver 500 com mensagem amigável.
+
+Guardar resultado:
+
+Guardar resumo, pontos-chave e tarefas sugeridas nos campos definidos em 1.
+
+Atualizar iaLastGeneratedAt (se existir).
+
+Resposta:
+
+Devolver JSON com:
+
+resumoIA
+
+pontosChaveIA (já como array ou string, conforme o que for mais cómodo)
+
+tarefasSugeridasIA (array de objetos).
+
+3. Frontend – secção “Resumo IA da Visita” em VisitaDetail
+
+Na página de detalhe da visita (VisitaDetail):
+
+Criar uma nova secção, por exemplo abaixo das notas e do áudio, chamada:
+
+“Resumo IA da Visita”
+
+Comportamento:
+
+Estado inicial:
+
+Se ainda não existir resumoIA:
+
+Mostrar texto tipo:
+
+“Ainda não existe resumo IA para esta visita.”
+
+Botão: “Gerar resumo com IA”.
+
+Se já existir:
+
+Mostrar:
+
+Bloco com o resumo (texto).
+
+Lista de pontos-chave (bullets).
+
+Lista de tarefas sugeridas (só em modo leitura, por agora).
+
+Botões:
+
+“Atualizar resumo IA” (regerar).
+
+Opcional: “Ocultar/mostrar” secção se o ecrã estiver muito cheio.
+
+Fluxo ao clicar “Gerar resumo com IA” ou “Atualizar resumo IA”:
+
+Chamar POST /api/visitas/:id/ia-resumo.
+
+Mostrar estado de loading (spinner / botão desativado).
+
+Em sucesso:
+
+Atualizar o estado local com resumo, bullets e tarefas sugeridas.
+
+Mostrar notificação tipo “Resumo IA atualizado com sucesso”.
+
+Em erro:
+
+Mostrar mensagem amigável:
+
+Se 400 (sem transcrições): “Não há transcrições disponíveis para gerar o resumo.”
+
+Outros erros: “Ocorreu um erro ao gerar o resumo IA. Tente mais tarde.”
+
+UI:
+
+Usar cards com o mesmo estilo (vm-card) para esta secção.
+
+Garantir boa leitura em light-business e dark-pro.
+
+4. Frontend – criar tarefas a partir das sugestões da IA (opcional mas recomendado)
+
+Extensão opcional desta fase (se não complicar demasiado):
+
+Para cada item em tarefasSugeridasIA, mostrar:
+
+Título, descrição proposta, prazo sugerido, prioridade.
+
+Botão “Criar tarefa” ao lado.
+
+Ao clicar em “Criar tarefa”:
+
+Abrir o formulário de criação de tarefa com:
+
+Título pré-preenchido.
+
+Descrição com base em descricao + link à visita.
+
+Prazo sugerido (data atual + prazo_sugerido_dias).
+
+Ligação à visita atual (visitaId).
+
+Ou, em alternativa (mais simples):
+
+Chamar diretamente o endpoint de criação de tarefa com estes dados e depois refrescar a lista de tarefas ligadas à visita.
+
+Nota: se esta parte complicar demasiado, podes deixar a UI apenas em modo leitura e documentar isso no resumo final.
+
+5. Testes esperados
+
+Testar pelo menos estes cenários:
+
+Visita com 1 clip de áudio transcrito:
+
+Abrir VisitaDetail.
+
+Clicar em “Gerar resumo com IA”.
+
+Ver resumo + pontos-chave + tarefas sugeridas preenchidos.
+
+Visita com vários clips transcritos:
+
+Confirmar que o resumo faz sentido com base em todo o conteúdo (não apenas 1 clip).
+
+Visita sem transcrições:
+
+POST /api/visitas/:id/ia-resumo deve devolver erro 400.
+
+UI deve mostrar mensagem clara e não rebentar.
+
+Regenerar:
+
+Com resumo já existente, clicar “Atualizar resumo IA”.
+
+Confirmar que os dados são atualizados (e iaLastGeneratedAt também, se existir).
+
+Multi-empresa:
+
+Garantir que uma empresa não consegue gerar/ver resumo de visita de outra empresa
+(respeitar empresaId em todas as queries).
+
+No final, gera um resumo semelhante às fases anteriores com:
+
+Campos/tabelas adicionados ou alterados.
+
+Novo endpoint criado.
+
+Ajustes feitos em VisitaDetail (e eventualmente criação de tarefas a partir das sugestões).

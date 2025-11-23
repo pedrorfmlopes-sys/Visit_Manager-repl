@@ -375,6 +375,9 @@ export const visitas = pgTable("visitas", {
   proximaVisita: timestamp("proxima_visita"),
   linkVisita: varchar("link_visita", { length: 100 }).unique(),
   resumoIa: text("resumo_ia"),
+  pontosChaveIA: text("pontos_chave_ia"), // FASE 14: JSON array of key points
+  tarefasSugeridasIA: text("tarefas_sugeridas_ia"), // FASE 14: JSON array of suggested tasks
+  iaLastGeneratedAt: timestamp("ia_last_generated_at"), // FASE 14: Track when AI summary was generated
   transcricaoAudio: text("transcricao_audio"),
   latitude: varchar("latitude", { length: 50 }),
   longitude: varchar("longitude", { length: 50 }),
@@ -434,6 +437,9 @@ export const insertVisitaSchema = createInsertSchema(visitas).omit({
   updatedAt: true,
   linkVisita: true,
   resumoIa: true,
+  pontosChaveIA: true, // FASE 14: Set by AI endpoint
+  tarefasSugeridasIA: true, // FASE 14: Set by AI endpoint
+  iaLastGeneratedAt: true, // FASE 14: Set by AI endpoint
   transcricaoAudio: true,
   gabineteId: true, // DEPRECATED - use entidadeId
   odooActivityId: true,
