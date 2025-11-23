@@ -33,14 +33,26 @@ export function FABMenu() {
 
   // Load position from localStorage and calculate initial gap
   useEffect(() => {
-    console.log("FABMenu: Mounted");
     const savedPosition = localStorage.getItem(FAB_STORAGE_KEY);
     if (savedPosition) {
       try {
-        setPosition(JSON.parse(savedPosition));
+        const parsed = JSON.parse(savedPosition);
+        
+        // Validate position is within viewport with safe margins
+        // Keep it in top 70% of screen to ensure visibility above bottom nav
+        const maxSafeY = Math.max(200, window.innerHeight * 0.7);
+        const validX = Math.max(0, Math.min(parsed.x, window.innerWidth - FAB_SIZE));
+        const validY = Math.max(0, Math.min(parsed.y, maxSafeY - FAB_SIZE));
+        
+        console.log("FABMenu: Loaded and validated position", { original: parsed, validated: { x: validX, y: validY }, maxSafeY });
+        setPosition({ x: validX, y: validY });
       } catch {
+        console.log("FABMenu: Failed to parse stored position, using default");
         setPosition(DEFAULT_POSITION);
       }
+    } else {
+      console.log("FABMenu: No stored position, using default", DEFAULT_POSITION);
+      setPosition(DEFAULT_POSITION);
     }
     
     calculateGap();
@@ -107,7 +119,7 @@ export function FABMenu() {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
-      console.log("FABMenu: Menu toggled");
+      console.log("FABMenu: Menu toggled, isOpen now:", !isOpen);
       setIsOpen(!isOpen);
     }
   };
@@ -129,6 +141,8 @@ export function FABMenu() {
       return position.y + itemOffset;
     }
   };
+
+  console.log("FABMenu: Rendering with position", { x: position.x, y: position.y, isOpen });
 
   return (
     <>
