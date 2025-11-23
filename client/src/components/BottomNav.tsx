@@ -14,6 +14,8 @@ type NavItem = {
 
 const agentNavItems: NavItem[] = [
   { path: "/", icon: LayoutDashboard, label: "Hoje" },
+  { path: "/entidades", icon: Building2, label: "Entidades" },
+  { path: "/contactos", icon: Users, label: "Contactos" },
   { path: "/visitas", icon: FileText, label: "Visitas" },
   { path: "/tarefas", icon: CheckCircle2, label: "Tarefas" },
   { path: "/agente-mais", icon: MoreHorizontal, label: "Mais" },
