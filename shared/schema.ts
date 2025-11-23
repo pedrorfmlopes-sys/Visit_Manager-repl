@@ -423,6 +423,10 @@ export const visitasRelations = relations(visitas, ({ one, many }) => ({
 
 export const insertVisitaSchema = createInsertSchema(visitas).omit({
   id: true,
+  empresaId: true, // Set by backend from getUserContext
+  userId: true, // Legacy field, use createdByUserId (backend sets)
+  createdByUserId: true, // Set by backend from getUserContext
+  assignedUserId: true, // Optional, set by backend
   createdAt: true,
   updatedAt: true,
   linkVisita: true,
@@ -551,6 +555,9 @@ export const tarefasRelations = relations(tarefas, ({ one }) => ({
 
 export const insertTarefaSchema = createInsertSchema(tarefas).omit({
   id: true,
+  empresaId: true, // Set by backend from getUserContext
+  createdByUserId: true, // Set by backend from getUserContext
+  assignedUserId: true, // Optional, set by backend
   createdAt: true,
   updatedAt: true,
   odooTaskId: true,

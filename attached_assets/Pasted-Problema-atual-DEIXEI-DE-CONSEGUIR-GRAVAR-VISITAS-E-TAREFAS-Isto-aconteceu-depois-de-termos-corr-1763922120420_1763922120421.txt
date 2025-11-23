@@ -1,0 +1,172 @@
+Problema atual: DEIXEI DE CONSEGUIR GRAVAR VISITAS E TAREFAS
+
+Isto aconteceu depois de termos corrigido os schemas de entidades/contactos (onde adicionaste `empresaId: true` no `omit()` dos insert schemas).
+
+Agora o comportamento é:
+
+- No frontend:
+  - Quando tento criar uma NOVA VISITA → não grava.
+  - Quando tento criar uma NOVA TAREFA → não grava.
+- Suspeita forte:
+  - Os schemas Zod de VISITAS e TAREFAS estão a exigir `empresaId` (ou outros campos de sistema) vindos do frontend, em vez de serem injetados pelo backend via `getUserContext`.
+
+Quero que faças o seguinte, de forma semelhante ao que fizeste para ENTIDADES e CONTACTOS:
+
+1) Verificar schemas Zod de VISITAS e TAREFAS
+
+No ficheiro `shared/schema.ts` procura por algo como:
+
+- `insertVisitaSchema`
+- `insertTarefaSchema` (ou nomes parecidos)
+
+O que eu quero é:
+
+- Para VISITAS:
+  - `insertVisitaSchema` deve fazer `omit()` de:
+    - `id`
+    - `empresaId`      ✅ (backend injeta a partir de getUserContext)
+    - `createdAt`
+    - `updatedAt`
+    - quaisquer campos de sistema que o frontend não controla
+  - O schema só deve validar os campos que o formulário realmente envia:
+    - entidadeId, contactoId (se existir), dataVisita, tipoVisita, notas, etc.
+- Para TAREFAS:
+  - `insertTarefaSchema` também deve fazer `omit()` de:
+    - `id`
+    - `empresaId`      ✅ (backend injeta)
+    - `createdAt`
+    - `updatedAt`
+    - e, se fizer sentido, campos como `createdByUserId` se forem sempre preenchidos pelo backend.
+  - De novo, o frontend só envia:
+    - título, descrição, visitaId/entidadeId, dueDate, etc.
+
+Exemplo do que quero (pseudo):
+
+// VISITAS
+export const insertVisitaSchema = createInsertSchema(visitas).omit({
+  id: true,
+  empresaId: true,   // ✅ backend
+  createdAt: true,
+  updatedAt: true,
+});
+
+// TAREFAS
+export const insertTarefaSchema = createInsertSchema(tarefas).omit({
+  id: true,
+  empresaId: true,   // ✅ backend
+  createdAt: true,
+  updatedAt: true,
+});
+
+Se já estiver assim, revê se não há `.extend({...})` a reintroduzir empresaId ou outros campos obrigatórios que o frontend NÃO envia.
+
+2) Verificar rotas de VISITAS e TAREFAS (server/routes.ts)
+
+Procura em `server/routes.ts`:
+
+- VISITAS:
+  - `POST /api/visitas`
+  - `PATCH /api/visitas/:id`
+- TAREFAS:
+  - `POST /api/tarefas`
+  - `PATCH /api/tarefas/:id`
+
+Quero que confirmes que o fluxo é:
+
+// Exemplo VISITAS (create)
+app.post('/api/visitas', isAuthenticated, async (req: any, res) => {
+  const { userId, userRole, empresaId } = await getUserContext(req);
+  if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+
+  // 1) Validar body SEM empresaId
+  const validated = insertVisitaSchema.parse(req.body);
+
+  // 2) Injetar campos de sistema
+  const dataToSave = {
+    ...validated,
+    empresaId,          // ✅ multi-tenant
+    createdByUserId: userId,
+  };
+
+  const visita = await storage.createVisita(dataToSave);
+  res.json(visita);
+});
+
+Para TAREFAS, o mesmo padrão:
+
+- extrair `{ userId, empresaId }` via getUserContext
+- validar body com `insertTarefaSchema.parse(req.body)` (SEM empresaId)
+- depois fazer:
+  - `await storage.createTarefa({ ...validated, empresaId, createdByUserId: userId })`
+
+3) Verificar storage (server/storage.ts)
+
+Confirma que:
+
+- `createVisita(data)` já assume que data.empresaId vem preenchido pelo caller (routes.ts).
+- `createTarefa(data)` idem.
+- Não estás a tentar buscar empresaId “outra vez” dentro de storage.
+
+4) Fazer testes REAIS (tu aí no container)
+
+A) VISITA – via API
+
+- Testa diretamente com curl:
+
+curl -X POST http://localhost:5000/api/visitas \
+  -H "Cookie: <sessionId-admin>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "entidadeId": "algum-entidade-id-valido",
+    "dataVisita": "2025-11-23T10:00:00.000Z",
+    "notas": "Visita de teste criada via curl"
+  }'
+
+Espera:
+- Status 200
+- Objeto visita com id preenchido
+- Na BD, empresaId correto.
+
+B) TAREFA – via API
+
+curl -X POST http://localhost:5000/api/tarefas \
+  -H "Cookie: <sessionId-admin>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "titulo": "Tarefa Teste",
+    "descricao": "Criada via curl",
+    "estado": "aberta"
+  }'
+
+Espera:
+- 200 OK
+- Tarefa criada
+- empresaId correto na BD.
+
+C) FRONTEND
+
+- Com a app a correr:
+  - Criar nova VISITA pela UI → tem de gravar.
+  - Criar nova TAREFA pela UI → tem de gravar.
+
+5) IMPORTANTE – NÃO TOCAR:
+
+Por favor, NÃO alteres:
+
+- multi-empresa em entidades/contactos (já está a funcionar)
+- backoffice (empresa, utilizadores, marcas)
+- áudio nas visitas (upload, gravação, transcrição)
+- editor rico de notas
+- UI de marcas (dropdown multi-select)
+- FASES anteriores já validadas
+
+Só quero que:
+
+- criar/editar VISITAS volte a funcionar
+- criar/editar TAREFAS volte a funcionar
+- sem quebrar o resto da app.
+
+No final, por favor:
+- Diz qual era exatamente o problema (ex.: schemas a exigir empresaId / createdByUserId, etc.).
+- Que linhas/ficheiros alteraste (shared/schema.ts, routes.ts, storage.ts, etc.).
+- Confirma que `npm run build` passa e que conseguiste criar VISITA e TAREFA pela UI normal.
