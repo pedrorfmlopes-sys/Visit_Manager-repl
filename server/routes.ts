@@ -1275,8 +1275,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Audio not found" });
       }
       
+      // Extract filename from URL path and read from disk
+      const filename = targetAudio.fileUrl.split('/').pop();
+      const filePath = path.join(uploadsDir, filename);
+      
+      // Check if file exists
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: "Audio file not found on disk" });
+      }
+      
+      // Create readable stream for OpenAI
+      const audioStream = fs.createReadStream(filePath);
+      
       const transcription = await client.audio.transcriptions.create({
-        file: await fetch(`http://localhost:5000${targetAudio.fileUrl}`).then(r => r.blob()),
+        file: audioStream as any,
         model: "whisper-1",
         language: "pt",
       });
