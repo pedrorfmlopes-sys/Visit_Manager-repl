@@ -14,8 +14,8 @@ export function MainLayout({ children }: MainLayoutProps) {
   const { isAdmin, empresa } = useAuth();
   const [location] = useLocation();
   
-  // Pages where FAB should appear
-  const mainPages = ["/", "/visitas", "/tarefas"];
+  // Pages where FAB should appear - show on main pages for both admin and agent
+  const mainPages = ["/", "/visitas", "/tarefas", "/entidades", "/contactos"];
   const showFAB = mainPages.some(page => location === page || location.startsWith(page + "/"));
 
   if (isAdmin) {
