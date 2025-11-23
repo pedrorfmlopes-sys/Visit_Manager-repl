@@ -510,6 +510,11 @@ export class DatabaseStorage implements IStorage {
         user: true,
         assignedUser: true,
         createdByUser: true,
+        marcas: {
+          with: {
+            marca: true,
+          },
+        },
       },
     });
   }
