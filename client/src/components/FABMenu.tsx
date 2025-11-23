@@ -115,9 +115,9 @@ export function FABMenu() {
   return (
     <div
       ref={fabRef}
-      className={`fixed z-50 flex gap-2 items-end transition-all ${
+      className={`fixed z-50 flex gap-2 transition-all ${
         isDragging ? "cursor-grabbing" : "cursor-grab"
-      } ${shouldOpenUp ? "flex-col" : "flex-col-reverse"}`}
+      } ${shouldOpenUp ? "flex-col-reverse" : "flex-col"}`}
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
