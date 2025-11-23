@@ -11,12 +11,17 @@ interface FABPosition {
 const DEFAULT_POSITION: FABPosition = { x: 16, y: 96 }; // bottom-right: right-4, bottom-24
 const FAB_STORAGE_KEY = "fab-position";
 const FAB_SIZE = 56; // 14*4 = h-14 w-14 in pixels
+const MENU_ITEM_HEIGHT = 56; // h-14 w-14
+const GAP_SIZE = 8; // gap-2 = 8px
+const MENU_ITEMS_COUNT = 4;
+const TOTAL_MENU_HEIGHT = (MENU_ITEMS_COUNT + 1) * MENU_ITEM_HEIGHT + MENU_ITEMS_COUNT * GAP_SIZE; // +1 for main button
 
 export function FABMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState<FABPosition>(DEFAULT_POSITION);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [shouldOpenUp, setShouldOpenUp] = useState(false);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const fabRef = useRef<HTMLDivElement>(null);
   const [, setLocation] = useLocation();
@@ -32,6 +37,12 @@ export function FABMenu() {
       }
     }
   }, []);
+
+  // Determine if menu should open upwards based on position
+  useEffect(() => {
+    const openUp = position.y + TOTAL_MENU_HEIGHT > window.innerHeight;
+    setShouldOpenUp(openUp);
+  }, [position]);
 
   // Handle global mousemove and mouseup when dragging
   useEffect(() => {
@@ -104,9 +115,9 @@ export function FABMenu() {
   return (
     <div
       ref={fabRef}
-      className={`fixed z-50 flex flex-col-reverse items-end gap-2 transition-all ${
+      className={`fixed z-50 flex gap-2 items-end transition-all ${
         isDragging ? "cursor-grabbing" : "cursor-grab"
-      }`}
+      } ${shouldOpenUp ? "flex-col" : "flex-col-reverse"}`}
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
