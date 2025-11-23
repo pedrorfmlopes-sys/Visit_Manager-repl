@@ -2407,18 +2407,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/pdf/visita/:id/pro', isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
-      const { userId, userRole } = await getUserContext(req);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const { includePhotos, includeTasks, includeIA, includeCharts, type } = req.query;
       
-      const visita = await storage.getVisita(id, userId, userRole);
+      const visita = await storage.getVisita(id, empresaId, userId, userRole);
       if (!visita) {
         return res.status(404).json({ message: 'Visita não encontrada' });
       }
       
-      const entidade = visita.entidadeId ? await storage.getEntidade(visita.entidadeId, userId, userRole) : null;
-      const contacto = visita.contactoId ? await storage.getContacto(visita.contactoId, userId, userRole) : null;
-      const tarefas = await storage.getTarefasByVisitaId(id, userId, userRole);
-      const recentVisits = entidade ? await storage.getVisitasByEntidade(entidade.id, userId, userRole) : [];
+      const entidade = visita.entidadeId ? await storage.getEntidade(visita.entidadeId, empresaId, userId, userRole) : null;
+      const contacto = visita.contactoId ? await storage.getContacto(visita.contactoId, empresaId, userId, userRole) : null;
+      const tarefas = await storage.getTarefasByVisitaId(id, empresaId, userId, userRole);
+      const recentVisits = entidade ? await storage.getVisitasByEntidade(entidade.id, empresaId, userId, userRole) : [];
       
       const { generateVisitaPDFPro } = await import('./pdfPro');
       const { getOpenAIClient } = await import('./openai');
@@ -2447,18 +2448,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/pdf/entidade/:id/pro', isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
-      const { userId, userRole } = await getUserContext(req);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const { includePhotos, includeTasks, includeIA, includeCharts, type } = req.query;
       
-      const entidade = await storage.getEntidade(id, userId, userRole);
+      const entidade = await storage.getEntidade(id, empresaId, userId, userRole);
       if (!entidade) {
         return res.status(404).json({ message: 'Entidade não encontrada' });
       }
       
-      const allContactos = await storage.getContactos(userId, userRole);
+      const allContactos = await storage.getContactos(empresaId, userId, userRole);
       const contactos = allContactos.filter(c => c.entidadeId === id);
-      const visitas = await storage.getVisitasByEntidade(id, userId, userRole);
-      const tarefas = await storage.getTarefasByEntidadeId(id, userId, userRole);
+      const visitas = await storage.getVisitasByEntidade(id, empresaId, userId, userRole);
+      const tarefas = await storage.getTarefasByEntidadeId(id, empresaId, userId, userRole);
       
       const { generateEntidadePDFPro } = await import('./pdfPro');
       const { getOpenAIClient } = await import('./openai');
