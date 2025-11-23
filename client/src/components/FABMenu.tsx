@@ -8,9 +8,9 @@ interface FABPosition {
   y: number;
 }
 
-const DEFAULT_POSITION: FABPosition = { x: 16, y: 96 }; // bottom-right: right-4, bottom-24
+const DEFAULT_POSITION: FABPosition = { x: 16, y: 96 };
 const FAB_STORAGE_KEY = "fab-position";
-const FAB_SIZE = 56; // 14*4 = h-14 w-14 in pixels
+const FAB_SIZE = 56;
 
 export function FABMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -19,7 +19,7 @@ export function FABMenu() {
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [shouldOpenUp, setShouldOpenUp] = useState(false);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
-  const fabRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const [, setLocation] = useLocation();
 
   // Load position from localStorage on mount
@@ -34,14 +34,13 @@ export function FABMenu() {
     }
   }, []);
 
-  // Determine if menu should open upwards based on position
+  // Determine if menu should open upwards
   useEffect(() => {
-    const totalMenuHeight = 56 * 5 + 8 * 4; // 5 buttons + 4 gaps
-    const openUp = position.y + totalMenuHeight > window.innerHeight;
-    setShouldOpenUp(openUp);
+    const totalMenuHeight = 56 * 5 + 8 * 4;
+    setShouldOpenUp(position.y + totalMenuHeight > window.innerHeight);
   }, [position]);
 
-  // Handle global mousemove and mouseup when dragging
+  // Handle drag on global events
   useEffect(() => {
     if (!isDragging) return;
 
@@ -49,7 +48,6 @@ export function FABMenu() {
       const newX = e.clientX - dragOffset.x;
       const newY = e.clientY - dragOffset.y;
 
-      // Keep within bounds
       const boundedX = Math.max(0, Math.min(newX, window.innerWidth - FAB_SIZE));
       const boundedY = Math.max(0, Math.min(newY, window.innerHeight - FAB_SIZE));
 
@@ -58,7 +56,6 @@ export function FABMenu() {
 
     const handleMouseUp = () => {
       setIsDragging(false);
-      // Save position when drag ends
       localStorage.setItem(FAB_STORAGE_KEY, JSON.stringify(position));
     };
 
@@ -78,54 +75,48 @@ export function FABMenu() {
     { icon: Building2, label: "Entidade", action: "/entidades/nova", testId: "fab-new-entidade" },
   ];
 
-  const handleMenuItemClick = (action: string) => {
-    setIsOpen(false);
-    setLocation(action);
-  };
-
-  // Long press detection for drag mode
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Close menu if open
-    setIsOpen(false);
-
-    const rect = fabRef.current?.getBoundingClientRect();
+  const handleMainButtonMouseDown = (e: React.MouseEvent) => {
+    const rect = buttonRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    // Start long press timer
+    setIsOpen(false);
+
     longPressTimer.current = setTimeout(() => {
       setIsDragging(true);
-      // Calculate offset from mouse position to FAB's top-left corner
       setDragOffset({
         x: e.clientX - rect.left,
         y: e.clientY - rect.top,
       });
-    }, 3000); // 3 seconds
+    }, 3000);
   };
 
-  const handleMouseUp = () => {
+  const handleMainButtonMouseUp = () => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
   };
 
+  const handleMenuItemClick = (action: string) => {
+    setIsOpen(false);
+    setLocation(action);
+  };
+
   return (
     <div
-      ref={fabRef}
-      className={`fixed z-50 flex gap-2 transition-all ${isDragging ? "cursor-grabbing" : "cursor-grab"} ${
-        shouldOpenUp ? "flex-col-reverse" : "flex-col"
-      }`}
+      className={`fixed z-50 flex gap-2 transition-all ${shouldOpenUp ? "flex-col-reverse" : "flex-col"}`}
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
       }}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
     >
       {/* Main FAB button */}
       <Button
+        ref={buttonRef}
         size="icon"
         variant="default"
+        onMouseDown={handleMainButtonMouseDown}
+        onMouseUp={handleMainButtonMouseUp}
         onClick={() => !isDragging && setIsOpen(!isOpen)}
         className={`h-14 w-14 rounded-full shadow-lg transition-transform ${
           isOpen ? "rotate-45" : "rotate-0"
