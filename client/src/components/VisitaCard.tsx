@@ -1,6 +1,7 @@
 import { Calendar, Building2, User, ChevronRight, Image as ImageIcon, Mic, UserCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { RichTextViewer } from "@/components/RichTextViewer";
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
 import type { VisitaWithRelations } from "@shared/schema";
@@ -60,9 +61,9 @@ export function VisitaCard({ visita, onClick }: VisitaCardProps) {
             )}
             
             {visita.notas && (
-              <p className="text-sm text-muted-foreground line-clamp-2">
-                {visita.notas}
-              </p>
+              <div className="text-sm text-muted-foreground line-clamp-2 overflow-hidden" data-testid="text-notas">
+                <RichTextViewer content={visita.notas} />
+              </div>
             )}
             
             <div className="flex items-center gap-2 mt-1">
