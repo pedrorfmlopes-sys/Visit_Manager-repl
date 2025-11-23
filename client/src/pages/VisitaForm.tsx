@@ -123,9 +123,6 @@ export default function VisitaForm() {
       marcasEntregues: [],
       marcasIds: [],
       proximaVisita: undefined,
-      userId: "",
-      createdByUserId: currentUser?.id,
-      assignedUserId: currentUser?.id, // Default to current user
     },
   });
 
@@ -168,9 +165,7 @@ export default function VisitaForm() {
               titulo: taskTitle,
               descricao: taskDescription || null,
               visitaId: visitaData.id,
-              entidadeId: form.getValues("entidadeId"),
-              createdByUserId: currentUser.id,
-              assignedUserId: currentUser.id,
+              entidadeId: form.getValues("entidadeId") || undefined,
               dueDate: taskDueDate || null,
               repeatInterval: "none" as const,
               status: "pending" as const,

@@ -48,15 +48,20 @@ export default function TarefaForm() {
       descricao: "",
       visitaId: undefined,
       entidadeId: undefined,
-      assignedUserId: currentUser?.id || undefined,
+      assignedUserId: undefined,
       dueDate: undefined,
       repeatInterval: "none",
       status: "pending",
-      createdByUserId: currentUser?.id || "",
     },
     values: tarefa ? {
-      ...tarefa,
+      titulo: tarefa.titulo,
       descricao: (tarefa.descricao === '<p></p>' || !tarefa.descricao) ? "" : tarefa.descricao,
+      visitaId: tarefa.visitaId || undefined,
+      entidadeId: tarefa.entidadeId || undefined,
+      assignedUserId: tarefa.assignedUserId || undefined,
+      dueDate: tarefa.dueDate,
+      repeatInterval: tarefa.repeatInterval,
+      status: tarefa.status,
     } : undefined,
   });
 
@@ -141,7 +146,6 @@ export default function TarefaForm() {
       visitaId: data.visitaId || undefined,
       assignedUserId: data.assignedUserId || undefined,
       dueDate: dueDateValue as any,
-      createdByUserId: data.createdByUserId || currentUser?.id || "",
     };
     
     if (isEdit) {

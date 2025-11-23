@@ -1,0 +1,177 @@
+Ainda não consigo gravar VISITAS nem TAREFAS pela UI – continua a dar erro e não guarda.
+
+Já corrigimos ENTIDADES e CONTACTOS (omitindo empresaId nos insert schemas), mas o mesmo tipo de problema está a acontecer com VISITAS e TAREFAS.
+
+Quero que faças o seguinte de forma CIRÚRGICA, sem mexer em nada do resto:
+
+1) LOG TEMPORÁRIO DOS ERROS DE VALIDAÇÃO
+
+No ficheiro `server/routes.ts`, na rota:
+
+- POST /api/visitas
+- POST /api/tarefas
+
+Antes de devolver o erro, quero que faças um console.log da mensagem de erro do Zod para percebermos o que está a falhar.
+
+Exemplo (podes adaptar):
+
+try {
+  const validated = insertVisitaSchema.parse(req.body);
+  ...
+} catch (err) {
+  console.error("[VISITAS ZOD ERROR]", err);
+  return res.status(400).json({ message: "Validation failed", details: err });
+}
+
+Faz o mesmo para TAREFAS.
+
+Depois corre a app e tenta criar uma visita e uma tarefa TU MESMO aí no container, para ver qual o erro exato.
+
+2) ALINHAR insertVisitaSchema E insertTarefaSchema COM O PAYLOAD REAL DO FRONTEND
+
+No ficheiro `shared/schema.ts`:
+
+Procura por:
+
+- `insertVisitaSchema`
+- `insertTarefaSchema`
+- eventualmente `updateVisitaSchema`, `updateTarefaSchema` se existirem.
+
+Quero que garantes que:
+
+a) VISITAS
+
+O `insertVisitaSchema` deve:
+
+- fazer `omit()` pelo menos de:
+
+  - id: true
+  - empresaId: true          // Set by backend from getUserContext
+  - createdAt: true
+  - updatedAt: true
+  - createdByUserId: true    // Se este campo existir na tabela
+  - lastPlannerSyncAt: true  // Qualquer campo de sync que não venha do frontend
+
+- NÃO deve exigir:
+
+  - empresaId (vem só do backend)
+  - createdByUserId (vem só do backend)
+  - qualquer campo que o formulário não envia (ex.: estado com default).
+
+Ou seja, quero algo deste género:
+
+export const insertVisitaSchema = createInsertSchema(visitas).omit({
+  id: true,
+  empresaId: true,       // ✅ Set by backend
+  createdAt: true,
+  updatedAt: true,
+  createdByUserId: true, // ✅ Set by backend
+  lastPlannerSyncAt: true, // se existir
+});
+
+Se estiveres a usar `.extend({...})`, verifica que não estás a voltar a pôr empresaId como obrigatório.
+
+b) TAREFAS
+
+O `insertTarefaSchema` deve:
+
+- fazer `omit()` de:
+
+  - id: true
+  - empresaId: true         // Set by backend
+  - createdAt: true
+  - updatedAt: true
+  - createdByUserId: true   // Se existir
+  - qualquer campo de sync (ex.: lastPlannerSyncAt, lastOutlookSyncAt, etc.)
+
+Exemplo:
+
+export const insertTarefaSchema = createInsertSchema(tarefas).omit({
+  id: true,
+  empresaId: true,         // ✅ Set by backend from getUserContext
+  createdAt: true,
+  updatedAt: true,
+  createdByUserId: true,   // se existir
+  lastPlannerSyncAt: true, // se existir
+});
+
+De novo, o schema só deve validar o que o formulário de TAREFA realmente envia: titulo, descricao, estado, visitaId, entidadeId, dueDate, prioridade, etc.
+
+3) GARANTIR QUE AS ROTAS NÃO ESTÃO A ESPERAR EMPRESAID DO FRONTEND
+
+Verifica em `server/routes.ts`:
+
+- POST /api/visitas:
+
+  - Extrai: `const { userId, userRole, empresaId } = await getUserContext(req);`
+  - Valida: `const validated = insertVisitaSchema.parse(req.body);`
+  - Injeta: `const dataToSave = { ...validated, empresaId, createdByUserId: userId };`
+  - Chama: `const visita = await storage.createVisita(dataToSave);`
+
+- POST /api/tarefas:
+
+  - Mesmo padrão: getUserContext → parse() → injeta empresaId + createdByUserId → createTarefa.
+
+Quero que confirmes explicitamente que:
+
+- Nenhuma destas rotas está a tentar ler `req.body.empresaId`.
+- Nenhuma está a tentar passar `empresaId` para o schema Zod.
+- Tudo o que é empresaId, createdByUserId, etc., é tratado exclusivamente no backend, depois do parse.
+
+4) TESTES QUE QUERO QUE FAÇAS AÍ MESMO
+
+Depois de corrigires os schemas e as rotas se necessário:
+
+A) TESTE API – VISITA
+
+Faz um curl aí no container (adaptando o id de entidade):
+
+curl -X POST http://localhost:5000/api/visitas \
+  -H "Cookie: <sessionId-admin>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "entidadeId": "ALGUM_ENTIDADE_ID_VALIDO",
+    "dataVisita": "2025-11-23T10:00:00.000Z",
+    "notas": "Visita de teste para validação Zod"
+  }'
+
+Tem de dar 200 OK e devolver a visita com id, empresaId, etc.
+
+B) TESTE API – TAREFA
+
+curl -X POST http://localhost:5000/api/tarefas \
+  -H "Cookie: <sessionId-admin>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "titulo": "Tarefa Teste Pós-Fix",
+    "descricao": "Criada via curl",
+    "estado": "aberta"
+  }'
+
+Também tem de dar 200 OK.
+
+C) TESTE UI – FRONTEND
+
+Com a app a correr:
+
+- Criar Nova VISITA pela UI → TEM de gravar sem erro.
+- Criar Nova TAREFA pela UI → TEM de gravar sem erro.
+
+5) IMPORTANTE – NÃO TOCAR EM:
+
+- ENTIDADES e CONTACTOS (já estão bons).
+- Multi-empresa (empresaId nos outros módulos).
+- Backoffice (empresa, utilizadores, marcas).
+- Áudio e transcrição.
+- Editor rico de notas.
+- Campo marcasIds em visitas e dropdown de marcas.
+
+Só quero:
+
+- VISITAS e TAREFAS a gravarem novamente pela UI, com schemas alinhados e sem exigir campos de backend do frontend.
+
+No final:
+
+- Diz-me qual era exatamente a causa (que campo(s) o Zod estava a exigir).
+- Que linhas/ficheiros alteraste.
+- Confirma que `npm run build` passa e que conseguiste TU criar visita e tarefa pela UI.
