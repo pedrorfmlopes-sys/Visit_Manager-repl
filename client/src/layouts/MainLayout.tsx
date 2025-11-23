@@ -14,15 +14,15 @@ export function MainLayout({ children }: MainLayoutProps) {
   const { isAdmin, empresa } = useAuth();
   const [location] = useLocation();
   
-  // Agent pages where FAB should appear
-  const agentMainPages = ["/", "/visitas", "/tarefas"];
-  const showFAB = !isAdmin && agentMainPages.some(page => location === page || location.startsWith(page + "/"));
+  // Pages where FAB should appear
+  const mainPages = ["/", "/visitas", "/tarefas"];
+  const showFAB = mainPages.some(page => location === page || location.startsWith(page + "/"));
 
   if (isAdmin) {
     return (
       <div className="flex h-screen bg-background">
         <AdminSidebar />
-        <div className="flex-1 flex flex-col overflow-hidden ml-64">
+        <div className="flex-1 flex flex-col overflow-hidden ml-64 relative">
           {/* Admin header with logo */}
           {empresa?.logoUrl && (
             <header className="sticky top-0 z-20 bg-background border-b border-border px-6 py-3 hidden lg:block">
@@ -41,6 +41,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           <main className="flex-1 overflow-y-auto">
             {children}
           </main>
+          {showFAB && <FABMenu />}
         </div>
       </div>
     );
