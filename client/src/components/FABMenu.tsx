@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Plus, FileText, CheckCircle2, Building2, Users } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 import { useLocation } from "wouter";
 
 interface FABPosition {
@@ -21,7 +20,7 @@ export function FABMenu() {
   const [shouldOpenUp, setShouldOpenUp] = useState(false);
   const [dynamicGap, setDynamicGap] = useState(0);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
+  const buttonRef = useRef<HTMLDivElement>(null);
   const [, setLocation] = useLocation();
 
   // Calculate gap based on half screen height
@@ -92,10 +91,10 @@ export function FABMenu() {
   }, [isDragging, dragOffset, position]);
 
   const menuItems = [
-    { icon: CheckCircle2, label: "Tarefa", action: "/tarefas/nova", testId: "fab-new-tarefa" },
-    { icon: FileText, label: "Visita", action: "/visitas/nova", testId: "fab-new-visita" },
-    { icon: Users, label: "Contacto", action: "/contactos/novo", testId: "fab-new-contacto" },
-    { icon: Building2, label: "Entidade", action: "/entidades/nova", testId: "fab-new-entidade" },
+    { icon: "📋", label: "Tarefa", action: "/tarefas/nova", testId: "fab-new-tarefa" },
+    { icon: "📄", label: "Visita", action: "/visitas/nova", testId: "fab-new-visita" },
+    { icon: "👤", label: "Contacto", action: "/contactos/novo", testId: "fab-new-contacto" },
+    { icon: "🏢", label: "Entidade", action: "/entidades/nova", testId: "fab-new-entidade" },
   ];
 
   const handleMainButtonMouseDown = (e: React.MouseEvent) => {
@@ -139,13 +138,11 @@ export function FABMenu() {
   return (
     <>
       {/* Main FAB button - fixed positioning */}
-      <Button
+      <div
         ref={buttonRef}
-        size="icon"
-        variant="default"
         onMouseDown={handleMainButtonMouseDown}
         onMouseUp={handleMainButtonMouseUp}
-        className={`fixed z-50 h-14 w-14 rounded-full shadow-lg transition-transform ${
+        className={`fixed z-50 h-14 w-14 rounded-full shadow-lg transition-transform flex items-center justify-center bg-green-500 hover:bg-green-600 cursor-pointer ${
           isOpen ? "rotate-45" : "rotate-0"
         } ${isDragging ? "opacity-75 scale-125" : ""}`}
         style={{
@@ -154,24 +151,20 @@ export function FABMenu() {
           cursor: isDragging ? "grabbing" : "grab",
         }}
         data-testid={isOpen ? "fab-close" : "fab-open"}
-        disabled={isDragging}
         title={isDragging ? "Arrasta para mover o botão" : "Clica para abrir, segura 3 segundos para mover"}
       >
-        <Plus className="h-6 w-6" />
-      </Button>
+        <Plus className="h-6 w-6 text-white" />
+      </div>
 
       {/* Menu items - fixed positioning in viewport */}
       {isOpen && !isDragging && (
         <>
           {menuItems.map((item, index) => {
-            const Icon = item.icon;
             return (
-              <Button
+              <div
                 key={item.testId}
-                size="icon"
-                variant="default"
                 onClick={() => handleMenuItemClick(item.action)}
-                className="fixed z-40 h-14 w-14 rounded-full shadow-lg"
+                className="fixed z-40 h-14 w-14 rounded-full shadow-lg flex items-center justify-center bg-blue-500 hover:bg-blue-600 cursor-pointer text-white"
                 style={{
                   left: `${position.x}px`,
                   top: `${getMenuItemPosition(index)}px`,
@@ -179,8 +172,8 @@ export function FABMenu() {
                 data-testid={item.testId}
                 title={item.label}
               >
-                <Icon className="h-6 w-6" />
-              </Button>
+                {item.icon}
+              </div>
             );
           })}
         </>
