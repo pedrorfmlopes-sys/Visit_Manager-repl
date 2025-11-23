@@ -33,6 +33,7 @@ export function FABMenu() {
 
   // Load position from localStorage and calculate initial gap
   useEffect(() => {
+    console.log("FABMenu: Mounted");
     const savedPosition = localStorage.getItem(FAB_STORAGE_KEY);
     if (savedPosition) {
       try {
@@ -93,6 +94,7 @@ export function FABMenu() {
     if (!rect) return;
 
     longPressTimer.current = setTimeout(() => {
+      console.log("FABMenu: Drag mode activated");
       setIsDragging(true);
       setDragOffset({
         x: e.clientX - rect.left,
@@ -105,11 +107,13 @@ export function FABMenu() {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
+      console.log("FABMenu: Menu toggled");
       setIsOpen(!isOpen);
     }
   };
 
   const handleMenuItemClick = (action: string) => {
+    console.log("FABMenu: Navigating to", action);
     setIsOpen(false);
     setLocation(action);
   };
@@ -120,10 +124,8 @@ export function FABMenu() {
     const itemOffset = (index + 1) * spacing;
     
     if (shouldOpenUp) {
-      // Menu opens upwards - items go UP from the main button
       return position.y - itemOffset;
     } else {
-      // Menu opens downwards - items go DOWN from the main button
       return position.y + itemOffset;
     }
   };
@@ -163,7 +165,7 @@ export function FABMenu() {
                 size="icon"
                 variant="default"
                 onClick={() => handleMenuItemClick(item.action)}
-                className="fixed z-50 h-14 w-14 rounded-full shadow-lg"
+                className="fixed z-40 h-14 w-14 rounded-full shadow-lg"
                 style={{
                   left: `${position.x}px`,
                   top: `${getMenuItemPosition(index)}px`,
