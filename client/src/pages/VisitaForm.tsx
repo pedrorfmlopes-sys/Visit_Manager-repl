@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -72,6 +72,23 @@ export default function VisitaForm() {
   const { data: allUsers = [] } = useAllUsers();
   const isAdmin = useIsAdmin();
   const { empresa } = useAuth();
+
+  // Refetch auth user when VisitaForm loads to ensure fresh empresa data
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+  }, [queryClient]);
+
+  // Debug logging for Marcas feature
+  useEffect(() => {
+    if (empresa) {
+      console.log("VisitaForm: empresa loaded", {
+        empresaId: empresa.id,
+        mostrarMarcasEmVisitas: empresa.mostrarMarcasEmVisitas,
+      });
+    } else {
+      console.log("VisitaForm: empresa is undefined or loading");
+    }
+  }, [empresa]);
 
   const { data: entidades } = useQuery<Entidade[]>({
     queryKey: ["/api/entidades"],

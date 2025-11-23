@@ -1,0 +1,70 @@
+BUG: A secção "Marcas Faladas Nesta Visita" NÃO aparece no VisitaForm.
+
+Contexto:
+- Em /admin/empresa tenho a opção "Mostrar marcas em visitas" ATIVA (true) e guardada.
+- Em /admin/marcas já tenho marcas criadas e ativas.
+- O backend já tem o endpoint GET /api/marcas?onlyAtivas=true e a lógica multi-empresa implementada.
+- O que acontece agora é que, quando abro o formulário de NOVA VISITA, a secção de marcas NÃO aparece de todo (nem sequer a mensagem "Nenhuma marca disponível").
+
+O que quero que verifiques e corrijas:
+
+1) Confirma que /api/auth/user devolve a empresa com mostrarMarcasEmVisitas = true.
+   - Em server/routes.ts, o endpoint /api/auth/user deve estar a incluir no JSON algo como:
+     {
+       "id": "...",
+       "email": "...",
+       "role": "...",
+       "empresa": {
+         "id": "...",
+         "nome": "...",
+         "logoUrl": "...",
+         "mostrarMarcasEmVisitas": true
+       }
+     }
+
+2) Confirma que o hook useAuth está a devolver a empresa.
+   - Em client/src/hooks/useAuth.ts, quero algo deste género no return:
+     return {
+       user,
+       empresa: user?.empresa,
+       isLoading,
+       isAuthenticated: !!user,
+       isAdmin: user?.role === "admin",
+     };
+
+3) Em client/src/pages/VisitaForm.tsx:
+   - Garante que o componente está a usar o hook assim:
+     const { empresa } = useAuth();
+   - E que o campo de marcas está protegido por esta condição:
+     {empresa?.mostrarMarcasEmVisitas && (
+       <FormField
+         control={form.control}
+         name="marcasIds"
+         ...
+       />
+     )}
+
+4) Se a condição estiver correta mas mesmo assim não renderizar:
+   - Adiciona um console.log(empresa) dentro do VisitaForm para garantir que:
+     - empresa NÃO é undefined
+     - empresa.mostrarMarcasEmVisitas === true
+
+5) Objetivo final:
+   - /admin/empresa → "Mostrar marcas em visitas" = true
+   - /admin/marcas → tenho pelo menos 1 marca ativa
+   - Em "Nova Visita":
+     - a secção "Marcas Faladas Nesta Visita" aparece
+     - mesmo que a lista esteja vazia, deve mostrar pelo menos o título e, em último caso, a mensagem "Nenhuma marca disponível".
+
+Por favor:
+- Não alteres a lógica multi-tenant, áudio, editor rico ou outras fases.
+- Faz apenas as alterações mínimas em:
+  - /api/auth/user (se necessário),
+  - useAuth.ts,
+  - VisitaForm.tsx (uso de empresa e condição de renderização).
+
+No fim, confirma:
+- O que estava a falhar (empresa não chegava ao VisitaForm? mostrarMarcasEmVisitas vinha false? etc.).
+- Que ficheiros alteraste.
+- Que `npm run build` passa.
+- E que, em Nova Visita, a secção de marcas aparece corretamente.
