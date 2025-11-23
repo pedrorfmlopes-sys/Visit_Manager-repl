@@ -1484,10 +1484,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignedUserId: validatedData.assignedUserId || null,
         dueDate: validatedData.dueDate || null,
         createdByUserId: userId,
-        empresaId,
       };
       
-      const tarefa = await storage.createTarefa(cleanedData);
+      const tarefa = await storage.createTarefa(cleanedData, empresaId);
       res.json(tarefa);
     } catch (error) {
       console.error("Error creating tarefa:", error);
