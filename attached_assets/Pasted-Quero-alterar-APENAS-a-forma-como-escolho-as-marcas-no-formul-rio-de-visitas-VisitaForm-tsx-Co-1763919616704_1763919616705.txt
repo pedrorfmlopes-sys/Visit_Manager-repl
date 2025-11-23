@@ -1,0 +1,139 @@
+Quero alterar APENAS a forma como escolho as marcas no formulário de visitas (VisitaForm.tsx).
+
+Contexto atual (FASE 5–8):
+- Backend de marcas está OK:
+  - /api/marcas?onlyAtivas=true filtra por empresaId e ativa=true.
+- Em VisitaForm.tsx:
+  - Campo "marcasIds" existe no React Hook Form.
+  - As marcas são carregadas via useQuery("/api/marcas?onlyAtivas=true").
+  - O campo está a ser renderizado como um “cluster” de badges clicáveis:
+    - mostra TODAS as marcas como etiquetas, e clico para selecionar/deselecionar.
+
+Problema:
+- Visualmente fica confuso e pesado quando há muitas marcas.
+- Quero uma experiência mais “clean” com uma DROPLIST/MULTI-SELECT, em vez de uma grelha de badges.
+
+🎯 OBJETIVO – NOVO COMPORTAMENTO
+
+No formulário (VisitaForm.tsx):
+
+1) Em vez de mostrar todas as marcas como badges “soltas”,
+   quero um componente do género:
+
+   [ Marcas faladas v ]
+   - Ao clicar abre uma lista dropdown
+   - Dentro da lista:
+     - aparece uma lista de marcas com checkbox ou estado de seleção
+     - posso marcar/desmarcar várias marcas
+     - idealmente com campo de pesquisa no topo (opcional, se for simples de implementar)
+
+2) UX desejada:
+   - Label: "Marcas Faladas Nesta Visita"
+   - Placeholder no botão/dropdown:
+     - Se nenhuma marca selecionada → "Seleciona uma ou mais marcas"
+     - Se 1 selecionada → "1 marca selecionada"
+     - Se >1 selecionada → "X marcas selecionadas"
+   - Opcional: por baixo do dropdown, mostrar as marcas seleccionadas como pequenas tags/badges (apenas as selecionadas, não todas).
+
+3) Lado funcional (IMPORTANTE):
+   - O campo do React Hook Form continua a chamar-se **"marcasIds"** e deve continuar a ser um array de IDs (string[]).
+   - O onChange do multi-select deve atualizar **form.getValues("marcasIds")** tal como antes:
+     - Exemplo: ["marca-id-1", "marca-id-3"].
+   - O submit do formulário **NÃO MUDA**:
+     - continua a enviar marcasIds para o backend como já está implementado na FASE 5.
+
+🔧 IMPLEMENTAÇÃO SUGERIDA (podes seguir este padrão, mas és livre para escolher o melhor dentro do stack atual):
+
+- O projeto já usa shadcn/ui (Button, Badge, Form, etc.).
+- Sugestão de abordagem:
+
+  a) No VisitaForm.tsx:
+     - Mantém o <FormField name="marcasIds"> tal como está.
+     - Substitui o bloco atual de badges por um componente de dropdown multi-select, por exemplo:
+       - Popover + Button para abrir/fechar
+       - Dentro do Popover, usar uma lista com checkboxes (ou Command + CommandItem + Checkbox, padrão shadcn)
+
+  b) Comportamento do click:
+     - Ao clicar num item da lista:
+       - se o id ainda não estiver em field.value → adiciona
+       - se já estiver → remove
+     - Atualiza `field.onChange(newIds)`.
+
+  c) Exemplo de UX esperado (pseudo-código, ajusta para o stack real):
+
+     <FormField name="marcasIds">
+       {({ field }) => (
+         <FormItem>
+           <FormLabel>Marcas Faladas Nesta Visita</FormLabel>
+           <Popover>
+             <PopoverTrigger asChild>
+               <Button variant="outline" role="combobox" className="w-full justify-between">
+                 {field.value?.length
+                   ? `${field.value.length} marca(s) selecionada(s)`
+                   : "Seleciona uma ou mais marcas"}
+               </Button>
+             </PopoverTrigger>
+             <PopoverContent className="w-full p-0">
+               {/* Opcional: campo de pesquisa */}
+               {/* Lista de marcas com checkboxes */}
+               {marcas.map((marca) => {
+                 const isSelected = field.value?.includes(marca.id);
+                 return (
+                   <div
+                     key={marca.id}
+                     onClick={() => {
+                       const newIds = isSelected
+                         ? field.value.filter((id) => id !== marca.id)
+                         : [...(field.value || []), marca.id];
+                       field.onChange(newIds);
+                     }}
+                     className="flex items-center justify-between px-2 py-1 cursor-pointer hover:bg-muted"
+                   >
+                     <span>{marca.nome}</span>
+                     <Checkbox checked={isSelected} />
+                   </div>
+                 );
+               })}
+             </PopoverContent>
+           </Popover>
+
+           {/* Opcional: mostrar as selecionadas como chips pequenos */}
+           {field.value?.length > 0 && (
+             <div className="mt-2 flex flex-wrap gap-1">
+               {marcas
+                 .filter((m) => field.value.includes(m.id))
+                 .map((m) => (
+                   <Badge key={m.id} variant="secondary" className="text-xs">
+                     {m.nome}
+                   </Badge>
+                 ))}
+             </div>
+           )}
+
+           <FormDescription className="text-xs">
+             Escolhe uma ou mais marcas que foram abordadas na visita.
+           </FormDescription>
+           <FormMessage />
+         </FormItem>
+       )}
+     </FormField>
+
+- Podes adaptar este padrão ao design já usado no projeto (classes, componentes exatos, etc.).
+- O importante é:
+  - **Deixar de ter a grelha gigante de badges de todas as marcas**
+  - Passar a ter **um único controlo limpo** (dropdown/multi-select)
+  - Continuar a alimentar `marcasIds` como array de strings.
+
+⚠️ NÃO MUDAR:
+- Schema da base de dados.
+- Storage / endpoints relacionados com marcas e visitas (FASE 5).
+- Lógica multi-empresa e RBAC.
+- Parte de áudio, transcrição ou editor rico de notas.
+
+No final, por favor:
+- Confirma quais ficheiros alteraste (principalmente VisitaForm.tsx e componentes relacionados).
+- Garante que `npm run build` passa sem erros.
+- Verifica que:
+  - Em /admin/empresa com "Mostrar marcas em visitas" = true e com marcas ativas,
+  - Em "Nova Visita" aparece o dropdown de marcas,
+  - Consigo selecionar múltiplas marcas e que elas continuam a ser guardadas corretamente na visita.

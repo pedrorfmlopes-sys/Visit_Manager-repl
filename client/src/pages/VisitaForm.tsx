@@ -67,6 +67,9 @@ export default function VisitaForm() {
   const [taskDescription, setTaskDescription] = useState("");
   const [taskDueDate, setTaskDueDate] = useState<Date | undefined>(undefined);
   
+  // Marcas search state (FASE 5 UI update)
+  const [marcasSearch, setMarcasSearch] = useState("");
+  
   // User context for multi-agent system
   const { data: currentUser } = useCurrentUser();
   const { data: allUsers = [] } = useAllUsers();
@@ -589,7 +592,7 @@ export default function VisitaForm() {
               )}
             />
 
-            {/* FASE 5: Marcas Faladas */}
+            {/* FASE 5: Marcas Faladas - Updated UI with dropdown/multi-select */}
             {empresa?.mostrarMarcasEmVisitas && (
               <FormField
                 control={form.control}
@@ -597,36 +600,88 @@ export default function VisitaForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Marcas Faladas Nesta Visita</FormLabel>
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap gap-2">
-                        {marcas.map((marca) => {
-                          const isSelected = selectedMarcasIds.includes(marca.id);
-                          return (
-                            <button
-                              key={marca.id}
-                              type="button"
-                              onClick={() => {
-                                const newIds = isSelected
-                                  ? selectedMarcasIds.filter(id => id !== marca.id)
-                                  : [...selectedMarcasIds, marca.id];
-                                field.onChange(newIds);
-                              }}
-                              data-testid={`button-marca-${marca.id}`}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className="w-full justify-between"
+                          data-testid="button-marcas-dropdown"
+                        >
+                          {field.value?.length
+                            ? `${field.value.length} marca${field.value.length === 1 ? "" : "s"} selecionada${field.value.length === 1 ? "" : "s"}`
+                            : "Seleciona uma ou mais marcas"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" side="bottom" align="start">
+                        <div className="p-3 border-b">
+                          <Input
+                            placeholder="Pesquisar marcas..."
+                            value={marcasSearch}
+                            onChange={(e) => setMarcasSearch(e.target.value)}
+                            className="h-8"
+                            data-testid="input-marcas-search"
+                          />
+                        </div>
+                        <div className="max-h-64 overflow-y-auto">
+                          {marcas.length === 0 ? (
+                            <div className="px-3 py-2 text-sm text-muted-foreground">
+                              Nenhuma marca disponível
+                            </div>
+                          ) : (
+                            marcas
+                              .filter((marca) =>
+                                marca.nome.toLowerCase().includes(marcasSearch.toLowerCase())
+                              )
+                              .map((marca) => {
+                                const isSelected = field.value?.includes(marca.id);
+                                return (
+                                  <div
+                                    key={marca.id}
+                                    className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted"
+                                    onClick={() => {
+                                      const newIds = isSelected
+                                        ? (field.value || []).filter((id) => id !== marca.id)
+                                        : [...(field.value || []), marca.id];
+                                      field.onChange(newIds);
+                                    }}
+                                    data-testid={`button-marca-${marca.id}`}
+                                  >
+                                    <Checkbox
+                                      checked={isSelected}
+                                      onCheckedChange={() => {}}
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <span className="text-sm">{marca.nome}</span>
+                                  </div>
+                                );
+                              })
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+
+                    {/* Show selected marcas as small badges below */}
+                    {field.value && field.value.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {marcas
+                          .filter((m) => field.value?.includes(m.id))
+                          .map((m) => (
+                            <Badge
+                              key={m.id}
+                              variant="secondary"
+                              className="text-xs"
+                              data-testid={`badge-marca-selected-${m.id}`}
                             >
-                              <Badge 
-                                variant={isSelected ? "default" : "outline"}
-                                className="cursor-pointer"
-                              >
-                                {marca.nome}
-                              </Badge>
-                            </button>
-                          );
-                        })}
+                              {m.nome}
+                            </Badge>
+                          ))}
                       </div>
-                      {marcas.length === 0 && (
-                        <p className="text-sm text-muted-foreground">Nenhuma marca disponível</p>
-                      )}
-                    </div>
+                    )}
+
+                    <FormDescription className="text-xs">
+                      Escolhe uma ou mais marcas que foram abordadas na visita.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
