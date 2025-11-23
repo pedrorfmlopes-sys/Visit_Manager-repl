@@ -1117,12 +1117,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Visitas endpoints - FASE 2: filtered by empresaId
+  // Visitas endpoints - FASE 2: filtered by empresaId, FASE 11: query params support
   app.get('/api/visitas', isAuthenticated, async (req: any, res) => {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      const visitas = await storage.getVisitas(empresaId, userId, userRole);
+      
+      let visitas = await storage.getVisitas(empresaId, userId, userRole);
+      
+      // Apply query filters (FASE 11)
+      const search = req.query.search as string | undefined;
+      const from = req.query.from as string | undefined;
+      const to = req.query.to as string | undefined;
+      const filterUserId = req.query.userId as string | undefined;
+      const marcaId = req.query.marcaId as string | undefined;
+      const hasAudioToTranscribe = req.query.hasAudioToTranscribe === 'true';
+      
+      visitas = visitas.filter(v => {
+        // Search filter
+        if (search) {
+          const q = search.toLowerCase();
+          const matchesSearch = 
+            v.entidade?.nome.toLowerCase().includes(q) ||
+            v.contacto?.nome.toLowerCase().includes(q) ||
+            v.notas?.toLowerCase().includes(q);
+          if (!matchesSearch) return false;
+        }
+        
+        // Date range filter
+        if (from || to) {
+          const visitaDate = new Date(v.dataVisita);
+          if (from) {
+            const fromDate = new Date(from);
+            if (visitaDate < fromDate) return false;
+          }
+          if (to) {
+            const toDate = new Date(to);
+            toDate.setHours(23, 59, 59, 999);
+            if (visitaDate > toDate) return false;
+          }
+        }
+        
+        // User filter (admin only)
+        if (filterUserId && v.createdByUserId !== filterUserId) return false;
+        
+        // Marca filter
+        if (marcaId && !v.marcas?.some(m => m.marcaId === marcaId)) return false;
+        
+        // Audio to transcribe filter
+        if (hasAudioToTranscribe) {
+          const hasAudio = v.audioUrl || (v.audios && v.audios.length > 0);
+          const hasUntranscribedAudio = v.audios?.some(a => !a.transcricao);
+          if (!hasAudio || !hasUntranscribedAudio) return false;
+        }
+        
+        return true;
+      });
+      
       res.json(visitas);
     } catch (error) {
       console.error("Error fetching visitas:", error);

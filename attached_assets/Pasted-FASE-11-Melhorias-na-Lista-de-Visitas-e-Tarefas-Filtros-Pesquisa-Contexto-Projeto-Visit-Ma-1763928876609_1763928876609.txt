@@ -1,0 +1,177 @@
+FASE 11 – Melhorias na Lista de Visitas e Tarefas (Filtros + Pesquisa)
+
+Contexto:
+
+Projeto: Visit Manager multi-empresa.
+
+Já temos:
+
+Autenticação com roles "admin" / "agent".
+
+Tema por empresa ("light-business" / "dark-pro").
+
+Layouts diferenciados: MainLayout com sidebar para admin e bottom nav para agent.
+
+Listas de visitas e tarefas funcionais, mas com filtros muito básicos.
+
+Objetivo desta fase:
+
+Tornar as páginas de lista de visitas e lista de tarefas realmente úteis no dia a dia, com:
+
+Pesquisa textual.
+
+Filtros rápidos por datas e estado.
+
+Filtros extra para admin (por utilizador, marca, entidade).
+
+Manter a compatibilidade total com o backend e com o multi-tenant.
+
+Tarefas técnicas:
+
+Backend – Extensão dos endpoints de listagem (mínimo necessário)
+
+Identificar os endpoints existentes de listagem:
+
+Visitas: GET /api/visitas (ou o equivalente atual).
+
+Tarefas: GET /api/tarefas (ou equivalente).
+
+Adicionar suporte a query params opcionais:
+
+search: string para pesquisa em:
+
+entidade (nome),
+
+contacto (nome),
+
+notas da visita (texto/HTML),
+
+eventualmente nome de utilizador.
+
+from e to: datas (YYYY-MM-DD) para filtrar por data da visita ou data da tarefa.
+
+userId: filtrar por utilizador responsável pela visita/tarefa (usado sobretudo por admin).
+
+marcaId: filtrar visitas que tenham essa marca em visitasMarcas.
+
+status ou state: para tarefas (pendente, concluída, em atraso, se já existir).
+
+hasAudioToTranscribe: booleano (ex.: true) para filtrar visitas que tenham áudio sem transcrição.
+
+Os filtros devem ser todos opcionais e combináveis, e o filtro por empresaId deve continuar sempre presente na query principal.
+
+Evitar grandes refactors no storage: idealmente, adaptar a função existente para aceitar um objeto de filtros.
+
+Frontend – Lista de Visitas (Agent)
+
+Na página de lista de visitas do agente:
+
+Adicionar uma barra de filtros no topo com:
+
+Campo de pesquisa (search).
+
+Botões de atalho de datas:
+
+“Hoje” ⇒ from = to = hoje.
+
+“Esta semana” ⇒ from = início da semana, to = fim da semana.
+
+“Últimos 30 dias” ⇒ intervalo adequado.
+
+“Tudo” ⇒ sem filtros de datas.
+
+Opcional: checkbox “Com áudio por transcrever” (mapeado para hasAudioToTranscribe=true).
+
+Integrar estes filtros com a query de React Query:
+
+A queryKey deve incluir os filtros (search, from, to, hasAudioToTranscribe).
+
+A função de fetch deve passar os filtros como query params para o endpoint.
+
+A UI deve respeitar o tema atual (usar classes/variáveis já existentes como vm-card, texto muted, etc.).
+
+Frontend – Lista de Tarefas (Agent)
+
+Adicionar filtros rápidos:
+
+Tabs ou botões para:
+
+“Pendentes”
+
+“Atrasadas”
+
+“Concluídas”
+
+Se o modelo de dados já tiver dueDate, considerar "atrasadas" quando dueDate < hoje e não concluídas.
+
+Adicionar ordenação simples:
+
+Por defeito, ordenar por dueDate ascendente.
+
+Se já existir ordenação, apenas garantir que está consistente com estes filtros.
+
+Integrar com React Query da mesma forma (queryKey com filtros).
+
+Frontend – Lista de Visitas (Admin)
+
+Na versão admin da página de visitas:
+
+Reutilizar barra de pesquisa e filtros de datas.
+
+Acrescentar:
+
+Dropdown “Utilizador” com os utilizadores da empresa (se já existir endpoint de utilizadores; caso contrário, usar lista mínima que já tens).
+
+Dropdown “Marca” com as marcas ativas (marcas da empresa).
+
+Estes controlos têm de alimentar os query params userId e marcaId.
+
+A UI pode usar o layout de sidebar existente, colocando a barra de filtros no topo da área de conteúdo.
+
+Frontend – Lista de Tarefas (Admin)
+
+Similar à lista de visitas para admin:
+
+Filtros por userId.
+
+Filtro por estado (status) se existir.
+
+Filtro por ligação a visita (ex.: checkbox "Só tarefas ligadas a visitas").
+
+Integrar com React Query e endpoints como acima.
+
+Testes manuais esperados
+
+Login como agent:
+
+Ver lista de visitas:
+
+Testar pesquisa por nome de entidade.
+
+Testar filtros de datas (Hoje, Esta semana, Últimos 30 dias).
+
+Testar o filtro “Com áudio por transcrever”, se existirem visitas com áudio sem transcrição.
+
+Ver lista de tarefas:
+
+Alternar entre “Pendentes”, “Atrasadas” e “Concluídas”.
+
+Login como admin:
+
+Lista de visitas:
+
+Filtrar por utilizador, por marca, por intervalo de datas e por pesquisa.
+
+Lista de tarefas:
+
+Filtrar por utilizador e estado.
+
+Restrições:
+
+Não alterar a lógica de multi-empresa nem a de autenticação.
+
+Não remover funcionalidades existentes nas listas; apenas estender com filtros e pesquisa.
+
+Manter o código organizado (ex.: extrair componentes de “barra de filtros” se começar a ficar muito grande).
+
+No final, produz um pequeno resumo das alterações (ficheiros tocados, novos componentes, novos parâmetros de query) tal como nas fases anteriores.
