@@ -12,7 +12,7 @@ const DEFAULT_POSITION: FABPosition = { x: 16, y: 96 };
 const FAB_STORAGE_KEY = "fab-position";
 const FAB_SIZE = 56;
 const BUTTON_HEIGHT = 56;
-const MENU_ITEMS_COUNT = 4; // Number of menu items (not including main button)
+const MENU_ITEMS_COUNT = 4;
 
 export function FABMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -20,12 +20,20 @@ export function FABMenu() {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [shouldOpenUp, setShouldOpenUp] = useState(false);
-  const [dynamicGap, setDynamicGap] = useState(12);
+  const [dynamicGap, setDynamicGap] = useState(0);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [, setLocation] = useLocation();
 
-  // Load position from localStorage on mount
+  // Calculate gap based on half screen height
+  const calculateGap = () => {
+    const halfScreen = window.innerHeight / 2;
+    const gap = (halfScreen - (5 * BUTTON_HEIGHT)) / 4;
+    console.log("calculateGap - New gap value:", gap);
+    setDynamicGap(gap);
+  };
+
+  // Load position from localStorage and calculate initial gap
   useEffect(() => {
     const savedPosition = localStorage.getItem(FAB_STORAGE_KEY);
     if (savedPosition) {
@@ -42,20 +50,10 @@ export function FABMenu() {
     return () => window.removeEventListener("resize", calculateGap);
   }, []);
 
-  const calculateGap = () => {
-    // Half of screen height
-    const halfScreen = window.innerHeight / 2;
-    
-    // Total space available for buttons + gaps: 5 buttons (1 main + 4 menu)
-    // (5 * BUTTON_HEIGHT) + (4 * gap) = halfScreen
-    // gap = (halfScreen - (5 * BUTTON_HEIGHT)) / 4
-    const gap = (halfScreen - (5 * BUTTON_HEIGHT)) / 4;
-    setDynamicGap(gap);
-  };
-
   // Determine if menu should open upwards
   useEffect(() => {
     const totalMenuHeight = 5 * BUTTON_HEIGHT + 4 * dynamicGap;
+    console.log("useEffect - shouldOpenUp:", { dynamicGap, totalMenuHeight });
     setShouldOpenUp(position.y + totalMenuHeight > window.innerHeight);
   }, [position, dynamicGap]);
 
@@ -126,21 +124,28 @@ export function FABMenu() {
 
   // Calculate menu item position with dynamic gap
   const getMenuItemStyle = (index: number) => {
-    const itemOffset = index * (BUTTON_HEIGHT + dynamicGap);
+    const spacing = BUTTON_HEIGHT + dynamicGap;
+    const itemOffset = index * spacing;
+    const positionValue = BUTTON_HEIGHT + dynamicGap + itemOffset;
+    
+    console.log("getMenuItemStyle rendering:", { index, dynamicGap, spacing, itemOffset, positionValue, shouldOpenUp });
+    
     if (shouldOpenUp) {
       // Menu opens upwards - items positioned above the main button
       return {
-        bottom: `${BUTTON_HEIGHT + dynamicGap + itemOffset}px`,
+        bottom: `${positionValue}px`,
         left: "0",
       };
     } else {
       // Menu opens downwards - items positioned below the main button
       return {
-        top: `${BUTTON_HEIGHT + dynamicGap + itemOffset}px`,
+        top: `${positionValue}px`,
         left: "0",
       };
     }
   };
+
+  console.log("FABMenu render:", { isOpen, isDragging, shouldOpenUp, dynamicGap });
 
   return (
     <div
@@ -179,6 +184,8 @@ export function FABMenu() {
         <>
           {menuItems.map((item, index) => {
             const Icon = item.icon;
+            const style = getMenuItemStyle(index);
+            console.log(`MenuItem ${index}:`, style);
             return (
               <Button
                 key={item.testId}
@@ -186,7 +193,7 @@ export function FABMenu() {
                 variant="default"
                 onClick={() => handleMenuItemClick(item.action)}
                 className="h-14 w-14 rounded-full shadow-lg absolute"
-                style={getMenuItemStyle(index)}
+                style={style}
                 data-testid={item.testId}
                 title={item.label}
               >
