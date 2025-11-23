@@ -11,6 +11,7 @@ interface FABPosition {
 const DEFAULT_POSITION: FABPosition = { x: 16, y: 96 };
 const FAB_STORAGE_KEY = "fab-position";
 const FAB_SIZE = 56;
+const GAP = 16; // Increased gap between buttons
 
 export function FABMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -36,7 +37,7 @@ export function FABMenu() {
 
   // Determine if menu should open upwards
   useEffect(() => {
-    const totalMenuHeight = 56 * 5 + 8 * 4;
+    const totalMenuHeight = 56 * 5 + GAP * 4;
     setShouldOpenUp(position.y + totalMenuHeight > window.innerHeight);
   }, [position]);
 
@@ -79,8 +80,7 @@ export function FABMenu() {
     const rect = buttonRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    setIsOpen(false);
-
+    // Start long press timer for drag activation
     longPressTimer.current = setTimeout(() => {
       setIsDragging(true);
       setDragOffset({
@@ -91,9 +91,13 @@ export function FABMenu() {
   };
 
   const handleMainButtonMouseUp = () => {
+    // If timer is still active, it means user didn't hold for 3 seconds
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
+      
+      // This is a regular click - toggle menu
+      setIsOpen(!isOpen);
     }
   };
 
@@ -104,17 +108,17 @@ export function FABMenu() {
 
   // Calculate menu item position
   const getMenuItemStyle = (index: number) => {
-    const itemOffset = index * (56 + 8); // button height + gap
+    const itemOffset = index * (56 + GAP); // button height + gap
     if (shouldOpenUp) {
       // Menu opens upwards - items positioned above the main button
       return {
-        bottom: `${56 + 8 + itemOffset}px`,
+        bottom: `${56 + GAP + itemOffset}px`,
         left: "0",
       };
     } else {
       // Menu opens downwards - items positioned below the main button
       return {
-        top: `${56 + 8 + itemOffset}px`,
+        top: `${56 + GAP + itemOffset}px`,
         left: "0",
       };
     }
@@ -137,7 +141,6 @@ export function FABMenu() {
         variant="default"
         onMouseDown={handleMainButtonMouseDown}
         onMouseUp={handleMainButtonMouseUp}
-        onClick={() => !isDragging && setIsOpen(!isOpen)}
         className={`h-14 w-14 rounded-full shadow-lg transition-transform absolute ${
           isOpen ? "rotate-45" : "rotate-0"
         } ${isDragging ? "opacity-75 scale-125" : ""}`}
@@ -148,7 +151,7 @@ export function FABMenu() {
         }}
         data-testid={isOpen ? "fab-close" : "fab-open"}
         disabled={isDragging}
-        title={isDragging ? "Arrasta para mover o botão" : "Segura 3 segundos para mover"}
+        title={isDragging ? "Arrasta para mover o botão" : "Clica para abrir, segura 3 segundos para mover"}
       >
         <Plus className="h-6 w-6" />
       </Button>
