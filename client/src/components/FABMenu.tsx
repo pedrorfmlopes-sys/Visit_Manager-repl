@@ -11,9 +11,6 @@ interface FABPosition {
 const DEFAULT_POSITION: FABPosition = { x: 16, y: 96 }; // bottom-right: right-4, bottom-24
 const FAB_STORAGE_KEY = "fab-position";
 const FAB_SIZE = 56; // 14*4 = h-14 w-14 in pixels
-const MENU_ITEM_HEIGHT = 56; // h-14 w-14
-const GAP_SIZE = 8; // gap-2 = 8px
-const MENU_ITEMS_COUNT = 4;
 
 export function FABMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -39,7 +36,7 @@ export function FABMenu() {
 
   // Determine if menu should open upwards based on position
   useEffect(() => {
-    const totalMenuHeight = (MENU_ITEMS_COUNT + 1) * MENU_ITEM_HEIGHT + MENU_ITEMS_COUNT * GAP_SIZE;
+    const totalMenuHeight = 56 * 5 + 8 * 4; // 5 buttons + 4 gaps
     const openUp = position.y + totalMenuHeight > window.innerHeight;
     setShouldOpenUp(openUp);
   }, [position]);
@@ -112,22 +109,10 @@ export function FABMenu() {
     }
   };
 
-  // Calculate menu items positions
-  const getMenuItemPosition = (index: number) => {
-    const itemOffset = index * (MENU_ITEM_HEIGHT + GAP_SIZE);
-    if (shouldOpenUp) {
-      // Menu opens upwards - items go negative (above the button)
-      return -(itemOffset + MENU_ITEM_HEIGHT + GAP_SIZE);
-    } else {
-      // Menu opens downwards - items go positive (below the button)
-      return MENU_ITEM_HEIGHT + GAP_SIZE + itemOffset;
-    }
-  };
-
   return (
     <div
       ref={fabRef}
-      className={`fixed z-50 transition-all ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+      className={`fixed z-50 flex relative transition-all ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
@@ -135,46 +120,47 @@ export function FABMenu() {
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
     >
-      {/* Main FAB button - always at the same position */}
-      <Button
-        size="icon"
-        variant="default"
-        onClick={() => !isDragging && setIsOpen(!isOpen)}
-        className={`h-14 w-14 rounded-full shadow-lg transition-transform ${
-          isOpen ? "rotate-45" : "rotate-0"
-        } ${isDragging ? "opacity-75 scale-125" : ""}`}
-        data-testid={isOpen ? "fab-close" : "fab-open"}
-        disabled={isDragging}
-        title={isDragging ? "Arrasta para mover o botão" : "Segura 3 segundos para mover"}
+      {/* Container for menu items and main button */}
+      <div
+        className={`flex gap-2 items-center ${shouldOpenUp ? "flex-col-reverse" : "flex-col"}`}
       >
-        <Plus className="h-6 w-6" />
-      </Button>
+        {/* Main FAB button */}
+        <Button
+          size="icon"
+          variant="default"
+          onClick={() => !isDragging && setIsOpen(!isOpen)}
+          className={`h-14 w-14 rounded-full shadow-lg transition-transform flex-shrink-0 ${
+            isOpen ? "rotate-45" : "rotate-0"
+          } ${isDragging ? "opacity-75 scale-125" : ""}`}
+          data-testid={isOpen ? "fab-close" : "fab-open"}
+          disabled={isDragging}
+          title={isDragging ? "Arrasta para mover o botão" : "Segura 3 segundos para mover"}
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
 
-      {/* Menu items - positioned absolutely above or below the button */}
-      {isOpen && !isDragging && (
-        <>
-          {menuItems.map((item, index) => {
-            const Icon = item.icon;
-            return (
-              <Button
-                key={item.testId}
-                size="icon"
-                variant="default"
-                onClick={() => handleMenuItemClick(item.action)}
-                className="h-14 w-14 rounded-full shadow-lg absolute"
-                style={{
-                  left: "0",
-                  top: `${getMenuItemPosition(index)}px`,
-                }}
-                data-testid={item.testId}
-                title={item.label}
-              >
-                <Icon className="h-6 w-6" />
-              </Button>
-            );
-          })}
-        </>
-      )}
+        {/* Menu items */}
+        {isOpen && !isDragging && (
+          <>
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Button
+                  key={item.testId}
+                  size="icon"
+                  variant="default"
+                  onClick={() => handleMenuItemClick(item.action)}
+                  className="h-14 w-14 rounded-full shadow-lg flex-shrink-0"
+                  data-testid={item.testId}
+                  title={item.label}
+                >
+                  <Icon className="h-6 w-6" />
+                </Button>
+              );
+            })}
+          </>
+        )}
+      </div>
     </div>
   );
 }
