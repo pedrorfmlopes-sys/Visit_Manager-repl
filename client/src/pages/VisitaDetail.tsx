@@ -631,13 +631,9 @@ export default function VisitaDetail() {
                   <Badge key={idx} variant="secondary">{marca}</Badge>
                 ))}
               </div>
-              )}
-              {audioClips.length === 0 && !isRecording && supportsRecording && (
-                <p className="text-sm text-muted-foreground">Nenhum áudio ainda. Clica em "Gravar" para começar!</p>
-              )}
             </CardContent>
           </Card>
-        ) : null}
+        )}
 
         {/* FASE 5: Marcas Faladas */}
         {visita.marcas && visita.marcas.length > 0 && (
@@ -653,13 +649,9 @@ export default function VisitaDetail() {
                   </Badge>
                 ))}
               </div>
-              )}
-              {audioClips.length === 0 && !isRecording && supportsRecording && (
-                <p className="text-sm text-muted-foreground">Nenhum áudio ainda. Clica em "Gravar" para começar!</p>
-              )}
             </CardContent>
           </Card>
-        ) : null}
+        )}
 
         {/* FASE 6: Áudio da Visita */}
         {audioClips.length > 0 || supportsRecording ? (
