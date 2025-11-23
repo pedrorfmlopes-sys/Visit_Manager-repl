@@ -164,7 +164,7 @@ export function FABMenu() {
               <div
                 key={item.testId}
                 onClick={() => handleMenuItemClick(item.action)}
-                className="fixed z-40 h-14 w-14 rounded-full shadow-lg flex items-center justify-center bg-blue-500 hover:bg-blue-600 cursor-pointer text-white"
+                className="fixed z-40 h-14 w-14 rounded-full shadow-lg flex items-center justify-center bg-green-500 hover:bg-green-600 cursor-pointer text-white"
                 style={{
                   left: `${position.x}px`,
                   top: `${getMenuItemPosition(index)}px`,
