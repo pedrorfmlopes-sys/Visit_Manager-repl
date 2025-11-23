@@ -1512,7 +1512,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         entidadeId: req.query.entidadeId as string | undefined,
         overdue: req.query.overdue === 'true',
       };
-      const tarefas = await storage.getTarefas(empresaId, userId, userRole, filters);
+      let tarefas = await storage.getTarefas(empresaId, userId, userRole, filters);
+      
+      // Apply search filter (FASE 11)
+      const search = req.query.search as string | undefined;
+      if (search) {
+        const q = search.toLowerCase();
+        tarefas = tarefas.filter(t =>
+          t.titulo.toLowerCase().includes(q) ||
+          t.descricao?.toLowerCase().includes(q) ||
+          t.entidade?.nome.toLowerCase().includes(q)
+        );
+      }
+      
       res.json(tarefas);
     } catch (error) {
       console.error("Error fetching tarefas:", error);
