@@ -1,0 +1,65 @@
+import { ReactNode } from "react";
+import { AdminSidebar } from "@/components/AdminSidebar";
+import { BottomNav } from "@/components/BottomNav";
+import { useAuth } from "@/hooks/useAuth";
+
+interface MainLayoutProps {
+  children: ReactNode;
+}
+
+export function MainLayout({ children }: MainLayoutProps) {
+  const { isAdmin, empresa } = useAuth();
+
+  if (isAdmin) {
+    return (
+      <div className="flex h-screen bg-background">
+        <AdminSidebar />
+        <div className="flex-1 flex flex-col overflow-hidden ml-64">
+          {/* Admin header with logo */}
+          {empresa?.logoUrl && (
+            <header className="sticky top-0 z-20 bg-background border-b border-border px-6 py-3 hidden lg:block">
+              <div className="flex items-center h-10">
+                <img 
+                  src={empresa.logoUrl} 
+                  alt={empresa.nome} 
+                  className="h-full max-h-10 object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            </header>
+          )}
+          <main className="flex-1 overflow-y-auto">
+            {children}
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  // Agent layout: bottom nav + content
+  return (
+    <div className="min-h-screen bg-background pb-20">
+      {/* Logo header for agents */}
+      {empresa?.logoUrl && (
+        <header className="sticky top-0 z-20 bg-background border-b border-border px-4 py-2">
+          <div className="flex items-center justify-center h-12">
+            <img 
+              src={empresa.logoUrl} 
+              alt={empresa.nome} 
+              className="h-full max-h-12 object-contain"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          </div>
+        </header>
+      )}
+      <main className="max-w-2xl mx-auto">
+        {children}
+      </main>
+      <BottomNav />
+    </div>
+  );
+}

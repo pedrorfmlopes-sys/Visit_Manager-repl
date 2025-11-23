@@ -14,15 +14,8 @@ const navItems = [
   { path: "/lembretes", icon: Bell, label: "Lembretes", showBadge: true },
 ];
 
-const adminNavItems = [
-  { path: "/admin/empresa", icon: Settings, label: "Empresa" },
-  { path: "/admin/utilizadores", icon: Users, label: "Utilizadores" },
-  { path: "/admin/marcas", icon: Building2, label: "Marcas" },
-];
-
 export function BottomNav() {
   const [location] = useLocation();
-  const { isAdmin } = useAuth();
   
   const { data: lembretes } = useQuery<Lembrete[]>({
     queryKey: ['/api/lembretes'],
@@ -31,12 +24,10 @@ export function BottomNav() {
 
   const lembretesCount = lembretes?.length || 0;
 
-  const items = isAdmin ? [...navItems, ...adminNavItems] : navItems;
-
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-card-border z-50 safe-bottom-nav">
       <div className="h-16 flex items-center justify-around max-w-2xl mx-auto px-2 overflow-x-auto">
-        {items.map((item) => {
+        {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location === item.path || (item.path !== "/" && location.startsWith(item.path));
           const showBadge = item.showBadge && lembretesCount > 0;

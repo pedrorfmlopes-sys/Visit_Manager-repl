@@ -4,7 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
-import { BottomNav } from "@/components/BottomNav";
+import { MainLayout } from "@/layouts/MainLayout";
 import { SyncIndicator } from "@/components/SyncIndicator";
 import { offlineStorage } from "@/lib/offlineStorage";
 import { syncPTEnrichmentQueue } from "@/lib/offlineQueue";
@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
+import AdminDashboard from "@/pages/AdminDashboard";
 import Gabinetes from "@/pages/Gabinetes";
 import GabineteForm from "@/pages/GabineteForm";
 import Entidades from "@/pages/Entidades";
@@ -68,50 +69,69 @@ function Router() {
     );
   }
 
-  return (
-    <Switch>
-      {!isAuthenticated ? (
+  if (!isAuthenticated) {
+    return (
+      <Switch>
         <Route path="/" component={Landing} />
-      ) : (
-        <>
-          <Route path="/" component={Dashboard} />
-          {/* NEW: Entidades routes (Universal Entities) */}
-          <Route path="/entidades" component={Entidades} />
-          <Route path="/entidades/nova" component={EntidadeForm} />
-          <Route path="/entidades/:id/editar" component={EntidadeForm} />
-          <Route path="/entidades/:id" component={EntidadeDetail} />
-          {/* LEGACY: Gabinetes routes (backward compatibility) */}
-          <Route path="/gabinetes" component={Gabinetes} />
-          <Route path="/gabinetes/novo" component={GabineteForm} />
-          <Route path="/gabinetes/:id" component={GabineteForm} />
-          <Route path="/contactos" component={Contactos} />
-          <Route path="/contactos/novo" component={ContactoForm} />
-          <Route path="/contactos/:id/detalhes" component={ContactoDetail} />
-          <Route path="/contactos/:id" component={ContactoForm} />
-          <Route path="/visitas" component={Visitas} />
-          <Route path="/visitas/nova" component={VisitaForm} />
-          <Route path="/visitas/:id" component={VisitaDetail} />
-          <Route path="/tarefas" component={Tarefas} />
-          <Route path="/tarefas/nova" component={TarefaForm} />
-          <Route path="/tarefas/:id" component={TarefaDetail} />
-          <Route path="/tarefas/:id/editar" component={TarefaForm} />
-          <Route path="/lembretes" component={Lembretes} />
-          <Route path="/analytics" component={Analytics} />
-          <Route path="/qr" component={QRScanner} />
-          <Route path="/qr-scanner" component={QRScanner} />
-          {/* Admin routes - FASE 4 */}
-          {isAdmin && (
-            <>
-              <Route path="/admin/empresa" component={() => <AdminRoute component={AdminEmpresa} />} />
-              <Route path="/admin/utilizadores" component={() => <AdminRoute component={AdminUsers} />} />
-              <Route path="/admin/marcas" component={() => <AdminRoute component={AdminMarcas} />} />
-            </>
-          )}
-          {/* <Route path="/integracoes/microsoft" component={MicrosoftIntegration} /> */}
-        </>
-      )}
-      <Route component={NotFound} />
-    </Switch>
+        <Route component={NotFound} />
+      </Switch>
+    );
+  }
+
+  return (
+    <MainLayout>
+      <Switch>
+        {/* Dashboard - shows different page based on role */}
+        <Route path="/" component={isAdmin ? AdminDashboard : Dashboard} />
+        
+        {/* Entidades routes */}
+        <Route path="/entidades" component={Entidades} />
+        <Route path="/entidades/nova" component={EntidadeForm} />
+        <Route path="/entidades/:id/editar" component={EntidadeForm} />
+        <Route path="/entidades/:id" component={EntidadeDetail} />
+        
+        {/* Gabinetes routes (backward compatibility) */}
+        <Route path="/gabinetes" component={Gabinetes} />
+        <Route path="/gabinetes/novo" component={GabineteForm} />
+        <Route path="/gabinetes/:id" component={GabineteForm} />
+        
+        {/* Contactos routes */}
+        <Route path="/contactos" component={Contactos} />
+        <Route path="/contactos/novo" component={ContactoForm} />
+        <Route path="/contactos/:id/detalhes" component={ContactoDetail} />
+        <Route path="/contactos/:id" component={ContactoForm} />
+        
+        {/* Visitas routes */}
+        <Route path="/visitas" component={Visitas} />
+        <Route path="/visitas/nova" component={VisitaForm} />
+        <Route path="/visitas/:id" component={VisitaDetail} />
+        
+        {/* Tarefas routes */}
+        <Route path="/tarefas" component={Tarefas} />
+        <Route path="/tarefas/nova" component={TarefaForm} />
+        <Route path="/tarefas/:id" component={TarefaDetail} />
+        <Route path="/tarefas/:id/editar" component={TarefaForm} />
+        
+        {/* Lembretes and Analytics */}
+        <Route path="/lembretes" component={Lembretes} />
+        <Route path="/analytics" component={Analytics} />
+        
+        {/* QR Scanner */}
+        <Route path="/qr" component={QRScanner} />
+        <Route path="/qr-scanner" component={QRScanner} />
+        
+        {/* Admin routes */}
+        {isAdmin && (
+          <>
+            <Route path="/admin/empresa" component={() => <AdminRoute component={AdminEmpresa} />} />
+            <Route path="/admin/utilizadores" component={() => <AdminRoute component={AdminUsers} />} />
+            <Route path="/admin/marcas" component={() => <AdminRoute component={AdminMarcas} />} />
+          </>
+        )}
+        
+        <Route component={NotFound} />
+      </Switch>
+    </MainLayout>
   );
 }
 
@@ -168,26 +188,10 @@ function AppContent() {
   }, [isOnline, isAuthenticated]);
 
   return (
-    <div className="relative">
-      {/* FASE 5: App header with logo */}
-      {isAuthenticated && empresa?.logoUrl && (
-        <header className="sticky top-0 z-20 bg-background border-b border-border px-4 py-2">
-          <div className="flex items-center justify-center h-12">
-            <img 
-              src={empresa.logoUrl} 
-              alt={empresa.nome} 
-              className="h-full max-h-12 object-contain"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-              }}
-            />
-          </div>
-        </header>
-      )}
+    <>
       <Router />
-      {isAuthenticated && <BottomNav />}
       {isAuthenticated && <SyncIndicator />}
-    </div>
+    </>
   );
 }
 

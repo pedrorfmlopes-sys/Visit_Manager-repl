@@ -1,0 +1,79 @@
+FASE 10 – Layouts e navegação por role (agent vs admin)
+
+Contexto:
+
+A app Visit Manager já é multi-empresa e multi-utilizador.
+
+Temos user.role ("admin" / "agent") e empresa.theme ("light-business" / "dark-pro").
+
+A FASE 9 já está feita: o tema visual muda com base em empresa.theme.
+
+Objetivo desta fase:
+
+Criar um sistema de layouts no frontend que adapta a navegação ao user.role.
+
+Manter toda a lógica de auth, empresas e visitas tal como está, sem partir nada.
+
+Requisitos:
+
+Criar um componente de layout principal (ex.: AppShell ou MainLayout) na pasta mais adequada (client/src/components ou client/src/layouts):
+
+Usa useAuth() para obter user e empresa.
+
+Se user.role === "agent": renderiza um layout mobile-first com:
+
+Header simples (título da página / logo pequeno).
+
+Bottom navigation (reutilizar o BottomNav atual se existir, ou criar um novo) com 3–4 tabs: Dashboard, Visitas, Tarefas, Perfil.
+
+Se user.role === "admin": renderiza um layout com:
+
+Sidebar à esquerda com links para: Dashboard, Visitas, Tarefas, Entidades, Admin (Utilizadores/Empresa/Marcas).
+
+Zona central para o conteúdo da página.
+
+O layout deve respeitar o sistema de temas já implementado (usar classes genéricas tipo vm-card, cores base do index.css, etc.).
+
+Integrar o novo layout com o router:
+
+Ajustar App.tsx (ou o ficheiro onde as rotas estão definidas) para que:
+
+As rotas protegidas (Dashboard, Visitas, Tarefas, Entidades, Admin) sejam renderizadas dentro do AppShell.
+
+O login/registro continua fora do layout principal (e sem sidebar/bottom nav).
+
+Garantir que a proteção de rotas (RequireAuth, RequireAdmin ou equivalente) continua a funcionar.
+
+Criar um dashboard simples para o admin:
+
+Na página de Dashboard (ou criar uma DashboardAdminPage se fizer sentido), mostrar:
+
+Nº de visitas de hoje e desta semana (pode usar endpoint existente de listagem + contagens em frontend).
+
+Nº de tarefas por concluir e em atraso.
+
+Lista das últimas X visitas (por exemplo, 5–10) com data, entidade e utilizador.
+
+O dashboard deve ser visualmente coerente com o tema (usar cartões com vm-card, títulos, textos muted, etc.).
+
+Manter compatibilidade:
+
+Não remover nem alterar endpoints backend.
+
+Não mexer na lógica de multi-empresa; apenas consumir os dados que já existem.
+
+Evitar grandes refactors: criar os layouts por cima da estrutura atual, com as mínimas alterações possíveis.
+
+Entregáveis esperados:
+
+Novos componentes de layout (para agent e admin).
+
+Atualização das rotas para usar o layout.
+
+Dashboard funcional para admin com dados reais.
+
+Testado manualmente:
+
+Login como agent → ver layout com bottom nav.
+
+Login como admin → ver layout com sidebar e dashboard.
