@@ -1,7 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
-import { Building2, Users, FileText, CheckCircle2, Calendar, AlertCircle } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Building2, Users, FileText, CheckCircle2, Calendar, AlertCircle, Zap } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { format, startOfWeek, endOfWeek } from "date-fns";
 import { pt } from "date-fns/locale";
 import type { VisitaWithRelations, Tarefa } from "@shared/schema";
@@ -16,6 +19,11 @@ interface DashboardStats {
 }
 
 export default function AdminDashboard() {
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const isDev = import.meta.env.DEV;
+
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard"],
   });
@@ -26,6 +34,34 @@ export default function AdminDashboard() {
 
   const { data: tarefas, isLoading: tarefasLoading } = useQuery<Tarefa[]>({
     queryKey: ["/api/tarefas"],
+  });
+
+  const toggleRoleMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/dev/toggle-role", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to toggle role");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Sucesso",
+        description: `Role alterado para: ${data.role}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 500);
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Falha ao mudar role. Apenas disponível em desenvolvimento.",
+        variant: "destructive",
+      });
+    },
   });
 
   // Calculate stats from data
@@ -51,9 +87,24 @@ export default function AdminDashboard() {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Dashboard Admin</h1>
-        <p className="text-muted-foreground mt-1">Visão geral da empresa</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Dashboard Admin</h1>
+          <p className="text-muted-foreground mt-1">Visão geral da empresa</p>
+        </div>
+        {isDev && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => toggleRoleMutation.mutate()}
+            disabled={toggleRoleMutation.isPending}
+            data-testid="button-toggle-role-admin"
+            className="flex items-center gap-2"
+          >
+            <Zap className="h-4 w-4" />
+            {toggleRoleMutation.isPending ? "..." : `Dev: Mudar para ${user?.role === "admin" ? "agent" : "admin"}`}
+          </Button>
+        )}
       </div>
 
       {/* KPIs */}
