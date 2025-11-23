@@ -11,7 +11,8 @@ interface FABPosition {
 const DEFAULT_POSITION: FABPosition = { x: 16, y: 96 };
 const FAB_STORAGE_KEY = "fab-position";
 const FAB_SIZE = 56;
-const GAP = 24; // Gap between buttons
+const GAP_DOWN = 12; // Gap when menu opens downwards (top position)
+const GAP_UP = 24; // Gap when menu opens upwards (bottom position)
 
 export function FABMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -37,7 +38,7 @@ export function FABMenu() {
 
   // Determine if menu should open upwards
   useEffect(() => {
-    const totalMenuHeight = 56 * 5 + GAP * 4;
+    const totalMenuHeight = 56 * 5 + GAP_UP * 4;
     setShouldOpenUp(position.y + totalMenuHeight > window.innerHeight);
   }, [position]);
 
@@ -106,19 +107,20 @@ export function FABMenu() {
     setLocation(action);
   };
 
-  // Calculate menu item position
+  // Calculate menu item position with dynamic gap
   const getMenuItemStyle = (index: number) => {
-    const itemOffset = index * (56 + GAP); // button height + gap
+    const gap = shouldOpenUp ? GAP_UP : GAP_DOWN;
+    const itemOffset = index * (56 + gap); // button height + gap
     if (shouldOpenUp) {
       // Menu opens upwards - items positioned above the main button
       return {
-        bottom: `${56 + GAP + itemOffset}px`,
+        bottom: `${56 + gap + itemOffset}px`,
         left: "0",
       };
     } else {
       // Menu opens downwards - items positioned below the main button
       return {
-        top: `${56 + GAP + itemOffset}px`,
+        top: `${56 + gap + itemOffset}px`,
         left: "0",
       };
     }
