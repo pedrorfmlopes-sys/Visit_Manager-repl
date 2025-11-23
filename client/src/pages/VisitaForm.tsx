@@ -151,6 +151,34 @@ export default function VisitaForm() {
       queryClient.invalidateQueries({ queryKey: ["/api/entidades"] });
       queryClient.refetchQueries({ queryKey: ["/api/entidades"] });
       
+      // FASE 7.2: Upload pending audio clips after visita is created
+      if (pendingClips.length > 0 && visitaData.id) {
+        try {
+          await Promise.all(
+            pendingClips.map(async (clip) => {
+              const clipFormData = new FormData();
+              clipFormData.append('audio', clip);
+              const response = await fetch(`/api/visitas/${visitaData.id}/audio`, {
+                method: 'POST',
+                credentials: 'include',
+                body: clipFormData,
+              });
+              if (!response.ok) throw new Error('Failed to upload audio');
+              return response.ok;
+            })
+          );
+          setPendingClips([]);
+          queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaData.id, "audio"] });
+        } catch (error) {
+          console.error("Failed to upload pending clips:", error);
+          toast({ 
+            title: "Atenção", 
+            description: "Visita criada mas alguns áudios não foram enviados.",
+            variant: "destructive"
+          });
+        }
+      }
+      
       // Create task if requested
       if (createTask && taskTitle) {
         if (!currentUser) {
@@ -297,37 +325,8 @@ export default function VisitaForm() {
       formData.append("media", file);
     });
     
-    // Hook into mutation to upload pending clips after visita is created
-    const originalMutate = createMutation.mutate;
-    createMutation.mutate(formData, {
-      onSuccess: async (visitaData) => {
-        // Upload pending audio clips if any
-        if (pendingClips.length > 0 && visitaData.id) {
-          try {
-            await Promise.all(
-              pendingClips.map(async (clip) => {
-                const formData = new FormData();
-                formData.append('audio', clip);
-                const response = await fetch(`/api/visitas/${visitaData.id}/audio`, {
-                  method: 'POST',
-                  credentials: 'include',
-                  body: formData,
-                });
-                return response.ok;
-              })
-            );
-            setPendingClips([]);
-          } catch (error) {
-            console.error("Failed to upload pending clips:", error);
-            toast({ 
-              title: "Atenção", 
-              description: "Visita criada mas alguns áudios não foram enviados.",
-              variant: "destructive"
-            });
-          }
-        }
-      },
-    });
+    // Submit visita form - pending clips will be uploaded in onSuccess handler
+    createMutation.mutate(formData);
   };
 
   const handleAudioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
