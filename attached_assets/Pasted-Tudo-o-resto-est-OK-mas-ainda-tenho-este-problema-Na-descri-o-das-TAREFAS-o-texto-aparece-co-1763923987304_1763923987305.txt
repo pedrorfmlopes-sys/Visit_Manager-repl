@@ -1,0 +1,121 @@
+Tudo o resto está OK, mas ainda tenho este problema:
+
+Na descrição das TAREFAS, o texto aparece como HTML literal, por exemplo:
+  <p> Visita Teste01</>
+
+Ou seja:
+- A descrição está a ser guardada como HTML (o que é esperado).
+- Mas no frontend está a ser mostrada como texto puro, sem ser interpretado/renderizado.
+
+Quero que corrijas isto usando o mesmo padrão que já temos para as notas das visitas e/ou o componente RichTextViewer.
+
+1) Verificar onde a descrição da tarefa é renderizada
+
+No frontend (client/src), procura por:
+- `tarefa.descricao`
+- ou `task.descricao`
+
+Provavelmente em ficheiros como:
+- `client/src/pages/Tarefas*.tsx`
+- `client/src/components/TaskCard.tsx` / `TarefaCard.tsx` / `TasksList.tsx`
+
+Deve haver algo do género:
+
+  <p className="...">
+    {tarefa.descricao}
+  </p>
+
+Isso é o que faz aparecer `<p> Visita Teste01</>` como texto literal.
+
+2) Usar RichTextViewer (ou a mesma abordagem de VisitaDetail)
+
+Já vi que existe `client/src/components/RichTextViewer.tsx` e que já o melhoraste.
+
+Quero que, em TODOS os sítios onde a descrição da tarefa é mostrada, faças:
+
+- Em vez de `<p>{tarefa.descricao}</p>` ou semelhante,
+- Usar o componente:
+
+  `<RichTextViewer content={tarefa.descricao || ""} />`
+
+Desde que este componente:
+
+- Use DOMPurify.sanitize internamente
+- Faça `dangerouslySetInnerHTML`
+- Tenha classes parecidas com as notas da visita, tipo:
+
+  `className="prose prose-sm dark:prose-invert max-w-none text-sm"`
+
+Se o RichTextViewer ainda NÃO estiver a usar DOMPurify + dangerouslySetInnerHTML, então:
+
+3) Ajustar o próprio RichTextViewer (se necessário)
+
+No ficheiro `client/src/components/RichTextViewer.tsx`:
+
+- Garante que:
+
+  - Se `content` tiver `<` → tratar como HTML:
+    - Sanitizar com DOMPurify.sanitize(content).
+    - Renderizar com `dangerouslySetInnerHTML`.
+  - Se NÃO tiver `<` → tratar como texto plano:
+    - `<p className="text-sm text-foreground whitespace-pre-wrap">{content}</p>`.
+
+Exemplo de intenção (podes adaptar ao código atual):
+
+  if (!content) return null;
+
+  if (content.includes("<")) {
+    const safe = DOMPurify.sanitize(content);
+    return (
+      <div
+        className="prose prose-sm dark:prose-invert max-w-none text-sm"
+        dangerouslySetInnerHTML={{ __html: safe }}
+      />
+    );
+  }
+
+  return (
+    <p className="text-sm text-foreground whitespace-pre-wrap">
+      {content}
+    </p>
+  );
+
+4) Aplicar isto especificamente às TAREFAS
+
+Depois de ajustares o RichTextViewer (se for preciso), assegura-te de que:
+
+- Lista de tarefas usa `<RichTextViewer content={tarefa.descricao} />`
+- Detalhe de tarefa (se existir página própria) também usa RichTextViewer.
+
+Nenhum componente deve mostrar mais `{tarefa.descricao}` diretamente em `<p>`.
+
+5) Testes que quero que faças TU
+
+Aí mesmo no container:
+
+A) Criar uma tarefa nova com descrição multi-linha, por exemplo:
+
+  "Pontos da visita:
+  - Rever proposta
+  - Confirmar datas
+  - Marcar próxima reunião"
+
+B) Ver na LISTA de tarefas:
+  - Tem de aparecer legível (sem mostrar `<p>`).
+  - Se houver truncagem, pelo menos sem HTML à vista.
+
+C) Ver no DETALHE da tarefa (se existir):
+  - Descrição com quebras de linha corretas.
+  - Se estiver em HTML, renderizada como tal (bold, listas, etc.).
+
+6) IMPORTANTE – NÃO ALTERAR:
+
+- Nada de multi-empresa.
+- Nada de backoffice (empresa, utilizadores, marcas).
+- Nada de visitas, marcas, áudio, notas ricas.
+- Só a forma como a descrição da tarefa é RENDERIZADA no frontend.
+
+No final:
+
+- Diz-me quais componentes mexeste (ex.: TaskCard, TarefasList, etc.).
+- Confirma que conseguiste ver uma descrição tipo `<p> Visita Teste01</>` a aparecer formatada corretamente (sem tags) depois da correção.
