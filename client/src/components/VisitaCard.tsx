@@ -34,7 +34,7 @@ export function VisitaCard({ visita, onClick }: VisitaCardProps) {
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 mb-2">
             <h3 className="font-medium text-base text-foreground" data-testid={`text-visita-gabinete-${visita.id}`}>
-              {visita.gabinete?.nome || "Gabinete desconhecido"}
+              {visita.entidade?.nome || "Entidade desconhecida"}
             </h3>
             <Badge variant="secondary" className="text-xs whitespace-nowrap">
               {dataFormatada}

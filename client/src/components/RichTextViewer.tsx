@@ -14,7 +14,7 @@ export function RichTextViewer({ content, className = '' }: RichTextViewerProps)
 
   return (
     <div
-      className={`prose prose-sm max-w-none ${className}`}
+      className={`prose prose-sm dark:prose-invert max-w-none ${className}`}
       dangerouslySetInnerHTML={{ __html: sanitizedContent }}
       data-testid="rich-text-content"
     />

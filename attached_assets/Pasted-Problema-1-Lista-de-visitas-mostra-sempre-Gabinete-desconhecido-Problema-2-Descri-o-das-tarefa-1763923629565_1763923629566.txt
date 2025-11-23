@@ -1,0 +1,157 @@
+Problema 1: Lista de visitas mostra sempre "Gabinete desconhecido"
+Problema 2: Descrição das tarefas não aparece formatada corretamente
+
+Desde as últimas fases (multi-empresa, marcas, editor rico, etc.):
+
+- Consigo CRIAR visitas e tarefas sem erro ✅
+- Mas na LISTA de VISITAS:
+  - Em vez de ver "Entidade – Contacto" ou algo semelhante, vejo só "Gabinete desconhecido".
+- Na LISTA/DETALHE das TAREFAS:
+  - O texto da descrição não aparece bem formatado (perde quebras de linha ou mostra texto “feio”).
+
+Quero que corrijas isto **sem mexer em nada do resto** (multi-empresa, áudio, editor rico, etc.).
+
+
+1) VISITAS – "Gabinete desconhecido" na lista
+
+Passos que quero que sigas:
+
+a) FRONTEND – descobrir onde essa string é usada
+
+- Procura por "Gabinete desconhecido" no frontend (client/src):
+  - Deve estar em algum componente como:
+    - VisitaCard.tsx
+    - VisitasList.tsx
+    - ou semelhante.
+- Vê qual é a lógica atual:
+  - Algo do género:
+    - `visita.entidade?.nome ?? "Gabinete desconhecido"`
+    - ou usa `visita.entidadeNome` / `visita.contactoNome` com fallback.
+
+b) BACKEND – garantir que getVisitas devolve entidade/contacto
+
+- Abre `server/storage.ts` e encontra `getVisitas(...)`.
+- Quero que confirmes que, para cada visita, estás a carregar também:
+  - a ENTIDADE associada
+  - e, se existir, o CONTACTO associado
+
+Este método deve:
+
+- Filtrar por empresaId (multi-tenant) como já fazes.
+- Fazer o `select`/`innerJoin`/`with` correto para incluir os dados necessários para a lista:
+  - nome da entidade
+  - nome do contacto
+
+Exemplo do que quero (em termos de intenção):
+
+- Para Drizzle:
+  - `await db.select().from(visitas).leftJoin(entidades, ...).leftJoin(contactos, ...)`
+  - ou usar `.with: { entidade: true, contacto: true }`, dependendo de como está o schema.
+
+Garante que:
+
+- O objeto `visita` que é devolvido pelo backend para o frontend tem o que o componente espera:
+  - Se o componente usa `visita.entidade?.nome`, então `getVisitas` tem de devolver `entidade` aninhada.
+  - Se usa `visita.entidadeNome`, então o select tem de construir esse campo.
+
+c) MULTI-EMPRESA – cuidar dos joins
+
+Como agora temos multi-empresa:
+
+- Garante que os joins entre visitas, entidades e contactos respeitam empresaId:
+  - visitas.empresaId = empresaId
+  - entidades.empresaId = empresaId
+  - contactos.empresaId = empresaId
+
+Se o join estiver só por id e a empresaId não alinhar, pode regressar `null` e o frontend cai no fallback "Gabinete desconhecido".
+
+d) TESTES que quero que faças TU
+
+Depois da correção:
+
+- Cria uma nova ENTIDADE “Cliente Teste Marca X”.
+- Cria um CONTACTO “João Silva” associado a essa entidade.
+- Cria uma VISITA associada a essa entidade/contacto.
+- Abre a lista de visitas:
+  - Quero ver algo do género:
+    - "Cliente Teste Marca X – João Silva"
+    - NOT "Gabinete desconhecido".
+
+Se o componente usar outro formato (ex.: só o nome da entidade), está ok – o importante é deixar de ver o fallback “Gabinete desconhecido” quando há entidade/contacto.
+
+
+2) TAREFAS – descrição não formatada
+
+Sintoma:
+- Texto das descrições de tarefas está “feio”:
+  - pode estar a ignorar quebras de linha,
+  - ou a mostrar HTML bruto,
+  - ou a cortar demasiado.
+
+Quero que faças:
+
+a) Ver onde a descrição é mostrada
+
+- Procura no frontend (client/src) pelos componentes que mostram tarefas:
+  - TarefasList.tsx, TarefaCard.tsx, TaskListPage.tsx, etc.
+- Vê como estão a renderizar `tarefa.descricao`:
+  - `<p className="...">{tarefa.descricao}</p>` ?
+  - Sem `whitespace-pre-wrap`?
+  - Ou diretamente o texto sem tratar HTML?
+
+b) Alinhar comportamento com Notas da Visita (onde já está correto)
+
+Nas notas da visita, já temos esta lógica:
+
+- Se `notas` contém `<`:
+  - usa `DOMPurify.sanitize()` + `dangerouslySetInnerHTML` + classe `prose`.
+- Se não contém `<`:
+  - renderiza como `<p className="whitespace-pre-wrap">`.
+
+Quero uma lógica semelhante para a descrição das tarefas:
+
+- Se `tarefa.descricao` contiver `<` (HTML):
+  - renderizar com `DOMPurify.sanitize(tarefa.descricao)` + `dangerouslySetInnerHTML`.
+  - usar uma classe tipo `prose prose-sm dark:prose-invert max-w-none text-sm` ou equivalente.
+- Se for texto simples:
+  - usar `<p className="text-sm text-foreground whitespace-pre-wrap">` para manter as quebras de linha.
+
+Isto deve ser aplicado:
+- Pelo menos no detalhe da tarefa (se houver página).
+- E, se fizer sentido, também na lista (mesmo que seja truncada com 1–2 linhas).
+
+c) TESTES que quero que faças
+
+- Cria uma tarefa com descrição multi-linha, por exemplo:
+
+  "Pontos a tratar:
+  - Rever propostas
+  - Confirmar datas
+  - Enviar email follow-up"
+
+- Vê como aparece:
+  - Lista das tarefas → deve mostrar as quebras de linha ou uma versão legível (truncada bem).
+  - Detalhe da tarefa → deve mostrar a descrição com as linhas e bullets visíveis, sem HTML cru.
+
+d) NÃO MEXER em:
+
+- Multi-empresa (empresaId).
+- Backoffice (empresa, utilizadores, marcas).
+- Áudio / transcrição.
+- Editor rico de notas das visitas.
+- MarcasIds nas visitas (dropdown de marcas).
+- Criação de visitas/tarefas (já está a gravar).
+
+Só quero:
+
+- Lista de visitas a mostrar corretamente entidade/contacto (sem "Gabinete desconhecido" quando há dados).
+- Descrição das tarefas a ser rendida de forma legível e formatada (respeitar HTML ou quebras de linha).
+
+No final:
+
+- Diz exatamente:
+  - Que ficheiros/components alteraste no frontend.
+  - Que ajustes fizeste em `getVisitas` em storage (se mexeste lá).
+- Confirma que:
+  - Conseguiste TU criar uma visita com entidade+contacto e ver o nome certo na lista.
+  - Conseguiste TU criar tarefa com descrição multi-linha e ver a formatação correta.
