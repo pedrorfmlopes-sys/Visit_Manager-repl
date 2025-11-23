@@ -1366,7 +1366,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create visita - FASE 2: auto-set empresaId
-      const visita = await storage.createVisita({ ...visitaData, empresaId });
+      const visita = await storage.createVisita(visitaData, empresaId);
 
       // FASE 5: Add marcas to visita if provided
       if (req.body.marcasIds) {
