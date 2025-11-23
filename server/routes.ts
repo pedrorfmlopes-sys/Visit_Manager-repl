@@ -319,6 +319,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Dev endpoint: Toggle role between admin and agent (FASE 12 - for testing)
+  app.post('/api/dev/toggle-role', isAuthenticated, async (req: any, res) => {
+    if (process.env.NODE_ENV !== 'development') {
+      return res.status(403).json({ message: "Only available in development" });
+    }
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const newRole = user.role === 'admin' ? 'agent' : 'admin';
+      await db.update(require('./db').users).set({ role: newRole }).where(eq(require('./db').users.id, userId));
+      
+      const updatedUser = await storage.getUser(userId);
+      res.json({ 
+        message: `Role toggled to ${newRole}`,
+        role: updatedUser?.role 
+      });
+    } catch (error) {
+      console.error("Error toggling role:", error);
+      res.status(500).json({ message: "Failed to toggle role" });
+    }
+  });
+
   // Get all users (for admin dropdown)
   app.get('/api/users', isAuthenticated, async (req: any, res) => {
     try {
