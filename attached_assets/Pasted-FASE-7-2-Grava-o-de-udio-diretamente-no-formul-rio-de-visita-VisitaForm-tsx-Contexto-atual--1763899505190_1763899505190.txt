@@ -1,0 +1,183 @@
+FASE 7.2 – Gravação de áudio diretamente no formulário de visita (VisitaForm.tsx)
+
+Contexto atual (NÃO ALTERAR):
+- Backend:
+  - Tabela VISITAS_AUDIO já existe.
+  - Endpoints de áudio já estão implementados e a funcionar:
+    - POST   /api/visitas/:id/audio
+    - GET    /api/visitas/:id/audio
+    - DELETE /api/visitas/:id/audio/:audioId
+    - POST   /api/visitas/:id/audio/:audioId/transcrever
+- Frontend:
+  - VisitaDetail.tsx (FASE 7.1) já tem:
+    - Lista de áudios
+    - Botões Ouvir / Transcrever / Apagar
+    - E AGORA também tem:
+      - Botão “Gravar” com MediaRecorder
+      - startRecording / stopRecording / uploadRecordedAudio()
+      - Contador de tempo, estados, toasts, etc.
+  - VisitaForm.tsx:
+    - Já tem secção “Áudio da Visita” com upload manual de ficheiro (input file) que envia para os endpoints de áudio depois da visita existir.
+
+IMPORTANTE:
+- NÃO mexer em:
+  - server/*
+  - endpoints de áudio
+  - VisitaDetail.tsx (já está ok)
+- Nesta FASE 7.2 quero alterações **apenas em client/src/pages/VisitaForm.tsx**.
+
+=========================================
+OBJETIVO DA FASE 7.2
+=========================================
+
+Adicionar gravação de áudio com MediaRecorder também no formulário da visita (VisitaForm.tsx), com este comportamento:
+
+1) **Nova visita**:
+   - O utilizador ainda NÃO tem visitaId.
+   - Quero poder gravar UM OU VÁRIOS clips de áudio ANTES de criar a visita.
+   - Esses clips ficam guardados em memória (estado local).
+   - Quando a visita for criada com sucesso (POST /api/visitas), quero que:
+     - para cada clip gravado em memória,
+       - seja feito um POST /api/visitas/:id/audio,
+       - exatamente como já se faz para upload de ficheiros.
+
+2) **Editar visita existente**:
+   - Aqui já temos visitaId.
+   - Quero poder gravar clips e enviá-los imediatamente para o backend, tal como o comportamento em VisitaDetail.tsx (não é preciso manter em memória até guardar a visita).
+   - Ou seja:
+     - gravar → parar → enviar direto para POST /api/visitas/:id/audio → refetch da lista de áudios (se estiver a ser mostrada no form).
+
+=========================================
+DETALHE DA IMPLEMENTAÇÃO EM VisitaForm.tsx
+=========================================
+
+1) Secção “Áudio da Visita” no formulário:
+
+Na mesma secção onde já tens:
+- o input de upload de ficheiro(s) áudio,
+
+adicionar:
+
+- Um botão com ícone de microfone, por exemplo:
+  - “Gravar áudio”
+- Um pequeno bloco de UI para:
+  - mostrar o estado de gravação (“A gravar… X segundos”),
+  - listar os clips gravados **nesta sessão**, se estivermos em modo “nova visita”.
+
+2) Estados e Refs (pode ser semelhante ao VisitaDetail.tsx):
+
+No componente VisitaForm, adicionar algo do género:
+
+- `const [isRecording, setIsRecording] = useState(false);`
+- `const [recordingTime, setRecordingTime] = useState(0);`
+- `const [pendingClips, setPendingClips] = useState<File[]>([]);`  // para nova visita
+- `const mediaRecorderRef = useRef<MediaRecorder | null>(null);`
+- `const audioChunksRef = useRef<Blob[]>([]);`
+- `const [supportsRecording, setSupportsRecording] = useState(true);`
+
+Feature detection:
+- Tal como em VisitaDetail, detetar se:
+  - `navigator.mediaDevices` e `window.MediaRecorder` existem.
+- Se não houver suporte:
+  - desativar/esconder o botão “Gravar áudio”
+  - mostrar nota tipo “Gravação de áudio não suportada neste dispositivo”.
+
+3) Funções de gravação:
+
+Reutilizar o MESMO padrão de VisitaDetail.tsx, adaptando o comportamento:
+
+- `async function startRecording() { ... }`
+  - Pede permissão de microfone com `navigator.mediaDevices.getUserMedia({ audio: true })`.
+  - Cria MediaRecorder, guarda em `mediaRecorderRef.current`.
+  - Limpa `audioChunksRef.current = []`.
+  - `mediaRecorder.ondataavailable` → push para `audioChunksRef.current`.
+  - `mediaRecorder.onstop`:
+    - cria `const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });`
+    - cria `const file = new File([blob], 'visita-audio-<timestamp>.webm', { type: 'audio/webm' });`
+    - **A partir daqui o comportamento diverge:**
+      - se for NOVA visita (ainda sem visitaId) → adicionar este file ao array de `pendingClips`.
+      - se for EDIÇÃO (já temos visitaId) → upload direto para `/api/visitas/:id/audio`.
+- `function stopRecording()`:
+  - faz `mediaRecorderRef.current?.stop()`
+  - pára contador.
+- Contador:
+  - usar `setInterval` / `setTimeout` ou `requestAnimationFrame` simples.
+  - Não precisa ser ultra preciso, só visual.
+
+Como distinguir “nova visita” de “editar visita”?
+- Usar a mesma lógica que já existe no VisitaForm (normalmente:
+  - se tem id na URL → edição,
+  - se não tem → criação).
+- Se o componente já tem esse estado (por ex. `isEditMode` ou presença de `initialData`), reutilizar.
+
+4) Tratamento no submit da visita:
+
+- O comportamento atual do submit (create/update visita) deve ser mantido.
+- Para **NOVA visita**:
+  - Depois de receber a resposta do POST /api/visitas (com o id da nova visita), acrescentar um passo:
+    - Se `pendingClips.length > 0`:
+      - para cada File em `pendingClips`:
+        - construir um `FormData()`,
+        - `formData.append('file', clipFile)`,
+        - fazer `fetch(POST /api/visitas/:id/audio, { method: 'POST', body: formData, credentials: 'include' })`.
+      - Opcional: podes fazer isto com `Promise.all`.
+    - Se algum upload falhar:
+      - não anular a criação da visita (a visita já está guardada).
+      - mostrar toast tipo “Visita criada, mas alguns áudios não foram enviados.”
+    - Se todos forem bem-sucedidos:
+      - toast tipo “Visita criada com sucesso (incluindo áudios).”
+  - No final, limpar `pendingClips`.
+
+- Para **EDIÇÃO de visita**:
+  - Os clips não precisam de ir para `pendingClips`.
+  - Ao terminar uma gravação em modo edição:
+    - fazer upload direto para `/api/visitas/:id/audio`,
+    - tal como já se faz em VisitaDetail.tsx,
+    - e, se o formulário mostrar a lista de áudios, fazer refetch.
+
+5) UI para os clips pendentes (nova visita):
+
+Na secção de “Áudio da Visita” em VisitaForm, quando for nova visita:
+
+- Mostrar uma lista dos clips gravados nesta sessão:
+  - Nome (ou “Clip 1”, “Clip 2”, etc.)
+  - Duração aproximada (se guardares).
+  - Botão “Ouvir”:
+    - usar `URL.createObjectURL(file)` para preview local.
+  - Botão “Remover” que tira o clip do array `pendingClips`.
+
+Em modo edição:
+- Podes simplesmente:
+  - não usar `pendingClips` (porque vais fazer upload imediato),
+  - ou só listares áudios vindos do backend (se essa parte já existir).
+
+=========================================
+REQUISITOS FINAIS
+=========================================
+
+No fim da FASE 7.2 quero:
+
+1) Código alterado apenas em client/src/pages/VisitaForm.tsx.
+2) Build a passar:
+   - `npm run build` sem erros.
+3) Fluxo a funcionar assim:
+   - Nova visita:
+     - Gravo 1–2 clips.
+     - Submeto a visita.
+     - Visita é criada.
+     - Clips são enviados automaticamente para /api/visitas/:id/audio.
+   - Edição de visita:
+     - Gravo um clip.
+     - Ao parar, o áudio é enviado de imediato para /api/visitas/:id/audio.
+4) Detecção de suporte de MediaRecorder:
+   - Se não suportado, botão desativado ou escondido.
+5) Erros de permissão de microfone tratados com mensagens amigáveis.
+
+No final, por favor:
+- Mostra o trecho relevante de VisitaForm.tsx com:
+  - estados e refs novos,
+  - funções startRecording/stopRecording,
+  - UI da secção “Áudio da Visita”.
+- Confirma explicitamente que:
+  - `npm run build` passou,
+  - a app arranca e o formulário de visita abre sem quebrar.

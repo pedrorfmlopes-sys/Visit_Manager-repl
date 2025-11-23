@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { ArrowLeft, Loader2, Calendar as CalendarIcon, Upload, X, WifiOff, Plus } from "lucide-react";
+import { ArrowLeft, Loader2, Calendar as CalendarIcon, Upload, X, WifiOff, Plus, Mic, Volume2, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,19 @@ export default function VisitaForm() {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const { location: gpsLocation, error: gpsError, isLoading: gpsLoading, requestLocation } = useGeolocation(true);
+  
+  // FASE 7.2: Audio recording
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [pendingClips, setPendingClips] = useState<File[]>([]);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [supportsRecording, setSupportsRecording] = useState(
+    typeof navigator !== 'undefined' && 
+    (navigator.mediaDevices?.getUserMedia !== undefined || (navigator as any).getUserMedia !== undefined) &&
+    typeof MediaRecorder !== 'undefined'
+  );
   
   // Task creation state
   const [createTask, setCreateTask] = useState(false);
@@ -269,7 +282,37 @@ export default function VisitaForm() {
       formData.append("media", file);
     });
     
-    createMutation.mutate(formData);
+    // Hook into mutation to upload pending clips after visita is created
+    const originalMutate = createMutation.mutate;
+    createMutation.mutate(formData, {
+      onSuccess: async (visitaData) => {
+        // Upload pending audio clips if any
+        if (pendingClips.length > 0 && visitaData.id) {
+          try {
+            await Promise.all(
+              pendingClips.map(async (clip) => {
+                const formData = new FormData();
+                formData.append('audio', clip);
+                const response = await fetch(`/api/visitas/${visitaData.id}/audio`, {
+                  method: 'POST',
+                  credentials: 'include',
+                  body: formData,
+                });
+                return response.ok;
+              })
+            );
+            setPendingClips([]);
+          } catch (error) {
+            console.error("Failed to upload pending clips:", error);
+            toast({ 
+              title: "Atenção", 
+              description: "Visita criada mas alguns áudios não foram enviados.",
+              variant: "destructive"
+            });
+          }
+        }
+      },
+    });
   };
 
   const handleAudioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -282,6 +325,79 @@ export default function VisitaForm() {
   const handleMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     setMediaFiles(prev => [...prev, ...files].slice(0, 5));
+  };
+
+  // FASE 7.2: Recording functions
+  const uploadRecordedAudio = async (blob: Blob, visitaId?: string) => {
+    try {
+      const file = new File([blob], `visita-audio-${Date.now()}.webm`, { type: 'audio/webm' });
+      
+      if (!visitaId) {
+        // Nova visita - guardar em pendingClips
+        setPendingClips(prev => [...prev, file]);
+        toast({ title: "Áudio gravado", description: "Será enviado quando criares a visita." });
+        return;
+      }
+      
+      // Edição - enviar imediato
+      const formData = new FormData();
+      formData.append('audio', file);
+      
+      const response = await fetch(`/api/visitas/${visitaId}/audio`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      
+      if (!response.ok) throw new Error('Failed to upload audio');
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId, "audio"] });
+      toast({ title: "Sucesso", description: "Áudio gravado e enviado!" });
+    } catch (error) {
+      toast({ title: "Erro", description: "Falha ao enviar áudio.", variant: "destructive" });
+    }
+  };
+
+  const startRecording = async () => {
+    if (!supportsRecording) {
+      toast({ title: "Erro", description: "Gravação de áudio não suportada neste dispositivo.", variant: "destructive" });
+      return;
+    }
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      
+      mediaRecorder.ondataavailable = (e) => {
+        audioChunksRef.current.push(e.data);
+      };
+      
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        stream.getTracks().forEach(track => track.stop());
+        await uploadRecordedAudio(audioBlob);
+      };
+      
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      
+      if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime(t => t + 1);
+      }, 1000);
+    } catch (error) {
+      toast({ title: "Erro", description: "Permissão de microfone negada ou indisponível.", variant: "destructive" });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
+    }
   };
 
   return (
@@ -502,7 +618,29 @@ export default function VisitaForm() {
             )}
 
             <div className="space-y-2">
-              <FormLabel>Áudio da Visita</FormLabel>
+              <div className="flex items-center justify-between">
+                <FormLabel>Áudio da Visita</FormLabel>
+                {supportsRecording && (
+                  <Button
+                    type="button"
+                    variant={isRecording ? "destructive" : "outline"}
+                    size="sm"
+                    onClick={isRecording ? stopRecording : startRecording}
+                    data-testid="button-record-audio-form"
+                  >
+                    <Mic className="h-3 w-3 mr-1" />
+                    {isRecording ? `Parar (${recordingTime}s)` : "Gravar"}
+                  </Button>
+                )}
+              </div>
+              
+              {isRecording && (
+                <div className="p-3 bg-destructive/10 border border-destructive rounded-md flex items-center gap-2">
+                  <div className="h-2 w-2 bg-red-500 rounded-full animate-pulse" />
+                  <p className="text-sm text-destructive font-medium">A gravar... {recordingTime}s</p>
+                </div>
+              )}
+              
               <div className="flex items-center gap-2">
                 <Input
                   type="file"
@@ -526,6 +664,31 @@ export default function VisitaForm() {
                   </Button>
                 </div>
               )}
+              
+              {pendingClips.length > 0 && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
+                  <p className="text-xs font-medium mb-2 text-blue-900 dark:text-blue-100">Áudios gravados nesta sessão ({pendingClips.length}):</p>
+                  <div className="space-y-2">
+                    {pendingClips.map((clip, idx) => (
+                      <div key={idx} className="flex items-center gap-2 text-xs p-2 bg-background rounded">
+                        <Volume2 className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                        <span className="flex-1">{clip.name}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setPendingClips(prev => prev.filter((_, i) => i !== idx))}
+                          className="h-6 w-6"
+                          data-testid={`button-remove-clip-${idx}`}
+                        >
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
               <p className="text-xs text-muted-foreground">
                 A IA irá transcrever automaticamente o áudio
               </p>
