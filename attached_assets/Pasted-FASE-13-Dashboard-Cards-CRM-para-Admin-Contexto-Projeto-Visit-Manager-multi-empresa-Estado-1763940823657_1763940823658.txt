@@ -1,0 +1,186 @@
+FASE 13 – Dashboard “Cards CRM” para Admin
+
+Contexto:
+
+Projeto: Visit Manager multi-empresa.
+
+Estado atual:
+
+Tema por empresa (light-business / dark-pro) ✅
+
+Layout admin com sidebar (AdminSidebar) + AdminDashboard ✅
+
+Layout agent mobile com BottomNav + FAB (6 tabs + drag + localStorage) ✅
+
+Listas de visitas/tarefas com filtros avançados (agent e admin) ✅
+
+O AdminDashboard atual já mostra KPIs e listas, mas ainda não segue o conceito “Cards CRM”.
+
+Objetivo desta fase:
+
+Transformar o dashboard do admin numa home mais visual, organizada em cards, com:
+
+Card “Visitas desta semana”
+
+Card “Tarefas em atraso”
+
+Card “Clientes chave” (top entidades por nº de visitas)
+
+Os cards devem ser clicáveis e abrir as listas respetivas já com os filtros certos.
+
+Tarefas técnicas:
+
+Rever/Atualizar AdminDashboard para estrutura em cards
+
+Manter a página como ponto de entrada para user.role === "admin" (rota / para admin).
+
+Organizar o conteúdo em cards (estilo grid):
+
+Em desktop:
+
+2–3 cards por linha (responsivo).
+
+Em mobile:
+
+1 card por linha (stack vertical).
+
+Card “Visitas desta semana”
+
+Conteúdo:
+
+Título: “Visitas desta semana”.
+
+Número grande com total de visitas na semana corrente (segunda a domingo, por exemplo).
+
+Lista resumida (3–5 itens) das visitas mais recentes da semana:
+
+Data, Entidade, talvez utilizador/estado.
+
+Dados:
+
+Reutilizar o endpoint de listagem de visitas (GET /api/visitas) com filtros from/to para semana atual.
+
+Calcular as contagens no frontend com base no resultado.
+
+Interação:
+
+Ao clicar no card (ou num botão “Ver todas” dentro do card):
+
+Navegar para a página de Visitas respeitando os filtros da semana atual.
+
+Exemplo: usar query params (?from=...&to=...) que a página AdminVisitas já sabe interpretar.
+
+Card “Tarefas em atraso”
+
+Conteúdo:
+
+Título: “Tarefas em atraso”.
+
+Número grande com total de tarefas atrasadas:
+
+Critério: dueDate < hoje e não concluída (usa a lógica já existente de overdue / status).
+
+Lista resumida (3–5 tarefas) com título, entidade (se existir) e dueDate.
+
+Dados:
+
+Reutilizar GET /api/tarefas com os filtros já existentes:
+
+overdue ou combinação status=pending + comparação de datas.
+
+Calcular contagem no frontend.
+
+Interação:
+
+Ao clicar no card:
+
+Navegar para a página AdminTarefas com filtro de “Apenas em atraso” ativo
+(usando os mesmos query params que a Tarefas/AdminTarefas já utilizam).
+
+Card “Clientes chave”
+
+Conceito:
+
+“Clientes chave” = entidades com maior nº de visitas num certo período recente (ex.: últimos 30 dias).
+
+Conteúdo:
+
+Título: “Clientes chave (últimos 30 dias)”.
+
+Lista de 3–5 entidades com:
+
+Nome da entidade.
+
+Nº de visitas no período.
+
+Opcional: última data de visita.
+
+Dados:
+
+Carregar visitas dos últimos 30 dias via GET /api/visitas (from/to).
+
+No frontend, agrupar por entidadeId e ordenar pelo nº de visitas.
+
+Não criar endpoint novo se não for necessário – faz a agregação no frontend.
+
+Interação:
+
+Ao clicar num item da lista dentro do card:
+
+Navegar para:
+
+Página de Visitas filtrada por essa entidade (por ex.: query param entidadeId=),
+
+ou página de Entidades com pesquisa preenchida (o que for mais simples de implementar com o código atual).
+
+Visual dos cards e integração com tema
+
+Usar classes/helpers que já respeitam o tema (light-business/dark-pro), por exemplo:
+
+Fundo do card com a classe genérica que já existe para cartões (vm-card ou equivalente).
+
+Títulos com estilo consistente com o resto da app.
+
+Números grandes (KPI) destacados.
+
+Listas internas com texto muted e boa legibilidade em ambos os temas.
+
+Garantir que o AdminDashboard continua a funcionar bem tanto em light-business como em dark-pro.
+
+Testes esperados
+
+Login como admin:
+
+Ver AdminDashboard com pelo menos estes 3 cards:
+
+“Visitas desta semana”
+
+“Tarefas em atraso”
+
+“Clientes chave (últimos 30 dias)”
+
+Ver que:
+
+Os números e listas fazem sentido com os dados de teste.
+
+Clicar nos cards leva à página de listas correspondente com filtros aplicados.
+
+Login como agent:
+
+Não ver esta página de cards (continua a ver o layout de agent com dashboard “Hoje”, BottomNav e FAB).
+
+Restrições:
+
+Não criar endpoints de backend novos se for possível reutilizar /api/visitas e /api/tarefas.
+
+Não mexer na lógica de multi-empresa; todos os pedidos continuam a usar o contexto de empresa atual.
+
+Limitar alterações ao frontend (AdminDashboard + componentes auxiliares).
+
+No final, gera um resumo semelhante às fases anteriores com:
+
+Ficheiros modificados.
+
+Novos componentes criados (se existirem).
+
+Descrição curta de cada card e dos filtros que aplica ao navegar para as listas.

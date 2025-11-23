@@ -1,11 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Building2, Users, FileText, CheckCircle2, Calendar, AlertCircle, Zap } from "lucide-react";
+import { Building2, Users, FileText, CheckCircle2, Calendar, AlertCircle, Zap, TrendingUp, ArrowRight } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { format, startOfWeek, endOfWeek } from "date-fns";
+import { useLocation } from "wouter";
+import { format, startOfWeek, endOfWeek, subDays } from "date-fns";
 import { pt } from "date-fns/locale";
 import type { VisitaWithRelations, Tarefa } from "@shared/schema";
 
@@ -18,9 +19,17 @@ interface DashboardStats {
   proximasVisitas: VisitaWithRelations[];
 }
 
+interface KeyClient {
+  entidadeId: string;
+  nome: string;
+  visitCount: number;
+  lastVisitDate?: string;
+}
+
 export default function AdminDashboard() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const isDev = import.meta.env.DEV;
 
@@ -82,6 +91,60 @@ export default function AdminDashboard() {
   const tarefasEmAtraso = tarefas?.filter(t => {
     return t.status !== 'done' && (t.dueDate ? new Date(t.dueDate) < today : false);
   }).length || 0;
+
+  // Get visitas desta semana
+  const weekStart = startOfWeek(today, { locale: pt });
+  const weekEnd = endOfWeek(today, { locale: pt });
+  const visitasEsteSemanaSorted = visitas?.filter(v => {
+    const visitaDate = new Date(v.dataVisita);
+    return visitaDate >= weekStart && visitaDate <= weekEnd;
+  }).sort((a, b) => new Date(b.dataVisita).getTime() - new Date(a.dataVisita).getTime()) || [];
+
+  // Get tarefas em atraso
+  const tarefasEmAtrasoList = tarefas?.filter(t => {
+    return t.status !== 'done' && (t.dueDate ? new Date(t.dueDate) < today : false);
+  }).sort((a, b) => {
+    const dateA = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+    const dateB = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+    return dateA - dateB;
+  }) || [];
+
+  // Calculate key clients (top entities by visit count in last 30 days)
+  const thirtyDaysAgo = subDays(today, 30);
+  const visitas30Days = visitas?.filter(v => {
+    const visitaDate = new Date(v.dataVisita);
+    return visitaDate >= thirtyDaysAgo && visitaDate <= today;
+  }) || [];
+
+  const keyClientMap = new Map<string, { nome: string; count: number; lastDate: Date }>();
+  visitas30Days.forEach(v => {
+    if (v.entidadeId && v.entidade) {
+      const existing = keyClientMap.get(v.entidadeId);
+      const visitDate = new Date(v.dataVisita);
+      if (existing) {
+        existing.count += 1;
+        if (visitDate > existing.lastDate) {
+          existing.lastDate = visitDate;
+        }
+      } else {
+        keyClientMap.set(v.entidadeId, {
+          nome: v.entidade.nome,
+          count: 1,
+          lastDate: visitDate,
+        });
+      }
+    }
+  });
+
+  const keyClients = Array.from(keyClientMap.entries())
+    .map(([id, data]) => ({
+      entidadeId: id,
+      nome: data.nome,
+      visitCount: data.count,
+      lastVisitDate: format(data.lastDate, "dd MMM yyyy", { locale: pt }),
+    }))
+    .sort((a, b) => b.visitCount - a.visitCount)
+    .slice(0, 5);
 
   const isLoading = statsLoading || visitasLoading || tarefasLoading;
 
@@ -166,7 +229,156 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Stats Summary */}
+      {/* CRM Cards Section */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-80 rounded-lg" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Visitas desta semana */}
+          <Card 
+            className="cursor-pointer hover-elevate transition-all"
+            onClick={() => {
+              const from = format(weekStart, "yyyy-MM-dd");
+              const to = format(weekEnd, "yyyy-MM-dd");
+              setLocation(`/visitas?from=${from}&to=${to}`);
+            }}
+            data-testid="card-visitas-semana"
+          >
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">Visitas desta semana</CardTitle>
+                <Calendar className="h-5 w-5 text-green-500" />
+              </div>
+              <p className="text-2xl font-bold text-foreground mt-2">{visitasSemana}</p>
+            </CardHeader>
+            <CardContent>
+              {visitasEsteSemanaSorted.length > 0 ? (
+                <div className="space-y-2">
+                  {visitasEsteSemanaSorted.slice(0, 5).map((visita) => (
+                    <div
+                      key={visita.id}
+                      className="flex items-start justify-between text-sm"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-foreground truncate">{visita.entidade?.nome || "Entidade"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(visita.dataVisita), "dd MMM HH:mm", { locale: pt })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  {visitasEsteSemanaSorted.length > 5 && (
+                    <p className="text-xs text-muted-foreground pt-2">+{visitasEsteSemanaSorted.length - 5} mais</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Nenhuma visita esta semana</p>
+              )}
+              <div className="mt-4 flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Click para ver todas</span>
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Tarefas em atraso */}
+          <Card 
+            className="cursor-pointer hover-elevate transition-all"
+            onClick={() => {
+              setLocation("/tarefas?overdue=true");
+            }}
+            data-testid="card-tarefas-atraso"
+          >
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">Tarefas em atraso</CardTitle>
+                <AlertCircle className="h-5 w-5 text-red-500" />
+              </div>
+              <p className="text-2xl font-bold text-foreground mt-2">{tarefasEmAtraso}</p>
+            </CardHeader>
+            <CardContent>
+              {tarefasEmAtrasoList.length > 0 ? (
+                <div className="space-y-2">
+                  {tarefasEmAtrasoList.slice(0, 5).map((tarefa) => (
+                    <div
+                      key={tarefa.id}
+                      className="flex items-start justify-between text-sm"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-foreground truncate">{tarefa.titulo}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {tarefa.dueDate && format(new Date(tarefa.dueDate), "dd MMM yyyy", { locale: pt })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  {tarefasEmAtrasoList.length > 5 && (
+                    <p className="text-xs text-muted-foreground pt-2">+{tarefasEmAtrasoList.length - 5} mais</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Nenhuma tarefa em atraso</p>
+              )}
+              <div className="mt-4 flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Click para ver todas</span>
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Clientes chave */}
+          <Card 
+            className="cursor-pointer hover-elevate transition-all lg:col-span-2"
+            data-testid="card-clientes-chave"
+          >
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">Clientes chave (últimos 30 dias)</CardTitle>
+                <TrendingUp className="h-5 w-5 text-blue-500" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              {keyClients.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {keyClients.map((client, idx) => (
+                    <div
+                      key={client.entidadeId}
+                      className="p-3 rounded-lg border border-border hover-elevate cursor-pointer"
+                      onClick={() => {
+                        setLocation(`/visitas?entidadeId=${client.entidadeId}`);
+                      }}
+                      data-testid={`client-card-${idx}`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-foreground text-sm truncate">{client.nome}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {client.lastVisitDate}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-primary">{client.visitCount}</p>
+                          <p className="text-xs text-muted-foreground">visitas</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Nenhuma visita nos últimos 30 dias</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Summary Stats */}
       {isLoading ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
@@ -212,49 +424,6 @@ export default function AdminDashboard() {
           </Card>
         </div>
       ) : null}
-
-      {/* Últimas Visitas */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Últimas Visitas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {visitasLoading ? (
-            <div className="space-y-2">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-16 rounded" />
-              ))}
-            </div>
-          ) : visitas && visitas.length > 0 ? (
-            <div className="space-y-3">
-              {visitas.slice(0, 10).map((visita) => (
-                <div
-                  key={visita.id}
-                  className="flex items-start justify-between p-3 rounded-lg border border-border hover-elevate transition-colors"
-                  data-testid={`visit-item-${visita.id}`}
-                >
-                  <div className="flex-1">
-                    <p className="font-medium text-foreground">{visita.entidade?.nome || "Entidade"}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(visita.dataVisita), "dd MMM yyyy 'às' HH:mm", { locale: pt })}
-                    </p>
-                    {visita.notas && (
-                      <p className="text-sm text-muted-foreground mt-1 truncate">{visita.notas}</p>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs font-semibold px-2 py-1 rounded bg-blue-500/10 text-blue-700 dark:text-blue-400">
-                      Registada
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-center text-muted-foreground py-8">Nenhuma visita registada</p>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

@@ -6,6 +6,55 @@ This Progressive Web Application (PWA) streamlines commercial visit management f
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
+## Project Status - Phases Completed
+
+### FASE 1-11 Summary
+- FASE 1: Multi-empresa architecture ✅
+- FASE 2: 24 API endpoints ✅
+- FASE 3: Backoffice Admin API ✅
+- FASE 4: Frontend admin backoffice ✅
+- FASE 5: Marcas em Visitas ✅
+- FASE 6: Áudio com Transcrição por IA ✅
+- FASE 9: Tema por Empresa ✅
+- FASE 10: Layouts e Navegação por Role ✅
+- FASE 11: Filtros Avançados para Visitas/Tarefas ✅
+- FASE 12: Agent Bottom Navigation & FAB System ✅
+
+### FASE 13 Implementation (Dashboard Cards CRM para Admin) - COMPLETED 23/11/2025
+
+**Objetivo:** Transformar AdminDashboard numa interface visual com cards CRM clicáveis para acesso rápido a dados relevantes.
+
+**Implementação:**
+- Refactored `AdminDashboard.tsx` com nova estrutura de cards
+- KPIs mantidos no topo (4 cards: Visitas Hoje, Esta Semana, Tarefas Concluir, Em Atraso)
+- 3 novos CRM Cards principais:
+  1. **Visitas desta semana** - Clicável para filtros de data (from/to)
+  2. **Tarefas em atraso** - Clicável para filtro overdue=true
+  3. **Clientes chave (últimos 30 dias)** - Grid de sub-cards por entidade, cada um clicável para filtro entidadeId
+
+**Layout Responsivo:**
+- Desktop: 2 cards por linha (cards 1-2), 1 full-width (card 3)
+- Mobile: 1 card por linha (stack vertical)
+
+**Cards Features:**
+- Hover-elevate feedback visual
+- Listas resumidas (max 5 itens) + contador para mais
+- Footer "Click para ver todas" com ícone ArrowRight
+- Navegação com query params para aplicar filtros automaticamente
+- Icons coloridos por card (Calendar verde, AlertCircle vermelho, TrendingUp azul)
+
+**Frontend Calculations (no new backend endpoints):**
+- Agrupa visitas/tarefas por semana/atraso/entidade
+- Top 5 clientes por contagem de visitas nos últimos 30 dias
+- Ordenação por data/contagem
+
+**Result:**
+- ✅ Cards CRM visual e interativos
+- ✅ Reutiliza `/api/visitas` e `/api/tarefas` com query params
+- ✅ Tema (light-business/dark-pro) respeitado
+- ✅ Responsivo desktop/mobile
+- ✅ Data-testids para automatização
+
 ## System Architecture
 
 ### Frontend Architecture
