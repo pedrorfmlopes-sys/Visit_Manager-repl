@@ -35,23 +35,29 @@ export function FABMenu() {
         setPosition(DEFAULT_POSITION);
       }
     }
+    
+    // Calculate initial dynamic gap
+    calculateGap();
+    window.addEventListener("resize", calculateGap);
+    return () => window.removeEventListener("resize", calculateGap);
   }, []);
 
-  // Calculate dynamic gap and determine if menu should open upwards
-  useEffect(() => {
+  const calculateGap = () => {
     // Half of screen height
     const halfScreen = window.innerHeight / 2;
     
     // Total space available for buttons + gaps: 5 buttons (1 main + 4 menu)
     // (5 * BUTTON_HEIGHT) + (4 * gap) = halfScreen
     // gap = (halfScreen - (5 * BUTTON_HEIGHT)) / 4
-    const gap = Math.max(8, (halfScreen - (5 * BUTTON_HEIGHT)) / 4);
+    const gap = (halfScreen - (5 * BUTTON_HEIGHT)) / 4;
     setDynamicGap(gap);
-    
-    // Determine if menu should open upwards
-    const totalMenuHeight = 5 * BUTTON_HEIGHT + 4 * gap;
+  };
+
+  // Determine if menu should open upwards
+  useEffect(() => {
+    const totalMenuHeight = 5 * BUTTON_HEIGHT + 4 * dynamicGap;
     setShouldOpenUp(position.y + totalMenuHeight > window.innerHeight);
-  }, [position]);
+  }, [position, dynamicGap]);
 
   // Handle drag on global events
   useEffect(() => {
