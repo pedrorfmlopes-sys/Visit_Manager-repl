@@ -6,6 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { MainLayout } from "@/layouts/MainLayout";
 import { SyncIndicator } from "@/components/SyncIndicator";
+import { FABMenu } from "@/components/FABMenu";
+import { useLocation } from "wouter";
 import { offlineStorage } from "@/lib/offlineStorage";
 import { syncPTEnrichmentQueue } from "@/lib/offlineQueue";
 import { useEffect, useRef, useState } from "react";
@@ -143,6 +145,28 @@ function AppContent() {
   const { isAuthenticated, empresa } = useAuth();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const prevOnlineStatus = useRef<boolean | null>(null);
+  const [location] = useLocation();
+
+  // Pages where FAB should appear
+  const mainPages = ["/", "/visitas", "/tarefas", "/entidades", "/contactos"];
+  const showFAB = mainPages.some(page => location === page || location.startsWith(page + "/"));
+  
+  // Hide FAB on create/edit routes
+  const hideFABRoutes = [
+    "/entidades/nova",
+    "/entidades/:id/editar",
+    "/contactos/novo",
+    "/visitas/nova",
+    "/tarefas/nova",
+    "/tarefas/:id/editar"
+  ];
+  const isFABHidden = hideFABRoutes.some(route => {
+    if (route.includes(":id")) {
+      const pattern = route.replace(":id", "[^/]+");
+      return new RegExp(`^${pattern}$`).test(location);
+    }
+    return location === route;
+  });
 
   useEffect(() => {
     offlineStorage.init().catch(console.error);
@@ -194,6 +218,7 @@ function AppContent() {
   return (
     <>
       <Router />
+      {isAuthenticated && showFAB && !isFABHidden && <FABMenu />}
     </>
   );
 }
