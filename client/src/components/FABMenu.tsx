@@ -17,49 +17,44 @@ export function FABMenu() {
     setLocation("/tarefas/nova");
   };
 
-  if (isOpen) {
-    return (
-      <div className="fixed bottom-24 right-4 z-40 space-y-2">
-        <Button
-          size="icon"
-          variant="default"
-          onClick={handleNewTarefa}
-          className="flex flex-col items-center h-14 w-14 rounded-full shadow-lg"
-          data-testid="fab-new-tarefa"
-        >
-          <CheckCircle2 className="h-6 w-6" />
-        </Button>
-        <Button
-          size="icon"
-          variant="default"
-          onClick={handleNewVisita}
-          className="flex flex-col items-center h-14 w-14 rounded-full shadow-lg"
-          data-testid="fab-new-visita"
-        >
-          <FileText className="h-6 w-6" />
-        </Button>
-        <Button
-          size="icon"
-          variant="outline"
-          onClick={() => setIsOpen(false)}
-          className="flex flex-col items-center h-14 w-14 rounded-full shadow-lg"
-          data-testid="fab-close"
-        >
-          <Plus className="h-6 w-6 rotate-45" />
-        </Button>
-      </div>
-    );
-  }
-
   return (
-    <Button
-      size="icon"
-      variant="default"
-      onClick={() => setIsOpen(true)}
-      className="fixed bottom-24 right-4 z-40 h-14 w-14 rounded-full shadow-lg"
-      data-testid="fab-open"
-    >
-      <Plus className="h-6 w-6" />
-    </Button>
+    <div className="fixed bottom-24 right-4 z-50 flex flex-col-reverse items-end gap-2">
+      {/* Main FAB button - always visible, toggles menu */}
+      <Button
+        size="icon"
+        variant="default"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`h-14 w-14 rounded-full shadow-lg transition-transform ${
+          isOpen ? "rotate-45" : "rotate-0"
+        }`}
+        data-testid={isOpen ? "fab-close" : "fab-open"}
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
+
+      {/* Menu items - shown when open */}
+      {isOpen && (
+        <>
+          <Button
+            size="icon"
+            variant="default"
+            onClick={handleNewTarefa}
+            className="h-14 w-14 rounded-full shadow-lg"
+            data-testid="fab-new-tarefa"
+          >
+            <CheckCircle2 className="h-6 w-6" />
+          </Button>
+          <Button
+            size="icon"
+            variant="default"
+            onClick={handleNewVisita}
+            className="h-14 w-14 rounded-full shadow-lg"
+            data-testid="fab-new-visita"
+          >
+            <FileText className="h-6 w-6" />
+          </Button>
+        </>
+      )}
+    </div>
   );
 }
