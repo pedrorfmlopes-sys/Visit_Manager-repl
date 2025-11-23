@@ -5,22 +5,23 @@ import { TarefaCard } from "@/components/TarefaCard";
 import { EmptyState } from "@/components/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { TarefasFilterBar, type TarefasFilters } from "@/components/TarefasFilterBar";
 import type { TarefaWithRelations } from "@shared/schema";
 
 export default function Tarefas() {
   const [, setLocation] = useLocation();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "done">("all");
+  const [filters, setFilters] = useState<TarefasFilters>({});
 
-  // Build query string
+  // Build query string from filters
   const queryParams = new URLSearchParams();
-  if (statusFilter !== "all") queryParams.set("status", statusFilter);
-  if (searchQuery) queryParams.set("search", searchQuery);
+  if (filters.search) queryParams.set("search", filters.search);
+  if (filters.status) queryParams.set("status", filters.status);
+  if (filters.overdue) queryParams.set("overdue", "true");
+  if (filters.assignedUserId) queryParams.set("assignedUserId", filters.assignedUserId);
+  if (filters.entidadeId) queryParams.set("entidadeId", filters.entidadeId);
 
   const { data: tarefas, isLoading } = useQuery<TarefaWithRelations[]>({
-    queryKey: ["/api/tarefas", { statusFilter, searchQuery }],
+    queryKey: ["/api/tarefas", filters],
     queryFn: async () => {
       const response = await fetch(`/api/tarefas?${queryParams.toString()}`);
       if (!response.ok) throw new Error("Failed to fetch tarefas");
@@ -33,41 +34,10 @@ export default function Tarefas() {
       <header className="sticky top-0 z-10 bg-card border-b border-card-border px-4 py-4">
         <div className="max-w-2xl mx-auto">
           <h1 className="text-xl font-semibold text-foreground mb-3">Tarefas</h1>
-          <div className="space-y-3">
-            <Input
-              type="text"
-              placeholder="Pesquisar tarefas..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              data-testid="input-search-tarefas"
-            />
-            <div className="flex gap-2 flex-wrap">
-              <Button
-                variant={statusFilter === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setStatusFilter("all")}
-                data-testid="filter-all"
-              >
-                Todas
-              </Button>
-              <Button
-                variant={statusFilter === "pending" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setStatusFilter("pending")}
-                data-testid="filter-pending"
-              >
-                Pendentes
-              </Button>
-              <Button
-                variant={statusFilter === "done" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setStatusFilter("done")}
-                data-testid="filter-done"
-              >
-                Concluídas
-              </Button>
-            </div>
-          </div>
+          <TarefasFilterBar 
+            filters={filters}
+            onFilterChange={setFilters}
+          />
         </div>
       </header>
 
@@ -88,7 +58,7 @@ export default function Tarefas() {
               />
             ))}
           </div>
-        ) : searchQuery ? (
+        ) : filters.search ? (
           <EmptyState
             icon={CheckCircle2}
             title="Nenhum resultado"
