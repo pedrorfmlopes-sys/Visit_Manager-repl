@@ -78,7 +78,17 @@ Frontend backoffice with 3 admin pages (AdminEmpresa, AdminUsers, AdminMarcas). 
 - Frontend: AdminEmpresa.tsx com Select de tema (2 opções)
 - Migração DB: Campo criado com default "light-business"
 - Funcionalidade: Temas guardados e recuperados corretamente
-- Próximo: FASE 9.2 implementará os estilos/cores reais por tema
+
+**FASE 9.2 Implementada (23/11/2025):**
+- Backend: `/api/auth/user` agora retorna `empresa.theme` junto com dados da empresa
+- Frontend: `useAuth()` hook atualizado para incluir `theme` na interface `AuthUser`
+- App.tsx: UseEffect que aplica tema baseado em `empresa.theme`
+  - Se theme === "dark-pro": Adiciona classe "dark" a document.documentElement + data-theme="dark-pro"
+  - Se theme === "light-business": Remove classe "dark" + data-theme="light-business"
+- CSS global (index.css): Seletores `:root[data-theme="light-business"]` e `:root[data-theme="dark-pro"]` ligadas aos estilos Tailwind
+- Tailwind config: `darkMode: ["class"]` já configurado - CSS dark-mode aproveita automaticamente
+- Resultado: Mudança visual imediata (cores, backgrounds, texto) ao alternar entre temas
+- Temas persistem na BD e aplicam automaticamente ao recarregar a app
 
 ## System Architecture
 

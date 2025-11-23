@@ -128,16 +128,13 @@ function AppContent() {
   useEffect(() => {
     if (isAuthenticated && empresa?.theme) {
       const root = document.documentElement;
-      console.log("[App] Applying theme:", empresa.theme);
       
       if (empresa.theme === "dark-pro") {
         root.classList.add("dark");
         root.setAttribute("data-theme", "dark-pro");
-        console.log("[App] Dark mode enabled");
       } else if (empresa.theme === "light-business") {
         root.classList.remove("dark");
         root.setAttribute("data-theme", "light-business");
-        console.log("[App] Light mode enabled");
       }
     }
   }, [isAuthenticated, empresa?.theme]);
