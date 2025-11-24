@@ -207,56 +207,6 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      {/* PDF Reports - TOPO */}
-      <Card data-testid="card-reports" className="border-primary/30 bg-primary/5">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Download className="h-5 w-5 text-primary" />
-            Exportar Relatórios PDF
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Button
-              variant="default"
-              onClick={() => handleDownloadReport('monthly', 'agent')}
-              data-testid="button-report-monthly-agent"
-              className="w-full"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Mensal Pessoal
-            </Button>
-            <Button
-              variant="default"
-              onClick={() => handleDownloadReport('weekly', 'agent')}
-              data-testid="button-report-weekly-agent"
-              className="w-full"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Semanal Pessoal
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => handleDownloadReport('monthly', 'company')}
-              data-testid="button-report-monthly-company"
-              className="w-full"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Mensal Empresa
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => handleDownloadReport('weekly', 'company')}
-              data-testid="button-report-weekly-company"
-              className="w-full"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Semanal Empresa
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* KPIs */}
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -511,6 +461,56 @@ export default function AdminDashboard() {
           </Card>
         </div>
       ) : null}
+
+      {/* PDF Reports - FINAL */}
+      <Card data-testid="card-reports" className="border-primary/30 bg-primary/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Download className="h-5 w-5 text-primary" />
+            Exportar Relatórios PDF
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <Button
+              variant="default"
+              onClick={() => handleDownloadReport('monthly', 'agent')}
+              data-testid="button-report-monthly-agent"
+              className="w-full"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Mensal Pessoal
+            </Button>
+            <Button
+              variant="default"
+              onClick={() => handleDownloadReport('weekly', 'agent')}
+              data-testid="button-report-weekly-agent"
+              className="w-full"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Semanal Pessoal
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => handleDownloadReport('monthly', 'company')}
+              data-testid="button-report-monthly-company"
+              className="w-full"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Mensal Empresa
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => handleDownloadReport('weekly', 'company')}
+              data-testid="button-report-weekly-company"
+              className="w-full"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Semanal Empresa
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

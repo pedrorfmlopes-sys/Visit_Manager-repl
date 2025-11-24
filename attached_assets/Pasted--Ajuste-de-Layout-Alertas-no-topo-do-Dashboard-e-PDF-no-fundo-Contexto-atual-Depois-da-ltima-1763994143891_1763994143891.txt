@@ -1,0 +1,86 @@
+🔧 Ajuste de Layout – Alertas no topo do Dashboard e PDF no fundo
+
+Contexto atual:
+
+Depois da última fase, temos:
+
+Um card/área de “Exportar Relatórios PDF” no topo do Dashboard (agent e admin).
+
+Uma barra/painel de alertas (AlertRibbon / AlertPanel) integrada no conteúdo, mas a posição ainda não está ideal do ponto de vista UX.
+
+O resultado é que o Dashboard abre logo com os botões de PDF, e os alertas ficam misturados com o resto dos cards.
+
+🎯 Objetivo de UX:
+
+No Dashboard (agent e admin), a ordem desejada é:
+
+Título / header do dashboard
+
+Alertas do dia (tarefas em atraso, tarefas de hoje, visitas de hoje, etc.)
+
+KPI cards + cards CRM / listas
+
+No fundo, uma secção com botões para exportar os relatórios PDF
+
+Ou seja:
+
+Os alertas devem estar no topo do conteúdo (logo a seguir ao título),
+
+E a secção de PDFs deve estar no final do dashboard, como “ações de fim de página”.
+
+✅ Ajustes pedidos
+
+1️⃣ Alertas no topo do Dashboard
+
+Em AdminDashboard e AgentDashboard:
+
+Renderizar o componente de alertas (seja AlertRibbon/AlertPanel, o que estiver em uso agora) logo abaixo do título do dashboard.
+
+Depois dos alertas, vêm os KPI cards e restantes cards CRM/listas.
+
+Importante:
+
+Os alertas devem fazer parte do fluxo normal da página (sem position: fixed a tapar botões).
+
+Em mobile e desktop, o comportamento deve ser o mesmo:
+título → alertas → cards → resto.
+
+2️⃣ Export PDF no fundo do Dashboard
+
+A secção/card “Exportar Relatórios PDF” (que atualmente está no topo do dashboard) deve ser movida para o final do conteúdo:
+
+Depois dos KPI cards, CRM cards e listas.
+
+Fica como o último bloco da página.
+
+Mantém:
+
+Os mesmos botões (mensal, semanal, empresa, etc.).
+
+As mesmas chamadas de API/links.
+
+Apenas muda a posição no layout.
+
+3️⃣ Coisas a confirmar no fim
+
+AgentDashboard:
+
+Ao abrir:
+
+Ver o título, logo a seguir os alertas (se existirem).
+
+Depois os cards.
+
+No fim da página, a secção de exportação de relatórios PDF.
+
+AdminDashboard:
+
+O mesmo padrão: título → alertas → cards CRM/KPI → secção de PDF no fundo.
+
+Nenhum alerta deve tapar botões do header/top bar.
+
+Resumo:
+
+Alertas ficam no topo do conteúdo do dashboard (abaixo do título).
+
+Botões de PDF saem do topo e passam para o final do dashboard.
