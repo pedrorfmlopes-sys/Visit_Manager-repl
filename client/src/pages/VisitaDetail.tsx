@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import DOMPurify from 'dompurify';
-import { ArrowLeft, ArrowRight, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles, Bell, Volume2, Trash2, Loader2, Mic, Plus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles, Bell, Volume2, Trash2, Loader2, Mic, Plus, X, Edit } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { pt } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -689,14 +689,33 @@ export default function VisitaDetail() {
             </Button>
             <h1 className="text-xl font-semibold text-foreground">Detalhes da Visita</h1>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleShare}
-            data-testid="button-share"
-          >
-            <Share2 className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleShare}
+              data-testid="button-share"
+            >
+              <Share2 className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setLocation(`/visitas/${visitaId}/editar`)}
+              data-testid="button-editar"
+            >
+              <Edit className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => deleteVisitaMutation.mutate()}
+              disabled={deleteVisitaMutation.isPending}
+              data-testid="button-deletar"
+            >
+              <Trash2 className="h-5 w-5 text-destructive" />
+            </Button>
+          </div>
         </div>
       </header>
 

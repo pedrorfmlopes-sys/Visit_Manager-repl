@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, User, Phone, Mail, Building2, Edit, Share2, MessageCircle, Link as LinkIcon, Copy, FileText, Globe, MapPin, Linkedin, Instagram, Facebook, Sparkles } from "lucide-react";
+import { ArrowLeft, User, Phone, Mail, Building2, Edit, Share2, MessageCircle, Link as LinkIcon, Copy, FileText, Globe, MapPin, Linkedin, Instagram, Facebook, Sparkles, Trash2 } from "lucide-react";
 import { SiX } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { EmailAIDialog } from "@/components/EmailAIDialog";
 import { QuickActionButton } from "@/components/QuickActionButton";
 import { formatContactForSharing } from "@/lib/shareFormatters";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import type { ContactoWithRelations } from "@shared/schema";
 
 export default function ContactoDetail() {
@@ -21,12 +22,36 @@ export default function ContactoDetail() {
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   const { isOnline, shareViaWhatsApp, shareViaEmail, copyToClipboard, copyLink } = useShareActions();
 
   const { data: contacto, isLoading } = useQuery<ContactoWithRelations>({
     queryKey: ["/api/contactos", contactoId],
     enabled: !!contactoId,
+  });
+
+  // Delete contacto mutation
+  const deleteContactoMutation = useMutation({
+    mutationFn: async () => {
+      if (!contactoId) throw new Error("Contacto ID is required");
+      await apiRequest('DELETE', `/api/contactos/${contactoId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contactos"] });
+      toast({
+        title: "Sucesso",
+        description: "Contacto eliminado com sucesso",
+      });
+      setLocation("/contactos");
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Falha ao eliminar contacto",
+        variant: "destructive",
+      });
+    },
   });
 
   if (isLoading) {
@@ -203,6 +228,15 @@ export default function ContactoDetail() {
               data-testid="button-editar"
             >
               <Edit className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => deleteContactoMutation.mutate()}
+              disabled={deleteContactoMutation.isPending}
+              data-testid="button-deletar"
+            >
+              <Trash2 className="h-5 w-5 text-destructive" />
             </Button>
           </div>
         </div>

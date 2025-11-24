@@ -1,6 +1,6 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, MapPin, Phone, Mail, Globe, Edit, Building2, Users, UserCircle, Calendar, Sparkles, Linkedin, Facebook, Instagram, Share2, MessageCircle, Link as LinkIcon, Copy, FileText, Bell, AlertCircle, Download } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, Mail, Globe, Edit, Building2, Users, UserCircle, Calendar, Sparkles, Linkedin, Facebook, Instagram, Share2, MessageCircle, Link as LinkIcon, Copy, FileText, Bell, AlertCircle, Download, Trash2 } from "lucide-react";
 import { SiX } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +19,7 @@ import { EmailAIDialog } from "@/components/EmailAIDialog";
 import { QuickActionButton } from "@/components/QuickActionButton";
 import { formatEntityForSharing } from "@/lib/shareFormatters";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import type { EntidadeWithRelations, Lembrete } from "@shared/schema";
 import { useState } from "react";
 
@@ -35,6 +35,7 @@ export default function EntidadeDetail() {
   const [, setLocation] = useLocation();
   const entidadeId = params?.id;
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [pdfProDialogOpen, setPdfProDialogOpen] = useState(false);
@@ -58,6 +59,29 @@ export default function EntidadeDetail() {
   });
 
   const entityReminders = allLembretes?.filter(l => l.entidadeId === entidadeId) || [];
+
+  // Delete entidade mutation
+  const deleteEntidadeMutation = useMutation({
+    mutationFn: async () => {
+      if (!entidadeId) throw new Error("Entidade ID is required");
+      await apiRequest('DELETE', `/api/entidades/${entidadeId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/entidades"] });
+      toast({
+        title: "Sucesso",
+        description: "Entidade eliminada com sucesso",
+      });
+      setLocation("/entidades");
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Falha ao eliminar entidade",
+        variant: "destructive",
+      });
+    },
+  });
   
   // PT Enrichment mutation
   const ptEnrichMutation = useMutation({
@@ -375,6 +399,15 @@ export default function EntidadeDetail() {
               data-testid="button-editar"
             >
               <Edit className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => deleteEntidadeMutation.mutate()}
+              disabled={deleteEntidadeMutation.isPending}
+              data-testid="button-deletar"
+            >
+              <Trash2 className="h-5 w-5 text-destructive" />
             </Button>
           </div>
         </div>
