@@ -98,7 +98,15 @@ export const empresas = pgTable("empresas", {
     "enableFollowups": true,
     "enableAlertRibbon": true,
     "enableBadges": true,
-    "refreshInterval": 60
+    "refreshInterval": 60,
+    "visitas": {
+      "enableFilterDateQuick": true,
+      "enableFilterUser": true,
+      "enableFilterMarca": true,
+      "enableFilterEntidade": true,
+      "enableFilterContacto": true,
+      "enableFilterHasAudio": true
+    }
   }'`),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -169,6 +177,15 @@ export const userSettingsSchema = z.object({
     emailTaskReminders: z.boolean().default(false),
     emailVisitReminders: z.boolean().default(false),
   }).default({}).optional(),
+  // FASE 29: User UI preferences for visits filtering
+  visitasUi: z.object({
+    showAdvancedFilters: z.boolean().default(true),
+  }).default({}).optional(),
+  // FASE 28: Onboarding tips tracking
+  onboarding: z.object({
+    seenDashboardTips: z.boolean().default(false),
+    seenVisitsTips: z.boolean().default(false),
+  }).default({}).optional(),
 }).partial().default({});
 
 export type UserSettings = z.infer<typeof userSettingsSchema>;
@@ -187,6 +204,36 @@ export const userSettingsResponseSchema = z.object({
 });
 
 export type UserSettingsResponse = z.infer<typeof userSettingsResponseSchema>;
+
+// FASE 29: Entity Types (Tipos de Entidades) table - configurable per company
+export const entidadeTipos = pgTable("entidade_tipos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: 'cascade' }),
+  nome: varchar("nome", { length: 255 }).notNull(),
+  cor: varchar("cor", { length: 20 }), // hex or color tag, optional
+  ativo: boolean("ativo").default(true).notNull(),
+  ordem: integer("ordem").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const entidadeTiposRelations = relations(entidadeTipos, ({ one, many }) => ({
+  empresa: one(empresas, {
+    fields: [entidadeTipos.empresaId],
+    references: [empresas.id],
+  }),
+  entidades: many(entidades),
+}));
+
+export const insertEntidadeTipoSchema = createInsertSchema(entidadeTipos).omit({
+  id: true,
+  empresaId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertEntidadeTipo = z.infer<typeof insertEntidadeTipoSchema>;
+export type EntidadeTipo = typeof entidadeTipos.$inferSelect;
 
 // REFAITA: Marcas (Brands) table - agora com empresaId, codigo, ativa
 export const marcas = pgTable("marcas", {
@@ -221,7 +268,8 @@ export type Marca = typeof marcas.$inferSelect;
 export const entidades = pgTable("entidades", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: 'cascade' }), // NOVO
-  tipoEntidade: tipoEntidadeEnum("tipo_entidade").notNull().default('Gabinete'),
+  entidadeTipoId: varchar("entidade_tipo_id").references(() => entidadeTipos.id, { onDelete: 'set null' }), // FASE 29: FK to configurable types
+  tipoEntidade: tipoEntidadeEnum("tipo_entidade").notNull().default('Gabinete'), // Legacy enum, kept for backward compatibility
   nome: varchar("nome", { length: 255 }).notNull(),
   morada: text("morada"),
   cidade: varchar("cidade", { length: 100 }),
@@ -300,6 +348,7 @@ export const insertEntidadeSchema = createInsertSchema(entidades).omit({
   lastEnrichedAt: true,
   enrichmentSource: true,
   pendingEnrichment: true,
+  entidadeTipoId: true, // Set by form, optional
 }).extend({
   // Add validation for coordinates (empty string treated as null)
   latitude: z.string().regex(/^-?([0-9]{1,2}|1[0-7][0-9]|180)(\.[0-9]+)?$/).or(z.literal("")).optional().nullable(),
@@ -387,6 +436,10 @@ export const entidadesRelations = relations(entidades, ({ one, many }) => ({
   empresa: one(empresas, {
     fields: [entidades.empresaId],
     references: [empresas.id],
+  }),
+  entidadeTipo: one(entidadeTipos, {
+    fields: [entidades.entidadeTipoId],
+    references: [entidadeTipos.id],
   }),
   contactos: many(contactos),
   visitas: many(visitas),

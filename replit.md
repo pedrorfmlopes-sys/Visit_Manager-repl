@@ -45,7 +45,7 @@ PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities in
 -   **Admin Settings Center**: Organized 6-tab settings page with company configuration, logo upload, and UI settings JSON for future extensibility (FASE 22).
 -   **Logo Upload**: Direct upload of company logo with preview, type validation (PNG/JPG/SVG/WebP), and automatic database persistence.
 
-## Recent Features (FASE 20-28)
+## Recent Features (FASE 20-29)
 
 ### FASE 20: Unified Visit Status Management
 - Consolidated modal dialog for appointment status changes with 3 visual action paths (follow-up, mark done, cancel)
@@ -119,6 +119,19 @@ PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities in
 - **Debug Endpoint**: `GET /api/admin/debug` returns: app version, DB status, company stats, settings flags, integration status
 - **Admin Tools Card**: New card in AdminDashboard with button to access Debug / Estado da Aplicação
 - **Status**: ✅ IMPLEMENTADO - Onboarding, Activity Logs, Debug tools funcionais
+
+### FASE 29: Types de Entidades Configuráveis & Filtros de Visitas (Em Progresso)
+- **New Table `entidade_tipos`**: Stores company-configurable entity types (id, empresaId, nome, cor, ativo, ordem, timestamps)
+- **Schema Updates**: Added `entidadeTipoId` FK to entidades, relationships, Zod schemas
+- **UISettings Extensions**: Added `visitas` object with filter toggles (enableFilterEntidade, enableFilterContacto, etc)
+- **UserSettings Extensions**: Added `visitasUi` object for user-level filter preferences
+- **Backend APIs**: 
+  - `GET /api/admin/entidade-tipos` - List all types (admin-only)
+  - `POST /api/admin/entidade-tipos` - Create new type
+  - `PATCH /api/admin/entidade-tipos/:id` - Update type
+  - `GET /api/entidade-tipos` - List active types (authenticated users)
+- **Storage Methods**: `getEntidadeTipos()`, `getEntidadeTiposAtivos()`, `getEntidadeTipo()`, `createEntidadeTipo()`, `updateEntidadeTipo()`
+- **Status**: 🔄 IN PROGRESS - Schema + APIs ready, pending UI implementation + filter integration
 
 ## External Dependencies
 

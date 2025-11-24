@@ -20,6 +20,8 @@ export default function Visitas() {
   if (filters.userId) queryParams.set("userId", filters.userId);
   if (filters.marcaId) queryParams.set("marcaId", filters.marcaId);
   if (filters.hasAudioToTranscribe) queryParams.set("hasAudioToTranscribe", "true");
+  if (filters.entidadeId) queryParams.set("entidadeId", filters.entidadeId);
+  if (filters.contactoId) queryParams.set("contactoId", filters.contactoId);
 
   const { data: visitas, isLoading } = useQuery<VisitaWithRelations[]>({
     queryKey: ["/api/visitas", filters],

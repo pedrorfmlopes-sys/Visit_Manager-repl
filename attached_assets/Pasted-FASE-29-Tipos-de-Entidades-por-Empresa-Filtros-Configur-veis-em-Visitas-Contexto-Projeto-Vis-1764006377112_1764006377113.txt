@@ -1,0 +1,347 @@
+FASE 29 – Tipos de Entidades por Empresa & Filtros Configuráveis em Visitas
+
+Contexto:
+
+Projeto: Visit Manager multi-empresa, com:
+
+uiSettings (empresa) em /admin/empresa.
+
+userSettings (utilizador) em /perfil.
+
+Filtros avançados em Visitas/Tarefas (FASE 11) e dashboards completos.
+
+Objetivo desta fase:
+
+Tornar os tipos de entidades configuráveis por empresa (não hardcoded).
+
+Melhorar os filtros/pesquisa em Visitas:
+
+Filtros claros por Entidade e Contacto.
+
+Tornar os filtros “avançados” configuráveis:
+
+Admin pode ativar/desativar certos filtros a nível de empresa.
+
+Cada utilizador pode, nas suas definições, simplificar/ocultar filtros que não usa.
+
+⚠️ Importante:
+
+Nada de quebrar queries existentes: apenas estender.
+
+Respeitar multi-empresa e RBAC.
+
+1. Tipos de Entidades personalizáveis por empresa
+
+1.1. Schema – nova tabela de tipos de entidade
+
+Criar tabela nova, ex.: entidade_tipos (nome que fizer mais sentido dentro do schema):
+
+Campos sugeridos:
+
+id (PK)
+
+empresaId (FK → empresas)
+
+nome (string, ex.: “Arquitetura”, “Revenda”, “Hotel”, etc.)
+
+cor (string opcional, ex.: hex ou tag de cor – opcional nesta fase)
+
+ativo (boolean, default true)
+
+ordem (opcional, para ordenar na UI)
+
+createdAt, updatedAt (se for consistente com o resto do schema)
+
+Atualizar shared/schema.ts (Drizzle + Zod) com:
+
+Tabela entidadeTipos.
+
+Relação entidade.tipo (FK entidade.entidadeTipoId → entidadeTipos.id).
+
+1.2. Ligação às entidades
+
+Adicionar campo entidadeTipoId à tabela de entidades:
+
+Opcional (nullable) para não quebrar dados existentes.
+
+Atualizar models/Zod para incluir entidadeTipoId onde fizer sentido.
+
+1.3. API para gerir tipos de entidade
+
+Criar endpoints admin-only em /api/admin/entidade-tipos:
+
+GET /api/admin/entidade-tipos
+
+Lista todos os tipos da empresa atual (empresaId).
+
+POST /api/admin/entidade-tipos
+
+Cria novo tipo (nome obrigatório, opcional cor, ativo default true).
+
+PATCH /api/admin/entidade-tipos/:id
+
+Atualiza nome/cor/ativo/ordem.
+
+(Opcional) DELETE ou soft-delete através do campo ativo.
+
+Tudo filtrado por empresaId do contexto.
+
+1.4. Backoffice – gestão de tipos de entidade
+
+Na área de admin, dentro de /admin/empresa ou numa nova página (/admin/entidade-tipos), criar uma UI simples:
+
+Tabela/lista dos tipos de entidade:
+
+Nome, Ativo, Cor (se usado).
+
+Botão “Adicionar Tipo”.
+
+Botão editar (ícone lápis).
+
+Toggle Ativo/Desativo.
+
+RBAC: apenas admin.
+
+1.5. Formulário de Entidade – escolher tipo
+
+No EntidadeForm (create/edit):
+
+Adicionar um campo “Tipo de entidade”:
+
+Select com os tipos ativos da empresa.
+
+Permitir “Sem tipo” (opcional).
+
+Carregar a lista de tipos via GET /api/admin/entidade-tipos.
+
+No EntidadeDetail:
+
+Mostrar o tipo (badge/label com o nome, e cor se disponível).
+
+2. Filtros adicionais em Visitas – Entidade e Contacto
+
+Objetivo: facilitar a vida quando há muitas visitas, permitindo filtrar por entidade/contacto de forma direta.
+
+2.1. Backend – já existe suporte?
+
+Confirmar que o endpoint GET /api/visitas já suporta:
+
+entidadeId
+
+contactoId
+
+Se não suportar, adicionar no storage:
+
+Filtros opcionais:
+
+Se entidadeId presente → WHERE visitas.entidadeId = ...
+
+Se contactoId presente → WHERE visitas.contactoId = ...
+
+Manter compatível com os filtros já existentes (search, from, to, marcaId, etc.).
+
+2.2. Frontend – Filtros de Entidade & Contacto
+
+Para agents (Visitas.tsx):
+
+Na VisitasFilterBar ou componente equivalente:
+
+Adicionar:
+
+Select “Entidade”:
+
+Pesquisa remota (typeahead) ou dropdown com as entidades mais usadas.
+
+Ao selecionar, atualiza query param entidadeId.
+
+Select “Contacto”:
+
+Opcional; pode ser filtrado pelo mesmo endpoint /api/contactos, ou contactos da entidade selecionada.
+
+Atualiza query param contactoId.
+
+Para admins (AdminVisitas.tsx):
+
+Já existem filtros extra (utilizadores, marcas). Adicionar:
+
+Select “Entidade” e “Contacto”, usando a mesma abordagem.
+
+Integrar com o sistema de query params:
+
+Ao escolher entidade/contacto, atualizar a URL (?entidadeId=...&contactoId=...).
+
+Botão “Limpar filtros” deve limpar também estes dois.
+
+3. Filtros “configuráveis” via settings (admin + utilizador)
+
+Objetivo: permitir que:
+
+O admin defina, ao nível da empresa, que filtros aparecem (básico vs avançados).
+
+Cada utilizador possa simplificar ainda mais (ocultar coisas que não quer ver), mas nunca ultrapassando o “teto” definido pela empresa.
+
+3.1. uiSettings – nível empresa (admin)
+
+Em uiSettings (tabela empresas), adicionar uma secção, por exemplo:
+
+uiSettings: {
+  // ...
+  visitas: {
+    enableFilterDateQuick: boolean;      // Hoje / Esta semana / 30 dias
+    enableFilterUser: boolean;           // Filtro por utilizador (admin)
+    enableFilterMarca: boolean;          // Filtro por marca
+    enableFilterEntidade: boolean;       // NOVO
+    enableFilterContacto: boolean;       // NOVO
+    enableFilterHasAudio: boolean;       // Filtro "com áudio"
+  }
+}
+
+
+No Centro de Configurações da Empresa (/admin/empresa, aba “Visitas & Tarefas”):
+
+Mostrar estes toggles:
+
+“Filtro rápido por datas (Hoje / Semana / 30 dias)”
+
+“Filtro por utilizador (admin)”
+
+“Filtro por marca”
+
+“Filtro por entidade”
+
+“Filtro por contacto”
+
+“Filtro ‘Com áudio por transcrever’”
+
+Ao desativar:
+
+O filtro correspondente deixa de aparecer para todos os utilizadores da empresa.
+
+3.2. userSettings – nível utilizador
+
+Em userSettings (FASE 24), adicionar uma pequena subsecção, ex.:
+
+userSettings: {
+  // ...
+  visitasUi?: {
+    showAdvancedFilters: boolean; // liga/desliga bloco de filtros avançados
+    showEntidadeFilter?: boolean;
+    showContactoFilter?: boolean;
+    // opcionalmente mais finos se fizer sentido
+  }
+}
+
+
+Na página /perfil (secção de Preferências de Interface ou nova secção “Visitas”):
+
+Adicionar opções do tipo:
+
+Toggle “Mostrar filtros avançados nas visitas”.
+
+(Opcional) Toggles individuais por filtro, mas o mínimo é um toggle global.
+
+Regra de ouro:
+
+O que a empresa desligar em uiSettings não pode ser reativado pelo utilizador.
+
+Ex.: se uiSettings.visitas.enableFilterEntidade = false, o filtro de entidade:
+
+Não aparece, independentemente de userSettings.
+
+O utilizador só consegue esconder mais (mas não mostrar algo que a empresa bloqueou).
+
+3.3. Comportamento nos componentes de filtro
+
+Nos componentes VisitasFilterBar / AdminVisitasFilterBar:
+
+Antes de renderizar cada filtro, verificar:
+
+uiSettings.visitas.enableFilterX (empresa).
+
+userSettings.visitasUi.showAdvancedFilters (user).
+
+Exemplo:
+
+Filtro Entidade:
+
+Só renderizar se:
+
+uiSettings.visitas.enableFilterEntidade === true e
+
+(ou não há userSettings, ou o utilizador não desligou advanced filters).
+
+Filtro Contacto:
+
+Mesma lógica.
+
+Para os filtros “básicos” (por exemplo search e quick dates):
+
+Podem ser sempre visíveis, ou controlados também por settings se fizer sentido – fica ao teu critério, desde que documentado.
+
+4. Testes esperados
+
+Tipos de Entidade (Admin / Backoffice)
+
+Como admin:
+
+Criar 2–3 tipos novos (ex.: “Arquiteto”, “Revenda”, “Hotel”).
+
+Ver a lista, ativar/desativar.
+
+No EntidadeForm:
+
+Ver dropdown com esses tipos.
+
+Criar uma entidade com tipo “Hotel”.
+
+No EntidadeDetail:
+
+Ver o tipo da entidade visível.
+
+Filtros Entidade/Contacto em Visitas
+
+Em Visitas (agent):
+
+Ver selects de Entidade/Contacto (se ativados em uiSettings).
+
+Filtrar por entidade → lista de visitas só dessa entidade.
+
+Em AdminVisitas:
+
+Idem para admins, com os filtros adicionais.
+
+Settings empresa vs utilizador
+
+Desativar, como admin, p.ex. enableFilterContacto:
+
+Confirmar que filtro Contacto desaparece para todos.
+
+Como utilizador:
+
+Nas definições pessoais, marcar “Esconder filtros avançados”.
+
+Confirmar que só vê filtros básicos (ex.: pesquisa, datas).
+
+Reativar “Mostrar filtros avançados”:
+
+Filtros de Entidade/Contacto voltam, desde que a empresa não os tenha desligado.
+
+RBAC & Multi-empresa
+
+Admin só manipula tipos de entidade e uiSettings da própria empresa.
+
+Agents nunca vêem o backoffice de tipos.
+
+5. Documentação
+
+Atualizar replit.md com uma secção “FASE 29 – Tipos de Entidades & Filtros Configuráveis”:
+
+Estrutura da nova tabela de tipos de entidade.
+
+Novos campos nas entidades (entidadeTipoId).
+
+Endpoints /api/admin/entidade-tipos.
+
+Novos campos em uiSettings.visitas e userSettings.visitasUi.
+
+Regras de visibilidade dos filtros (empresa manda, utilizador refina).

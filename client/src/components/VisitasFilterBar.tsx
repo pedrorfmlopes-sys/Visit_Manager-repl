@@ -12,6 +12,8 @@ export interface VisitasFilters {
   userId?: string;
   marcaId?: string;
   hasAudioToTranscribe?: boolean;
+  entidadeId?: string;
+  contactoId?: string;
 }
 
 interface VisitasFilterBarProps {
@@ -20,6 +22,8 @@ interface VisitasFilterBarProps {
   showAdminFilters?: boolean;
   users?: { id: string; email: string }[];
   marcas?: { id: string; nome: string }[];
+  entidades?: { id: string; nome: string }[];
+  contactos?: { id: string; nome: string }[];
 }
 
 export function VisitasFilterBar({

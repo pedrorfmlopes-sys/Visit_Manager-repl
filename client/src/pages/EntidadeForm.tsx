@@ -47,6 +47,11 @@ export default function EntidadeForm() {
   // Enrichment state
   const [isEnriching, setIsEnriching] = useState(false);
 
+  // FASE 29: Fetch entity types
+  const { data: entidadeTipos = [] } = useQuery({
+    queryKey: ["/api/entidade-tipos"],
+  });
+
   const { data: entidade } = useQuery<Entidade>({
     queryKey: ["/api/entidades", entidadeId],
     enabled: !!entidadeId,

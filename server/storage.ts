@@ -2,6 +2,7 @@ import {
   empresas,
   users,
   entidades,
+  entidadeTipos,
   contactos,
   visitas,
   tarefas,
@@ -15,6 +16,8 @@ import {
   type UpsertUser,
   type Entidade,
   type InsertEntidade,
+  type EntidadeTipo,
+  type InsertEntidadeTipo,
   type Contacto,
   type InsertContacto,
   type Visita,
@@ -92,6 +95,13 @@ export interface IStorage {
   getMarca(id: string): Promise<Marca | undefined>;
   createMarca(marca: InsertMarca): Promise<Marca>;
   updateMarca(id: string, marca: Partial<InsertMarca>, empresaId: string): Promise<Marca | undefined>;
+
+  // FASE 29: Entity Types (Tipos de Entidades) - configurable per company
+  getEntidadeTipos(empresaId: string): Promise<EntidadeTipo[]>;
+  getEntidadeTiposAtivos(empresaId: string): Promise<EntidadeTipo[]>;
+  getEntidadeTipo(id: string, empresaId: string): Promise<EntidadeTipo | undefined>;
+  createEntidadeTipo(tipo: InsertEntidadeTipo, empresaId: string): Promise<EntidadeTipo>;
+  updateEntidadeTipo(id: string, tipo: Partial<InsertEntidadeTipo>, empresaId: string): Promise<EntidadeTipo | undefined>;
   
   // FASE 6: Audio management
   addAudioToVisita(visitaId: string, fileUrl: string, empresaId: string): Promise<VisitasAudio>;
@@ -1004,6 +1014,52 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(marcas)
       .where(eq(marcas.empresaId, empresaId))
       .orderBy(marcas.nome);
+  }
+
+  // FASE 29: Entity Types CRUD
+  async getEntidadeTipos(empresaId: string): Promise<EntidadeTipo[]> {
+    return db.select().from(entidadeTipos)
+      .where(eq(entidadeTipos.empresaId, empresaId))
+      .orderBy(entidadeTipos.ordem, entidadeTipos.nome);
+  }
+
+  async getEntidadeTiposAtivos(empresaId: string): Promise<EntidadeTipo[]> {
+    return db.select().from(entidadeTipos)
+      .where(and(
+        eq(entidadeTipos.empresaId, empresaId),
+        eq(entidadeTipos.ativo, true)
+      ))
+      .orderBy(entidadeTipos.ordem, entidadeTipos.nome);
+  }
+
+  async getEntidadeTipo(id: string, empresaId: string): Promise<EntidadeTipo | undefined> {
+    return db.select().from(entidadeTipos)
+      .where(and(
+        eq(entidadeTipos.id, id),
+        eq(entidadeTipos.empresaId, empresaId)
+      ))
+      .then((res) => res[0]);
+  }
+
+  async createEntidadeTipo(tipo: InsertEntidadeTipo, empresaId: string): Promise<EntidadeTipo> {
+    return db.insert(entidadeTipos)
+      .values({
+        ...tipo,
+        empresaId,
+      })
+      .returning()
+      .then((res) => res[0]);
+  }
+
+  async updateEntidadeTipo(id: string, tipo: Partial<InsertEntidadeTipo>, empresaId: string): Promise<EntidadeTipo | undefined> {
+    return db.update(entidadeTipos)
+      .set(tipo)
+      .where(and(
+        eq(entidadeTipos.id, id),
+        eq(entidadeTipos.empresaId, empresaId)
+      ))
+      .returning()
+      .then((res) => res[0]);
   }
 
   async getMarcasByEmpresaAtiva(empresaId: string): Promise<Marca[]> {

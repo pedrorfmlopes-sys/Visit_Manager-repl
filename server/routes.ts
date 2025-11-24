@@ -3257,6 +3257,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // FASE 29: Entidade Tipos (Entity Types) - CRUD endpoints
+  
+  // GET /api/admin/entidade-tipos - List all entity types (admin only)
+  app.get('/api/admin/entidade-tipos', requireAdmin, async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const tipos = await storage.getEntidadeTipos(empresaId);
+      res.json(tipos);
+    } catch (error) {
+      console.error("Error fetching entidade tipos:", error);
+      res.status(500).json({ message: "Failed to fetch entidade tipos" });
+    }
+  });
+
+  // POST /api/admin/entidade-tipos - Create new entity type
+  app.post('/api/admin/entidade-tipos', requireAdmin, async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const { nome, cor, ativo, ordem } = req.body;
+      
+      if (!nome) {
+        return res.status(400).json({ message: "Entity type name is required" });
+      }
+      
+      const newTipo = await storage.createEntidadeTipo({
+        nome,
+        cor: cor || null,
+        ativo: ativo !== false,
+        ordem: ordem || 0,
+      }, empresaId);
+      
+      res.json(newTipo);
+    } catch (error) {
+      console.error("Error creating entidade tipo:", error);
+      res.status(400).json({ message: "Failed to create entidade tipo" });
+    }
+  });
+
+  // PATCH /api/admin/entidade-tipos/:id - Update entity type
+  app.patch('/api/admin/entidade-tipos/:id', requireAdmin, async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const { nome, cor, ativo, ordem } = req.body;
+      
+      const updateData: Partial<EntidadeTipo> = {};
+      if (nome !== undefined) updateData.nome = nome;
+      if (cor !== undefined) updateData.cor = cor;
+      if (ativo !== undefined) updateData.ativo = ativo;
+      if (ordem !== undefined) updateData.ordem = ordem;
+      
+      const updated = await storage.updateEntidadeTipo(req.params.id, updateData, empresaId);
+      if (!updated) {
+        return res.status(404).json({ message: "Entidade tipo not found or unauthorized" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating entidade tipo:", error);
+      res.status(500).json({ message: "Failed to update entidade tipo" });
+    }
+  });
+
+  // GET /api/entidade-tipos - List active entity types (for frontend dropdowns)
+  app.get('/api/entidade-tipos', isAuthenticated, async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const tipos = await storage.getEntidadeTiposAtivos(empresaId);
+      res.json(tipos);
+    } catch (error) {
+      console.error("Error fetching active entidade tipos:", error);
+      res.status(500).json({ message: "Failed to fetch entidade tipos" });
+    }
+  });
+
   // GET /api/marcas - List active brands (public endpoint, authenticated but no admin required)
   app.get('/api/marcas', isAuthenticated, async (req: any, res) => {
     try {
