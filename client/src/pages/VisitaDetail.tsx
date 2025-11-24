@@ -454,7 +454,12 @@ export default function VisitaDetail() {
       const formData = new FormData();
       formData.append("entidadeId", visita?.entidadeId || visita?.gabineteId || "");
       formData.append("contactoId", visita?.contactoId || "");
-      formData.append("dataVisita", new Date(visita.proximaVisita).toISOString());
+      
+      // Convert proximaVisita to ISO string if it's not already
+      const proximaData = typeof visita.proximaVisita === 'string' 
+        ? visita.proximaVisita 
+        : new Date(visita.proximaVisita).toISOString();
+      formData.append("dataVisita", proximaData);
       formData.append("visitaAnteriorId", visitaId);
       
       // Add pre-filled notes with reference to previous visit
