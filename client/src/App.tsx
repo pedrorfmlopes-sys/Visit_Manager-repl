@@ -104,11 +104,13 @@ function Router() {
         <Route path="/contactos" component={Contactos} />
         <Route path="/contactos/novo" component={ContactoForm} />
         <Route path="/contactos/:id/detalhes" component={ContactoDetail} />
+        <Route path="/contactos/:id/editar" component={ContactoForm} />
         <Route path="/contactos/:id" component={ContactoForm} />
         
         {/* Visitas routes */}
         <Route path="/visitas" component={isAdmin ? AdminVisitas : Visitas} />
         <Route path="/visitas/nova" component={VisitaForm} />
+        <Route path="/visitas/:id/editar" component={VisitaForm} />
         <Route path="/visitas/:id" component={VisitaDetail} />
         
         {/* Tarefas routes */}
@@ -158,7 +160,9 @@ function AppContent() {
     "/entidades/nova",
     "/entidades/:id/editar",
     "/contactos/novo",
+    "/contactos/:id/editar",
     "/visitas/nova",
+    "/visitas/:id/editar",
     "/tarefas/nova",
     "/tarefas/:id/editar"
   ];
