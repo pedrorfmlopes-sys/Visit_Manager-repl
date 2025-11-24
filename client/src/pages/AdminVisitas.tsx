@@ -14,15 +14,19 @@ export default function AdminVisitas() {
   const [filters, setFilters] = useState<VisitasFilters>({});
   const [users, setUsers] = useState<{ id: string; email: string }[]>([]);
   const [marcas, setMarcas] = useState<{ id: string; nome: string }[]>([]);
+  const [entidades, setEntidades] = useState<{ id: string; nome: string }[]>([]);
+  const [contactos, setContactos] = useState<{ id: string; nome: string }[]>([]);
   const { empresa } = useAuth();
 
-  // Fetch users and marcas for filters
+  // Fetch users, marcas, entidades, and contactos for filters
   useEffect(() => {
     const fetchAdminData = async () => {
       try {
-        const [usersRes, marcasRes] = await Promise.all([
+        const [usersRes, marcasRes, entidadesRes, contactosRes] = await Promise.all([
           fetch("/api/admin/utilizadores"),
           fetch("/api/marcas"),
+          fetch("/api/entidades"),
+          fetch("/api/contactos"),
         ]);
         
         if (usersRes.ok) {
@@ -33,6 +37,16 @@ export default function AdminVisitas() {
         if (marcasRes.ok) {
           const marcasData = await marcasRes.json();
           setMarcas(marcasData);
+        }
+
+        if (entidadesRes.ok) {
+          const entidadesData = await entidadesRes.json();
+          setEntidades(entidadesData);
+        }
+
+        if (contactosRes.ok) {
+          const contactosData = await contactosRes.json();
+          setContactos(contactosData);
         }
       } catch (error) {
         console.error("Error fetching admin data:", error);
@@ -50,6 +64,8 @@ export default function AdminVisitas() {
   if (filters.userId) queryParams.set("userId", filters.userId);
   if (filters.marcaId) queryParams.set("marcaId", filters.marcaId);
   if (filters.hasAudioToTranscribe) queryParams.set("hasAudioToTranscribe", "true");
+  if (filters.entidadeId) queryParams.set("entidadeId", filters.entidadeId);
+  if (filters.contactoId) queryParams.set("contactoId", filters.contactoId);
 
   const { data: visitas, isLoading } = useQuery<VisitaWithRelations[]>({
     queryKey: ["/api/visitas", filters],
@@ -71,6 +87,8 @@ export default function AdminVisitas() {
             showAdminFilters={true}
             users={users}
             marcas={empresa?.mostrarMarcasEmVisitas ? marcas : []}
+            entidades={entidades}
+            contactos={contactos}
           />
         </div>
       </header>

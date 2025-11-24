@@ -1,0 +1,226 @@
+Boa notícia: o PASSO 1 está mesmo resolvido – o backend está a filtrar por entidadeId e contactoId como deve ser, com testes A/B/C todos OK.
+
+Ou seja: se o frontend mandar ?entidadeId=...&contactoId=..., a API já responde certo.
+Logo, os problemas que ainda sentes agora são 100% lado frontend / settings.
+
+Para não deixar o agent baralhar-se, vamos continuar em passos pequenos.
+Agora focamos só em Visitas (frontend), sem mexer em settings, nem EntidadeForm, nem AdminEmpresa.
+
+Plano geral (para contextualizar)
+
+✅ PASSO 1 – Backend /api/visitas filtra por entidade/contacto
+
+🔜 PASSO 2 – Visitas.tsx + VisitasFilterBar: filtros Entidade/Contacto visíveis e a enviar os params certos
+
+Depois:
+
+PASSO 3 – Aba Filtros em AdminEmpresa a gravar em uiSettings
+
+PASSO 4 – Ligar filtros às settings + refinar EntidadeForm/AdminEntidadeTipos
+
+Agora vamos só mandar o PASSO 2 ao agent.
+
+🧾 PROMPT – PASSO 2 (Frontend Visitas: Entidade & Contacto)
+
+Copia isto para o agent:
+
+PASSO 2 – Frontend Visitas: filtros Entidade & Contacto a funcionar (sem mexer em settings ainda)
+
+Contexto:
+
+PASSO 1 já confirmou que o backend faz corretamente:
+
+GET /api/visitas?entidadeId=...&contactoId=... filtra como deve ser (AND logic).
+
+Agora o problema está no frontend:
+
+Filtros de Entidade/Contacto podem não estar a aparecer ou não estar a enviar os parâmetros corretos.
+
+⚠️ Neste PASSO 2:
+
+Não tocar em:
+
+AdminEmpresa / Tab “Filtros”
+
+uiSettings / userSettings
+
+EntidadeForm / AdminEntidadeTipos
+
+Foco exclusivo:
+
+Visitas.tsx (agent e admin)
+
+VisitasFilterBar (ou componentes equivalentes para filtros de visitas)
+
+1. Garantir que Visitas.tsx passa entidadeId/contactoId para a query
+
+Abre o ficheiro da página de visitas do agente (ex.: client/src/pages/Visitas.tsx).
+
+Procura onde é criado o estado dos filtros, algo deste género:
+
+const [filters, setFilters] = useState({
+  search: "",
+  from: null,
+  to: null,
+  marcaId: undefined,
+  // ...
+});
+
+
+Garante que o estado inclui também:
+
+entidadeId?: string
+
+contactoId?: string
+
+Procura onde é feita a chamada à API (useQuery / fetch de /api/visitas):
+
+Tens de garantir que, quando constróis a URL ou o params, estás a incluir:
+
+entidadeId: filters.entidadeId
+
+contactoId: filters.contactoId
+
+Exemplo genérico (adapta à tua implementação):
+
+const queryString = new URLSearchParams();
+if (filters.search) queryString.set("search", filters.search);
+if (filters.entidadeId) queryString.set("entidadeId", filters.entidadeId);
+if (filters.contactoId) queryString.set("contactoId", filters.contactoId);
+// ...
+fetch(`/api/visitas?${queryString.toString()}`)
+
+
+Verifica também, se estiveres a sincronizar com a URL (React Router), que:
+
+Se a URL tiver ?entidadeId= ou ?contactoId=, esses valores são carregados para o state filters quando a página monta.
+
+2. VisitasFilterBar: adicionar/selects de Entidade e Contacto
+
+Abre o componente de filtros de visitas (ex.: client/src/components/VisitasFilterBar.tsx).
+
+Confirma a assinatura de props:
+
+Idealmente tens algo como:
+
+type VisitasFilterBarProps = {
+  filters: { /* ... */ entidadeId?: string; contactoId?: string; };
+  onChange: (newFilters) => void;
+  // ...
+}
+
+
+Se não tiver entidadeId/contactoId, adiciona-os nas props e no tipo de filters.
+
+Adiciona dois novos controles na UI do filtro:
+
+Filtro de Entidade:
+
+Pode ser um <Select> ou combobox, com pesquisa básica.
+
+Fonte de dados:
+
+Podes usar um hook existente que já carregue entidades (useEntidades) ou criar um useQuery simples dentro da FilterBar para /api/entidades?search=.
+
+Comportamento:
+
+Quando o utilizador escolhe uma entidade:
+
+chama onChange({ ...filters, entidadeId: selectedId }).
+
+Quando limpa o campo:
+
+onChange({ ...filters, entidadeId: undefined }).
+
+Filtro de Contacto:
+
+Mesma lógica:
+
+<Select> ou combobox para contactos (/api/contactos?search=).
+
+onChange({ ...filters, contactoId: selectedId }).
+
+Limpar → contactoId: undefined.
+
+Se quiseres, podes tornar o dropdown de contactos dependente da entidade (primeiro escolhe entidade, depois só contactos dessa entidade), mas não é obrigatório neste passo; o importante é enviar o contactoId certo para o parent.
+
+Garante que estes filtros aparecem na UI:
+
+Por agora, neste PASSO 2, não precisas de os esconder/mostrar com base em settings.
+
+Podes deixá-los sempre visíveis para simplificar.
+
+Mais tarde (PASSO 3) vamos então ligar isto às flags de uiSettings/userSettings.
+
+3. AdminVisitas: repetir filtros Entidade/Contacto
+
+Abre a página de visitas para admin (ex.: client/src/pages/AdminVisitas.tsx).
+
+Se ela já reutiliza VisitasFilterBar, perfeito:
+
+Garante que:
+
+passa filters.entidadeId e filters.contactoId nas props;
+
+recebe os valores atualizados no onChange e os reenvia para a query da API.
+
+Se AdminVisitas tiver a sua própria barra de filtros:
+
+Repete a mesma abordagem:
+
+estado local entidadeId, contactoId,
+
+selects de Entidade/Contacto,
+
+querystring com entidadeId e contactoId,
+
+useQuery chama /api/visitas com os params corretos.
+
+4. Testes que quero que faças (lado frontend)
+
+Depois de implementares isto:
+
+Teste 1 – Filtro Entidade (Agent)
+
+Abre a página de Visitas como agent.
+
+Escolhe uma entidade no filtro.
+
+Verifica:
+
+A URL passa a ter ?entidadeId=<id> (se estiveres a sincronizar com querystring).
+
+A lista de visitas mostra apenas visitas dessa entidade.
+
+Teste 2 – Filtro Contacto (Agent)
+
+Escolhe um contacto no filtro.
+
+Verifica se a lista só mostra visitas desse contacto.
+
+Teste 3 – Entidade + Contacto (Agent)
+
+Escolhe entidade A + contacto C.
+
+Verifica se só aparecem visitas que tenham os dois (AND).
+
+Teste 4 – AdminVisitas
+
+Repete os testes 1–3 na vista de admin.
+
+⚠️ Se nos testes A/B/C do PASSO 1 o backend já filtrava corretamente, qualquer falha aqui será necessariamente frontend.
+
+5. Relatório deste PASSO 2
+
+No relatório desta mini-fase, por favor inclui:
+
+Ficheiros modificados (ex.: Visitas.tsx, VisitasFilterBar.tsx, AdminVisitas.tsx).
+
+Como ficaste a construir a querystring / params para /api/visitas.
+
+Como ficaram os selects de Entidade/Contacto (que endpoint usam para carregar dados).
+
+Resultados dos testes 1–4 (passou/falhou + observações).
+
+Relembro:
+👉 Neste PASSO 2 não mexer na Tab “Filtros” de AdminEmpresa, nem em uiSettings, nem em EntidadeForm — isso vamos tratar num PASSO 3 separado, depois de ter a funcionalidade base a funcionar em Visitas.
