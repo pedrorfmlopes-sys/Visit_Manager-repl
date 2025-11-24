@@ -113,6 +113,66 @@ export default function Dashboard() {
           </>
         ) : stats ? (
           <>
+            {/* PDF Reports - TOPO */}
+            <Card data-testid="card-reports" className="border-primary/30 bg-primary/5">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Download className="h-5 w-5 text-primary" />
+                  Exportar Relatórios PDF
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    variant="default"
+                    onClick={() => handleDownloadReport('monthly', 'agent')}
+                    data-testid="button-report-monthly-agent"
+                    className="w-full"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Mensal
+                  </Button>
+                  <Button
+                    variant="default"
+                    onClick={() => handleDownloadReport('weekly', 'agent')}
+                    data-testid="button-report-weekly-agent"
+                    className="w-full"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Semanal
+                  </Button>
+                </div>
+                {isAdmin && (
+                  <>
+                    <Separator />
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase">Empresa (Admin)</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Button
+                          variant="outline"
+                          onClick={() => handleDownloadReport('monthly', 'company')}
+                          data-testid="button-report-monthly-company"
+                          className="w-full"
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Mensal
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => handleDownloadReport('weekly', 'company')}
+                          data-testid="button-report-weekly-company"
+                          className="w-full"
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Semanal
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
             <div className="grid grid-cols-2 gap-3">
               <Card className="p-4 text-center space-y-2">
                 <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mx-auto">
@@ -172,64 +232,6 @@ export default function Dashboard() {
                 </div>
                 <div className="text-muted-foreground">→</div>
               </div>
-            </Card>
-
-            <Card data-testid="card-reports">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Download className="h-5 w-5" />
-                  Relatórios PDF PRO
-                </CardTitle>
-                <CardDescription>Exporte relatórios detalhados com gráficos e análise IA</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDownloadReport('monthly', 'agent')}
-                    data-testid="button-report-monthly-agent"
-                  >
-                    <Calendar className="h-4 w-4 mr-2" />
-                    Mensal
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDownloadReport('weekly', 'agent')}
-                    data-testid="button-report-weekly-agent"
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Semanal
-                  </Button>
-                </div>
-                {isAdmin && (
-                  <>
-                    <Separator />
-                    <p className="text-sm text-muted-foreground">Relatórios da Empresa (Admin)</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDownloadReport('monthly', 'company')}
-                        data-testid="button-report-monthly-company"
-                      >
-                        <Building2 className="h-4 w-4 mr-2" />
-                        Mensal Empresa
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDownloadReport('weekly', 'company')}
-                        data-testid="button-report-weekly-company"
-                      >
-                        <BarChart className="h-4 w-4 mr-2" />
-                        Semanal Empresa
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </CardContent>
             </Card>
 
             {stats.marcasMaisEntregues.length > 0 && (
