@@ -922,7 +922,12 @@ export default function VisitaDetail() {
                 )}
 
                 {/* Sugestões de Tarefas e Agendamentos */}
-                {visita.tarefasSugeridasIA && visita.tarefasSugeridasIA.length > 0 && (
+                {visita.tarefasSugeridasIA && (() => {
+                  const parsed = typeof visita.tarefasSugeridasIA === 'string' 
+                    ? JSON.parse(visita.tarefasSugeridasIA) 
+                    : visita.tarefasSugeridasIA;
+                  return Array.isArray(parsed) && parsed.length > 0;
+                })() && (
                   <>
                     {/* Tarefas Sugeridas */}
                     {((typeof visita.tarefasSugeridasIA === 'string' 
