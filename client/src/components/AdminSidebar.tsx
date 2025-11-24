@@ -2,6 +2,13 @@ import { Link, useLocation } from "wouter";
 import { LayoutDashboard, Building2, Users, CheckCircle2, Bell, Settings, LogOut, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
 import { useTodaySummary } from "@/hooks/use-today-summary";
 
@@ -14,17 +21,18 @@ const sidebarItems = [
   { path: "/lembretes", icon: Bell, label: "Lembretes" },
 ];
 
-const adminSidebarItems = [
-  { path: "/admin/empresa", icon: Settings, label: "Definições" },
-];
 
 export function AdminSidebar() {
-  const [location] = useLocation();
-  const { user, empresa } = useAuth();
+  const [location, setLocation] = useLocation();
+  const { user, empresa, isAdmin } = useAuth();
   const { tarefasAtrasadas, tarefasHoje, visitasHoje } = useTodaySummary();
 
   const handleLogout = () => {
     window.location.href = "/api/logout";
+  };
+
+  const handleNavigateToSettings = () => {
+    setLocation("/admin/empresa");
   };
 
   return (
@@ -101,43 +109,38 @@ export function AdminSidebar() {
           })}
         </div>
 
-        <div className="pt-2">
-          <p className="px-2 text-xs font-semibold text-muted-foreground mb-2">ADMIN</p>
-          {adminSidebarItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location === item.path || (item.path !== "/" && location.startsWith(item.path));
-            
-            return (
-              <Link key={item.path} href={item.path}>
-                <button
-                  data-testid={`nav-${item.label.toLowerCase()}`}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-md transition-colors text-sm ${
-                    isActive
-                      ? "bg-primary/10 text-primary font-medium"
-                      : "text-muted-foreground hover:text-foreground hover-elevate"
-                  }`}
-                >
-                  <Icon className="h-5 w-5 flex-shrink-0" />
-                  <span>{item.label}</span>
-                </button>
-              </Link>
-            );
-          })}
-        </div>
       </nav>
 
       {/* Footer */}
       <div className="p-4 border-t border-card-border space-y-2">
         <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-        <Link href="/perfil">
-          <button
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-xs text-muted-foreground hover:text-foreground hover-elevate transition-colors"
-            data-testid="button-admin-settings"
-          >
-            <Settings className="h-4 w-4" />
-            Definições
-          </button>
-        </Link>
+        
+        {/* Settings Dropdown Menu - only for admins */}
+        {isAdmin && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start text-xs hover-elevate"
+                data-testid="button-settings-dropdown"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Definições
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="top" align="start" className="w-56">
+              <DropdownMenuLabel>Definições</DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={handleNavigateToSettings}
+                data-testid="menu-item-settings-empresa"
+              >
+                Centro de Configurações da Empresa
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        
         <Button
           variant="ghost"
           size="sm"

@@ -1,0 +1,131 @@
+🔧 FASE 32 – Um único botão “Definições” no rodapé com menu para cima
+
+Contexto atual (após FASE 31):
+
+O AdminSidebar.tsx foi simplificado e agora tem um único item “Definições” na secção ADMIN que aponta para /admin/empresa.
+
+No fundo do sidebar, junto ao email do utilizador, ainda existe outro item “Definições”.
+
+O utilizador quer:
+
+ver apenas um botão de Definições no ecrã, localizado no rodapé,
+
+ao clicar, abrir um pequeno menu para cima com as opções de configuração.
+
+🎯 Objetivo desta fase:
+
+Remover o item “Definições” da secção ADMIN do sidebar.
+
+Criar um único botão “Definições” no rodapé, ao lado/acima de “Sair”.
+
+Ao clicar nesse botão, abrir um menu popover / dropdown / sheet para cima com pelo menos:
+
+“Centro de Configurações da Empresa” → navega para /admin/empresa
+
+(deixar preparado para no futuro adicionar “As minhas definições / Perfil”)
+
+1. Sidebar – remover “Definições” da secção ADMIN
+
+No AdminSidebar.tsx (ou componente equivalente da navegação lateral):
+
+Remove o item “Definições” da secção ADMIN:
+
+Deixa a secção NAVEGAÇÃO com: Dashboard, Entidades, Contactos, Visitas, Tarefas, Lembretes.
+
+Não deve existir nenhum item “Definições” nessa lista principal.
+
+Resultado esperado:
+
+A secção principal do sidebar mostra só itens operacionais (Dashboard, Entidades, …).
+
+2. Rodapé – criar o botão único de Definições com menu para cima
+
+No mesmo componente (ou num componente filho) onde já renderizas:
+
+o email do utilizador
+
+o botão “Sair”
+
+Adiciona um único botão “Definições” (com ícone Settings):
+
+Visualmente alinhado com o estilo actual,
+
+Colocado entre o email e o botão “Sair” (ou ao lado, se for horizontal).
+
+Envolve esse botão num componente de menu (pode ser DropdownMenu ou Sheet do shadcn/ui).
+Exemplo de UX (só conceito, ajusta ao teu design actual):
+
+<DropdownMenu>
+  <DropdownMenuTrigger asChild>
+    <Button variant="ghost" size="sm">
+      <Settings className="mr-2 h-4 w-4" />
+      Definições
+    </Button>
+  </DropdownMenuTrigger>
+  <DropdownMenuContent side="top" align="start">
+    <DropdownMenuLabel>Definições</DropdownMenuLabel>
+    <DropdownMenuItem onClick={() => navigate("/admin/empresa")}>
+      Centro de Configurações da Empresa
+    </DropdownMenuItem>
+    {/* Futuro: As minhas definições / Perfil */}
+  </DropdownMenuContent>
+</DropdownMenu>
+
+
+Para já, só precisa de uma opção funcional:
+
+“Centro de Configurações da Empresa” → navegar para /admin/empresa.
+
+3. Comportamento para roles (Admin vs Agent)
+
+Se o user não for admin:
+
+Podes:
+
+ou esconder o item “Centro de Configurações da Empresa”,
+
+ou deixar o menu mas com essa opção desactivada.
+
+Se for admin (caso actual do Pedro):
+
+O menu mostra “Centro de Configurações da Empresa” activo.
+
+4. Testes a realizar
+
+Como admin:
+
+Verifica o sidebar:
+
+Não deve existir nenhum item “Definições” na secção NAVEGAÇÃO / ADMIN.
+
+No rodapé, deve aparecer:
+
+email do utilizador
+
+botão “Definições”
+
+botão “Sair”
+
+Clica no botão “Definições”:
+
+Deve abrir um menu para cima (popover/sheet) com opção:
+
+“Centro de Configurações da Empresa”
+
+Ao clicar nessa opção, deve navegar para /admin/empresa.
+
+5. Relatório desta fase
+
+No relatório, descreve:
+
+Como ficou a estrutura final do sidebar (itens principais + rodapé).
+
+Que componente usaste para o menu (DropdownMenu, Sheet, etc.).
+
+Qual a navegação configurada quando se escolhe “Centro de Configurações da Empresa”.
+
+Resultado dos testes (ponto 4).
+
+Objetivo final:
+👉 No ecrã só existe um único botão “Definições” visível, no rodapé,
+👉 Esse botão abre um menu para cima com as opções de configuração (por agora, empresa).
