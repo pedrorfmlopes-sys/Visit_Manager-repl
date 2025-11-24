@@ -166,11 +166,11 @@ export default function VisitaForm() {
     onSuccess: async (visitaData) => {
       queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
       
-      // FASE 15: Invalidate previous visit query and its posteriores if this is a follow-up visit
+      // FASE 15: Refetch previous visit query and its posteriores if this is a follow-up visit
       const visitaAnteriorId = new URLSearchParams(window.location.search).get('visitaAnteriorId');
       if (visitaAnteriorId) {
-        queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaAnteriorId] });
-        queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaAnteriorId, "posteriores"] });
+        queryClient.refetchQueries({ queryKey: ["/api/visitas", visitaAnteriorId] });
+        queryClient.refetchQueries({ queryKey: ["/api/visitas", visitaAnteriorId, "posteriores"] });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/entidades"] });
@@ -247,7 +247,13 @@ export default function VisitaForm() {
         });
       }
       
-      setLocation("/visitas");
+      // FASE 15: If this is a follow-up visit, navigate back to anterior visit, otherwise to list
+      const visitaAnteriorIdNav = new URLSearchParams(window.location.search).get('visitaAnteriorId');
+      if (visitaAnteriorIdNav) {
+        setLocation(`/visitas/${visitaAnteriorIdNav}`);
+      } else {
+        setLocation("/visitas");
+      }
     },
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
