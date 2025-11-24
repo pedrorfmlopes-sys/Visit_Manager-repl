@@ -61,7 +61,6 @@ export default function VisitaDetail() {
   const [createdAppointmentId, setCreatedAppointmentId] = useState<string | null>(null);
   const [localProximaVisita, setLocalProximaVisita] = useState<Date | null>(null);
   const [createdSuggestedMap, setCreatedSuggestedMap] = useState<Map<string, { type: 'tarefa' | 'agendamento', status?: string, date?: Date }>>(new Map());
-  const [deleteConfirmDialogOpen, setDeleteConfirmDialogOpen] = useState(false);
   const [pdfProOptions, setPdfProOptions] = useState({
     includePhotos: true,
     includeTasks: true,
@@ -390,7 +389,7 @@ export default function VisitaDetail() {
 
   const createAppointmentMutation = useMutation({
     mutationFn: async () => {
-      if (!appointmentDate || !visitaId) throw new Error('No appointment data');
+      if (!suggestedTaskToCreate || !appointmentDate || !visitaId) throw new Error('No appointment data');
       
       // Update the current visit with the next appointment date
       const response = await apiRequest("PATCH", `/api/visitas/${visitaId}`, {
@@ -440,69 +439,6 @@ export default function VisitaDetail() {
       toast({
         title: "Erro",
         description: "Falha ao agendar próxima visita",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // FASE 15: Mutation to mark scheduled appointment as completed and create follow-up visit
-  const markAsCompletedMutation = useMutation({
-    mutationFn: async () => {
-      if (!visitaId || !visita?.proximaVisita) throw new Error('No appointment data');
-      
-      console.log("📋 Creating follow-up visit from appointment:", visita.proximaVisita);
-      
-      // Prepare follow-up visit data
-      const formData = new FormData();
-      formData.append("entidadeId", visita?.entidadeId || visita?.gabineteId || "");
-      formData.append("contactoId", visita?.contactoId || "");
-      
-      // Send proximaVisita directly - backend will convert it
-      formData.append("dataVisita", String(visita.proximaVisita));
-      formData.append("visitaAnteriorId", visitaId);
-      
-      // Add pre-filled notes with reference to previous visit
-      const previousSummary = visita?.resumoIa ? `<p>Referência à visita anterior: ${visita.resumoIa}</p><p></p><p></p>` : "<p></p><p></p><p></p>";
-      formData.append("notas", previousSummary);
-      
-      console.log("📨 FormData content:", {
-        entidadeId: visita?.entidadeId || visita?.gabineteId,
-        contactoId: visita?.contactoId,
-        dataVisita: String(visita.proximaVisita),
-        visitaAnteriorId: visitaId,
-      });
-      
-      // Create the follow-up visit
-      const response = await apiRequest("POST", "/api/visitas", formData);
-      return response;
-    },
-    onSuccess: async (response: any) => {
-      console.log("✅ Follow-up visit created successfully:", response);
-      
-      // Invalidate caches
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["/api/visitas"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] }),
-        visitaId && queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId, "posteriores"] }),
-      ]);
-      
-      // Wait a moment for cache updates
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      toast({
-        title: "Sucesso",
-        description: "Visita marcada como realizado. Nova visita criada!",
-      });
-      
-      // Navigate to the newly created visit
-      if (response?.id) {
-        setLocation(`/visitas/${response.id}`);
-      }
-    },
-    onError: () => {
-      toast({
-        title: "Erro",
-        description: "Falha ao marcar como realizado",
         variant: "destructive",
       });
     },
@@ -1220,7 +1156,7 @@ export default function VisitaDetail() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setDeleteConfirmDialogOpen(true)}
+                onClick={() => deleteScheduledAppointmentMutation.mutate()}
                 disabled={deleteScheduledAppointmentMutation.isPending}
                 data-testid="button-delete-scheduled-appointment"
                 className="h-8 w-8"
@@ -1231,7 +1167,7 @@ export default function VisitaDetail() {
             <CardContent className="space-y-4">
               <div>
                 <p className="text-sm font-medium">
-                  {(localProximaVisita || visita?.proximaVisita) && format(new Date(localProximaVisita || visita?.proximaVisita!), "PPP 'às' HH:mm", { locale: pt })}
+                  {format(new Date(localProximaVisita || visita?.proximaVisita), "PPP 'às' HH:mm", { locale: pt })}
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
                   Agendada a partir de sugestão IA
@@ -1242,9 +1178,8 @@ export default function VisitaDetail() {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    const proximaData = localProximaVisita || visita?.proximaVisita;
-                    if (visita?.gabinete && proximaData) {
-                      downloadNextVisitICS(visita.gabinete, visita.contacto || undefined, new Date(proximaData));
+                    if (visita?.gabinete && (visita?.proximaVisita || localProximaVisita)) {
+                      downloadNextVisitICS(visita.gabinete, visita.contacto || undefined, new Date(visita?.proximaVisita || localProximaVisita));
                       toast({
                         title: "Exportado",
                         description: "Próxima visita exportada para calendário!",
@@ -1271,12 +1206,24 @@ export default function VisitaDetail() {
                   <Button
                     variant="default"
                     size="sm"
-                    onClick={() => markAsCompletedMutation.mutate()}
-                    disabled={markAsCompletedMutation.isPending}
+                    onClick={() => {
+                      // Navigate to new visit form with pre-filled data (via query params)
+                      const params = new URLSearchParams({
+                        visitaAnteriorId: visitaId || "",
+                        dataVisita: (localProximaVisita || visita?.proximaVisita)?.toString() || "",
+                        entidadeId: visita?.entidadeId || visita?.gabineteId || "",
+                        contactoId: visita?.contactoId || "",
+                        entidadeName: visita?.gabinete?.nome || visita?.entidade?.nome || "",
+                        contactoName: visita?.contacto?.nome || "",
+                        visitaAnteriorData: visita?.dataVisita?.toString() || "",
+                        resumoVisitaAnterior: visita?.resumoIa || "",
+                      });
+                      setLocation(`/visitas/nova?${params.toString()}`);
+                    }}
                     data-testid="button-mark-scheduled-visit-done"
                   >
                     <CheckCircle2 className="h-4 w-4 mr-2" />
-                    {markAsCompletedMutation.isPending ? "A criar..." : "Marcar como Realizado"}
+                    Marcar como Realizado
                   </Button>
                 )}
               </div>
@@ -1764,40 +1711,6 @@ export default function VisitaDetail() {
               <Download className="h-4 w-4 mr-2" />
               Exportar
             </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* FASE 15: Delete Scheduled Appointment Confirmation Dialog */}
-      <Dialog open={deleteConfirmDialogOpen} onOpenChange={setDeleteConfirmDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Eliminar Agendamento</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Tem a certeza que deseja eliminar este agendamento? Esta ação não pode ser desfeita.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <Button
-                variant="outline"
-                onClick={() => setDeleteConfirmDialogOpen(false)}
-                data-testid="button-delete-confirm-cancel"
-              >
-                Cancelar
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  deleteScheduledAppointmentMutation.mutate();
-                  setDeleteConfirmDialogOpen(false);
-                }}
-                disabled={deleteScheduledAppointmentMutation.isPending}
-                data-testid="button-delete-confirm"
-              >
-                {deleteScheduledAppointmentMutation.isPending ? "A eliminar..." : "Eliminar"}
-              </Button>
-            </div>
           </div>
         </DialogContent>
       </Dialog>
