@@ -35,6 +35,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
+interface SuggestedTask {
+  titulo: string;
+  descricao: string;
+  prioridade: 'alta' | 'normal' | 'baixa';
+  prazo_sugerido_dias: number;
+}
+
 export default function VisitaDetail() {
   const [, params] = useRoute("/visitas/:id");
   const [, setLocation] = useLocation();
@@ -45,6 +52,7 @@ export default function VisitaDetail() {
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [pdfProDialogOpen, setPdfProDialogOpen] = useState(false);
+  const [suggestedTaskToCreate, setSuggestedTaskToCreate] = useState<SuggestedTask | null>(null);
   const [pdfProOptions, setPdfProOptions] = useState({
     includePhotos: true,
     includeTasks: true,
@@ -222,11 +230,9 @@ export default function VisitaDetail() {
       descricao: visita?.notas || "",
       visitaId: visitaId,
       entidadeId: visita?.entidadeId || visita?.gabineteId || undefined,
-      assignedUserId: currentUser?.id || undefined,
       dueDate: tomorrow,
       repeatInterval: "none",
       status: "pending",
-      createdByUserId: currentUser?.id || "",
     },
   });
 
@@ -236,7 +242,6 @@ export default function VisitaDetail() {
         ...data,
         entidadeId: data.entidadeId || undefined,
         visitaId: data.visitaId || undefined,
-        assignedUserId: data.assignedUserId || undefined,
         dueDate: data.dueDate || undefined,
       };
       await apiRequest("POST", "/api/tarefas", cleanedData);
@@ -279,12 +284,26 @@ export default function VisitaDetail() {
       descricao: visita?.notas || "",
       visitaId: visitaId,
       entidadeId: visita?.entidadeId || visita?.gabineteId || undefined,
-      assignedUserId: isAdmin ? undefined : currentUser?.id,
       dueDate: tomorrow,
       repeatInterval: "none",
       status: "pending",
-      createdByUserId: currentUser?.id || "",
     });
+    setSuggestedTaskToCreate(null);
+    setIsTaskDialogOpen(true);
+  };
+
+  const handleCreateSuggestedTask = (suggestedTask: SuggestedTask) => {
+    const dueDate = addDays(new Date(), suggestedTask.prazo_sugerido_dias);
+    form.reset({
+      titulo: suggestedTask.titulo,
+      descricao: suggestedTask.descricao,
+      visitaId: visitaId,
+      entidadeId: visita?.entidadeId || visita?.gabineteId || undefined,
+      dueDate: dueDate,
+      repeatInterval: "none",
+      status: "pending",
+    });
+    setSuggestedTaskToCreate(suggestedTask);
     setIsTaskDialogOpen(true);
   };
 
@@ -860,23 +879,36 @@ export default function VisitaDetail() {
                         ? JSON.parse(visita.tarefasSugeridasIA) 
                         : visita.tarefasSugeridasIA
                       ).map((tarefa: any, idx: number) => (
-                        <div key={idx} className="p-2 bg-muted/30 rounded-md border border-muted">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-sm font-medium text-foreground">{tarefa.titulo}</span>
-                            <Badge 
-                              variant="outline" 
-                              className="text-xs"
-                              data-testid={`badge-priority-${tarefa.prioridade}-${idx}`}
-                            >
-                              {tarefa.prioridade === 'alta' && 'Alta'}
-                              {tarefa.prioridade === 'normal' && 'Normal'}
-                              {tarefa.prioridade === 'baixa' && 'Baixa'}
-                            </Badge>
+                        <div key={idx} className="p-3 bg-muted/30 rounded-md border border-muted space-y-2">
+                          <div className="flex items-start gap-2 justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-sm font-medium text-foreground">{tarefa.titulo}</span>
+                                <Badge 
+                                  variant="outline" 
+                                  className="text-xs"
+                                  data-testid={`badge-priority-${tarefa.prioridade}-${idx}`}
+                                >
+                                  {tarefa.prioridade === 'alta' && 'Alta'}
+                                  {tarefa.prioridade === 'normal' && 'Normal'}
+                                  {tarefa.prioridade === 'baixa' && 'Baixa'}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground mb-1">{tarefa.descricao}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Prazo sugerido: {tarefa.prazo_sugerido_dias} dias
+                              </p>
+                            </div>
                           </div>
-                          <p className="text-xs text-muted-foreground mb-1">{tarefa.descricao}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Prazo sugerido: {tarefa.prazo_sugerido_dias} dias
-                          </p>
+                          <Button
+                            size="sm"
+                            onClick={() => handleCreateSuggestedTask(tarefa)}
+                            className="w-full"
+                            data-testid={`button-create-suggested-task-${idx}`}
+                          >
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Criar Tarefa
+                          </Button>
                         </div>
                       ))}
                     </div>
