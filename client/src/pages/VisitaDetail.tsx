@@ -310,16 +310,35 @@ export default function VisitaDetail() {
         visitaId: data.visitaId || undefined,
         dueDate: data.dueDate || undefined,
       };
-      await apiRequest("POST", "/api/tarefas", cleanedData);
+      return await apiRequest("POST", "/api/tarefas", cleanedData);
     },
-    onSuccess: () => {
+    onSuccess: async (createdTask: any) => {
+      // FASE 21: Link created task to suggestion
+      if (suggestedTaskToCreate && visitaId && createdTask?.id && visita?.tarefasSugeridasIA) {
+        try {
+          const suggestions = typeof visita.tarefasSugeridasIA === 'string' 
+            ? JSON.parse(visita.tarefasSugeridasIA) 
+            : visita.tarefasSugeridasIA;
+          
+          const updated = suggestions.map((s: any) =>
+            s.titulo === suggestedTaskToCreate.titulo ? { ...s, tarefaId: createdTask.id } : s
+          );
+          
+          await apiRequest("PATCH", `/api/visitas/${visitaId}`, {
+            tarefasSugeridasIA: JSON.stringify(updated),
+          });
+        } catch (err) {
+          console.error('Failed to link task to suggestion:', err);
+        }
+      }
+      
       queryClient.invalidateQueries({ queryKey: ["/api/tarefas"] });
       queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
       
       // Register in created suggestions map
       if (suggestedTaskToCreate) {
         const key = `${suggestedTaskToCreate.titulo}`;
-        setCreatedSuggestedMap(prev => new Map(prev).set(key, { type: 'tarefa', status: 'pending' }));
+        setCreatedSuggestedMap(prev => new Map(prev).set(key, { type: 'tarefa', status: 'pending', id: createdTask?.id }));
       }
       
       toast({
@@ -404,6 +423,25 @@ export default function VisitaDetail() {
     },
     onSuccess: async (response: any) => {
       console.log("🎯 Appointment mutation success! Response:", response);
+      
+      // FASE 21: Link appointment to suggestion
+      if (suggestedTaskToCreate && visitaId && visita?.tarefasSugeridasIA) {
+        try {
+          const suggestions = typeof visita.tarefasSugeridasIA === 'string' 
+            ? JSON.parse(visita.tarefasSugeridasIA) 
+            : visita.tarefasSugeridasIA;
+          
+          const updated = suggestions.map((s: any) =>
+            s.titulo === suggestedTaskToCreate.titulo ? { ...s, visitaId: visitaId, dataAgendada: appointmentDate } : s
+          );
+          
+          await apiRequest("PATCH", `/api/visitas/${visitaId}`, {
+            tarefasSugeridasIA: JSON.stringify(updated),
+          });
+        } catch (err) {
+          console.error('Failed to link appointment to suggestion:', err);
+        }
+      }
       
       // Update local state immediately to show card
       if (appointmentDate) {
@@ -1074,16 +1112,28 @@ export default function VisitaDetail() {
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleCreateSuggestedTask(tarefa)}
-                                  className="flex-1"
-                                  disabled={!!createdSuggestedMap.get(`${tarefa.titulo}`)}
-                                  data-testid={`button-create-suggested-task-${idx}`}
-                                >
-                                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                                  Criar Tarefa
-                                </Button>
+                                {tarefa.tarefaId ? (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => setLocation(`/tarefas/${tarefa.tarefaId}`)}
+                                    className="flex-1"
+                                    data-testid={`button-view-suggested-task-${idx}`}
+                                  >
+                                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                                    Ver Tarefa
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleCreateSuggestedTask(tarefa)}
+                                    className="flex-1"
+                                    disabled={!!createdSuggestedMap.get(`${tarefa.titulo}`)}
+                                    data-testid={`button-create-suggested-task-${idx}`}
+                                  >
+                                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                                    Criar Tarefa
+                                  </Button>
+                                )}
                                 {createdSuggestedMap.get(`${tarefa.titulo}`)?.type === 'tarefa' && (
                                   <Badge variant="outline" className="text-xs whitespace-nowrap">
                                     {createdSuggestedMap.get(`${tarefa.titulo}`)?.status}
@@ -1124,22 +1174,40 @@ export default function VisitaDetail() {
                                     </Badge>
                                   </div>
                                   <p className="text-xs text-muted-foreground mb-1">{agendamento.descricao}</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    Data sugerida: {format(addDays(new Date(), agendamento.prazo_sugerido_dias), "PPP", { locale: pt })}
-                                  </p>
+                                  {agendamento.dataAgendada ? (
+                                    <p className="text-xs text-muted-foreground font-medium">
+                                      Agendado para: {format(new Date(agendamento.dataAgendada), "PPP", { locale: pt })}
+                                    </p>
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground">
+                                      Data sugerida: {format(addDays(new Date(), agendamento.prazo_sugerido_dias), "PPP", { locale: pt })}
+                                    </p>
+                                  )}
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleCreateSuggestedAppointment(agendamento)}
-                                  className="flex-1"
-                                  disabled={!!createdSuggestedMap.get(`${agendamento.titulo}`)}
-                                  data-testid={`button-schedule-suggested-appointment-${idx}`}
-                                >
-                                  <Calendar className="h-3 w-3 mr-1" />
-                                  Agendar Visita
-                                </Button>
+                                {agendamento.dataAgendada ? (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => setLocation(`/visitas`)}
+                                    className="flex-1"
+                                    data-testid={`button-view-suggested-appointment-${idx}`}
+                                  >
+                                    <Calendar className="h-3 w-3 mr-1" />
+                                    Ver Agendamento
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleCreateSuggestedAppointment(agendamento)}
+                                    className="flex-1"
+                                    disabled={!!createdSuggestedMap.get(`${agendamento.titulo}`)}
+                                    data-testid={`button-schedule-suggested-appointment-${idx}`}
+                                  >
+                                    <Calendar className="h-3 w-3 mr-1" />
+                                    Agendar Visita
+                                  </Button>
+                                )}
                                 {createdSuggestedMap.get(`${agendamento.titulo}`)?.type === 'agendamento' && (
                                   <Badge variant="outline" className="text-xs whitespace-nowrap">
                                     {createdSuggestedMap.get(`${agendamento.titulo}`)?.date 

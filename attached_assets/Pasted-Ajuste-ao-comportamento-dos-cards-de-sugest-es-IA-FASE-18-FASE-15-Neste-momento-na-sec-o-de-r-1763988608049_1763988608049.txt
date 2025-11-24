@@ -1,0 +1,81 @@
+Ajuste ao comportamento dos cards de sugestões IA (FASE 18 / FASE 15)
+
+Neste momento, na secção de resumo IA da visita, tenho:
+
+Cards com sugestões de tarefas (botão “Criar tarefa”).
+
+Cards com sugestões de agendamentos/visitas (botão “Agendar visita” / “Criar visita”).
+
+Após a FASE 18, o fluxo base está a funcionar, mas falta um comportamento importante:
+
+Problema atual:
+
+Depois de eu criar uma tarefa a partir de uma sugestão IA:
+
+No momento o botão muda (ex.: “Tarefa criada”), mas isto é só em memória.
+
+Se eu recarregar a página ou voltar mais tarde à visita, o card volta a aparecer como se nunca tivesse sido criada a tarefa (mostra novamente “Criar tarefa”).
+
+O mesmo raciocínio aplica-se aos agendamentos/visitas criados a partir de sugestões IA.
+
+Comportamento desejado:
+
+1️⃣ Para sugestões IA → TAREFAS
+
+Quando eu clicar em “Criar tarefa” e a tarefa for criada com sucesso:
+
+Guardar de forma persistente a relação entre a sugestão IA e a tarefa criada
+(podes escolher a estrutura mais simples e consistente com a FASE 18, por exemplo acrescentando tarefaId na entrada correspondente de tarefasSugeridasIA ou estrutura equivalente).
+
+A partir desse momento, esse card deve passar a mostrar:
+
+Que a tarefa já foi criada (ex.: badge “Tarefa criada”).
+
+O estado real da tarefa (pending/done/overdue) e, se possível, o prazo.
+
+Em vez do botão “Criar tarefa”, pode ter:
+
+botão “Ver tarefa” que leva ao detalhe da tarefa, ou
+
+apenas o estado, mas sem permitir criar outra tarefa a partir da mesma sugestão.
+
+Quando eu reabrir a visita noutro momento:
+
+O card deve continuar neste estado “ligado à tarefa”, e não voltar ao botão “Criar tarefa”.
+
+Se o estado da tarefa mudar (por exemplo, eu marcar como concluída noutra parte da app):
+
+O card deve refletir essa mudança, indo buscar o estado atual da tarefa pelo tarefaId.
+
+2️⃣ Para sugestões IA → AGENDAMENTOS / VISITAS
+
+Quando eu usar a sugestão para criar um agendamento/visita:
+
+Guardar, de forma persistente, a ligação entre a sugestão IA e a visita/agendamento criado
+(por exemplo, um visitaId ou proximaVisitaId associado à sugestão correspondente).
+
+A partir daí, o card deve mostrar:
+
+“Visita agendada para [data/hora]” ou texto equivalente.
+
+Eventual estado/flag se estiver atrasada.
+
+Em vez de “Agendar visita”, pode ter “Ver visita” ou ficar apenas em modo informativo.
+
+Quando eu reabrir a visita:
+
+O card deve continuar a mostrar esta informação da visita agendada, não voltar ao estado de sugestão inicial.
+
+Se a data/estado da visita agendada se alterar (por exemplo através do card “Próxima visita agendada” da FASE 15/20):
+
+O card de sugestão IA deve refletir essas alterações, usando o id da visita/agendamento ligado.
+
+Resumindo em termos de UX:
+
+Os cards de sugestões IA deixam de ser apenas “botões de criar coisas uma vez”.
+
+Depois de eu agir sobre a sugestão (criando uma tarefa ou uma visita), o card passa a ser uma espécie de “espelho do objeto real” (tarefa/visita), mostrando o estado atual e deixando claro o que já foi feito.
+
+Esta informação deve ser persistente (não desaparecer em reloads) e deve acompanhar as alterações de estado do objeto ligado.
+
+Podes ajustar a implementação atual da FASE 18/FASE 15 para suportar esta vinculação persistente (tarefaId/visitaId por sugestão) e atualizar os cards em função do estado real dessas entidades?
