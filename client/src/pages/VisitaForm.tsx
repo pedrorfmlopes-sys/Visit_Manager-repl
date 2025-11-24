@@ -997,6 +997,7 @@ export default function VisitaForm() {
                   id="create-task"
                   checked={createTask}
                   onCheckedChange={(checked) => setCreateTask(checked as boolean)}
+                  disabled={isEdit}
                   data-testid="checkbox-criar-tarefa"
                 />
                 <label
@@ -1069,16 +1070,18 @@ export default function VisitaForm() {
               <Button
                 type="submit"
                 className="w-full h-12"
-                disabled={createMutation.isPending || (createTask && !taskTitle)}
+                disabled={createMutation.isPending || updateMutation.isPending || (createTask && !taskTitle)}
                 data-testid="button-guardar"
               >
-                {createMutation.isPending ? (
+                {createMutation.isPending || updateMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    A criar visita...
+                    {isEdit ? "A atualizar visita..." : "A criar visita..."}
                   </>
                 ) : (
-                  createTask ? "Criar Visita e Tarefa" : "Criar Visita"
+                  isEdit 
+                    ? "Atualizar Visita" 
+                    : (createTask ? "Criar Visita e Tarefa" : "Criar Visita")
                 )}
               </Button>
             </div>

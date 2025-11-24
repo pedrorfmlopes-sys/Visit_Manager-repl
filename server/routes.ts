@@ -1583,8 +1583,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       
       const updates: any = {};
+      
+      // Allow updating specific fields (similar to contactos patch)
       if (req.body.proximaVisita !== undefined) {
         updates.proximaVisita = req.body.proximaVisita ? new Date(req.body.proximaVisita) : null;
+      }
+      if (req.body.entidadeId !== undefined) {
+        updates.entidadeId = req.body.entidadeId;
+      }
+      if (req.body.contactoId !== undefined) {
+        updates.contactoId = req.body.contactoId || null;
+      }
+      if (req.body.dataVisita !== undefined) {
+        updates.dataVisita = new Date(req.body.dataVisita);
+      }
+      if (req.body.notas !== undefined) {
+        updates.notas = req.body.notas || null;
+      }
+      if (req.body.marcasEntregues !== undefined) {
+        updates.marcasEntregues = req.body.marcasEntregues || [];
       }
       
       if (Object.keys(updates).length === 0) {
