@@ -1,0 +1,206 @@
+FASE 20 – Refactor do card “Próxima visita agendada” para um fluxo unificado de “Atualizar estado”
+
+Contexto:
+
+Projeto: Visit Manager multi-empresa.
+
+Estado atual (após FASE 15, 16, 18, 19):
+
+Existe um card de “Próxima visita agendada” no detalhe da visita, com:
+
+Data/hora da próxima visita.
+
+Botões:
+
+“Adicionar ao Calendário” (.ics).
+
+“Marcar como Realizado” → cria nova visita de follow-up com prefill.
+
+Ícone X que remove o agendamento (sem confirmação).
+
+Existe lógica de follow-up com visitaAnteriorId.
+
+Já temos alertas/badges (FASE 19), logo faz sentido tratar “agendamento atrasado”.
+
+Objetivo desta fase:
+
+Substituir o botão “Marcar como Realizado” e o X por um único botão:
+
+“Atualizar estado”
+
+Ao clicar em “Atualizar estado”, abrir um modal com 3 opções explícitas:
+
+Criar nova visita de follow-up (comportamento atual).
+
+Só marcar a visita atual como realizada (sem criar follow-up automático, com possibilidade de ligar a outra visita).
+
+Cancelar o agendamento (eliminar apenas a próxima visita agendada, não apagar registos).
+
+Melhorar a UX para que nada seja apagado “sem querer” e o utilizador tenha um fluxo claro de decisão.
+
+Tarefas técnicas:
+
+Remover o X e o botão direto “Marcar como Realizado”
+
+No card “Próxima visita agendada”, remover:
+
+Ícone X (remoção direta do agendamento).
+
+Botão “Marcar como Realizado” atual.
+
+Substituir por:
+
+Botão principal: “Atualizar estado”.
+
+Criar modal com 3 caminhos de ação
+
+Ao clicar em “Atualizar estado”, abrir um dialog/modal com 3 opções bem descritas:
+
+Opção 1 – Criar nova visita (follow-up)
+
+Texto exemplo:
+
+“Marcar esta visita como realizada e criar uma nova visita de follow-up com os mesmos dados (entidade, contacto, etc.).”
+
+Ação:
+
+Reutilizar a lógica existente de “Marcar como Realizado” / criação de follow-up:
+
+Cria nova visita com prefill.
+
+Liga via visitaAnteriorId.
+
+Navega para a nova visita, como faz atualmente.
+
+Opção 2 – Só marcar como realizada (sem follow-up automático)
+
+Texto exemplo:
+
+“Marcar apenas esta visita como realizada, sem criar nova visita de follow-up.”
+
+UI dentro do modal:
+
+Campo data/hora: data em que a visita foi realmente realizada (pode default para agora ou para a data agendada).
+
+Checkbox:
+
+“Associar esta visita a outra visita desta entidade”.
+
+Se o checkbox estiver ativo:
+
+Dropdown ou lista de visitas dessa entidade:
+
+Carregar via GET /api/visitas?entidadeId=... (ou endpoint equivalente).
+
+Mostrar data + um resumo simples (ex.: notas/resumoIA, se combo for fácil).
+
+Backend:
+
+PATCH na visita atual para:
+
+Atualizar dataVisita / estado (se existir um campo de estado).
+
+Limpar o campo de próxima visita agendada (se for esse o modelo).
+
+Se o utilizador escolheu uma visita para associar:
+
+Atualizar visitaAnteriorId ou campo equivalente para ligar à visita selecionada.
+
+Opção 3 – Cancelar agendamento
+
+Texto exemplo:
+
+“Cancelar apenas este agendamento de próxima visita. Não serão criadas nem apagadas visitas – apenas será removida a informação de próxima visita.”
+
+UI:
+
+Botão “Cancelar agendamento” dentro do modal.
+
+Confirmação clara:
+
+“Tens a certeza de que queres cancelar este agendamento? Isto não apaga nenhuma visita existente.”
+
+Backend:
+
+PATCH na visita atual para limpar o campo de próxima visita agendada
+(ex.: proximaVisita = null ou equivalente).
+
+Alertas visuais para “agendamento atrasado”
+
+Se a data/hora da próxima visita agendada já passou e ainda não foi marcada como realizada:
+
+Mostrar um badge no card:
+
+Exemplo: “Agendamento em atraso” (cor semelhante à usada para tarefas em atraso).
+
+“Atualizar estado” passa a ser o CTA óbvio para resolver a situação.
+
+Não é necessário mexer em FASE 19, mas o visual deve ser consistente com os alertas existentes.
+
+UX e copy
+
+Garantir que o texto de cada opção é claro e evita confusões:
+
+Diferenciar bem:
+
+“Criar nova visita de follow-up” vs “Só marcar como realizada”.
+
+“Cancelar agendamento” (não apaga visitas).
+
+Pode ser usado um layout de 3 cards dentro do modal (cada um com ícone + título + descrição + botão).
+
+Testes esperados
+
+Cenário 1:
+
+Visita com próxima visita agendada.
+
+Clicar em “Atualizar estado” → escolher “Criar nova visita”.
+
+Ver comportamento atual preservado (nova visita criada, chain de follow-up mantida).
+
+Cenário 2:
+
+“Atualizar estado” → “Só marcar como realizada”:
+
+Alterar data.
+
+(Opcional) associar a outra visita dessa entidade.
+
+Confirmar que:
+
+A visita atual fica com data/estado corretos.
+
+O card de próxima visita some ou é atualizado conforme a lógica.
+
+Cenário 3:
+
+“Atualizar estado” → “Cancelar agendamento”.
+
+Confirmar que o campo de próxima visita é limpo.
+
+O card deixa de aparecer ou mostra estado adequado.
+
+Cenário 4:
+
+Agendamento com data no passado:
+
+Card mostra “Agendamento em atraso”.
+
+Botão “Atualizar estado” funciona indiferentemente.
+
+Restrições:
+
+Não alterar a lógica de multi-empresa nem RBAC.
+
+Reutilizar o máximo possível da lógica já implementada em FASE 15 (follow-ups) e FASE 18 (criação de tarefas).
+
+Não criar endpoints novos se os PATCH/GET atuais forem suficientes; idealmente apenas estender os payloads de PATCH existentes quando necessário.
+
+No final, gerar um resumo da FASE 20 indicando:
+
+Como ficou o card de “Próxima visita agendada”.
+
+Como funciona o novo botão “Atualizar estado”.
+
+Que campos são atualizados em cada uma das 3 opções.

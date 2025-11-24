@@ -6,7 +6,121 @@ This Progressive Web Application (PWA) is designed to enhance the efficiency of 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
-## Project Status - FASE 19 IMPLEMENTED
+## Project Status - FASE 20 IMPLEMENTED
+
+### FASE 20: Refactor "Próxima Visita Agendada" para Fluxo Unificado de "Atualizar Estado" - COMPLETED 24/11/2025
+
+**Objetivo:** Substituir botões dispersos (X e "Marcar como Realizado") por um único botão "Atualizar estado" com modal de 3 opções e badge de "Agendamento em atraso".
+
+**Implementação:**
+
+1. **Novo Componente `UpdateVisitStatusDialog.tsx`:**
+   - Novo ficheiro: `client/src/components/UpdateVisitStatusDialog.tsx`
+   - Modal com 3 opções visuais (cards clicáveis)
+   - Step-by-step UX para cada ação
+   - Data-testids completos para QA
+
+2. **Opção 1 - Criar Nova Visita (Follow-up):**
+   - Reutiliza lógica existente de FASE 15
+   - Navega para `/visitas/nova` com query params pré-preenchidos
+   - Parâmetros: `visitaAnteriorId`, `dataVisita`, `entidadeId`, `contactoId`, etc.
+   - Mantém chain de follow-ups via `visitaAnteriorId`
+   - Data-testid: `button-confirm-follow-up`
+
+3. **Opção 2 - Só Marcar como Realizada (Sem Follow-up Automático):**
+   - Input de data/hora (default para agora)
+   - Checkbox opcional: "Associar a outra visita desta entidade"
+   - Se ativo, dropdown de visitas relacionadas (carregadas via `GET /api/visitas?entidadeId=...`)
+   - PATCH no backend:
+     - `dataVisita`: data em que foi realmente realizada
+     - `proximaVisita`: null (remove agendamento)
+     - `visitaAnteriorId`: visita selecionada (opcional)
+   - Data-testids: `input-realized-date`, `checkbox-associate-visita`, `select-related-visita`, `button-confirm-mark-done`
+
+4. **Opção 3 - Cancelar Agendamento:**
+   - Confirmação clara: "Isto irá remover apenas a informação de próxima visita. Nenhuma visita será criada ou eliminada."
+   - PATCH no backend: `proximaVisita: null`
+   - Sem apagar registos, apenas limpa campo
+   - Data-testid: `button-confirm-cancel`
+
+5. **Badge "Agendamento em Atraso":**
+   - Modificado: `client/src/pages/VisitaDetail.tsx` (linhas ~1182-1186)
+   - Verifica: `isBefore(dataVisita, startOfDay(hoje))` 
+   - Badge vermelho (destructive) com AlertTriangle icon
+   - Renderizado no CardTitle do card "Próxima Visita Agendada"
+   - Data-testid: `badge-overdue-appointment`
+
+6. **Modificações em VisitaDetail.tsx:**
+   - Removido botão X direto (remoção imediata)
+   - Removido botão "Marcar como Realizado" direto
+   - Adicionado novo botão "Atualizar Estado" (primary variant, tamanho sm)
+   - Botão navega para `setUpdateStatusDialogOpen(true)`
+   - Botão "Ir para a Visita Realizada" mantém-se se `visitasPosteriores` existem
+   - Data-testid: `button-update-visit-status`
+   - Integração: `<UpdateVisitStatusDialog open={updateStatusDialogOpen} onOpenChange={setUpdateStatusDialogOpen} visita={visita} onSuccess={...} />`
+
+**Fluxo UX:**
+
+1. Utilizador vê card "Próxima Visita Agendada"
+   - Se data < hoje: Badge vermelho "Em Atraso"
+2. Clica em "Atualizar Estado"
+3. Modal abre com 3 cards de opções (cada um clicável)
+4. Utilizador escolhe uma:
+   - **Follow-up**: Vê resumo (data agendada), clica "Criar Follow-up" → navega para nova visita
+   - **Só Marcar**: Preenche data + (opcionalmente) associa outra visita → clica "Marcar como Realizada" → PATCH + fecha modal
+   - **Cancelar**: Confirmação → PATCH `proximaVisita: null` → fecha modal
+5. Backend PATCH aplica apenas alterações necessárias
+6. Frontend invalida queries e card desaparece ou atualiza
+
+**Backend (Sem novos Endpoints):**
+
+- PATCH `/api/visitas/:id` aceita novos payloads:
+  ```typescript
+  {
+    dataVisita?: Date,
+    proximaVisita?: null,
+    visitaAnteriorId?: string
+  }
+  ```
+- Backend já suporta estes campos, sem mudanças necessárias
+- RBAC mantém-se (user ownership checks já existem)
+
+**Data-Testids Completos (QA):**
+
+- `badge-overdue-appointment` - Badge agendamento em atraso
+- `button-update-visit-status` - CTA principal "Atualizar estado"
+- `button-back-options`, `button-back-options-2`, `button-back-options-3` - Voltar entre steps
+- `button-confirm-follow-up` - Confirmar follow-up
+- `input-realized-date` - Data realizada
+- `checkbox-associate-visita` - Checkbox associação
+- `select-related-visita` - Dropdown de visitas relacionadas
+- `button-confirm-mark-done` - Confirmar marcar realizada
+- `button-confirm-cancel` - Confirmar cancelar agendamento
+
+**Cenários Testados:**
+
+| Cenário | Ação | Resultado Esperado |
+|---------|------|-------------------|
+| Visita com agendamento | Clicar "Atualizar estado" | Modal abre com 3 opções |
+| Selecionar Follow-up | Confirmar | Navega para nova visita pré-preenchida |
+| Selecionar Só Marcar | Preencher data + (opcionalmente) associar | PATCH atualiza `dataVisita` + limpa `proximaVisita` + linksa `visitaAnteriorId` |
+| Selecionar Cancelar | Confirmar | PATCH limpa `proximaVisita` apenas |
+| Agendamento no passado | Ver card | Badge vermelho "Em Atraso" visível |
+
+**Result:**
+
+- ✅ Card refatorado com novo botão "Atualizar estado"
+- ✅ Modal com 3 opções de ação bem diferenciadas
+- ✅ Badge "Agendamento em atraso" para datas passadas
+- ✅ Sem apagar nada por acidente (confirmações claras)
+- ✅ Reutiliza lógica FASE 15 (follow-ups)
+- ✅ Sem novos endpoints backend
+- ✅ RBAC respeitado (API filtra por empresaId)
+- ✅ UX clara e step-by-step
+
+---
+
+## Previous Phases Summary
 
 ### FASE 19: Alerts & Badges (Real-time Task/Visit Notifications) - COMPLETED 24/11/2025
 
@@ -62,62 +176,6 @@ Preferred communication style: Simple, everyday language.
    - Desaparece automaticamente se não houver alertas
    - Icons: AlertCircle (vermelho) ou Calendar (azul)
 
-6. **Integration with MainLayout:**
-   - Modificado: `client/src/layouts/MainLayout.tsx`
-   - AlertRibbon renderizado **abaixo do header** para ambos Admin e Agent
-   - Admin: Abaixo do logo (desktop) ou TopBar (mobile)
-   - Agent: Abaixo do logo
-   - Posicionado acima do content principal
-   - Z-index garantido para visibilidade
-
-**UX Features:**
-
-| Item | Admin Desktop | Admin Mobile | Agent |
-|------|---------------|--------------|-------|
-| Sidebar Badges | ✅ Tarefas + Visitas | ✅ Drawer | ✅ BottomNav |
-| Alert Ribbon | ✅ Sticky | ✅ Sticky | ✅ Sticky |
-| Prioridade | Atrasadas > Hoje | Atrasadas > Hoje | Atrasadas > Hoje |
-| Refetch | 2 minutos | 2 minutos | 2 minutos |
-| RBAC Filtering | ✅ Via API | ✅ Via API | ✅ Via API |
-
-**Data Accuracy:**
-
-- Filtros aplicados pelo backend (`GET /api/tarefas`, `GET /api/visitas`)
-- Contadores computados no frontend com `date-fns`
-- Comparação de datas: `isBefore()`, `isToday()` de date-fns
-- Timezone: Usa `new Date()` do cliente
-- Multi-empresa: Automático (backend já filtra por empresaId)
-
-**Performance:**
-
-- Queries tipadas com TanStack Query
-- TTL de 2 minutos para evitar sobrecarregar backend
-- Sem polling constante (apenas refetch em background)
-- Reutiliza queries existentes (cache compartilhado)
-- Badge rendering otimizado (apenas calcula se dados mudarem)
-
-**Data-Testids (QA):**
-
-- `badge-tasks-overdue` - Badge tarefas atrasadas
-- `badge-tasks-today` - Badge tarefas para hoje
-- `badge-visits-today` - Badge visitas para hoje
-- `badge-sidebar-tarefas` - Sidebar badge (admin)
-- `badge-sidebar-visitas` - Sidebar badge (admin)
-- `badge-drawer-tarefas` - Drawer badge (mobile admin)
-- `badge-drawer-visitas` - Drawer badge (mobile admin)
-- `button-alert-ribbon-action` - Botão "Ver" no AlertRibbon
-
-**Result:**
-
-- ✅ Badges em tempo real (atualizam a cada 2 minutos)
-- ✅ BottomNav + Sidebar + Drawer integrados
-- ✅ AlertRibbon sticky no topo com prioridade
-- ✅ RBAC respeitado (backend filtra por empresaId)
-- ✅ Sem novos endpoints backend
-- ✅ Reusa `useTodaySummary()` em múltiplos componentes
-- ✅ Desempenho otimizado (queries leves, refetch moderado)
-- ✅ Design respeitado (tema light-business/dark-pro adaptado)
-
 ## System Architecture
 
 ### Frontend Architecture
@@ -152,6 +210,7 @@ PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities in
 -   **Responsive Admin Layout**: Desktop sidebar adapts to a mobile drawer for optimal UX.
 -   **AI-to-Task Conversion**: Direct conversion of AI-suggested tasks to real system tasks with one click, including pre-filled forms and linking to the originating visit.
 -   **Real-time Alerts & Badges**: Visual notifications for pending/overdue tasks and today's visits across all navigation surfaces.
+-   **Unified Visit Status Management**: Consolidated "Atualizar Estado" dialog with 3 distinct action paths (follow-up, mark done only, cancel appointment) for scheduled visits, with overdue status detection.
 
 ## External Dependencies
 

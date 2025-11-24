@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import DOMPurify from 'dompurify';
-import { ArrowLeft, ArrowRight, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles, Bell, Volume2, Trash2, Loader2, Mic, Plus, X, Edit } from "lucide-react";
+import { ArrowLeft, ArrowRight, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles, Bell, Volume2, Trash2, Loader2, Mic, Plus, X, Edit, AlertTriangle } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { pt } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -19,11 +19,13 @@ import { LocationPreview } from "@/components/LocationPreview";
 import { TarefaCard } from "@/components/TarefaCard";
 import { ShareDialog, useShareActions } from "@/components/ShareDialog";
 import { EmailAIDialog } from "@/components/EmailAIDialog";
+import { UpdateVisitStatusDialog } from "@/components/UpdateVisitStatusDialog";
 import { formatVisitForSharing } from "@/lib/shareFormatters";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
+import { isBefore, startOfDay } from "date-fns";
 import { syncManager } from "@/lib/syncManager";
 import { insertTarefaSchema } from "@shared/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -68,6 +70,7 @@ export default function VisitaDetail() {
     includeCharts: true,
     type: 'interno' as 'interno' | 'cliente'
   });
+  const [updateStatusDialogOpen, setUpdateStatusDialogOpen] = useState(false);
   const { data: currentUser } = useCurrentUser();
   const isAdmin = useIsAdmin();
   
@@ -1166,24 +1169,20 @@ export default function VisitaDetail() {
           </CardContent>
         </Card>
 
-        {/* FASE 15: Próxima Visita Agendada - After AI Analysis */}
+        {/* FASE 20: Próxima Visita Agendada - Refactored with Update Status Dialog */}
         {(visita?.proximaVisita || localProximaVisita) && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-primary" />
                 Próxima Visita Agendada
+                {visita?.proximaVisita && isBefore(new Date(visita.proximaVisita), startOfDay(new Date())) && (
+                  <Badge variant="destructive" className="ml-2 text-xs" data-testid="badge-overdue-appointment">
+                    <AlertTriangle className="h-3 w-3 mr-1" />
+                    Em Atraso
+                  </Badge>
+                )}
               </CardTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => deleteScheduledAppointmentMutation.mutate()}
-                disabled={deleteScheduledAppointmentMutation.isPending}
-                data-testid="button-delete-scheduled-appointment"
-                className="h-8 w-8"
-              >
-                <X className="h-4 w-4 text-destructive" />
-              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
@@ -1212,39 +1211,25 @@ export default function VisitaDetail() {
                   <Calendar className="h-4 w-4 mr-2" />
                   Adicionar ao Calendário
                 </Button>
-                {/* FASE 15: Show navigation button if follow-up visit exists, otherwise show "Mark as Done" */}
-                {visitaWithPosteriores?.visitasPosteriores && visitaWithPosteriores.visitasPosteriores.length > 0 ? (
+                {/* FASE 20: Main CTA - Update Status Dialog */}
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => setUpdateStatusDialogOpen(true)}
+                  data-testid="button-update-visit-status"
+                >
+                  Atualizar Estado
+                </Button>
+                {/* FASE 15: Show navigation button if follow-up visit exists */}
+                {visitaWithPosteriores?.visitasPosteriores && visitaWithPosteriores.visitasPosteriores.length > 0 && (
                   <Button
-                    variant="default"
+                    variant="ghost"
                     size="sm"
                     onClick={() => setLocation(`/visitas/${visitaWithPosteriores.visitasPosteriores[0].id}`)}
                     data-testid="button-goto-visita-posterior-main"
                   >
                     <ArrowRight className="h-4 w-4 mr-2" />
                     Ir para a Visita Realizada
-                  </Button>
-                ) : (
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => {
-                      // Navigate to new visit form with pre-filled data (via query params)
-                      const params = new URLSearchParams({
-                        visitaAnteriorId: visitaId || "",
-                        dataVisita: (localProximaVisita || visita?.proximaVisita)?.toString() || "",
-                        entidadeId: visita?.entidadeId || visita?.gabineteId || "",
-                        contactoId: visita?.contactoId || "",
-                        entidadeName: visita?.gabinete?.nome || visita?.entidade?.nome || "",
-                        contactoName: visita?.contacto?.nome || "",
-                        visitaAnteriorData: visita?.dataVisita?.toString() || "",
-                        resumoVisitaAnterior: visita?.resumoIa || "",
-                      });
-                      setLocation(`/visitas/nova?${params.toString()}`);
-                    }}
-                    data-testid="button-mark-scheduled-visit-done"
-                  >
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Marcar como Realizado
                   </Button>
                 )}
               </div>
@@ -1601,6 +1586,16 @@ export default function VisitaDetail() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <UpdateVisitStatusDialog
+        open={updateStatusDialogOpen}
+        onOpenChange={setUpdateStatusDialogOpen}
+        visita={visita}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
+          setLocalProximaVisita(null);
+        }}
+      />
 
       <ShareDialog
         open={shareDialogOpen}
