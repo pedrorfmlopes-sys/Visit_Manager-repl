@@ -344,7 +344,7 @@ export default function ContactoForm() {
                       </SelectItem>
                       {entidades?.map((entidade) => (
                         <SelectItem key={entidade.id} value={entidade.id} data-testid={`option-entidade-${entidade.id}`}>
-                          {entidade.nome} ({entidade.tipoEntidade})
+                          {entidade.nome} {entidade.entidadeTipo && `(${entidade.entidadeTipo.nome})`}
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -107,8 +107,8 @@ export default function AdminEntidades() {
                         {entidade.nif && (
                           <p data-testid={`text-entidade-nif-${entidade.id}`}>NIF: {entidade.nif}</p>
                         )}
-                        {entidade.tipoEntidade && (
-                          <p data-testid={`text-entidade-tipo-${entidade.id}`}>Tipo: {entidade.tipoEntidade}</p>
+                        {entidade.entidadeTipo && (
+                          <p data-testid={`text-entidade-tipo-${entidade.id}`}>Tipo: {entidade.entidadeTipo.nome}</p>
                         )}
                         {entidade.email && (
                           <p data-testid={`text-entidade-email-${entidade.id}`}>{entidade.email}</p>

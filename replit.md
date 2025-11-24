@@ -54,3 +54,10 @@ PostgreSQL with Drizzle ORM is used for type-safe schema management. Core entiti
 -   **date-fns**: For date manipulation and timezone-aware comparisons.
 -   **chartjs-node-canvas**: For server-side chart rendering in PDF exports.
 -   **DOMPurify**: For XSS prevention in rich text content.
+### FASE X: Arrumar "Tipo de Entidade" - Dropdown, Filtros e Label (✅ Completo)
+- **Endpoint**: `GET /api/entidade-tipos` filtra por `empresaId` + retorna apenas `ativo = true`
+- **EntidadeForm**: Campo renomeado para "Entidade" (sem "Configurada" / "Legado")
+- **Filtros dinâmicos**: Entidades.tsx usa lista do backend (sem enum hardcoded)
+- **UI consistente**: ContactoForm, VisitaForm, AdminEntidades mostram `entidade.entidadeTipo.nome`
+- **Status**: ✅ Tipos dinâmicos do backend, 1 único campo visível, 5 ficheiros atualizados
+

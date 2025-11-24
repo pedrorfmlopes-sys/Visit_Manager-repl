@@ -624,7 +624,7 @@ export default function VisitaForm() {
                     <SelectContent>
                       {entidades?.map((entidade) => (
                         <SelectItem key={entidade.id} value={entidade.id}>
-                          {entidade.nome} ({entidade.tipoEntidade})
+                          {entidade.nome} {entidade.entidadeTipo && `(${entidade.entidadeTipo.nome})`}
                         </SelectItem>
                       ))}
                     </SelectContent>

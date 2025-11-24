@@ -405,7 +405,7 @@ export default function EntidadeForm() {
               name="entidadeTipoId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Tipo de Entidade (Configurado)</FormLabel>
+                  <FormLabel>Entidade</FormLabel>
                   <Select
                     onValueChange={(val) => field.onChange(val === "none" ? null : val)}
                     value={field.value || "none"}

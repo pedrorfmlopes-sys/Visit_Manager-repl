@@ -1,0 +1,185 @@
+🔧 FASE X – Arrumar “Tipo de Entidade”: dropdown, filtros e nome do campo
+
+Contexto actual:
+
+Já existe uma tabela de tipos de entidade (entidade_tipos) e a gestão desses tipos está em /admin/empresa → aba Entidades.
+
+No EntidadeForm aparece um campo chamado “Tipo de Entidade (Configurada)”.
+
+Eu já criei vários tipos nessa aba, mas:
+
+não aparecem na dropdown do formulário de Entidade,
+
+não aparecem nos filtros,
+
+continuo a ver a distinção “Configurada / Legado”, quando só quero um tipo.
+
+🎯 Objectivo desta fase:
+
+Garantir que o formulário de Entidade usa apenas UM campo de tipo (ligado à tabela de tipos) e que a dropdown é preenchida com os tipos criados em Definições.
+
+Renomear o campo visível para “Entidade” (sem “(Configurada)” nem “Legado”).
+
+Garantir que os filtros que usam tipo de entidade também usam esta mesma lista.
+
+⚠️ Nesta fase, não mexer ainda em ícones, nem noutros módulos (Visitas/Tarefas já estão OK em termos de filtros).
+
+1. Endpoint correcto para listar tipos de entidade
+
+Confirma qual é o endpoint “oficial” que devemos usar no frontend para listar tipos de entidade:
+
+idealmente algo como:
+GET /api/entidade-tipos
+que devolve apenas os tipos activos da empresa actual.
+
+Se só existir /api/admin/entidade-tipos:
+
+cria uma versão read-only “normal” (/api/entidade-tipos) que:
+
+usa o empresaId do utilizador autenticado (getUserContext),
+
+devolve apenas: id, nome, cor (e no futuro icon),
+
+só tipos activos.
+
+Garante que:
+
+o storage/drizzle está a filtrar por empresaId e ativo = true,
+
+não há mistura de tipos entre empresas.
+
+No final deste ponto, quero ter um endpoint simples, ex.:
+GET /api/entidade-tipos → [ { id, nome, cor, ... }, ... ]
+pronto para ser usado no formulário e nos filtros.
+
+2. EntidadeForm – usar apenas este tipo e renomear label
+
+Abre o EntidadeForm.tsx.
+
+Garante que estás a carregar os tipos com um useQuery que chama o endpoint definido acima:
+
+const { data: entidadeTipos = [], isLoading: tiposLoading } = useQuery(
+  ["entidade-tipos"],
+  () => fetch("/api/entidade-tipos").then(r => r.json())
+);
+
+
+Importante: usa = [] para nunca teres undefined.
+
+No campo de tipo:
+
+Remove qualquer campo “Tipo de Entidade (Legado)”.
+
+Mantém apenas um campo, com:
+
+name ligado a entidadeTipoId (ou o nome que já estiveres a usar para o FK),
+
+label → “Entidade” (este é o texto que quero ver no UI).
+
+A dropdown deve:
+
+mostrar todos os tipos activos (entidadeTipos),
+
+cada opção value = tipo.id, label = tipo.nome,
+
+nunca usar value="" em SelectItem (para não rebentar a shadcn Select).
+
+permitir não escolher nenhum tipo (placeholder vazio → value = undefined/null).
+
+Edição de entidade:
+
+Ao editar uma entidade já existente, o select deve vir:
+
+com value = entidade.entidadeTipoId (já migrado, se fizermos migração de dados),
+
+ou vazio se ainda não tiver tipo associado.
+
+Remove da UI qualquer referência textual a “(Configurada)” ou “Legado”.
+
+Na prática, o utilizador só deve ver um campo “Entidade”.
+
+3. Filtros que usam tipo de entidade – usar a mesma lista
+
+Identifica todos os sítios onde há filtro por tipo de entidade, por ex.:
+
+Filtros da página de Entidades (se existir),
+
+Filtros de Visitas (por tipo de entidade, não confundir com entidade em si),
+
+Qualquer outro filtro que use a lista de tipos.
+
+Garante que todos esses filtros:
+
+usam o mesmo endpoint /api/entidade-tipos,
+
+usam exactamente o mesmo modelo:
+
+id/nome,
+
+apenas tipos activos da empresa,
+
+nunca usam arrays “hardcoded” no frontend.
+
+Se em algum lado estiveres a usar ainda uma enum/local array dos tipos antigos (Gabinetes/Distribuidores/…):
+
+remove essa enum,
+
+passa a usar sempre a lista dinâmica vinda do backend.
+
+4. Testes que quero que faças
+
+Em /admin/empresa → Entidades:
+
+Criar 3 tipos: Gabinetes, Distribuidores, Construtores.
+
+Garantir que ficam ativo = true.
+
+Em Nova Entidade:
+
+Abrir o formulário.
+
+Verificar:
+
+o campo chama-se “Entidade”,
+
+a dropdown tem as 3 opções novas,
+
+consigo criar uma entidade escolhendo uma delas.
+
+Em Editar Entidade:
+
+Abrir uma entidade já existente.
+
+Verificar:
+
+o select mostra o tipo correcto, se houver,
+
+consigo alterar o tipo e gravar sem erros.
+
+Nos filtros (onde houver filtro por tipo de entidade):
+
+confirmar que:
+
+usam exactamente as mesmas 3 opções (Gabinetes, Distribuidores, Construtores),
+
+ao escolher um tipo, o filtro funciona e não rebenta.
+
+5. Relatório desta fase
+
+No relatório, por favor descreve:
+
+Qual ficou a rota “oficial” para listar tipos de entidade e como filtra por empresaId + ativo.
+
+Como ficaste a carregar essa lista no EntidadeForm e nos filtros.
+
+Onde removeste campos “legados” da UI e como renomeaste o label para “Entidade”.
+
+Resultados dos testes (1–4) com indicação clara de “OK / algum problema”.
+
+⚠️ Nota: Nesta fase não implementar ainda ícones por tipo – isso ficará para a fase seguinte. Aqui o foco é:
+
+dropdown preenchida,
+
+um único campo chamado “Entidade”,
+
+filtros a usarem a mesma lista dinâmica.

@@ -7,17 +7,19 @@ import { EmptyState } from "@/components/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocation } from "wouter";
-import type { EntidadeWithRelations } from "@shared/schema";
-
-type TipoEntidade = "Todos" | "Gabinete" | "Distribuidor" | "Parceiro" | "Construtor";
+import type { EntidadeWithRelations, EntidadeTipo } from "@shared/schema";
 
 export default function Entidades() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
-  const [tipoFilter, setTipoFilter] = useState<TipoEntidade>("Todos");
+  const [tipoFilter, setTipoFilter] = useState<string>("Todos");
 
   const { data: entidades, isLoading } = useQuery<EntidadeWithRelations[]>({
     queryKey: ["/api/entidades"],
+  });
+
+  const { data: tipos = [] } = useQuery<EntidadeTipo[]>({
+    queryKey: ["/api/entidade-tipos"],
   });
 
   const filteredEntidades = entidades?.filter((entidade) => {
@@ -28,7 +30,7 @@ export default function Entidades() {
       entidade.email?.toLowerCase().includes(query) ||
       entidade.nif?.toLowerCase().includes(query);
 
-    const matchesTipo = tipoFilter === "Todos" || entidade.tipoEntidade === tipoFilter;
+    const matchesTipo = tipoFilter === "Todos" || entidade.entidadeTipoId === tipoFilter;
 
     return matchesSearch && matchesTipo;
   });
@@ -44,20 +46,18 @@ export default function Entidades() {
             placeholder="Pesquisar entidades..."
           />
           
-          <Tabs value={tipoFilter} onValueChange={(v) => setTipoFilter(v as TipoEntidade)} className="mt-3">
-            <TabsList className="w-full grid grid-cols-3 h-auto gap-1" data-testid="tabs-tipo-filter">
-              <TabsTrigger value="Todos" className="text-xs py-2" data-testid="tab-todos">Todos</TabsTrigger>
-              <TabsTrigger value="Gabinete" className="text-xs py-2" data-testid="tab-gabinete">Gabinetes</TabsTrigger>
-              <TabsTrigger value="Distribuidor" className="text-xs py-2" data-testid="tab-distribuidor">Distribuidores</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          
-          <Tabs value={tipoFilter} onValueChange={(v) => setTipoFilter(v as TipoEntidade)} className="mt-1">
-            <TabsList className="w-full grid grid-cols-2 h-auto gap-1">
-              <TabsTrigger value="Parceiro" className="text-xs py-2" data-testid="tab-parceiro">Parceiros</TabsTrigger>
-              <TabsTrigger value="Construtor" className="text-xs py-2" data-testid="tab-construtor">Construtores</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          {tipos.length > 0 && (
+            <Tabs value={tipoFilter} onValueChange={setTipoFilter} className="mt-3">
+              <TabsList className="w-full grid h-auto gap-1" style={{ gridTemplateColumns: `repeat(${Math.min(tipos.length + 1, 4)}, 1fr)` }} data-testid="tabs-tipo-filter">
+                <TabsTrigger value="Todos" className="text-xs py-2" data-testid="tab-todos">Todos</TabsTrigger>
+                {tipos.map((tipo) => (
+                  <TabsTrigger key={tipo.id} value={tipo.id} className="text-xs py-2" data-testid={`tab-tipo-${tipo.id}`}>
+                    {tipo.nome}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          )}
         </div>
       </header>
 
