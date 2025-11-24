@@ -733,6 +733,24 @@ export default function VisitaDetail() {
             <h1 className="text-xl font-semibold text-foreground">Detalhes da Visita</h1>
           </div>
           <div className="flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleExportPDF}
+                  disabled={!isOnline || !visita}
+                  data-testid="button-export-pdf-header"
+                >
+                  <Download className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              {!isOnline && (
+                <TooltipContent>
+                  <p>Export só disponível online</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
             <Button
               variant="ghost"
               size="icon"

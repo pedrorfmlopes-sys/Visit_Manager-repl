@@ -1,0 +1,67 @@
+🔧 Bug / Ajuste – Botões de exportar PDF desapareceram
+
+Contexto:
+
+Antes das últimas fases (13–22), eu tinha na aplicação a possibilidade de exportar relatórios em PDF (por exemplo, a partir do detalhe da visita).
+
+Depois das alterações de layout (AdminSidebar, MainLayout, IA cards, Centro de Configurações, etc.), já não me aparece em lado nenhum a opção de exportar PDF.
+
+Aparentemente, o backend e a lógica de geração de PDF continuam no projeto, mas a UI para disparar isso deixou de estar visível.
+
+O que preciso:
+
+Confirmar primeiro:
+
+Quais são os endpoints e componentes atuais responsáveis pelo PDF:
+
+Ex.: /api/visitas/:id/pdf ou semelhante.
+
+Componente(s) de botão/ação de PDF (por ex. algum ExportPdfButton ou similar, se existir).
+
+Garantir que a ação de exportar PDF volta a estar visível:
+
+Pelo menos no detalhe da visita (VisitaDetail):
+
+Quero um botão claro, algo como “Exportar PDF” / “Relatório PDF”.
+
+Idealmente na zona de ações principais da visita (header ou secção de ações), visível para agent e admin (ou conforme as regras de RBAC que já tinhas).
+
+Se anteriormente existia também export PDF noutros sítios (ex.: lista de visitas / relatórios), repor esses botões também.
+
+Integrar com o layout atual:
+
+No layout de agent (mobile + BottomNav), o botão deve:
+
+Ser fácil de tocar em mobile (não escondido num menu obscuro).
+
+Respeitar o tema (light-business / dark-pro).
+
+No layout de admin (sidebar + drawer), basta que o botão esteja visível no VisitaDetail ou na vista onde antes já existia.
+
+Testes esperados:
+
+Abrir uma visita existente como agent:
+
+Ver o botão “Exportar PDF”.
+
+Clicar → download (ou abrir em nova aba) do PDF correspondente a essa visita.
+
+Abrir a mesma visita como admin:
+
+Ver o mesmo botão (ou conforme o comportamento que definirem, mas sem ficar escondido).
+
+Confirmar que o botão continua a aparecer após reload / navegação entre páginas.
+
+Resumo:
+
+A funcionalidade de exportar relatório PDF já existia e é importante no meu fluxo.
+
+Depois das últimas refactors de UI, o botão desapareceu.
+
+Quero que revisites os componentes de Visita/Relatórios para:
+
+Repor os botões,
+
+Garantir que chamam o endpoint correto,
+
+E integrar tudo no layout atual (agent/admin) sem quebrar nada.
