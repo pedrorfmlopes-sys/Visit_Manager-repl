@@ -513,8 +513,6 @@ export class DatabaseStorage implements IStorage {
         user: true,
         assignedUser: true,
         createdByUser: true,
-        visitaAnterior: true,
-        visitasPosteriores: true,
         gabinete: true,
         marcas: {
           with: {
@@ -553,8 +551,6 @@ export class DatabaseStorage implements IStorage {
         user: true,
         assignedUser: true,
         createdByUser: true,
-        visitaAnterior: true,
-        visitasPosteriores: true,
         gabinete: true,
         marcas: {
           with: {
