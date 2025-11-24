@@ -35,17 +35,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
-interface SuggestedTask {
+interface SuggestedItem {
   titulo: string;
   descricao: string;
   prioridade: 'alta' | 'normal' | 'baixa';
   prazo_sugerido_dias: number;
-}
-
-interface SuggestedAppointment {
-  titulo: string;
-  descricao: string;
-  dias_para_agendar: number;
+  tipo: 'tarefa' | 'agendamento';
 }
 
 export default function VisitaDetail() {
@@ -58,10 +53,11 @@ export default function VisitaDetail() {
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [pdfProDialogOpen, setPdfProDialogOpen] = useState(false);
-  const [suggestedTaskToCreate, setSuggestedTaskToCreate] = useState<SuggestedTask | null>(null);
-  const [suggestedAppointmentToCreate, setSuggestedAppointmentToCreate] = useState<SuggestedAppointment | null>(null);
+  const [suggestedTaskToCreate, setSuggestedTaskToCreate] = useState<SuggestedItem | null>(null);
   const [appointmentDialogOpen, setAppointmentDialogOpen] = useState(false);
   const [appointmentTitle, setAppointmentTitle] = useState("");
+  const [createdTaskId, setCreatedTaskId] = useState<string | null>(null);
+  const [createdAppointmentId, setCreatedAppointmentId] = useState<string | null>(null);
   const [pdfProOptions, setPdfProOptions] = useState({
     includePhotos: true,
     includeTasks: true,
@@ -301,59 +297,57 @@ export default function VisitaDetail() {
     setIsTaskDialogOpen(true);
   };
 
-  const handleCreateSuggestedTask = (suggestedTask: SuggestedTask) => {
-    const dueDate = addDays(new Date(), suggestedTask.prazo_sugerido_dias);
+  const handleCreateSuggestedTask = (suggestedItem: SuggestedItem) => {
+    const dueDate = addDays(new Date(), suggestedItem.prazo_sugerido_dias);
     form.reset({
-      titulo: suggestedTask.titulo,
-      descricao: suggestedTask.descricao,
+      titulo: suggestedItem.titulo,
+      descricao: suggestedItem.descricao,
       visitaId: visitaId,
       entidadeId: visita?.entidadeId || visita?.gabineteId || undefined,
       dueDate: dueDate,
       repeatInterval: "none",
       status: "pending",
     });
-    setSuggestedTaskToCreate(suggestedTask);
+    setSuggestedTaskToCreate(suggestedItem);
     setIsTaskDialogOpen(true);
   };
 
-  const handleCreateSuggestedAppointment = (suggestion: SuggestedTask) => {
-    const appointmentDate = addDays(new Date(), suggestion.prazo_sugerido_dias);
+  const handleCreateSuggestedAppointment = (suggestedItem: SuggestedItem) => {
     const entityName = visita?.entidade?.nome || visita?.gabinete?.nome || "";
-    const proposedTitle = `${suggestion.titulo} — ${entityName}`;
-    
+    const proposedTitle = `${suggestedItem.titulo} — ${entityName}`;
     setAppointmentTitle(proposedTitle);
-    setSuggestedAppointmentToCreate({
-      titulo: suggestion.titulo,
-      descricao: suggestion.descricao,
-      dias_para_agendar: suggestion.prazo_sugerido_dias,
-    });
+    setSuggestedTaskToCreate(suggestedItem);
     setAppointmentDialogOpen(true);
   };
 
   const createAppointmentMutation = useMutation({
     mutationFn: async () => {
-      if (!suggestedAppointmentToCreate) throw new Error('No appointment data');
+      if (!suggestedTaskToCreate) throw new Error('No appointment data');
       
-      const appointmentDate = addDays(new Date(), suggestedAppointmentToCreate.dias_para_agendar);
+      const appointmentDate = addDays(new Date(), suggestedTaskToCreate.prazo_sugerido_dias);
       const newVisita: InsertVisita = {
         dataVisita: appointmentDate,
         tipoVisita: "presencial",
         entidadeId: visita?.entidadeId || visita?.gabineteId || undefined,
         contactoId: visita?.contactoId || undefined,
-        notas: suggestedAppointmentToCreate.descricao,
+        notas: suggestedTaskToCreate.descricao,
       };
       
-      await apiRequest("POST", "/api/visitas", newVisita);
+      const response = await apiRequest("POST", "/api/visitas", newVisita);
+      return response;
     },
-    onSuccess: () => {
+    onSuccess: (response: any) => {
+      const newId = response?.id || "";
+      setCreatedAppointmentId(newId);
       queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
       toast({
         title: "Sucesso",
         description: "Visita agendada com sucesso",
       });
       setAppointmentDialogOpen(false);
-      setSuggestedAppointmentToCreate(null);
+      setSuggestedTaskToCreate(null);
       setAppointmentTitle("");
+      setTimeout(() => setCreatedAppointmentId(null), 3000);
     },
     onError: () => {
       toast({
@@ -927,61 +921,105 @@ export default function VisitaDetail() {
                   </div>
                 )}
 
-                {/* Tarefas Sugeridas */}
+                {/* Sugestões de Tarefas e Agendamentos */}
                 {visita.tarefasSugeridasIA && visita.tarefasSugeridasIA.length > 0 && (
-                  <div>
-                    <p className="text-sm font-medium text-foreground mb-2">Tarefas Sugeridas</p>
-                    <div className="space-y-2">
-                      {(typeof visita.tarefasSugeridasIA === 'string' 
-                        ? JSON.parse(visita.tarefasSugeridasIA) 
-                        : visita.tarefasSugeridasIA
-                      ).map((tarefa: any, idx: number) => (
-                        <div key={idx} className="p-3 bg-muted/30 rounded-md border border-muted space-y-2">
-                          <div className="flex items-start gap-2 justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="text-sm font-medium text-foreground">{tarefa.titulo}</span>
-                                <Badge 
-                                  variant="outline" 
-                                  className="text-xs"
-                                  data-testid={`badge-priority-${tarefa.prioridade}-${idx}`}
-                                >
-                                  {tarefa.prioridade === 'alta' && 'Alta'}
-                                  {tarefa.prioridade === 'normal' && 'Normal'}
-                                  {tarefa.prioridade === 'baixa' && 'Baixa'}
-                                </Badge>
+                  <>
+                    {/* Tarefas Sugeridas */}
+                    {((typeof visita.tarefasSugeridasIA === 'string' 
+                      ? JSON.parse(visita.tarefasSugeridasIA) 
+                      : visita.tarefasSugeridasIA
+                    ).filter((t: any) => t.tipo === 'tarefa')).length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium text-foreground mb-2">Tarefas Sugeridas</p>
+                        <div className="space-y-2">
+                          {(typeof visita.tarefasSugeridasIA === 'string' 
+                            ? JSON.parse(visita.tarefasSugeridasIA) 
+                            : visita.tarefasSugeridasIA
+                          ).filter((t: any) => t.tipo === 'tarefa').map((tarefa: any, idx: number) => (
+                            <div key={`tarefa-${idx}`} className="p-3 bg-muted/30 rounded-md border border-muted space-y-2">
+                              <div className="flex items-start gap-2 justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-sm font-medium text-foreground">{tarefa.titulo}</span>
+                                    <Badge 
+                                      variant="outline" 
+                                      className="text-xs"
+                                      data-testid={`badge-priority-${tarefa.prioridade}-${idx}`}
+                                    >
+                                      {tarefa.prioridade === 'alta' && 'Alta'}
+                                      {tarefa.prioridade === 'normal' && 'Normal'}
+                                      {tarefa.prioridade === 'baixa' && 'Baixa'}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mb-1">{tarefa.descricao}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Prazo sugerido: {tarefa.prazo_sugerido_dias} dias
+                                  </p>
+                                </div>
                               </div>
-                              <p className="text-xs text-muted-foreground mb-1">{tarefa.descricao}</p>
-                              <p className="text-xs text-muted-foreground">
-                                Prazo sugerido: {tarefa.prazo_sugerido_dias} dias
-                              </p>
+                              <Button
+                                size="sm"
+                                onClick={() => handleCreateSuggestedTask(tarefa)}
+                                className="w-full"
+                                data-testid={`button-create-suggested-task-${idx}`}
+                              >
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Criar Tarefa
+                              </Button>
                             </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() => handleCreateSuggestedTask(tarefa)}
-                              className="flex-1"
-                              data-testid={`button-create-suggested-task-${idx}`}
-                            >
-                              <CheckCircle2 className="h-3 w-3 mr-1" />
-                              Tarefa
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleCreateSuggestedAppointment(tarefa)}
-                              className="flex-1"
-                              data-testid={`button-schedule-suggested-appointment-${idx}`}
-                            >
-                              <Calendar className="h-3 w-3 mr-1" />
-                              Agendar
-                            </Button>
-                          </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </div>
+                      </div>
+                    )}
+
+                    {/* Agendamentos Sugeridos */}
+                    {((typeof visita.tarefasSugeridasIA === 'string' 
+                      ? JSON.parse(visita.tarefasSugeridasIA) 
+                      : visita.tarefasSugeridasIA
+                    ).filter((t: any) => t.tipo === 'agendamento')).length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium text-foreground mb-2">Agendamentos Sugeridos</p>
+                        <div className="space-y-2">
+                          {(typeof visita.tarefasSugeridasIA === 'string' 
+                            ? JSON.parse(visita.tarefasSugeridasIA) 
+                            : visita.tarefasSugeridasIA
+                          ).filter((t: any) => t.tipo === 'agendamento').map((agendamento: any, idx: number) => (
+                            <div key={`agendamento-${idx}`} className="p-3 bg-muted/30 rounded-md border border-muted space-y-2">
+                              <div className="flex items-start gap-2 justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-sm font-medium text-foreground">{agendamento.titulo}</span>
+                                    <Badge 
+                                      variant="outline" 
+                                      className="text-xs"
+                                      data-testid={`badge-priority-agendamento-${agendamento.prioridade}-${idx}`}
+                                    >
+                                      {agendamento.prioridade === 'alta' && 'Alta'}
+                                      {agendamento.prioridade === 'normal' && 'Normal'}
+                                      {agendamento.prioridade === 'baixa' && 'Baixa'}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mb-1">{agendamento.descricao}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Data sugerida: {format(addDays(new Date(), agendamento.prazo_sugerido_dias), "PPP", { locale: pt })}
+                                  </p>
+                                </div>
+                              </div>
+                              <Button
+                                size="sm"
+                                onClick={() => handleCreateSuggestedAppointment(agendamento)}
+                                className="w-full"
+                                data-testid={`button-schedule-suggested-appointment-${idx}`}
+                              >
+                                <Calendar className="h-3 w-3 mr-1" />
+                                Agendar Visita
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             ) : (

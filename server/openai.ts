@@ -212,6 +212,7 @@ export interface IAResumoOutput {
     descricao: string;
     prioridade: "baixa" | "normal" | "alta";
     prazo_sugerido_dias: number;
+    tipo: "tarefa" | "agendamento";
   }>;
 }
 
@@ -239,7 +240,7 @@ export async function generateAISummaryAndTasks(data: {
       : "Sem transcrições de áudio";
 
     const prompt = `
-Analisa esta visita comercial e gera um resumo profissional com pontos-chave e tarefas sugeridas em português PT-PT.
+Analisa esta visita comercial e gera um resumo profissional com pontos-chave e sugestões de follow-up em português PT-PT.
 
 **Entidade:** ${data.entidadeNome}
 ${data.contactoNome ? `**Contacto:** ${data.contactoNome}` : ''}
@@ -256,21 +257,22 @@ Por favor, gera um JSON estruturado com os seguintes campos:
   "pontos_chave": ["ponto 1", "ponto 2", "ponto 3", "ponto 4", "ponto 5"],
   "tarefas_sugeridas": [
     {
-      "titulo": "Título da tarefa de follow-up",
-      "descricao": "Descrição detalhada da ação a tomar",
+      "titulo": "Título da ação/reunião",
+      "descricao": "Descrição detalhada",
       "prioridade": "alta|normal|baixa",
-      "prazo_sugerido_dias": número de dias até prazo recomendado
+      "prazo_sugerido_dias": número de dias,
+      "tipo": "tarefa ou agendamento"
     }
   ]
 }
 
 Instruções:
-1. O resumo deve ser profissional e comercial, em português PT-PT
-2. Pontos-chave devem ser específicos e actionáveis (máx 5)
-3. Tarefas sugeridas devem ser práticas e relacionadas com follow-up/ações de venda
-4. Prioridades: "alta" para urgente, "normal" para standard, "baixa" para informativo
-5. Prazos sugeridos em dias (ex: 3, 7, 14, 30)
-6. Responde APENAS com JSON válido, sem explicações adicionais
+1. Tipo "tarefa": para ações internas (enviar email, preparar proposta, etc)
+2. Tipo "agendamento": para reuniões/visitas futuras (próxima reunião, demonstração, etc)
+3. Prioridades: "alta" urgente, "normal" standard, "baixa" informativo
+4. Prazos em dias (ex: 3, 7, 14, 30)
+5. Máx 2-3 sugestões
+6. Responde APENAS com JSON válido
 `;
 
     const response = await openai.chat.completions.create({
