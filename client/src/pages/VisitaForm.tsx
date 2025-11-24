@@ -40,13 +40,13 @@ const visitaFormSchema = insertVisitaSchema.extend({
 type VisitaFormData = z.infer<typeof visitaFormSchema>;
 
 export default function VisitaForm() {
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isOnline = useOnlineStatus();
   
   // Get pre-fill data from query params (FASE 15: follow-up visits)
-  const queryParams = new URLSearchParams(location.split('?')[1] || '');
+  const queryParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
   const prefillData = {
     visitaAnteriorId: queryParams.get('visitaAnteriorId') || '',
     dataVisita: queryParams.get('dataVisita') ? new Date(queryParams.get('dataVisita')!) : null,
