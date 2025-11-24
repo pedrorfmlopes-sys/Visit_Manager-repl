@@ -414,14 +414,17 @@ export default function EntidadeForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Tipo de Entidade (Configurado)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                  <Select
+                    onValueChange={(val) => field.onChange(val === "none" ? null : val)}
+                    value={field.value || "none"}
+                  >
                     <FormControl>
                       <SelectTrigger className="h-12" data-testid="select-entidade-tipo-id">
                         <SelectValue placeholder="Selecione o tipo ou deixe em branco" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">Sem tipo</SelectItem>
+                      <SelectItem value="none">Sem tipo</SelectItem>
                       {entidadeTipos.map((tipo) => (
                         <SelectItem key={tipo.id} value={tipo.id} data-testid={`option-tipo-${tipo.id}`}>
                           {tipo.nome}
