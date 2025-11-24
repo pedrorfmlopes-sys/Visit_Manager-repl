@@ -179,9 +179,19 @@ export default function VisitaForm() {
 
   const updateMutation = useMutation({
     mutationFn: async (formData: FormData) => {
+      // Convert FormData to JSON for PATCH (unlike POST which uses FormData for file uploads)
+      const jsonData: any = {
+        entidadeId: formData.get("entidadeId"),
+        contactoId: formData.get("contactoId") || null,
+        dataVisita: formData.get("dataVisita"),
+        notas: formData.get("notas") || null,
+        marcasEntregues: formData.get("marcasEntregues") ? JSON.parse(formData.get("marcasEntregues") as string) : [],
+      };
+      
       const response = await fetch(`/api/visitas/${visitaId}`, {
         method: "PATCH",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(jsonData),
         credentials: "include",
       });
       
@@ -548,7 +558,9 @@ export default function VisitaForm() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-xl font-semibold text-foreground">Nova Visita</h1>
+          <h1 className="text-xl font-semibold text-foreground">
+            {isEdit ? "Editar Visita" : "Nova Visita"}
+          </h1>
         </div>
       </header>
 
