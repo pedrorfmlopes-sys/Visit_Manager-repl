@@ -1,0 +1,58 @@
+Preciso de confirmar / garantir duas coisas muito concretas sobre o novo card de IA Insights no Dashboard:
+
+1) Cenário Admin – foco em empresa/equipa
+
+Quando entro no AdminDashboard como utilizador com role = "admin":
+
+O endpoint /api/dashboard/insights deve gerar insights ao nível da empresa/equipa, não ao nível do utilizador individual.
+
+Isto significa:
+
+As métricas usadas pela IA (visitas, tarefas, clientes, etc.) devem ser agregadas por empresa (todos os utilizadores da empresa), e não apenas pelo userId do admin.
+
+O texto de insights deve falar em termos de equipa/empresa (ex.: “A equipa tem…”, “Na empresa, observa-se…”), não em “tu fizeste X visitas”.
+
+Podes, por favor, confirmar no código:
+
+Que no caso de role = "admin" estás a usar dados agregados da empresa (todas as visitas/tarefas da empresaId),
+
+E no caso de role = "agent" estás a filtrar por utilizador (createdByUserId / assignedUserId)?
+
+Se ainda não estiver assim, ajusta a query e o prompt para haver esta diferença clara:
+
+scope = "agent" → foco no utilizador.
+
+scope = "admin" → foco na empresa/equipa.
+
+2) Cenário IA desligada – não chamar API, mostrar mensagem
+
+Na FASE 22 criámos uiSettings nas configurações da empresa. Quero o seguinte comportamento:
+
+Se nas settings da empresa a IA para dashboards estiver desligada (ex.: flag tipo uiSettings.ia.dashboardInsightsEnabled = false ou equivalente):
+
+O card de IA Insights deve:
+
+Continuar a aparecer no dashboard,
+
+Mas mostrar apenas uma mensagem informativa, por exemplo:
+
+“Insights IA para o dashboard estão desativados nas definições da empresa.”
+
+Não deve chamar o endpoint /api/dashboard/insights nem fazer qualquer pedido à IA.
+
+Só quando essa flag estiver ativa é que o frontend deve:
+
+Chamar GET /api/dashboard/insights,
+
+Mostrar o texto de insights devolvido.
+
+Podes, por favor:
+
+Confirmar que estas duas condições já estão implementadas exatamente assim,
+ou, se não estiverem, ajustá-las e indicar no relatório:
+
+Como distingues agent/admin no backend para os insights,
+
+Qual é a flag/field em uiSettings que controla a ativação/desativação da IA no dashboard,
+
+E como o frontend evita chamar a API quando a IA está desligada?

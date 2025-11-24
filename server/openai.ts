@@ -436,10 +436,15 @@ export async function generateDashboardInsights(data: {
   }
 
   try {
-    const scopeLabel = data.scope === 'agent' ? 'do agente' : 'da empresa';
+    // Customize tone and perspective based on scope
+    const scopeLabel = data.scope === 'agent' ? 'pessoal' : 'da equipa/empresa';
+    const perspective = data.scope === 'agent' 
+      ? 'Escreve em tom de recomendações personalizadas para melhorar a tua performance pessoal.'
+      : 'Escreve em tom executivo dirigido à gestão, focando na performance coletiva da equipa/empresa.';
+
     const clientesText = data.metrics.clientesChave.length > 0
-      ? `Clientes chave: ${data.metrics.clientesChave.map(c => `${c.nome} (${c.visitCount} visitas)`).join(', ')}`
-      : 'Sem dados de clientes chave';
+      ? `Clientes/entidades chave: ${data.metrics.clientesChave.map(c => `${c.nome} (${c.visitCount} visitas)`).join(', ')}`
+      : 'Sem dados de clientes/entidades chave';
     
     const marcasText = data.metrics.marcasMaisTrabalhadas.length > 0
       ? `Marcas mais trabalhadas: ${data.metrics.marcasMaisTrabalhadas.map(m => `${m.marca} (${m.count}x)`).join(', ')}`
@@ -449,9 +454,9 @@ export async function generateDashboardInsights(data: {
 Analisa estes dados de vendas comerciais e gera um insight executivo profissional em português PT-PT.
 
 **Período:** Últimos 30 dias
-**Scope:** ${scopeLabel}
+**Escopo:** ${scopeLabel}
 
-**Métricas ${scopeLabel}:**
+**Métricas:**
 - Visitas realizadas: ${data.metrics.visitasRealizadas}
 - Visitas agendadas (próximos 7 dias): ${data.metrics.visitasAgendadas}
 - Tarefas criadas: ${data.metrics.tarefasCriadas}
@@ -462,14 +467,14 @@ Analisa estes dados de vendas comerciais e gera um insight executivo profissiona
 
 Por favor, gera um JSON estruturado com este campo:
 {
-  "insights": "Texto do insight em markdown (máx 500 palavras) com: 1 parágrafo sobre o que está a correr bem, 1 parágrafo sobre riscos/problemas, e uma lista de 3-5 recomendações concretas de ações. Escreve em tom profissional mas prático, dirigido a um vendedor comercial."
+  "insights": "Texto do insight em markdown (máx 500 palavras) com: 1 parágrafo sobre o que está a correr bem, 1 parágrafo sobre desafios/riscos, e uma lista de 3-5 recomendações concretas."
 }
 
 Instruções:
-1. Tom profissional mas prático
-2. Focado em ações concretas e melhorias mensuráveis
+1. ${perspective}
+2. Focado em ações concretas e mensuráveis
 3. Responde APENAS com JSON válido
-4. Gera conteúdo que seja útil para melhorar performance de vendas
+4. Linguagem profissional mas prática
 `;
 
     const response = await openai.chat.completions.create({
@@ -477,7 +482,7 @@ Instruções:
       messages: [
         {
           role: "system",
-          content: "És um analista de vendas especializado em fornecer insights acionáveis. Respondes sempre em português de Portugal e em formato JSON válido."
+          content: `És um analista de vendas especializado em CRM e insights de performance. Respondes sempre em português de Portugal, em formato JSON válido, sem emojis. Adaptare o tom e foco conforme o escopo (pessoal vs. equipa).`
         },
         {
           role: "user",

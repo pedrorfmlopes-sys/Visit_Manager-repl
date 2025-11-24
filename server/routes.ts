@@ -400,14 +400,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const to = new Date();
       const from = subDays(to, 30);
       
-      // Get metrics based on role
-      const visitas = userRole === 'admin'
-        ? await storage.getVisitasInPeriod(from, to, empresaId, userId, userRole)
-        : await storage.getVisitasInPeriod(from, to, empresaId, userId, userRole);
-      
+      // Get metrics - storage methods automatically differentiate:
+      // - agent: filtered by userId (createdByUserId/assignedUserId)
+      // - admin: aggregated by empresaId (all users)
+      const visitas = await storage.getVisitasInPeriod(from, to, empresaId, userId, userRole);
       const tarefas = await storage.getTarefasInPeriod(from, to, empresaId, userId, userRole);
       
-      // Get all visitas to calculate next 7 days
+      // Get all visitas to calculate next 7 days (same role-based filtering)
       const nextWeek = new Date(to.getTime() + 7 * 24 * 60 * 60 * 1000);
       const visitasProximas = await storage.getVisitasInPeriod(to, nextWeek, empresaId, userId, userRole);
       
@@ -456,7 +455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         marcasMaisTrabalhadas,
       };
       
-      // Generate insights with AI
+      // Generate insights with AI - scope determines context (agent=personal, admin=team)
       const insightsText = await generateDashboardInsights({
         scope: userRole as 'agent' | 'admin',
         userName: userId,
