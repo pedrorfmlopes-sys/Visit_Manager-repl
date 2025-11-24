@@ -333,23 +333,18 @@ export default function VisitaDetail() {
 
   const createAppointmentMutation = useMutation({
     mutationFn: async () => {
-      if (!suggestedTaskToCreate || !appointmentDate) throw new Error('No appointment data');
+      if (!suggestedTaskToCreate || !appointmentDate || !visitaId) throw new Error('No appointment data');
       
-      const newVisita: InsertVisita = {
-        dataVisita: appointmentDate,
-        tipoVisita: "presencial",
-        entidadeId: visita?.entidadeId || visita?.gabineteId || undefined,
-        contactoId: visita?.contactoId || undefined,
-        notas: suggestedTaskToCreate.descricao,
-      };
-      
-      const response = await apiRequest("POST", "/api/visitas", newVisita);
+      // Update the current visit with the next appointment date
+      const response = await apiRequest("PATCH", `/api/visitas/${visitaId}`, {
+        proximaVisita: appointmentDate,
+      });
       return response;
     },
     onSuccess: (response: any) => {
-      const newId = response?.id || "";
-      setCreatedAppointmentId(newId);
+      setCreatedAppointmentId(visitaId);
       queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
       
       // Register in created suggestions map
       if (suggestedTaskToCreate && appointmentDate) {
@@ -359,7 +354,7 @@ export default function VisitaDetail() {
       
       toast({
         title: "Sucesso",
-        description: "Visita agendada com sucesso",
+        description: "Próxima visita agendada com sucesso",
       });
       setAppointmentDialogOpen(false);
       setSuggestedTaskToCreate(null);
@@ -370,7 +365,7 @@ export default function VisitaDetail() {
     onError: () => {
       toast({
         title: "Erro",
-        description: "Falha ao agendar visita",
+        description: "Falha ao agendar próxima visita",
         variant: "destructive",
       });
     },
