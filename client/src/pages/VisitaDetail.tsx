@@ -1176,6 +1176,45 @@ export default function VisitaDetail() {
           </Card>
         )}
 
+        {/* FASE 15: Visita Posterior (seguimento realizado) - Shows visit created from this appointment */}
+        {visita?.visitasPosteriores && visita.visitasPosteriores.length > 0 && (
+          <Card className="bg-success/5 border-success/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-success" />
+                Visita de Seguimento Realizada
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Agendamento marcado como realizado. Nova visita criada:
+              </p>
+              {visita.visitasPosteriores.map((visitaPosterior) => (
+                <div key={visitaPosterior.id} className="space-y-2 p-3 bg-background rounded-md border border-border">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Entidade:</p>
+                    <p className="font-medium">{visitaPosterior.gabinete?.nome || visitaPosterior.entidade?.nome || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Data:</p>
+                    <p className="font-medium">{format(new Date(visitaPosterior.dataVisita), "PPP", { locale: pt })}</p>
+                  </div>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => setLocation(`/visitas/${visitaPosterior.id}`)}
+                    className="w-full"
+                    data-testid={`button-goto-visita-posterior-${visitaPosterior.id}`}
+                  >
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                    Ir para a Visita
+                  </Button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
         {/* FASE 15: GPS Location - Hidden by default, can be enabled in admin settings */}
         {false && gpsLocation && (
           <Card>

@@ -37,6 +37,8 @@
   --accent-foreground: 0 0% 0%;
   --destructive: 2.04 74.62% 61.37%;
   --destructive-foreground: 0 0% 100%;
+  --success: 120 100% 25.10%;
+  --success-foreground: 0 0% 100%;
   --input: 0 0% 0%;
   --ring: 0 0% 0%;
   --chart-1: 203.8863 88.2845% 53.1373%;
@@ -86,6 +88,10 @@
   /* Fallback for older browsers */
   --destructive-border: hsl(var(--destructive));
   --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+
+  /* Fallback for older browsers */
+  --success-border: hsl(var(--success));
+  --success-border: hsl(from hsl(var(--success)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 }
 
 :root[data-theme="dark-pro"],
@@ -122,6 +128,8 @@
   --accent-foreground: 203.7736 87.6033% 52.5490%;
   --destructive: 356.3033 90.5579% 54.3137%;
   --destructive-foreground: 0 0% 100%;
+  --success: 120 100% 25.10%;
+  --success-foreground: 0 0% 100%;
   --input: 207.6923 27.6596% 18.4314%;
   --ring: 202.8169 89.1213% 53.1373%;
   --chart-1: 203.8863 88.2845% 53.1373%;
