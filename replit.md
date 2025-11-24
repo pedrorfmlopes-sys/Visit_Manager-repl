@@ -45,7 +45,7 @@ PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities in
 -   **Admin Settings Center**: Organized 6-tab settings page with company configuration, logo upload, and UI settings JSON for future extensibility (FASE 22).
 -   **Logo Upload**: Direct upload of company logo with preview, type validation (PNG/JPG/SVG/WebP), and automatic database persistence.
 
-## Recent Features (FASE 20-22)
+## Recent Features (FASE 20-23)
 
 ### FASE 20: Unified Visit Status Management
 - Consolidated modal dialog for appointment status changes with 3 visual action paths (follow-up, mark done, cancel)
@@ -62,6 +62,17 @@ PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities in
 - Logo upload endpoint with file validation and automatic URL persistence
 - JSON-based `uiSettings` field for future configuration extensibility
 - Placeholder integrations (Outlook, Planner) ready for future OAuth setup
+
+### FASE 23: IA Insights Dashboard with RBAC + Feature Toggle
+- **Dashboard Insights Card**: AI-powered analysis on dashboard (agent personal, admin team-wide)
+- **RBAC Differentiation**: Storage layer filters data by userId (agent) vs empresaId (admin)
+- **Scope-aware Prompts**: OpenAI prompt adapts language (personal vs team context)
+- **Feature Toggle**: `uiSettings.enableIA` flag controls dashboard insights activation
+- **Settings UI**: Toggle in Admin Settings (IA & Áudio tab) to enable/disable insights
+- **No API Calls When Disabled**: Backend returns message without calling OpenAI when flag is false
+- **Metrics Collection**: Aggregates visits, tasks, top clients, brands over 30-day period
+- **Visual Design**: Amber-themed card with Lightbulb icon, positioned above PDF export
+- **Components**: New `DashboardInsightsCard.tsx`, integrated in Dashboard.tsx and AdminDashboard.tsx
 
 ## External Dependencies
 
