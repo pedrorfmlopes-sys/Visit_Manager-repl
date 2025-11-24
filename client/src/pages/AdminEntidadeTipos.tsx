@@ -88,6 +88,7 @@ export default function AdminEntidadeTipos() {
   });
 
   const handleSubmit = (data: any) => {
+    console.log("[DEBUG TIPO ENTIDADE SUBMIT]", data);
     if (editingId) {
       updateMutation.mutate({ id: editingId, updates: data });
     } else {

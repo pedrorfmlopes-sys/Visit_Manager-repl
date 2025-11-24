@@ -1,0 +1,219 @@
+🔧 FASE 30.2 – Corrigir ÍCONE por Tipo de Entidade (sempre igual)
+
+Contexto:
+
+Em Definições → Empresa → Entidades → Tipos de Entidade:
+
+Consigo criar tipos e escolher um ícone no dropdown.
+
+A criação/edição não dá erro.
+
+Mas:
+
+Todas as entidades aparecem com o MESMO ícone, mesmo que eu tenha tipos com ícones diferentes.
+
+Ex.:
+
+“Gabinete de Arquitetura” → escolho ícone A
+
+“Distribuidor” → escolho ícone B
+
+“Parceiro” → escolho ícone C
+→ Nos cards / detalhe, todos mostram o mesmo ícone.
+
+🎯 Objetivo desta fase:
+
+Garantir que:
+
+O valor de icon escolhido no tipo de entidade é gravado corretamente na BD.
+
+A lista de tipos devolvida pelo backend inclui icon com o valor certo.
+
+Os componentes (EntidadeCard, EntidadeDetail, etc.) usam esse entidade.entidadeTipo.icon para escolher o componente lucide, e não um valor fixo.
+
+⚠️ Não mexer em:
+
+Fluxo de entidades, visitas, tarefas, filtros, etc.
+
+Apenas no CRUD de tipos de entidade e na forma como os ícones são lidos e desenhados.
+
+1. Verificar se o icon certo está a ser gravado na BD
+
+Na rota POST /api/admin/entidade-tipos e PATCH /api/admin/entidade-tipos/:id:
+
+Adiciona um log temporário logo após o parse do body:
+
+console.log("[DEBUG TIPO ENTIDADE API] body:", req.body);
+
+
+No storage.createEntidadeTipo e storage.updateEntidadeTipo:
+
+Adiciona log imediatamente antes do insert/update:
+
+console.log("[DEBUG TIPO ENTIDADE STORAGE] data:", data);
+
+
+Cria 2–3 tipos com ícones diferentes e vê no terminal:
+
+Se req.body.icon tem o valor correspondente ao que seleccionei no UI (ex.: "Building2", "Handshake", "Factory").
+
+Se data.icon no storage é o mesmo valor ou se está sempre a cair no mesmo valor (por ex. ICON_OPTIONS[0]).
+
+Confirma na BD (via query) que, depois do insert/update, a tabela entidade_tipos tem valores de icon diferentes para tipos diferentes.
+
+Se nesta fase já vês que todos os tipos ficam com o mesmo valor de icon na BD, corrige primeiro o insert/update:
+
+o payload tem de vir do form (body.icon)
+
+e ser passado directamente para a coluna icon sem o substituir automaticamente pelo primeiro elemento da lista.
+
+2. Corrigir o Select de Ícone no formulário de Tipo de Entidade
+
+No componente React do modal “Novo/Editar Tipo de Entidade”:
+
+Garante que o campo icon está ligado directamente ao react-hook-form:
+
+<FormField
+  control={form.control}
+  name="icon"
+  render={({ field }) => (
+    <Select value={field.value} onValueChange={field.onChange}>
+      <FormControl>
+        <SelectTrigger>
+          <SelectValue placeholder="Escolha um ícone" />
+        </SelectTrigger>
+      </FormControl>
+      <SelectContent>
+        {ICON_OPTIONS.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {/* Icon + label */}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )}
+/>
+
+
+Sem state paralelo tipo const [selectedIcon, setSelectedIcon] = useState(ICON_OPTIONS[0]).
+
+Garante que ICON_OPTIONS é algo como:
+
+const ICON_OPTIONS = [
+  { value: "Building2", label: "Gabinete", Icon: Building2 },
+  { value: "Handshake", label: "Parceria", Icon: Handshake },
+  { value: "Factory", label: "Construtor", Icon: Factory },
+  // ...
+];
+
+
+E que o valor enviado para o backend é option.value (ex.: "Handshake"), não o label em texto (“Parceria”).
+
+Antes de chamar a mutation (create/update), loga:
+
+const payload = form.getValues();
+console.log("[DEBUG TIPO ENTIDADE SUBMIT]", payload);
+
+
+Confirma no browser que payload.icon é mesmo o valor que seleccionei na dropdown.
+
+3. Garantir que o frontend usa entidade.entidadeTipo.icon e não um valor fixo
+
+No EntidadeCard.tsx:
+
+Verifica a lógica que escolhe o ícone:
+
+elimina qualquer código do género:
+
+const TipoIcon = Building2; // fixo
+// ou switch baseado em tipoEntidade legado
+
+
+Usa sempre o valor vindo da API:
+
+const iconMap = {
+  Building2,
+  Handshake,
+  Factory,
+  Store,
+  Briefcase,
+  Users,
+  Home,
+  // ...
+};
+
+const iconName = entidade.entidadeTipo?.icon ?? "Building2";
+const TipoIcon = iconMap[iconName as keyof typeof iconMap] ?? Building2;
+
+
+No EntidadeDetail.tsx:
+
+Usa a MESMA lógica (iconName + iconMap) para o badge do tipo.
+
+Não hardcodes um ícone fixo aqui.
+
+Actualiza quaisquer outros locais onde o tipo de entidade aparece com ícone (se existirem) para usarem também entidade.entidadeTipo.icon.
+
+4. Testes que quero que faças
+
+Depois de corrigir:
+
+Em Definições → Empresa → Entidades (Tipos):
+
+Cria 3 tipos:
+
+Tipo A → ícone Building2
+
+Tipo B → ícone Handshake
+
+Tipo C → ícone Factory
+
+Abre a BD ou loga o resultado do GET /api/entidade-tipos:
+
+Confirma que cada tipo tem icon diferente.
+
+Vai à lista de Entidades:
+
+Para uma entidade do Tipo A → card deve mostrar ícone Building2.
+
+Tipo B → Handshake.
+
+Tipo C → Factory.
+
+Abre o detalhe de uma entidade:
+
+Badge do tipo deve mostrar o mesmo ícone que o card.
+
+Edita um tipo e muda o ícone:
+
+Grava.
+
+Recarrega lista de entidades:
+
+os cards desse tipo devem passar a usar o novo ícone.
+
+5. Relatório desta fase
+
+No relatório, por favor inclui:
+
+Os logs dos pontos 1 e 2 a mostrar:
+
+req.body.icon diferentes para tipos diferentes,
+
+data.icon no storage com esses valores,
+
+valores de icon na BD após insert/update.
+
+Em que ficheiros alteraste:
+
+o Select de ícone no modal (e como ficou ligado ao form),
+
+EntidadeCard.tsx,
+
+EntidadeDetail.tsx.
+
+Resultado dos testes (criar tipos com ícones diferentes + verificar nos cards/detalhes).
+
+Objetivo final:
+👉 Cada tipo de entidade tem o seu ícone próprio configurável,
+👉 Cada entidade mostra o ícone do SEU tipo, e não um ícone fixo para todas.

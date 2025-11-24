@@ -1064,24 +1064,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createEntidadeTipo(tipo: InsertEntidadeTipo, empresaId: string): Promise<EntidadeTipo> {
-    return db.insert(entidadeTipos)
+    console.log("[DEBUG TIPO ENTIDADE STORAGE] createEntidadeTipo data:", tipo);
+    const result = await db.insert(entidadeTipos)
       .values({
         ...tipo,
         empresaId,
       })
-      .returning()
-      .then((res) => res[0]);
+      .returning();
+    console.log("[DEBUG TIPO ENTIDADE STORAGE] Created tipo icon:", result[0]?.icon);
+    return result[0];
   }
 
   async updateEntidadeTipo(id: string, tipo: Partial<InsertEntidadeTipo>, empresaId: string): Promise<EntidadeTipo | undefined> {
-    return db.update(entidadeTipos)
+    console.log("[DEBUG TIPO ENTIDADE STORAGE] updateEntidadeTipo data:", tipo);
+    const result = await db.update(entidadeTipos)
       .set(tipo)
       .where(and(
         eq(entidadeTipos.id, id),
         eq(entidadeTipos.empresaId, empresaId)
       ))
-      .returning()
-      .then((res) => res[0]);
+      .returning();
+    console.log("[DEBUG TIPO ENTIDADE STORAGE] Updated tipo icon:", result[0]?.icon);
+    return result[0];
   }
 
   // PASSO 7: Migration - Convert legacy tipoEntidade to entidadeTipoId

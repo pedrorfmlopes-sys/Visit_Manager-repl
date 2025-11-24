@@ -3312,7 +3312,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       
-      const { nome, cor, ativo, ordem } = req.body;
+      console.log("[DEBUG TIPO ENTIDADE API] POST body:", req.body);
+      
+      const { nome, cor, icon, ativo, ordem } = req.body;
       
       if (!nome) {
         return res.status(400).json({ message: "Entity type name is required" });
@@ -3321,10 +3323,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newTipo = await storage.createEntidadeTipo({
         nome,
         cor: cor || null,
+        icon: icon || "Building2",
         ativo: ativo !== false,
         ordem: ordem || 0,
       }, empresaId);
       
+      console.log("[DEBUG TIPO ENTIDADE API] Created tipo with icon:", newTipo.icon);
       res.json(newTipo);
     } catch (error) {
       console.error("Error creating entidade tipo:", error);
@@ -3338,18 +3342,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       
-      const { nome, cor, ativo, ordem } = req.body;
+      console.log("[DEBUG TIPO ENTIDADE API] PATCH body:", req.body);
+      
+      const { nome, cor, icon, ativo, ordem } = req.body;
       
       const updateData: Partial<EntidadeTipo> = {};
       if (nome !== undefined) updateData.nome = nome;
       if (cor !== undefined) updateData.cor = cor;
+      if (icon !== undefined) updateData.icon = icon;
       if (ativo !== undefined) updateData.ativo = ativo;
       if (ordem !== undefined) updateData.ordem = ordem;
+      
+      console.log("[DEBUG TIPO ENTIDADE API] PATCH updateData:", updateData);
       
       const updated = await storage.updateEntidadeTipo(req.params.id, updateData, empresaId);
       if (!updated) {
         return res.status(404).json({ message: "Entidade tipo not found or unauthorized" });
       }
+      console.log("[DEBUG TIPO ENTIDADE API] Updated tipo with icon:", updated.icon);
       res.json(updated);
     } catch (error) {
       console.error("Error updating entidade tipo:", error);
