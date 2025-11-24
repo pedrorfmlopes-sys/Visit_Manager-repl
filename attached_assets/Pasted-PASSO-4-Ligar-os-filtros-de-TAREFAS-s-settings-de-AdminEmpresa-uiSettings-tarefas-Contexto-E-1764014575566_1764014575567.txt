@@ -1,0 +1,231 @@
+PASSO 4 – Ligar os filtros de TAREFAS às settings de AdminEmpresa (uiSettings.tarefas)
+
+Contexto:
+
+Em VISITAS, já fizeste:
+
+Backend /api/visitas a filtrar por entidade/contacto.
+
+VisitasFilterBar a obedecer a uiSettings.visitas (os switches em AdminEmpresa → Filtros → Visitas já ligam/desligam os filtros na UI).
+
+Em TAREFAS:
+
+Já existem filtros na UI (status, “apenas em atraso”, atribuído a, entidade, visita, etc.).
+
+Já criaste a Tab “Filtros → Tarefas” em /admin/empresa, mas tal como estava em Visitas antes, os switches ainda não têm efeito real.
+
+Objetivo deste PASSO 4:
+
+Só TAREFAS.
+
+Não tocar em VISITAS (já está ok), nem em Entidades/Contactos, nem em EntidadeForm.
+
+Fazer com que:
+
+uiSettings.tarefas controle a visibilidade dos filtros na página de Tarefas (agent) e AdminTarefas (admin), tal como fizeste com uiSettings.visitas.
+
+1. Confirmar estrutura de uiSettings.tarefas
+
+Vê no schema/Tipo de uiSettings (tanto no backend como no frontend) quais são as flags que definiste para Tarefas.
+
+Se ainda não estiver, cria algo nesta linha:
+
+uiSettings: {
+  tarefas?: {
+    enableFilterStatus?: boolean;
+    enableFilterOverdue?: boolean;
+    enableFilterAssignedUser?: boolean;
+    enableFilterEntidade?: boolean;
+    enableFilterVisita?: boolean;
+  };
+  // ... (visitas já tens feito)
+}
+
+
+Garante que:
+
+Estas flags são persistidas pela API /api/admin/empresa (o que já deve estar a acontecer com o resto de uiSettings).
+
+Na Tab “Filtros → Tarefas” em /admin/empresa, cada switch está ligado a uma destas flags (mesmo modelo que usaste em “Visitas”).
+
+(Se já estiver tudo ligado a nível de AdminEmpresa, não mudes nada aqui; só garante que os nomes batem certo com o que vais usar na UI de Tarefas.)
+
+2. Obter uiSettings.tarefas nas páginas de TAREFAS
+
+Na página de tarefas do agente (Tarefas.tsx ou similar):
+
+Usa useAuth() para obter empresa e as settings:
+
+const { empresa } = useAuth();
+const tarefasSettings = empresa?.uiSettings?.tarefas;
+
+
+Passa tarefasSettings para o componente de filtros de tarefas (algo tipo TarefasFilterBar), por props:
+
+<TarefasFilterBar
+  filters={filters}
+  onFilterChange={setFilters}
+  tarefasSettings={tarefasSettings}
+/>
+
+
+Na página de tarefas de admin (AdminTarefas.tsx ou equivalente):
+
+Faz o mesmo:
+
+const { empresa } = useAuth();
+const tarefasSettings = empresa?.uiSettings?.tarefas;
+
+
+e passa para a barra de filtros:
+
+<TarefasFilterBar
+  filters={filters}
+  onFilterChange={setFilters}
+  showAdminFilters={true}
+  tarefasSettings={tarefasSettings}
+/>
+
+3. Condicionar a renderização dos filtros dentro de TarefasFilterBar
+
+Abre o componente de filtros de tarefas (TarefasFilterBar.tsx ou o nome que estiveres a usar).
+
+Atualiza o tipo de props para aceitar as settings:
+
+interface TarefasFilterBarProps {
+  filters: TarefasFilters;
+  onFilterChange: (filters: TarefasFilters) => void;
+  showAdminFilters?: boolean;
+  // ... o que já tiveres (users, entidades, visitas, etc.)
+  tarefasSettings?: {
+    enableFilterStatus?: boolean;
+    enableFilterOverdue?: boolean;
+    enableFilterAssignedUser?: boolean;
+    enableFilterEntidade?: boolean;
+    enableFilterVisita?: boolean;
+  };
+}
+
+
+Dentro do componente, define defaults seguros (tal como fizeste em VisitasFilterBar):
+
+const s = tarefasSettings ?? {};
+const showStatus       = s.enableFilterStatus       ?? true;
+const showOverdue      = s.enableFilterOverdue      ?? true;
+const showAssignedUser = s.enableFilterAssignedUser ?? true;
+const showEntidade     = s.enableFilterEntidade     ?? true;
+const showVisita       = s.enableFilterVisita       ?? true;
+
+
+Agora envolve cada bloco de UI com a flag correspondente:
+
+Exemplo:
+
+{showStatus && (
+  // radio buttons / select "Todas / Pendentes / Concluídas"
+)}
+
+{showOverdue && (
+  // checkbox "Apenas em atraso"
+)}
+
+{showAssignedUser && users.length > 0 && (
+  // select "Atribuída a"
+)}
+
+{(showEntidade || showVisita) && (
+  <div className="grid ...">
+    {showEntidade && entidades.length > 0 && (
+      // select de Entidade
+    )}
+    {showVisita && visitas.length > 0 && (
+      // select de Visita
+    )}
+  </div>
+)}
+
+
+Não mexer na lógica de onFilterChange ou na construção da querystring; só condicionar a presença dos blocos na UI.
+
+4. Testes que quero que faças (manual, via UI)
+
+Ir a /admin/empresa → aba “Filtros” → tab “Tarefas”.
+
+Teste 1 – Status
+
+Desmarcar “Filtro Status (Todas/Pendentes/Concluídas)”
+
+Guardar.
+
+Abrir:
+
+/tarefas (agent),
+
+/tarefas (admin, se tiveres rota separada).
+
+Esperado:
+
+O controlo de status desapareceu nas duas vistas.
+
+Teste 2 – Em atraso
+
+Marcar de novo o status.
+
+Desmarcar “Filtro Apenas em atraso”.
+
+Guardar e recarregar Tarefas.
+
+Esperado:
+
+O checkbox/toggle “Apenas em atraso” já não aparece.
+
+Teste 3 – Atribuído a
+
+Desmarcar “Filtro Atribuído a”.
+
+Guardar, recarregar Tarefas (agent/admin).
+
+Esperado:
+
+O filtro “Utilizador / Atribuído a” desaparece.
+
+Teste 4 – Entidade / Visita
+
+Desmarcar “Filtro por Entidade” e “Filtro por Visita”.
+
+Guardar.
+
+Recarregar Tarefas.
+
+Esperado:
+
+Os selects de Entidade/Visita não aparecem mais na FilterBar.
+
+Teste 5 – Reativar tudo
+
+Voltar a marcar todos os switches em “Filtros → Tarefas”.
+
+Guardar.
+
+Recarregar Tarefas (agent/admin).
+
+Esperado:
+
+Todos os filtros voltam a aparecer e a funcionar normalmente.
+
+⚠️ Nota: Não é preciso mexer nesta fase em userSettings (preferências por utilizador) – tal como em Visitas, este passo é só para uiSettings.tarefas.
+
+5. Relatório deste PASSO 4
+
+No relatório desta mini-fase, por favor inclui:
+
+Quais flags finais ficaste a usar em uiSettings.tarefas.
+
+Onde vais buscar tarefasSettings (useAuth / empresa.uiSettings.tarefas).
+
+Em que ficheiros mexeste (Tarefas.tsx, AdminTarefas.tsx, TarefasFilterBar.tsx, etc.).
+
+Resultado dos Testes 1–5 (passou/falhou + observações).
+
+Reforço:
+👉 Neste PASSO 4 não tocar em VISITAS, nem em EntidadeForm, nem em AdminEntidadeTipos – queremos apenas que a página de Tarefas respeite as settings de filtros de Tarefas.

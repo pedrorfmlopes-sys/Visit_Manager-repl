@@ -7,12 +7,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
 import { TarefasFilterBar, type TarefasFilters } from "@/components/TarefasFilterBar";
 import type { TarefaWithRelations } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function AdminTarefas() {
   const [, setLocation] = useLocation();
   const [filters, setFilters] = useState<TarefasFilters>({});
   const [users, setUsers] = useState<{ id: string; email: string }[]>([]);
   const [entidades, setEntidades] = useState<{ id: string; nome: string }[]>([]);
+  const { empresa } = useAuth();
 
   // Fetch users and entidades for filters
   useEffect(() => {
@@ -68,6 +70,7 @@ export default function AdminTarefas() {
             showAdminFilters={true}
             users={users}
             entidades={entidades}
+            tarefasSettings={empresa?.uiSettings?.tarefas}
           />
         </div>
       </header>

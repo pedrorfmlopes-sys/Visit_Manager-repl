@@ -19,6 +19,13 @@ interface TarefasFilterBarProps {
   showAdminFilters?: boolean;
   users?: { id: string; email: string }[];
   entidades?: { id: string; nome: string }[];
+  tarefasSettings?: {
+    enableFilterStatus?: boolean;
+    enableFilterOverdue?: boolean;
+    enableFilterAssignedUser?: boolean;
+    enableFilterEntidade?: boolean;
+    enableFilterVisita?: boolean;
+  };
 }
 
 export function TarefasFilterBar({
@@ -27,10 +34,18 @@ export function TarefasFilterBar({
   showAdminFilters = false,
   users = [],
   entidades = [],
+  tarefasSettings,
 }: TarefasFilterBarProps) {
   const handleClear = () => {
     onFilterChange({});
   };
+  
+  // Settings with safe defaults (true = show by default)
+  const showStatus = tarefasSettings?.enableFilterStatus ?? true;
+  const showOverdue = tarefasSettings?.enableFilterOverdue ?? true;
+  const showAssignedUser = tarefasSettings?.enableFilterAssignedUser ?? true;
+  const showEntidade = tarefasSettings?.enableFilterEntidade ?? true;
+  const showVisita = tarefasSettings?.enableFilterVisita ?? true;
   
   const activeFilters = Object.entries(filters).filter(([, v]) => v !== undefined && v !== "").length;
 
@@ -50,69 +65,73 @@ export function TarefasFilterBar({
       </div>
 
       {/* Status filters */}
-      <div className="flex gap-2 flex-wrap">
-        <Button
-          variant={filters.status === undefined ? "default" : "outline"}
-          size="sm"
-          onClick={() => onFilterChange({ ...filters, status: undefined })}
-          data-testid="filter-all-status"
-        >
-          Todas
-        </Button>
-        <Button
-          variant={filters.status === "pending" ? "default" : "outline"}
-          size="sm"
-          onClick={() => onFilterChange({ ...filters, status: "pending" })}
-          data-testid="filter-pending"
-        >
-          Pendentes
-        </Button>
-        <Button
-          variant={filters.status === "done" ? "default" : "outline"}
-          size="sm"
-          onClick={() => onFilterChange({ ...filters, status: "done" })}
-          data-testid="filter-done"
-        >
-          Concluídas
-        </Button>
-        
-        {activeFilters > 0 && (
+      {showStatus && (
+        <div className="flex gap-2 flex-wrap">
           <Button
-            variant="outline"
+            variant={filters.status === undefined ? "default" : "outline"}
             size="sm"
-            onClick={handleClear}
-            data-testid="button-clear-filters"
+            onClick={() => onFilterChange({ ...filters, status: undefined })}
+            data-testid="filter-all-status"
           >
-            <X className="h-4 w-4" />
-            Limpar ({activeFilters})
+            Todas
           </Button>
-        )}
-      </div>
+          <Button
+            variant={filters.status === "pending" ? "default" : "outline"}
+            size="sm"
+            onClick={() => onFilterChange({ ...filters, status: "pending" })}
+            data-testid="filter-pending"
+          >
+            Pendentes
+          </Button>
+          <Button
+            variant={filters.status === "done" ? "default" : "outline"}
+            size="sm"
+            onClick={() => onFilterChange({ ...filters, status: "done" })}
+            data-testid="filter-done"
+          >
+            Concluídas
+          </Button>
+          
+          {activeFilters > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleClear}
+              data-testid="button-clear-filters"
+            >
+              <X className="h-4 w-4" />
+              Limpar ({activeFilters})
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Overdue filter */}
-      <div className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          id="overdue-filter"
-          checked={filters.overdue || false}
-          onChange={(e) =>
-            onFilterChange({
-              ...filters,
-              overdue: e.target.checked || undefined,
-            })
-          }
-          className="h-4 w-4 rounded border-input cursor-pointer"
-          data-testid="checkbox-overdue"
-        />
-        <label htmlFor="overdue-filter" className="text-sm cursor-pointer">
-          Apenas em atraso
-        </label>
-      </div>
+      {showOverdue && (
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="overdue-filter"
+            checked={filters.overdue || false}
+            onChange={(e) =>
+              onFilterChange({
+                ...filters,
+                overdue: e.target.checked || undefined,
+              })
+            }
+            className="h-4 w-4 rounded border-input cursor-pointer"
+            data-testid="checkbox-overdue"
+          />
+          <label htmlFor="overdue-filter" className="text-sm cursor-pointer">
+            Apenas em atraso
+          </label>
+        </div>
+      )}
 
       {/* Admin filters */}
-      {showAdminFilters && (
+      {showAdminFilters && (showAssignedUser || showEntidade) && (
         <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border">
-          {users.length > 0 && (
+          {showAssignedUser && users.length > 0 && (
             <select
               value={filters.assignedUserId || ""}
               onChange={(e) =>
@@ -130,7 +149,7 @@ export function TarefasFilterBar({
             </select>
           )}
           
-          {entidades.length > 0 && (
+          {showEntidade && entidades.length > 0 && (
             <select
               value={filters.entidadeId || ""}
               onChange={(e) =>

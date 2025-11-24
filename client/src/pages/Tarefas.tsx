@@ -7,10 +7,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
 import { TarefasFilterBar, type TarefasFilters } from "@/components/TarefasFilterBar";
 import type { TarefaWithRelations } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Tarefas() {
   const [, setLocation] = useLocation();
   const [filters, setFilters] = useState<TarefasFilters>({});
+  const { empresa } = useAuth();
 
   // Build query string from filters
   const queryParams = new URLSearchParams();
@@ -37,6 +39,7 @@ export default function Tarefas() {
           <TarefasFilterBar 
             filters={filters}
             onFilterChange={setFilters}
+            tarefasSettings={empresa?.uiSettings?.tarefas}
           />
         </div>
       </header>
