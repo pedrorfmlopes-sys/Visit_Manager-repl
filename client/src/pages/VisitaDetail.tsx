@@ -78,6 +78,15 @@ export default function VisitaDetail() {
     enabled: !!visitaId,
   });
 
+  // FASE 15: Load visitasPosteriores separately
+  const { data: visitasPosteriores = [] } = useQuery<VisitaWithRelations[]>({
+    queryKey: ["/api/visitas", visitaId, "posteriores"],
+    enabled: !!visitaId,
+  });
+
+  // Enrich visita with visitasPosteriores
+  const visitaWithPosteriores = visita ? { ...visita, visitasPosteriores } : undefined;
+
   // Delete visita mutation
   const deleteVisitaMutation = useMutation({
     mutationFn: async () => {
@@ -1150,11 +1159,11 @@ export default function VisitaDetail() {
                   Adicionar ao Calendário
                 </Button>
                 {/* FASE 15: Show navigation button if follow-up visit exists, otherwise show "Mark as Done" */}
-                {visita?.visitasPosteriores && visita.visitasPosteriores.length > 0 ? (
+                {visitaWithPosteriores?.visitasPosteriores && visitaWithPosteriores.visitasPosteriores.length > 0 ? (
                   <Button
                     variant="default"
                     size="sm"
-                    onClick={() => setLocation(`/visitas/${visita.visitasPosteriores[0].id}`)}
+                    onClick={() => setLocation(`/visitas/${visitaWithPosteriores.visitasPosteriores[0].id}`)}
                     data-testid="button-goto-visita-posterior-main"
                   >
                     <ArrowRight className="h-4 w-4 mr-2" />
@@ -1190,7 +1199,7 @@ export default function VisitaDetail() {
         )}
 
         {/* FASE 15: Visita Posterior (seguimento realizado) - Shows visit created from this appointment */}
-        {visita?.visitasPosteriores && visita.visitasPosteriores.length > 0 && (
+        {visitaWithPosteriores?.visitasPosteriores && visitaWithPosteriores.visitasPosteriores.length > 0 && (
           <Card className="bg-success/5 border-success/20">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
@@ -1202,7 +1211,7 @@ export default function VisitaDetail() {
               <p className="text-sm text-muted-foreground">
                 Agendamento marcado como realizado. Nova visita criada:
               </p>
-              {visita.visitasPosteriores.map((visitaPosterior) => (
+              {visitaWithPosteriores.visitasPosteriores.map((visitaPosterior) => (
                 <div key={visitaPosterior.id} className="space-y-2 p-3 bg-background rounded-md border border-border">
                   <div>
                     <p className="text-xs text-muted-foreground">Entidade:</p>

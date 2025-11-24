@@ -1219,6 +1219,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // FASE 15: Get related follow-up visits (visitasPosteriores)
+  app.get('/api/visitas/:id/posteriores', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      // Get all visitas and filter by visitaAnteriorId
+      const allVisitas = await storage.getVisitas(empresaId, userId, userRole);
+      const posteriores = allVisitas.filter(v => v.visitaAnteriorId === req.params.id);
+      
+      res.json(posteriores);
+    } catch (error) {
+      console.error("Error fetching visitas posteriores:", error);
+      res.status(500).json({ message: "Failed to fetch posteriores" });
+    }
+  });
+
   app.get('/api/visitas/:id/pdf', isAuthenticated, async (req: any, res) => {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
