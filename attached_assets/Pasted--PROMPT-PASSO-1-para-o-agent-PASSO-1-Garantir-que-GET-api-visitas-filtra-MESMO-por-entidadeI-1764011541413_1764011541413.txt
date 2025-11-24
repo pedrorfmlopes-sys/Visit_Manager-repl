@@ -1,0 +1,162 @@
+🧾 PROMPT PASSO 1 (para o agent)
+
+PASSO 1 – Garantir que GET /api/visitas filtra MESMO por entidadeId e contactoId (Backend apenas)
+
+Contexto rápido:
+
+Já tens no frontend:
+
+Visitas.tsx a construir querystring com entidadeId e contactoId.
+
+VisitasFilterBar.tsx com selects que chamam onFilterChange({ ...filters, entidadeId, contactoId }).
+
+Também tens o diagnóstico a indicar que os filtros podem não estar a ser aplicados no backend (PROBLEMA 10).
+
+O que eu quero neste passo:
+
+Só backend.
+
+Não mexer em React, nem em AdminEmpresa, nem em EntidadeForm neste passo.
+
+Apenas garantir que:
+
+GET /api/visitas lê entidadeId e contactoId da querystring,
+
+passa esses parâmetros para o storage,
+
+e o storage aplica o filtro na query à base de dados.
+
+1. Verificar rota GET /api/visitas
+
+Abre o ficheiro onde está registada a rota GET /api/visitas (provavelmente em server/routes.ts ou ficheiro equivalente).
+
+Confirma se o handler faz algo deste género (pseudo):
+
+app.get("/api/visitas", requireAuth, async (req, res) => {
+  const { search, from, to, userId, marcaId, hasAudioToTranscribe, entidadeId, contactoId } = req.query;
+  // ...
+  const visitas = await storage.getVisitas(empresaId, {
+    search,
+    from,
+    to,
+    userId,
+    marcaId,
+    hasAudioToTranscribe,
+    entidadeId,
+    contactoId,
+  });
+  res.json(visitas);
+});
+
+
+Se entidadeId e contactoId não estiverem a ser extraídos do req.query e passados para o storage:
+
+Adiciona-os, garantindo que:
+
+são strings (ou convertidos para o tipo correto),
+
+opcional: são ignorados se vazios.
+
+2. Verificar / ajustar storage.getVisitas
+
+Abre o ficheiro de storage (onde está getVisitas).
+
+Confirma a assinatura atual. O ideal é algo assim (pseudo-código):
+
+async function getVisitas(empresaId, filters: {
+  search?: string;
+  from?: string;
+  to?: string;
+  userId?: string;
+  marcaId?: string;
+  hasAudioToTranscribe?: boolean;
+  entidadeId?: string;
+  contactoId?: string;
+}) {
+  // ...
+}
+
+
+Dentro da implementação, garante que:
+
+se filters.entidadeId existir:
+
+adicionas um where visitas.entidadeId = filters.entidadeId
+
+se filters.contactoId existir:
+
+adicionas um where visitas.contactoId = filters.contactoId
+
+Exemplo genérico (não copiar literalmente, adapta à tua query com Drizzle):
+
+if (filters.entidadeId) {
+  qb = qb.where(eq(visitas.entidadeId, filters.entidadeId));
+}
+if (filters.contactoId) {
+  qb = qb.where(eq(visitas.contactoId, filters.contactoId));
+}
+
+
+Não mexer nos restantes filtros (search, from, to, marcaId, etc.) — só adicionar estes 2 de forma segura.
+
+3. Testes a fazer (tu, como agent, antes de devolver o relatório)
+
+Teste A – Filtro por Entidade
+
+Cria (ou usa) duas visitas com entidades diferentes (por ex.: Entidade A e Entidade B).
+
+Chama manualmente no browser ou Postman:
+
+/api/visitas?entidadeId=<ID da Entidade A>
+
+Esperado:
+
+A resposta só inclui visitas da Entidade A.
+
+Teste B – Filtro por Contacto
+
+Cria (ou usa) visitas com contactos diferentes.
+
+Chama:
+
+/api/visitas?contactoId=<ID de um contacto específico>
+
+Esperado:
+
+A resposta só inclui visitas com esse contacto.
+
+Teste C – Combinação Entidade + Contacto
+
+Chama:
+
+/api/visitas?entidadeId=<ID A>&contactoId=<ID C>
+
+Esperado:
+
+A resposta respeita ambos os filtros (AND).
+
+4. Relatório deste PASSO 1
+
+No relatório desta mini-fase, por favor inclui explicitamente:
+
+Em que ficheiro(s) mexeste (ex.: routes.ts, storage.ts).
+
+Como ficou a extração dos query params.
+
+Como ficou a aplicação dos filtros no storage.
+
+Resultados dos 3 testes (A, B, C) com uma nota do tipo “passou / ok”.
+
+⚠️ Muito importante neste passo:
+
+Não mexer em:
+
+EntidadeForm.tsx
+
+AdminEmpresa.tsx
+
+VisitasFilterBar.tsx
+
+Este passo é só backend para GET /api/visitas.
+
+Depois de isto estar garantido e testado, passamos ao PASSO 2 (persistir os toggles de Filtros em AdminEmpresa / uiSettings).
