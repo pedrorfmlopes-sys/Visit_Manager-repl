@@ -364,9 +364,11 @@ export default function VisitaDetail() {
 
   const handleCreateSuggestedTask = (suggestedItem: SuggestedItem) => {
     const dueDate = addDays(new Date(), suggestedItem.prazo_sugerido_dias);
+    // FASE 18: Add reference note to task description
+    const descriptionWithReference = `${suggestedItem.descricao}\n\n(Criada a partir de sugestão IA da visita)`;
     form.reset({
       titulo: suggestedItem.titulo,
-      descricao: suggestedItem.descricao,
+      descricao: descriptionWithReference,
       visitaId: visitaId,
       entidadeId: visita?.entidadeId || visita?.gabineteId || undefined,
       dueDate: dueDate,

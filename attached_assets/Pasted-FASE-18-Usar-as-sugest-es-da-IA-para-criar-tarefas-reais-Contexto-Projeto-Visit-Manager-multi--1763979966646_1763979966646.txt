@@ -1,0 +1,181 @@
+FASE 18 – Usar as sugestões da IA para criar tarefas reais
+
+Contexto:
+
+Projeto: Visit Manager multi-empresa.
+
+Situação atual (após FASE 14, 15, 16, 17):
+
+Cada visita pode ter:
+
+resumoIA (texto),
+
+pontosChaveIA (lista),
+
+tarefasSugeridasIA (lista de sugestões geradas pela IA).
+
+O CRUD de tarefas está completo:
+
+Já existe criação de tarefas normal (POST),
+
+Edição (PATCH),
+
+Delete com confirmação.
+
+Visitas já se ligam a:
+
+entidadeId,
+
+contactoId,
+
+e a tarefas/follow-ups.
+
+Neste momento, as tarefas sugeridas pela IA estão apenas em modo leitura na UI da visita.
+
+Objetivo desta fase:
+
+Permitir que o utilizador transforme cada sugestão da IA numa tarefa real do sistema, ligada à visita e à entidade/contacto, com o mínimo de cliques.
+
+Opcional: marcar de forma simples quais sugestões já foram usadas para criar tarefas.
+
+Tarefas técnicas:
+
+Confirmar formato de tarefasSugeridasIA
+
+Ver como o backend está atualmente a guardar tarefasSugeridasIA (após FASE 14):
+
+Ideal: array JSON do tipo:
+
+[{ titulo, descricao, prioridade, prazo_sugerido_dias, tipo? }, ...]
+
+Se estiver guardado como string, manter assim mas fazer JSON.parse no frontend.
+
+Não é necessário mudar o schema, a menos que seja mesmo indispensável.
+
+UI na página VisitaDetail – secção “Sugestões de tarefas (IA)”
+
+Na mesma zona onde já é mostrado o resumo IA, criar/ajustar uma secção para as sugestões:
+
+Para cada sugestão da IA:
+
+Mostrar:
+
+Título proposto.
+
+Descrição (abreviada ou completa).
+
+Prioridade (baixa / normal / alta).
+
+Prazo sugerido (ex.: “+3 dias” → hoje + 3 dias).
+
+Botão de ação: “Criar tarefa”.
+
+Caso não exista qualquer sugestão:
+
+Mostrar mensagem amigável:
+
+“Não existem sugestões de tarefas geradas pela IA para esta visita.”
+
+Criar tarefa real a partir de uma sugestão
+
+Ao clicar em “Criar tarefa” em determinada sugestão:
+
+Usar o endpoint de criação de tarefas já existente (POST /api/tarefas ou equivalente).
+
+Preencher automaticamente:
+
+titulo: vindo da sugestão IA.
+
+descricao: baseada na sugestão; pode incluir uma nota final do tipo:
+
+“(Criada a partir de sugestão IA da visita X).”
+
+prioridade: mapeada para o campo utilizado na app (se existir).
+
+dueDate: hoje + prazo_sugerido_dias.
+
+visitaId: id da visita atual.
+
+entidadeId/contactoId: obter da visita atual, se esses campos existirem na tabela de tarefas.
+
+assignedUserId: se já houver lógica de utilizador responsável, preferir:
+
+o utilizador atual, ou
+
+outro campo que já esteja definido como owner de tarefas.
+
+Em sucesso:
+
+Mostrar notificação “Tarefa criada com sucesso”.
+
+Atualizar a lista de tarefas ligadas à visita (se houver uma secção de tarefas nessa página) ou pelo menos invalidar a query do React Query associada.
+
+(Opcional) Evitar duplicações – marcação de “já usada”
+
+Se for simples, adicionar uma marca visual nas sugestões de IA já usadas:
+
+Exemplo:
+
+Depois de criar uma tarefa a partir de uma sugestão:
+
+Mostrar um badge “Tarefa criada” nessa sugestão.
+
+Desativar o botão “Criar tarefa”.
+
+A persistência pode ser:
+
+Apenas em frontend (estado local) OU
+
+Guardar num campo adicional (ex.: “tarefasIaUsadas”) associado à visita.
+
+Se isto complicar demasiado o backend, podes implementar só a marcação em frontend e documentar a limitação.
+
+UX / Layout
+
+Manter o mesmo estilo visual usado no resumo IA:
+
+Cards (vm-card) para a secção.
+
+Tipografia consistente com o tema (light-business / dark-pro).
+
+Em mobile:
+
+Garantir que a lista de sugestões é fácil de percorrer e tocar no botão “Criar tarefa”.
+
+Testes esperados
+
+Cenário 1 – visita com transcrição e sugestões IA:
+
+Ver resumo IA + lista de sugestões.
+
+Clicar em “Criar tarefa” numa sugestão:
+
+Confirmar que a tarefa aparece na lista de tarefas (no ecrã da visita ou na página geral de tarefas).
+
+Confirmar que visitaId e entidadeId ficam corretamente associados.
+
+Confirmar que dueDate respeita prazo_sugerido_dias.
+
+Cenário 2 – visita sem sugestões IA:
+
+Ver mensagem adequada e nenhuma ação disponível.
+
+Cenário 3 – multi-empresa:
+
+Garantir que a criação de tarefas continua a respeitar empresaId e RBAC exatamente como antes (só utilizadores da empresa podem criar tarefas nas suas visitas).
+
+Restrições:
+
+Não alterar a lógica de multi-empresa nem RBAC.
+
+Não criar endpoints novos se o endpoint de criação de tarefas atual for suficiente.
+
+Não alterar os fluxos de criação/edição de tarefas normais; apenas acrescentar este atalho a partir das sugestões IA.
+
+No final, gera um resumo no mesmo formato das fases anteriores, indicando:
+
+O que foi alterado no backend (se aplicável).
+
+Ajustes feitos em VisitaDetail e/ou componentes ligados a tarefas.
+
+Como ficou o fluxo “da sugestão IA até à tarefa real”.
