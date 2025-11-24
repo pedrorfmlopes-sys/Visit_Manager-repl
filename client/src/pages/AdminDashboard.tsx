@@ -10,6 +10,7 @@ import { useLocation } from "wouter";
 import { format, startOfWeek, endOfWeek, subDays } from "date-fns";
 import { pt } from "date-fns/locale";
 import { AlertRibbon } from "@/components/AlertRibbon";
+import { DashboardInsightsCard } from "@/components/DashboardInsightsCard";
 import type { VisitaWithRelations, Tarefa } from "@shared/schema";
 
 interface DashboardStats {
@@ -465,6 +466,9 @@ export default function AdminDashboard() {
           </Card>
         </div>
       ) : null}
+
+      {/* IA Insights */}
+      <DashboardInsightsCard />
 
       {/* PDF Reports - FINAL */}
       <Card data-testid="card-reports" className="border-primary/30 bg-primary/5">

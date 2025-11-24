@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useToast } from "@/hooks/use-toast";
 import { AlertRibbon } from "@/components/AlertRibbon";
+import { DashboardInsightsCard } from "@/components/DashboardInsightsCard";
 import type { VisitaWithRelations } from "@shared/schema";
 
 interface DashboardStats {
@@ -225,6 +226,9 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+
+            {/* IA Insights */}
+            <DashboardInsightsCard />
 
             {/* PDF Reports - FINAL */}
             <Card data-testid="card-reports" className="border-primary/30 bg-primary/5">

@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { getUserContext, ensureAuthenticated, requireAdmin } from "./authContext";
-import { transcribeAudio, generateVisitSummary, extractBusinessCardData, generateEmailDraft } from "./openai";
+import { transcribeAudio, generateVisitSummary, extractBusinessCardData, generateEmailDraft, generateDashboardInsights } from "./openai";
 import { sendVisitEmail } from "./email";
 import { enrichEntity, type EnrichmentInput, extractDomainFromEmail, isPersonalEmailDomain } from "./enrichment";
 import { ptIntelligentSearch, type PTEnrichmentInput } from "./enrichmentPT";
@@ -16,7 +16,7 @@ import { insertEntidadeSchema, insertContactoSchema, insertVisitaSchema, insertT
 import { generateEmailRequestSchema, getTemplate } from "@shared/emailTemplates";
 import { eq, and, desc, sql } from "drizzle-orm";
 import express from "express";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subDays } from "date-fns";
 import { pt } from "date-fns/locale";
 
 // Ensure upload directory exists
@@ -370,6 +370,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
       res.status(500).json({ message: "Failed to fetch dashboard stats" });
+    }
+  });
+
+  // FASE 23: Dashboard Insights endpoint
+  app.get('/api/dashboard/insights', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      // Get empresa to check if IA is enabled
+      const empresa = await storage.getEmpresa(empresaId);
+      if (!empresa) return res.status(404).json({ message: "Company not found" });
+      
+      // Check if dashboard insights are enabled (default enabled for backwards compatibility)
+      const uiSettings = typeof empresa.uiSettings === 'string' ? JSON.parse(empresa.uiSettings) : empresa.uiSettings;
+      const enableIA = uiSettings?.enableIA !== false; // Default to true
+      
+      if (!enableIA) {
+        return res.json({
+          scope: userRole,
+          period: { from: "", to: "" },
+          metrics: {},
+          insightsText: "Insights IA desativados nas definições da empresa."
+        });
+      }
+      
+      // Calculate period (last 30 days)
+      const to = new Date();
+      const from = subDays(to, 30);
+      
+      // Get metrics based on role
+      const visitas = userRole === 'admin'
+        ? await storage.getVisitasInPeriod(from, to, empresaId, userId, userRole)
+        : await storage.getVisitasInPeriod(from, to, empresaId, userId, userRole);
+      
+      const tarefas = await storage.getTarefasInPeriod(from, to, empresaId, userId, userRole);
+      
+      // Get all visitas to calculate next 7 days
+      const nextWeek = new Date(to.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const visitasProximas = await storage.getVisitasInPeriod(to, nextWeek, empresaId, userId, userRole);
+      
+      // Calculate client stats
+      const clientStats: { [key: string]: { nome: string; count: number } } = {};
+      visitas.forEach((v: any) => {
+        const key = v.entidade?.id || 'unknown';
+        if (!clientStats[key]) {
+          clientStats[key] = { nome: v.entidade?.nome || 'Desconhecido', count: 0 };
+        }
+        clientStats[key].count++;
+      });
+      
+      const clientesChave = Object.values(clientStats)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5)
+        .map(c => ({ nome: c.nome, visitCount: c.count }));
+      
+      // Calculate brand stats
+      const brandStats: { [key: string]: number } = {};
+      visitas.forEach((v: any) => {
+        if (v.marcas && Array.isArray(v.marcas)) {
+          v.marcas.forEach((m: any) => {
+            const marca = m.nome || m;
+            brandStats[marca] = (brandStats[marca] || 0) + 1;
+          });
+        }
+      });
+      
+      const marcasMaisTrabalhadas = Object.entries(brandStats)
+        .map(([marca, count]) => ({ marca, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+      
+      // Calculate task stats
+      const tarefasConcluidas = tarefas.filter((t: any) => t.status === 'done').length;
+      const tarefasEmAtraso = tarefas.filter((t: any) => t.status === 'pending' && t.dueDate && new Date(t.dueDate) < new Date()).length;
+      
+      const metrics = {
+        visitasRealizadas: visitas.length,
+        visitasAgendadas: visitasProximas.length,
+        tarefasCriadas: tarefas.length,
+        tarefasConcluidas,
+        tarefasEmAtraso,
+        clientesChave,
+        marcasMaisTrabalhadas,
+      };
+      
+      // Generate insights with AI
+      const insightsText = await generateDashboardInsights({
+        scope: userRole as 'agent' | 'admin',
+        userName: userId,
+        metrics,
+      });
+      
+      res.json({
+        scope: userRole,
+        period: {
+          from: format(from, 'yyyy-MM-dd'),
+          to: format(to, 'yyyy-MM-dd'),
+        },
+        metrics,
+        insightsText,
+      });
+    } catch (error) {
+      console.error("Error generating dashboard insights:", error);
+      res.status(500).json({ message: "Failed to generate dashboard insights" });
     }
   });
 

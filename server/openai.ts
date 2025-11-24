@@ -339,41 +339,34 @@ export async function generateEmailDraft(data: {
       amigavel: "Tom cordial e próximo, mantendo profissionalismo",
     }[data.tone] || "Tom profissional";
 
+    const visitInfo = data.visitData
+      ? `**Data da visita:** ${data.visitData.dataVisita.toLocaleDateString('pt-PT')}\n**Notas:** ${data.visitData.notas || 'N/A'}`
+      : "Sem dados de visita";
+
     const prompt = `
-Gera um email profissional em português de Portugal para o seguinte contexto:
+Gera um rascunho de email comercial seguindo estas especificações:
 
+**Destinatário:** ${data.contactoName || 'N/A'}
+**Entidade:** ${data.entidadeName || 'N/A'}
 **Tipo de email:** ${data.templateType}
-**Tom:** ${toneInstructions}
+**Tom requerido:** ${toneInstructions}
 
-**Informação disponível:**
-${data.entidadeName ? `- Entidade: ${data.entidadeName}` : ''}
-${data.contactoName ? `- Contacto: ${data.contactoName}` : ''}
-${data.contactoEmail ? `- Email do destinatário: ${data.contactoEmail}` : ''}
-${data.userName ? `- Remetente: ${data.userName}` : ''}
+**Contexto da visita:**
+${visitInfo}
 
-${data.visitData ? `
-**Última visita:**
-- Data: ${data.visitData.dataVisita.toLocaleDateString('pt-PT')}
-${data.visitData.notas ? `- Notas: ${data.visitData.notas}` : ''}
-${data.visitData.marcasEntregues && data.visitData.marcasEntregues.length > 0 ? `- Marcas entregues: ${data.visitData.marcasEntregues.join(', ')}` : ''}
-${data.visitData.resumoIa ? `- Resumo IA: ${data.visitData.resumoIa}` : ''}
-${data.visitData.tarefas && data.visitData.tarefas.length > 0 ? `- Tarefas: ${data.visitData.tarefas.map(t => t.titulo).join(', ')}` : ''}
-` : ''}
+${data.visitData?.marcasEntregues ? `**Marcas entregues:** ${data.visitData.marcasEntregues.join(', ')}` : ''}
 
-${data.recentVisits && data.recentVisits.length > 0 ? `
-**Visitas recentes:**
-${data.recentVisits.map((v, i) => `${i + 1}. ${v.dataVisita.toLocaleDateString('pt-PT')}${v.notas ? `: ${v.notas.substring(0, 100)}...` : ''}`).join('\n')}
-` : ''}
+Por favor, gera um JSON com os seguintes campos:
+{
+  "assunto": "Assunto do email",
+  "corpo": "Corpo do email em português PT-PT, bem estruturado com parágrafos"
+}
 
-Gera um email profissional seguindo estas diretrizes:
-1. Sem emojis
-2. Estilo comercial português de Portugal
-3. Tom conforme especificado
-4. Assunto claro e direto
-5. Corpo do email bem estruturado com parágrafos apropriados
-6. Terminar com assinatura formal
-
-Responde em JSON com os campos: "subject" e "body"
+Instruções:
+1. Responde APENAS com JSON válido
+2. Email profissional mas com o tom requerido
+3. Sem cumprimentos genéricos - foco em conteúdo específico da visita
+4. Máx 3-4 parágrafos
 `;
 
     const response = await openai.chat.completions.create({
@@ -381,26 +374,126 @@ Responde em JSON com os campos: "subject" e "body"
       messages: [
         {
           role: "system",
-          content: "És um assistente especializado em redação de emails comerciais. Respondes sempre em português de Portugal, sem emojis, em formato JSON.",
+          content: "És um especialista em redação de emails comerciais. Respondes sempre em português de Portugal e em formato JSON válido."
         },
         {
           role: "user",
-          content: prompt,
-        },
+          content: prompt
+        }
       ],
       response_format: { type: "json_object" },
       temperature: 0.7,
     });
 
     const result = response.choices[0].message.content;
-    const parsedResult = JSON.parse(result || "{}");
+    const parsed = JSON.parse(result || "{}");
 
     return {
-      subject: parsedResult.subject || "Assunto do email",
-      body: parsedResult.body || "",
+      subject: parsed.assunto || "Seguimento de visita comercial",
+      body: parsed.corpo || "Email gerado automaticamente",
     };
   } catch (error) {
     console.error("Error generating email draft:", error);
     throw new Error("Failed to generate email draft");
+  }
+}
+
+// FASE 23: Generate Dashboard Insights (AI analysis for agent/admin)
+export interface DashboardInsightsOutput {
+  scope: 'agent' | 'admin';
+  period: {
+    from: string;
+    to: string;
+  };
+  metrics: {
+    visitasRealizadas: number;
+    visitasAgendadas: number;
+    tarefasCriadas: number;
+    tarefasConcluidas: number;
+    tarefasEmAtraso: number;
+    clientesChave: Array<{ nome: string; visitCount: number }>;
+    marcasMaisTrabalhadas: Array<{ marca: string; count: number }>;
+  };
+  insightsText: string;
+}
+
+export async function generateDashboardInsights(data: {
+  scope: 'agent' | 'admin';
+  userName?: string;
+  metrics: {
+    visitasRealizadas: number;
+    visitasAgendadas: number;
+    tarefasCriadas: number;
+    tarefasConcluidas: number;
+    tarefasEmAtraso: number;
+    clientesChave: Array<{ nome: string; visitCount: number }>;
+    marcasMaisTrabalhadas: Array<{ marca: string; count: number }>;
+  };
+}): Promise<string> {
+  if (!openai) {
+    console.warn("OpenAI not configured. Skipping dashboard insights generation.");
+    return "[Insights IA indisponíveis - API key não configurada]";
+  }
+
+  try {
+    const scopeLabel = data.scope === 'agent' ? 'do agente' : 'da empresa';
+    const clientesText = data.metrics.clientesChave.length > 0
+      ? `Clientes chave: ${data.metrics.clientesChave.map(c => `${c.nome} (${c.visitCount} visitas)`).join(', ')}`
+      : 'Sem dados de clientes chave';
+    
+    const marcasText = data.metrics.marcasMaisTrabalhadas.length > 0
+      ? `Marcas mais trabalhadas: ${data.metrics.marcasMaisTrabalhadas.map(m => `${m.marca} (${m.count}x)`).join(', ')}`
+      : 'Sem dados de marcas';
+
+    const prompt = `
+Analisa estes dados de vendas comerciais e gera um insight executivo profissional em português PT-PT.
+
+**Período:** Últimos 30 dias
+**Scope:** ${scopeLabel}
+
+**Métricas ${scopeLabel}:**
+- Visitas realizadas: ${data.metrics.visitasRealizadas}
+- Visitas agendadas (próximos 7 dias): ${data.metrics.visitasAgendadas}
+- Tarefas criadas: ${data.metrics.tarefasCriadas}
+- Tarefas concluídas: ${data.metrics.tarefasConcluidas}
+- Tarefas em atraso: ${data.metrics.tarefasEmAtraso}
+- ${clientesText}
+- ${marcasText}
+
+Por favor, gera um JSON estruturado com este campo:
+{
+  "insights": "Texto do insight em markdown (máx 500 palavras) com: 1 parágrafo sobre o que está a correr bem, 1 parágrafo sobre riscos/problemas, e uma lista de 3-5 recomendações concretas de ações. Escreve em tom profissional mas prático, dirigido a um vendedor comercial."
+}
+
+Instruções:
+1. Tom profissional mas prático
+2. Focado em ações concretas e melhorias mensuráveis
+3. Responde APENAS com JSON válido
+4. Gera conteúdo que seja útil para melhorar performance de vendas
+`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "És um analista de vendas especializado em fornecer insights acionáveis. Respondes sempre em português de Portugal e em formato JSON válido."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.7,
+    });
+
+    const result = response.choices[0].message.content;
+    const parsed = JSON.parse(result || "{}");
+
+    return parsed.insights || "Insights indisponíveis neste momento";
+  } catch (error) {
+    console.error("Error generating dashboard insights:", error);
+    throw new Error("Failed to generate dashboard insights");
   }
 }

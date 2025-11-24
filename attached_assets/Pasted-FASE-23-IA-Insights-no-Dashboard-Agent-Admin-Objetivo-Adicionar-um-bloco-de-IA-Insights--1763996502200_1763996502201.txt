@@ -1,0 +1,209 @@
+FASE 23 – IA Insights no Dashboard (Agent + Admin)
+
+Objetivo:
+
+Adicionar um bloco de “IA Insights / Recomendações” no Dashboard, tanto para agent como para admin, que analisa os dados recentes (visitas, tarefas, clientes chave) e devolve um texto com:
+
+O que está a correr bem,
+
+Riscos / pontos fracos,
+
+Recomendações concretas de ações.
+
+Isto é diferente do PDF PRO de visita (que é por visita) – aqui é uma visão mais global (por utilizador ou por empresa).
+
+Backend – Endpoint de Insights
+
+Criar um endpoint novo, por exemplo:
+
+GET /api/dashboard/insights
+
+Comportamento:
+
+Respeita o contexto:
+
+empresaId do utilizador (multi-tenant).
+
+userId + role:
+
+Se role = "agent" → insights focados nesse utilizador.
+
+Se role = "admin" → insights focados na empresa/equipa.
+
+Dados que o endpoint deve reunir (antes de chamar a IA):
+
+Período base:
+
+Para já podes usar últimos 30 dias (e incluir no payload para IA).
+
+Métricas sugeridas:
+
+Nº de visitas realizadas no período.
+
+Nº de visitas agendadas para os próximos 7 dias.
+
+Nº de tarefas criadas / concluídas / em atraso.
+
+Principais clientes (por nº de visitas) e se têm tarefas em atraso.
+
+Marcas mais trabalhadas (se fácil de calcular).
+
+Esta parte pode reutilizar queries que o AdminDashboard já faz (não precisas de inventar KPIs novos, só empacotar o que já tens).
+
+Chamada IA (no backend):
+
+Com base nessas métricas, chamar o modelo de IA já utilizado no projeto (o mesmo stack usado para resumos IA de visitas).
+
+Passar um prompt do género (podes afinar, mas a ideia é esta):
+
+"És um assistente que analisa dados de visitas comerciais e tarefas.
+Período analisado: últimos 30 dias.
+
+Dados do utilizador/empresa: [colocar JSON com métricas].
+
+Gera um texto curto e objetivo com:
+
+1 parágrafo sobre o que está a correr bem.
+
+1 parágrafo sobre riscos/problemas (ex.: tarefas em atraso, falta de follow-up, concentração em poucos clientes).
+
+1 lista de 3 a 5 recomendações concretas de ações para melhorar resultados.
+
+Escreve em português de Portugal, num tom profissional mas prático."
+
+Resposta:
+
+O endpoint deve devolver algo do género:
+
+{
+  "scope": "agent" | "admin",
+  "period": {
+    "from": "...",
+    "to": "..."
+  },
+  "metrics": { ... },   // opcional, se quiseres devolver também
+  "insightsText": "..."
+}
+
+
+Frontend – Card “IA Insights” no Dashboard
+
+Localização no layout:
+
+Em ambos dashboards (agent e admin):
+
+O card de IA Insights deve aparecer perto do fundo do dashboard, mas acima do card de PDF Export.
+
+Ordem sugerida:
+
+Título “Dashboard”
+
+AlertRibbon
+
+KPI cards
+
+CRM cards / listas
+
+IA Insights
+
+PDF Export (já existe no fundo)
+
+Componente:
+
+Criar um componente reutilizável, ex.: DashboardInsightsCard.
+
+Usar React Query para chamar GET /api/dashboard/insights.
+
+Estados:
+
+loading: skeleton simples ou spinner dentro do card.
+
+error: mensagem tipo “Não foi possível carregar os insights agora”.
+
+success: mostrar texto da IA.
+
+UI sugerida:
+
+Card com título:
+
+Agent:
+
+“Recomendações para ti (últimos 30 dias)”
+
+Admin:
+
+“Insights para a empresa (últimos 30 dias)”
+
+Corpo:
+
+Mostrar insightsText formatado (pode ser só texto corrido ou com quebras de linha se vier estruturado).
+
+Pequeno rodapé:
+
+“Gerado automaticamente com base nas visitas e tarefas dos últimos 30 dias.”
+
+Botão opcional: “Regerar insights” (chama novamente a API com refetch()).
+
+RBAC:
+
+O próprio endpoint decide o scope com base no role, portanto o mesmo componente pode ser usado nos dois dashboards.
+
+Integração com Settings de IA (FASE 22)
+
+Respeitar as flags de IA no uiSettings da empresa (FASE 22):
+
+Se a empresa tiver IA desativada para dashboards (podes criar um sub-flag uiSettings.ia.dashboardInsightsEnabled ou reutilizar algo de IA global):
+
+Não chamar o endpoint.
+
+Mostrar no card apenas:
+
+“Insights IA desativados nas definições da empresa.”
+
+Se IA estiver ativa:
+
+Chamar normalmente o endpoint e mostrar o texto.
+
+Testes esperados
+
+Cenário Agent:
+
+Entrar como agent no dashboard.
+
+Ver:
+
+Título → AlertRibbon → KPI → cards → IA Insights → PDF Export.
+
+Ver texto com recomendações IA baseado nas minhas visitas/tarefas.
+
+Clicar em “Regerar” (se implementares) → ver o texto refrescar.
+
+Cenário Admin:
+
+Entrar como admin no AdminDashboard.
+
+Ver card IA Insights com foco em empresa/equipa (não apenas no utilizador).
+
+Cenário IA desligada:
+
+Desativar IA para dashboards nas settings da empresa.
+
+Ver que o card mostra mensagem informativa em vez de chamar a API.
+
+Restrição:
+
+Não quebrar performance do dashboard:
+
+Se for pesado calcular as métricas, usa caching (em memória/tempo) ou React Query com staleTime maior (ex.: 5 min).
+
+Manter RBAC e multi-empresa como já está.
+
+No final, por favor inclui no relatório:
+
+Endpoint criado e formato da resposta.
+
+Onde o card foi colocado no AgentDashboard/AdminDashboard.
+
+Como as flags de IA em settings influenciam a exibição do card.
+
+Exemplos de texto gerado pela IA (para termos referência de tom).
