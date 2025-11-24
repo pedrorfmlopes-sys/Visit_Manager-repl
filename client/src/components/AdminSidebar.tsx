@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Building2, Users, CheckCircle2, Bell, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, Building2, Users, CheckCircle2, Bell, Settings, LogOut, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,7 +9,7 @@ const sidebarItems = [
   { path: "/", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/entidades", icon: Building2, label: "Entidades" },
   { path: "/contactos", icon: Users, label: "Contactos" },
-  { path: "/visitas", icon: FileText, label: "Visitas" },
+  { path: "/visitas", icon: Calendar, label: "Visitas" },
   { path: "/tarefas", icon: CheckCircle2, label: "Tarefas" },
   { path: "/lembretes", icon: Bell, label: "Lembretes" },
 ];

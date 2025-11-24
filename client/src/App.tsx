@@ -35,8 +35,6 @@ import Lembretes from "@/pages/Lembretes";
 import Analytics from "@/pages/Analytics";
 import QRScanner from "@/pages/QRScanner";
 import AdminEmpresa from "@/pages/AdminEmpresa";
-import AdminUsers from "@/pages/AdminUsers";
-import AdminMarcas from "@/pages/AdminMarcas";
 import AdminDebug from "@/pages/AdminDebug";
 import AgentMore from "@/pages/AgentMore";
 import Perfil from "@/pages/Perfil";
