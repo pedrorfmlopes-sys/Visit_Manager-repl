@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useRoute } from "wouter";
 import { ArrowLeft, Loader2, Calendar as CalendarIcon, Upload, X, WifiOff, Plus, Mic, Volume2, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
@@ -41,9 +41,11 @@ type VisitaFormData = z.infer<typeof visitaFormSchema>;
 
 export default function VisitaForm() {
   const [, setLocation] = useLocation();
+  const [, params] = useRoute("/visitas/:id");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isOnline = useOnlineStatus();
+  const isEdit = params?.id && params.id !== "nova";
   
   // Get pre-fill data from query params (FASE 15: follow-up visits)
   const queryParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
@@ -126,6 +128,12 @@ export default function VisitaForm() {
     enabled: empresa?.mostrarMarcasEmVisitas ?? false,
   });
 
+  // Load existing visit data when in edit mode
+  const { data: existingVisita } = useQuery({
+    queryKey: ["/api/visitas", params?.id],
+    enabled: !!isEdit,
+  });
+
   // Build prefilled notes with header (FASE 15: use HTML paragraphs for RichTextEditor)
   const notasComResumo = prefillData.resumoVisitaAnterior && prefillData.visitaAnteriorData
     ? `<p></p><p></p><p><strong>***** Resumo da Visita Anterior, efetuada dia ${format(new Date(prefillData.visitaAnteriorData), "dd/MM/yyyy", { locale: pt })} *****</strong></p><p></p><p>${prefillData.resumoVisitaAnterior}</p>`
@@ -133,7 +141,15 @@ export default function VisitaForm() {
 
   const form = useForm<VisitaFormData>({
     resolver: zodResolver(visitaFormSchema),
-    defaultValues: {
+    defaultValues: isEdit && existingVisita ? {
+      entidadeId: existingVisita.entidadeId || "",
+      contactoId: existingVisita.contactoId || "",
+      dataVisita: new Date(existingVisita.dataVisita),
+      notas: existingVisita.notas || "",
+      marcasEntregues: existingVisita.marcasEntregues || [],
+      marcasIds: existingVisita.visitasMarcas?.map((vm: any) => vm.marca.id) || [],
+      proximaVisita: existingVisita.proximaVisita ? new Date(existingVisita.proximaVisita) : undefined,
+    } : {
       entidadeId: prefillData.entidadeId || "",
       contactoId: prefillData.contactoId || "",
       dataVisita: prefillData.dataVisita || new Date(),
@@ -142,11 +158,67 @@ export default function VisitaForm() {
       marcasIds: [],
       proximaVisita: undefined,
     },
+    values: isEdit && existingVisita ? {
+      entidadeId: existingVisita.entidadeId || "",
+      contactoId: existingVisita.contactoId || "",
+      dataVisita: new Date(existingVisita.dataVisita),
+      notas: existingVisita.notas || "",
+      marcasEntregues: existingVisita.marcasEntregues || [],
+      marcasIds: existingVisita.visitasMarcas?.map((vm: any) => vm.marca.id) || [],
+      proximaVisita: existingVisita.proximaVisita ? new Date(existingVisita.proximaVisita) : undefined,
+    } : undefined,
   });
 
   const selectedEntidadeId = form.watch("entidadeId");
   const selectedMarcasIds = form.watch("marcasIds") || [];
   const filteredContactos = contactos?.filter(c => c.entidadeId === selectedEntidadeId);
+
+  const updateMutation = useMutation({
+    mutationFn: async (formData: FormData) => {
+      const response = await fetch(`/api/visitas/${params?.id}`, {
+        method: "PATCH",
+        body: formData,
+        credentials: "include",
+      });
+      
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`${response.status}: ${text}`);
+      }
+      
+      return response.json();
+    },
+    onSuccess: async () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas", params?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      
+      toast({
+        title: "Sucesso",
+        description: "Visita atualizada com sucesso!",
+      });
+      
+      setLocation(`/visitas/${params?.id}`);
+    },
+    onError: (error: Error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Não autorizado",
+          description: "A fazer login novamente...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar a visita",
+        variant: "destructive",
+      });
+    },
+  });
 
   const createMutation = useMutation({
     mutationFn: async (formData: FormData) => {
@@ -367,8 +439,12 @@ export default function VisitaForm() {
       formData.append("media", file);
     });
     
-    // Submit visita form - pending clips will be uploaded in onSuccess handler
-    createMutation.mutate(formData);
+    // Submit visita form - use update or create depending on mode
+    if (isEdit) {
+      updateMutation.mutate(formData);
+    } else {
+      createMutation.mutate(formData);
+    }
   };
 
   const handleAudioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
