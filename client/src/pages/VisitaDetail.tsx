@@ -56,6 +56,7 @@ export default function VisitaDetail() {
   const [suggestedTaskToCreate, setSuggestedTaskToCreate] = useState<SuggestedItem | null>(null);
   const [appointmentDialogOpen, setAppointmentDialogOpen] = useState(false);
   const [appointmentTitle, setAppointmentTitle] = useState("");
+  const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
   const [createdTaskId, setCreatedTaskId] = useState<string | null>(null);
   const [createdAppointmentId, setCreatedAppointmentId] = useState<string | null>(null);
   const [createdSuggestedMap, setCreatedSuggestedMap] = useState<Map<string, { type: 'tarefa' | 'agendamento', status?: string, date?: Date }>>(new Map());
@@ -323,16 +324,17 @@ export default function VisitaDetail() {
   const handleCreateSuggestedAppointment = (suggestedItem: SuggestedItem) => {
     const entityName = visita?.entidade?.nome || visita?.gabinete?.nome || "";
     const proposedTitle = `${suggestedItem.titulo} — ${entityName}`;
+    const suggestedDate = addDays(new Date(), suggestedItem.prazo_sugerido_dias);
     setAppointmentTitle(proposedTitle);
+    setAppointmentDate(suggestedDate);
     setSuggestedTaskToCreate(suggestedItem);
     setAppointmentDialogOpen(true);
   };
 
   const createAppointmentMutation = useMutation({
     mutationFn: async () => {
-      if (!suggestedTaskToCreate) throw new Error('No appointment data');
+      if (!suggestedTaskToCreate || !appointmentDate) throw new Error('No appointment data');
       
-      const appointmentDate = addDays(new Date(), suggestedTaskToCreate.prazo_sugerido_dias);
       const newVisita: InsertVisita = {
         dataVisita: appointmentDate,
         tipoVisita: "presencial",
@@ -346,12 +348,11 @@ export default function VisitaDetail() {
     },
     onSuccess: (response: any) => {
       const newId = response?.id || "";
-      const appointmentDate = addDays(new Date(), suggestedTaskToCreate?.prazo_sugerido_dias || 0);
       setCreatedAppointmentId(newId);
       queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
       
       // Register in created suggestions map
-      if (suggestedTaskToCreate) {
+      if (suggestedTaskToCreate && appointmentDate) {
         const key = `${suggestedTaskToCreate.titulo}`;
         setCreatedSuggestedMap(prev => new Map(prev).set(key, { type: 'agendamento', date: appointmentDate }));
       }
@@ -363,6 +364,7 @@ export default function VisitaDetail() {
       setAppointmentDialogOpen(false);
       setSuggestedTaskToCreate(null);
       setAppointmentTitle("");
+      setAppointmentDate(null);
       setTimeout(() => setCreatedAppointmentId(null), 3000);
     },
     onError: () => {
@@ -1334,6 +1336,18 @@ export default function VisitaDetail() {
                 data-testid="input-appointment-title"
               />
             </div>
+            <div>
+              <Label className="mb-2 block">Data da Visita</Label>
+              <Input
+                type="datetime-local"
+                value={appointmentDate ? new Date(appointmentDate).toISOString().slice(0, 16) : ""}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setAppointmentDate(value ? new Date(value) : null);
+                }}
+                data-testid="input-appointment-date"
+              />
+            </div>
             <div className="text-sm text-muted-foreground">
               {suggestedTaskToCreate && (
                 <>
@@ -1354,6 +1368,7 @@ export default function VisitaDetail() {
                   setAppointmentDialogOpen(false);
                   setSuggestedTaskToCreate(null);
                   setAppointmentTitle("");
+                  setAppointmentDate(null);
                 }}
                 data-testid="button-cancel-appointment"
               >
@@ -1361,7 +1376,7 @@ export default function VisitaDetail() {
               </Button>
               <Button
                 onClick={() => createAppointmentMutation.mutate()}
-                disabled={createAppointmentMutation.isPending || !appointmentTitle.trim()}
+                disabled={createAppointmentMutation.isPending || !appointmentTitle.trim() || !appointmentDate}
                 data-testid="button-confirm-appointment"
               >
                 {createAppointmentMutation.isPending ? "A agendar..." : "Agendar"}
