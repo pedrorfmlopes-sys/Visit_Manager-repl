@@ -1,0 +1,231 @@
+🔧 FASE 29 – Correção Final (Tipos de Entidade + Filtros + Bugs)
+
+Já tens parte da infraestrutura feita (tabela de tipos de entidade, uiSettings expandido, AdminEntidadeTipos, etc.), mas neste momento:
+
+O EntidadeForm está a partir porque entidadeTipos é undefined.
+
+A tab “Filtros” em AdminEmpresa é só visual, não grava nada.
+
+Os filtros de Entidade/Contacto em Visitas ainda não aparecem para mim.
+
+Vou pedir-te uma correção focada, em 4 blocos:
+
+1. Corrigir EntidadeForm para usar tipos configurados (sem rebentar nada)
+
+Objetivo:
+
+O formulário de Entidade deve:
+
+continuar a funcionar como antes,
+
+ter um campo extra “Tipo de Entidade (Configurado)” que usa a lista de tipos configurados,
+
+sem dar erro por causa de entidadeTipos undefined.
+
+Pedidos concretos:
+
+No EntidadeForm.tsx:
+
+Adicionar um useQuery no topo do componente para carregar tipos:
+
+Ex: GET /api/entidade-tipos (ou o endpoint read-only que criaste).
+
+Garantir que usas um default seguro:
+
+algo como const entidadeTipos = data ?? []
+(não interessa a sintaxe exata aqui, o importante é nunca ser undefined).
+
+Garantir que o <Select> de entidadeTipoId:
+
+usa entidadeTipos desse useQuery,
+
+não rebenta se a lista vier vazia,
+
+mostra a mensagem:
+
+“Sem tipos definidos – configure em Definições → Entidades”
+apenas quando entidadeTipos.length === 0.
+
+Em relação ao campo antigo tipoEntidade:
+
+Por agora, mantém o campo antigo como “legado” (para não perder dados).
+
+Mas certifica-te que:
+
+o novo entidadeTipoId não entra em conflito com o que já existe,
+
+não há warnings de “controlled/uncontrolled” nos inputs.
+
+Confirmar que depois disto:
+
+EntidadeForm deixa de gerar erros de runtime,
+
+consolas React deixam de mostrar “Invalid hook call” ou undefined.map.
+
+2. Fazer a aba “Filtros” em AdminEmpresa gravar mesmo em uiSettings
+
+Neste momento:
+
+Tens uma Tab “Filtros” com sub-tabs (Entidades, Contactos, Visitas, Tarefas),
+
+Mas os checkboxes são inputs soltos (<input type="checkbox" defaultChecked>), não ligados ao form → não gravam nada.
+
+Quero que:
+
+Cada toggle desta aba “Filtros” esteja de facto ligado a uiSettings:
+
+Exemplo de mapeamento:
+
+Tab Entidades:
+
+Checkbox “Filtro por tipo de entidade” → uiSettings.entidades.enableFilterTipoEntidade
+
+Checkbox “Pesquisa” → uiSettings.entidades.enableFilterSearch
+
+Tab Contactos:
+
+Entidade → uiSettings.contactos.enableFilterEntidade
+
+Cargo → uiSettings.contactos.enableFilterCargo
+
+Pesquisa → uiSettings.contactos.enableFilterSearch
+
+Tab Visitas:
+
+Data rápida → uiSettings.visitas.enableFilterDateQuick
+
+Utilizador → uiSettings.visitas.enableFilterUser
+
+Marca → uiSettings.visitas.enableFilterMarca
+
+Entidade → uiSettings.visitas.enableFilterEntidade
+
+Contacto → uiSettings.visitas.enableFilterContacto
+
+Com áudio → uiSettings.visitas.enableFilterHasAudio
+
+Tab Tarefas:
+
+Status → uiSettings.tarefas.enableFilterStatus
+
+Em atraso → uiSettings.tarefas.enableFilterOverdue
+
+Atribuído a → uiSettings.tarefas.enableFilterAssignedUser
+
+Entidade → uiSettings.tarefas.enableFilterEntidade
+
+Visita → uiSettings.tarefas.enableFilterVisita
+
+Em vez de <input type="checkbox" defaultChecked>, usa o mesmo padrão de form que já tens:
+
+FormField, FormItem, FormControl, etc., com o componente de Checkbox que já usas noutros sítios.
+
+O estado deve vir de form.watch("uiSettings....") / defaultValues que já vêm do backend.
+
+Ao clicar em “Guardar” nas Definições de Empresa, estes flags de filtros têm MESMO de ser persistidos na BD (como já acontece com outros campos de uiSettings).
+
+Ajustar layout da TabsList se necessário:
+
+Garante que as 8 abas ("Geral", "Visitas & Tarefas", "IA & Áudio", "Localização", "Alertas & UX", "Integrações", "Entidades", "Filtros") não rebentam em mobile (podes usar grid + wrap ou scroll horizontal, desde que não parta o layout).
+
+3. Tornar Filtros de Visitas (Entidade/Contacto) visíveis e obedientes às settings
+
+Backend:
+
+Já suportas entidadeId e contactoId em GET /api/visitas.
+
+Só preciso que isso seja usado no frontend.
+
+Pedidos:
+
+Em Visitas.tsx (agent) / VisitasFilterBar:
+
+Adicionar um filtro de Entidade:
+
+Select com pesquisa de entidades (pode ser simples, não precisa ser super sofisticado).
+
+Ao escolher:
+
+atualiza o estado local,
+
+atualiza o query param entidadeId na URL,
+
+dispara refetch com esse filtro.
+
+Adicionar um filtro de Contacto:
+
+Similar: select com contactos (idealmente filtrados pela entidade, mas não obrigatório nesta fase).
+
+Atualiza contactoId na querystring.
+
+Em AdminVisitas.tsx:
+
+Repetir os mesmos filtros Entidade/Contacto na barra de filtros.
+
+Integração com uiSettings e userSettings:
+
+Os filtros só aparecem se:
+
+uiSettings.visitas.enableFilterEntidade === true (para Entidade),
+
+uiSettings.visitas.enableFilterContacto === true (para Contacto).
+
+Se o utilizador tiver um toggle tipo “Mostrar filtros avançados” desligado, podes esconder esse bloco de filtros avançados (mas nunca mostrar algo que a empresa desligou).
+
+4. Garantir que a aba “Entidades” em AdminEmpresa está estável e funcional
+
+Testar AdminEntidadeTipos.tsx:
+
+Ver se renderiza sem erros,
+
+Confirmar que:
+
+lista tipos existentes,
+
+permite criar novo tipo,
+
+permite editar nome/cor,
+
+permite ativar/desativar.
+
+Confirmar que:
+
+A aba “Entidades” em /admin/empresa mostra esse componente,
+
+Não há “invalid hook call” nem warnings estranhos no console.
+
+5. Checklist no relatório desta correção
+
+No próximo relatório, peço-te um bloco “Checklist FASE 29 – Correção” com:
+
+EntidadeForm
+
+ useQuery para carregar entidadeTipos adicionado.
+
+ Campo “Tipo de Entidade (Configurado)” funciona e não rebenta se lista vier vazia.
+
+ Sem erros undefined.map ou “Invalid hook call” relacionados com este form.
+
+AdminEmpresa / Aba Filtros
+
+ Checkboxes de Entidades/Contactos/Visitas/Tarefas ligados a uiSettings.
+
+ Guardar Definições grava os filtros na BD.
+
+ Layout das tabs estável em mobile/desktop.
+
+Filtros Visitas
+
+ Filtro Entidade visível e funcional em Visitas (agent + admin).
+
+ Filtro Contacto visível e funcional em Visitas (agent + admin).
+
+ Filtros obedecem a uiSettings + “filtros avançados” do utilizador.
+
+AdminEntidadeTipos / Aba Entidades
+
+ Aba Entidades em /admin/empresa mostra gestão de tipos a funcionar.
+
+ Nenhum item de “configuração” de entidades/tipos está espalhado no menu principal.
+
+Obrigado! A ideia é ficar com tudo arrumado nas Definições, tipos configuráveis por empresa a funcionar e filtros 100% controlados pelas settings, sem erros de hooks nem inputs “soltos”.

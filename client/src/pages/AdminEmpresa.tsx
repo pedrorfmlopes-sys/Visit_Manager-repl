@@ -635,124 +635,256 @@ export default function AdminEmpresa() {
                           <TabsTrigger value="tarefas-filter" data-testid="tab-filter-tarefas">Tarefas</TabsTrigger>
                         </TabsList>
 
+                        {/* ENTIDADES FILTERS */}
                         <TabsContent value="entidades-filter" className="space-y-4 mt-4">
-                          <div className="space-y-3">
-                            <div className="flex items-start gap-2">
-                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-tipo-entidade" />
-                              <div>
-                                <p className="font-medium text-sm">Filtro por Tipo de Entidade</p>
-                                <p className="text-xs text-muted-foreground">Permite filtrar por tipos configurados</p>
-                              </div>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-search-entidades" />
-                              <div>
-                                <p className="font-medium text-sm">Pesquisa por Nome</p>
-                                <p className="text-xs text-muted-foreground">Filtro de pesquisa rápida</p>
-                              </div>
-                            </div>
+                          <div className="space-y-4">
+                            <FormField
+                              control={form.control}
+                              name="uiSettings.entidades.enableFilterTipoEntidade"
+                              render={({ field }) => (
+                                <FormItem className="flex items-start gap-3">
+                                  <FormControl>
+                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-tipo-entidade" />
+                                  </FormControl>
+                                  <div>
+                                    <FormLabel>Filtro por Tipo de Entidade</FormLabel>
+                                    <p className="text-xs text-muted-foreground">Permite filtrar por tipos configurados</p>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="uiSettings.entidades.enableFilterSearch"
+                              render={({ field }) => (
+                                <FormItem className="flex items-start gap-3">
+                                  <FormControl>
+                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-search-entidades" />
+                                  </FormControl>
+                                  <div>
+                                    <FormLabel>Pesquisa por Nome</FormLabel>
+                                    <p className="text-xs text-muted-foreground">Filtro de pesquisa rápida</p>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
                           </div>
                         </TabsContent>
 
+                        {/* CONTACTOS FILTERS */}
                         <TabsContent value="contactos-filter" className="space-y-4 mt-4">
-                          <div className="space-y-3">
-                            <div className="flex items-start gap-2">
-                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-entidade-contacto" />
-                              <div>
-                                <p className="font-medium text-sm">Filtro por Entidade</p>
-                                <p className="text-xs text-muted-foreground">Filtrar contactos por entidade associada</p>
-                              </div>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-cargo" />
-                              <div>
-                                <p className="font-medium text-sm">Filtro por Cargo</p>
-                                <p className="text-xs text-muted-foreground">Filtrar por função/cargo</p>
-                              </div>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-search-contactos" />
-                              <div>
-                                <p className="font-medium text-sm">Pesquisa por Nome</p>
-                                <p className="text-xs text-muted-foreground">Filtro de pesquisa rápida</p>
-                              </div>
-                            </div>
+                          <div className="space-y-4">
+                            <FormField
+                              control={form.control}
+                              name="uiSettings.contactos.enableFilterEntidade"
+                              render={({ field }) => (
+                                <FormItem className="flex items-start gap-3">
+                                  <FormControl>
+                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-entidade-contacto" />
+                                  </FormControl>
+                                  <div>
+                                    <FormLabel>Filtro por Entidade</FormLabel>
+                                    <p className="text-xs text-muted-foreground">Filtrar contactos por entidade associada</p>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="uiSettings.contactos.enableFilterCargo"
+                              render={({ field }) => (
+                                <FormItem className="flex items-start gap-3">
+                                  <FormControl>
+                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-cargo" />
+                                  </FormControl>
+                                  <div>
+                                    <FormLabel>Filtro por Cargo</FormLabel>
+                                    <p className="text-xs text-muted-foreground">Filtrar por função/cargo</p>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="uiSettings.contactos.enableFilterSearch"
+                              render={({ field }) => (
+                                <FormItem className="flex items-start gap-3">
+                                  <FormControl>
+                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-search-contactos" />
+                                  </FormControl>
+                                  <div>
+                                    <FormLabel>Pesquisa por Nome</FormLabel>
+                                    <p className="text-xs text-muted-foreground">Filtro de pesquisa rápida</p>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
                           </div>
                         </TabsContent>
 
+                        {/* VISITAS FILTERS */}
                         <TabsContent value="visitas-filter" className="space-y-4 mt-4">
-                          <div className="space-y-3">
-                            <div className="flex items-start gap-2">
-                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-date-quick" />
-                              <div>
-                                <p className="font-medium text-sm">Filtro Datas (Hoje / Semana / 30 dias)</p>
-                              </div>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-user-visitas" />
-                              <div>
-                                <p className="font-medium text-sm">Filtro por Utilizador</p>
-                              </div>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-marca-visitas" />
-                              <div>
-                                <p className="font-medium text-sm">Filtro por Marca</p>
-                              </div>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-entidade-visitas" />
-                              <div>
-                                <p className="font-medium text-sm">Filtro por Entidade</p>
-                              </div>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-contacto-visitas" />
-                              <div>
-                                <p className="font-medium text-sm">Filtro por Contacto</p>
-                              </div>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-audio-visitas" />
-                              <div>
-                                <p className="font-medium text-sm">Filtro por Áudio (Com áudio por transcrever)</p>
-                              </div>
-                            </div>
+                          <div className="space-y-4">
+                            <FormField
+                              control={form.control}
+                              name="uiSettings.visitas.enableFilterDateQuick"
+                              render={({ field }) => (
+                                <FormItem className="flex items-start gap-3">
+                                  <FormControl>
+                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-date-quick" />
+                                  </FormControl>
+                                  <div>
+                                    <FormLabel>Filtro Datas (Hoje / Semana / 30 dias)</FormLabel>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="uiSettings.visitas.enableFilterUser"
+                              render={({ field }) => (
+                                <FormItem className="flex items-start gap-3">
+                                  <FormControl>
+                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-user-visitas" />
+                                  </FormControl>
+                                  <div>
+                                    <FormLabel>Filtro por Utilizador</FormLabel>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="uiSettings.visitas.enableFilterMarca"
+                              render={({ field }) => (
+                                <FormItem className="flex items-start gap-3">
+                                  <FormControl>
+                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-marca-visitas" />
+                                  </FormControl>
+                                  <div>
+                                    <FormLabel>Filtro por Marca</FormLabel>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="uiSettings.visitas.enableFilterEntidade"
+                              render={({ field }) => (
+                                <FormItem className="flex items-start gap-3">
+                                  <FormControl>
+                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-entidade-visitas" />
+                                  </FormControl>
+                                  <div>
+                                    <FormLabel>Filtro por Entidade</FormLabel>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="uiSettings.visitas.enableFilterContacto"
+                              render={({ field }) => (
+                                <FormItem className="flex items-start gap-3">
+                                  <FormControl>
+                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-contacto-visitas" />
+                                  </FormControl>
+                                  <div>
+                                    <FormLabel>Filtro por Contacto</FormLabel>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="uiSettings.visitas.enableFilterHasAudio"
+                              render={({ field }) => (
+                                <FormItem className="flex items-start gap-3">
+                                  <FormControl>
+                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-audio-visitas" />
+                                  </FormControl>
+                                  <div>
+                                    <FormLabel>Filtro por Áudio (Com áudio por transcrever)</FormLabel>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
                           </div>
                         </TabsContent>
 
+                        {/* TAREFAS FILTERS */}
                         <TabsContent value="tarefas-filter" className="space-y-4 mt-4">
-                          <div className="space-y-3">
-                            <div className="flex items-start gap-2">
-                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-status-tarefas" />
-                              <div>
-                                <p className="font-medium text-sm">Filtro por Status</p>
-                              </div>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-overdue" />
-                              <div>
-                                <p className="font-medium text-sm">Filtro Tarefas em Atraso</p>
-                              </div>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-assigned-user" />
-                              <div>
-                                <p className="font-medium text-sm">Filtro por Utilizador Atribuído</p>
-                              </div>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-entidade-tarefas" />
-                              <div>
-                                <p className="font-medium text-sm">Filtro por Entidade</p>
-                              </div>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-visita-tarefas" />
-                              <div>
-                                <p className="font-medium text-sm">Filtro por Visita</p>
-                              </div>
-                            </div>
+                          <div className="space-y-4">
+                            <FormField
+                              control={form.control}
+                              name="uiSettings.tarefas.enableFilterStatus"
+                              render={({ field }) => (
+                                <FormItem className="flex items-start gap-3">
+                                  <FormControl>
+                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-status-tarefas" />
+                                  </FormControl>
+                                  <div>
+                                    <FormLabel>Filtro por Status</FormLabel>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="uiSettings.tarefas.enableFilterOverdue"
+                              render={({ field }) => (
+                                <FormItem className="flex items-start gap-3">
+                                  <FormControl>
+                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-overdue" />
+                                  </FormControl>
+                                  <div>
+                                    <FormLabel>Filtro Tarefas em Atraso</FormLabel>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="uiSettings.tarefas.enableFilterAssignedUser"
+                              render={({ field }) => (
+                                <FormItem className="flex items-start gap-3">
+                                  <FormControl>
+                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-assigned-user" />
+                                  </FormControl>
+                                  <div>
+                                    <FormLabel>Filtro por Utilizador Atribuído</FormLabel>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="uiSettings.tarefas.enableFilterEntidade"
+                              render={({ field }) => (
+                                <FormItem className="flex items-start gap-3">
+                                  <FormControl>
+                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-entidade-tarefas" />
+                                  </FormControl>
+                                  <div>
+                                    <FormLabel>Filtro por Entidade</FormLabel>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="uiSettings.tarefas.enableFilterVisita"
+                              render={({ field }) => (
+                                <FormItem className="flex items-start gap-3">
+                                  <FormControl>
+                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-visita-tarefas" />
+                                  </FormControl>
+                                  <div>
+                                    <FormLabel>Filtro por Visita</FormLabel>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
                           </div>
                         </TabsContent>
                       </Tabs>
