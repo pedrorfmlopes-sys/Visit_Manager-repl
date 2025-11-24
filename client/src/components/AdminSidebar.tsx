@@ -1,7 +1,9 @@
 import { Link, useLocation } from "wouter";
 import { LayoutDashboard, Building2, Users, FileText, CheckCircle2, Bell, Settings, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
+import { useTodaySummary } from "@/hooks/use-today-summary";
 
 const sidebarItems = [
   { path: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -21,6 +23,7 @@ const adminSidebarItems = [
 export function AdminSidebar() {
   const [location] = useLocation();
   const { user, empresa } = useAuth();
+  const { tarefasAtrasadas, tarefasHoje, visitasHoje } = useTodaySummary();
 
   const handleLogout = () => {
     window.location.href = "/api/logout";
@@ -52,11 +55,32 @@ export function AdminSidebar() {
             const Icon = item.icon;
             const isActive = location === item.path || (item.path !== "/" && location.startsWith(item.path));
             
+            // Determine badge count
+            let badgeCount = 0;
+            let badgeVariant: "default" | "destructive" = "default";
+            let showBadge = false;
+            
+            if (item.label === "Tarefas") {
+              if (tarefasAtrasadas > 0) {
+                badgeCount = tarefasAtrasadas;
+                badgeVariant = "destructive";
+                showBadge = true;
+              } else if (tarefasHoje > 0) {
+                badgeCount = tarefasHoje;
+                badgeVariant = "default";
+                showBadge = true;
+              }
+            } else if (item.label === "Visitas" && visitasHoje > 0) {
+              badgeCount = visitasHoje;
+              badgeVariant = "default";
+              showBadge = true;
+            }
+            
             return (
               <Link key={item.path} href={item.path}>
                 <button
                   data-testid={`nav-${item.label.toLowerCase()}`}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-md transition-colors text-sm ${
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-md transition-colors text-sm relative ${
                     isActive
                       ? "bg-primary/10 text-primary font-medium"
                       : "text-muted-foreground hover:text-foreground hover-elevate"
@@ -64,6 +88,15 @@ export function AdminSidebar() {
                 >
                   <Icon className="h-5 w-5 flex-shrink-0" />
                   <span>{item.label}</span>
+                  {showBadge && (
+                    <Badge
+                      variant={badgeVariant}
+                      className="ml-auto text-xs"
+                      data-testid={`badge-sidebar-${item.label.toLowerCase()}`}
+                    >
+                      {Math.min(badgeCount, 9)}{badgeCount > 9 ? "+" : ""}
+                    </Badge>
+                  )}
                 </button>
               </Link>
             );

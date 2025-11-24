@@ -1,0 +1,268 @@
+Dito pelo ChatGPT:
+Pensado para 29s
+
+Ok, vamos continuar a brincar a “DLCs” da app 😄
+
+Pelo estado atual, tens quase tudo de “core” pronto. O próximo salto natural, sem partir nada, é:
+
+FASE 19 – Alertas & Badges de Tarefas/Visitas (notificações dentro da app)
+
+Ou seja: a app começa a “chamar por ti” quando tens coisas pendentes/atrasadas, tanto para agent como para admin.
+
+Aqui vai a prompt prontinha para colar no agent 👇
+
+FASE 19 – Alertas & Badges (tarefas/visitas pendentes e em atraso)
+
+FASE 19 – Alertas visuais e badges para tarefas/visitas pendentes
+
+Contexto:
+
+Projeto: Visit Manager multi-empresa.
+
+Estado atual relevante:
+
+Tarefas:
+
+Já existem filtros avançados (status, overdue, assignedUserId, entidadeId).
+
+Já existe CRUD completo (criar, editar, apagar).
+
+Visitas:
+
+Filtros por data (hoje, semana, últimos 30 dias).
+
+Histórico (visitaAnteriorId) e follow-ups.
+
+Dashboards:
+
+AdminDashboard com KPIs e cards CRM.
+
+Layout:
+
+Agent: BottomNav + FAB.
+
+Admin: Sidebar (desktop) + Drawer + TopBar (mobile).
+
+Atualmente, o utilizador só vê que tem tarefas/visitas pendentes quando abre as páginas.
+
+Objetivo desta fase:
+
+Adicionar alertas visuais e badges de contagem (tarefas pendentes/atrasadas, visitas de hoje) na navegação (BottomNav, AdminSidebar/Drawer) e em pequenos avisos no topo dos ecrãs.
+
+Objetivo final:
+
+O utilizador deve conseguir, à primeira vista:
+
+Ver se tem tarefas em atraso.
+
+Ver se tem tarefas pendentes hoje.
+
+Ver se tem visitas marcadas para hoje.
+
+Tudo isto sem abrir as páginas individuais.
+
+1. API / dados necessários
+
+Verifica primeiro o que já existe e reutiliza ao máximo.
+
+1.1. Tarefas
+
+Já existe GET /api/tarefas com:
+
+status (pending/done),
+
+overdue,
+
+assignedUserId,
+
+entidadeId, etc.
+
+A partir desta API é possível:
+
+Contar tarefas pendentes (status=pending).
+
+Contar tarefas em atraso (overdue=true ou dueDate < hoje).
+
+Contar tarefas “para hoje” (dueDate = hoje) se for suportado no filtro; caso não, podes:
+
+Ou acrescentar um parâmetro extra (ex.: dueToday) no backend.
+
+Ou filtrar no frontend a partir da lista de pendentes.
+
+1.2. Visitas
+
+GET /api/visitas já suporta filtros por datas (from/to).
+
+Para visitas de hoje:
+
+Usar from=today, to=today (ou intervalo start/end do dia), como já é feito noutros pontos.
+
+Pedido:
+
+Não criar endpoints complexos novos; se for mesmo necessário, apenas um “GET /api/resumo” muito simples com contagens, mas a preferência é reutilizar /api/tarefas e /api/visitas.
+
+2. Camada de “resumo” no frontend (hook ou context)
+
+Criar um pequeno “summary hook” reutilizável para contagens globais de hoje.
+
+Criar algo como useTodaySummary() ou similar que devolve:
+
+tarefasPendentes: número de tarefas pendentes (todas).
+
+tarefasAtrasadas: número de tarefas em atraso.
+
+tarefasHoje: número de tarefas com dueDate hoje (se fizer sentido).
+
+visitasHoje: número de visitas marcadas para hoje.
+
+Implementação:
+
+Usar React Query com queries leves:
+
+Exemplo: GET /api/tarefas?status=pending&overdue=true para atrasadas.
+
+GET /api/tarefas?status=pending&due=today (se implementarem) ou filtrar no frontend.
+
+GET /api/visitas?from=today&to=today para visitas de hoje.
+
+Colocar TTL razoável / refetchInterval opcional (ex.: refetch a cada 2-5 minutos em segundo plano), sem exagerar.
+
+3. Badges no BottomNav (Agent)
+
+Para o layout do agente (BottomNav + FAB):
+
+Atualizar o componente de BottomNav para mostrar badges com contagens:
+
+Tab Visitas:
+
+Pequeno badge (círculo) com visitasHoje (se > 0).
+
+Tab Tarefas:
+
+Badge com:
+
+Se houver tarefas em atraso → mostrar esse número (ou ícone de alerta + número).
+
+Caso não haja atrasadas mas haja pendentes → mostrar nº de pendentes.
+
+Tab Lembretes (se estiver ativa):
+
+Opcionalmente, mostrar nº de lembretes pendentes, se houver forma simples de obter essa info; caso contrário, podes deixar sem badge nesta fase.
+
+Comportamento:
+
+Se a contagem for 0, não mostrar badge.
+
+Se a contagem for muito alta, mostrar “9+” para não partir o layout.
+
+Badge deve respeitar o tema (cores de acento para o tema atual).
+
+4. Badges na Sidebar / Drawer (Admin)
+
+Para o layout de admin (sidebar em desktop, drawer em mobile):
+
+Atualizar AdminSidebar e AdminDrawer para mostrar badges em:
+
+Item “Visitas”:
+
+Badge com visitasHoje (se > 0).
+
+Item “Tarefas”:
+
+Badge com tarefasAtrasadas em destaque (vermelho), se > 0.
+
+Caso não haja atrasadas mas haja pendentes, badge com pendentes num tom neutro.
+
+O mesmo hook useTodaySummary() deve ser utilizado para alimentar tanto BottomNav (agent) como Sidebar/Drawer (admin), respeitando RBAC e empresaId.
+
+5. Alert ribbon / alerta no topo da página
+
+Pequeno “aviso” no topo de alguns ecrãs, útil para ambos os roles.
+
+Criar um componente AlertRibbon reutilizável:
+
+Aparecer no topo da página (logo abaixo do top bar / header).
+
+Conteúdo exemplo:
+
+Se tarefasAtrasadas > 0:
+
+“Tens X tarefas em atraso” + botão “Ver tarefas”.
+
+Se tarefasAtrasadas = 0 mas tarefasHoje > 0:
+
+“Tens X tarefas para hoje” + botão “Ver tarefas”.
+
+Opcional: mencionar visitas de hoje se fizer sentido.
+
+Onde mostrar:
+
+Dashboard do agent (“Hoje”).
+
+AdminDashboard.
+
+Opcionalmente, na página de tarefas.
+
+Botão “Ver tarefas”:
+
+Navega para a página de tarefas com filtros adequados já aplicados (ex.: overdue=true ou due=today).
+
+6. UX / Design
+
+Badges:
+
+Usar ícones/cores consistentes:
+
+Vermelho para “em atraso”.
+
+Azul/verde para “de hoje”/pendentes.
+
+Evitar poluição visual:
+
+Não encher todas as tabs com badges se o valor for 0.
+
+Performance:
+
+Garantir que as queries usadas pelo useTodaySummary() são leves.
+
+Ajustar cache/refetch do React Query para não bombardear o backend.
+
+7. Testes esperados
+
+Agent, com tarefas atrasadas e visitas hoje:
+
+Abrir a app:
+
+Ver badge na tab Tarefas com nº de atrasadas.
+
+Ver badge na tab Visitas com nº de visitas de hoje.
+
+Ver alerta no dashboard “Hoje” a indicar tarefas em atraso.
+
+Clicar em “Ver tarefas” → abrir página Tarefas com overdue=true.
+
+Admin, com tarefas pendentes mas sem atrasadas:
+
+Sidebar mostra badge em Tarefas com nº de pendentes (cor neutra).
+
+Sidebar/Drawer mostra badge em Visitas se houver visitas hoje.
+
+Sem dados:
+
+Nenhuma badge visível.
+
+Alert ribbon não aparece.
+
+Multi-empresa:
+
+Contagens sempre filtradas por empresaId.
+
+Admin/agent nunca veem dados de outra empresa.
+
+Restrições
+
+Não alterar a lógica de multi-empresa ou RBAC.
+
+Não criar endpoints complexos novos se a mesma informação puder ser derivada de /api/tarefas e /api/visitas.
+
+Não alterar fluxos de criação/edição de tarefas/visitas; apenas acrescentar camada de resumo/alertas.
