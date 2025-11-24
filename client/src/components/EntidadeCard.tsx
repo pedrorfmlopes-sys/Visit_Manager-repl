@@ -32,7 +32,9 @@ export function EntidadeCard({ entidade, onClick, showSyncStatus = false }: Enti
     .join("")
     .toUpperCase();
 
-  const TipoIcon = tipoIcons[entidade.tipoEntidade as keyof typeof tipoIcons] || Building2;
+  // Use configured type (entidadeTipo), fallback to legacy field
+  const tipoNome = entidade.entidadeTipo?.nome ?? entidade.tipoEntidade ?? "Desconhecido";
+  const TipoIcon = tipoIcons[tipoNome as keyof typeof tipoIcons] || Building2;
 
   return (
     <Card
@@ -54,7 +56,7 @@ export function EntidadeCard({ entidade, onClick, showSyncStatus = false }: Enti
             </h3>
             <Badge variant="outline" className="flex items-center gap-1 text-xs no-default-hover-elevate no-default-active-elevate" data-testid={`badge-tipo-${entidade.id}`}>
               <TipoIcon className="h-3 w-3" />
-              {tipoLabels[entidade.tipoEntidade as keyof typeof tipoLabels]}
+              {tipoLabels[tipoNome as keyof typeof tipoLabels] || tipoNome}
             </Badge>
           </div>
           

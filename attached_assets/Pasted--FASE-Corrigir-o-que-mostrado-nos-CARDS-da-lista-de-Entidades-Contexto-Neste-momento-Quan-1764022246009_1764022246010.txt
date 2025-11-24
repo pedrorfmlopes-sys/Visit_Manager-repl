@@ -1,0 +1,148 @@
+🔧 FASE – Corrigir o que é mostrado nos CARDS da lista de Entidades
+
+Contexto:
+
+Neste momento:
+
+Quando abro uma entidade em detalhe → o tipo está correto (usa o tipo configurado).
+
+Quando edito e gravo → o tipo também fica correto no detalhe.
+
+✅ Ou seja, form + detalhe estão OK.
+
+O problema só está:
+
+Na lista de entidades (os cards que aparecem ao abrir o menu “Entidades”):
+
+aí continuam a aparecer os tipos “antigos” / errados.
+
+🎯 Objetivo desta fase:
+
+Os cards da lista de Entidades devem mostrar o mesmo tipo configurado que já aparece correto no detalhe.
+
+Deixar de usar o campo legado ou qualquer lógica antiga nos cards.
+
+⚠️ Muito importante:
+
+Não mexer no formulário de entidade (create/edit) – já está a funcionar.
+
+Não mexer nos detalhes (EntidadeDetail) – já está a mostrar certo.
+
+Foco exclusivo:
+
+endpoint/lista de /api/entidades,
+
+componente da página de lista de entidades,
+
+componente EntidadeCard (ou equivalente).
+
+1. Garantir que a LISTA de entidades traz o tipo configurado na API
+
+Abre o handler de GET /api/entidades (lista, não o GET de 1 entidade).
+
+Confirma se a query ao Drizzle está a incluir a relação com os tipos, algo como:
+
+db.query.entidades.findMany({
+  where: eq(entidades.empresaId, empresaId),
+  with: {
+    entidadeTipo: true,
+  },
+  // ...
+});
+
+
+Se não estiver a incluir entidadeTipo na lista:
+
+adiciona o with: { entidadeTipo: true },
+
+garante que o tipo retornado para cada entidade tem a estrutura:
+
+{
+  id,
+  nome,
+  // ...
+  entidadeTipo?: {
+    id;
+    nome;
+    // ...
+  } | null;
+}
+
+
+Verifica também se em algum ponto estás a sobrescrever o resultado com tipoEntidade legado ao serializar a resposta.
+
+2. Ajustar o componente que desenha os CARDS (lista)
+
+Abre a página da lista de entidades (por ex.: Entidades.tsx ou EntidadesPage.tsx) e o componente que desenha cada card (EntidadeCard.tsx ou similar).
+
+Procura onde é mostrado o “tipo” no card.
+
+É provável que ainda esteja algo como:
+
+<Badge>{entidade.tipoEntidade}</Badge> // legado
+
+
+ou algum texto a usar tipoEntidade.
+
+Altera a lógica para usar primeiro o tipo configurado, tal como no detalhe:
+
+const tipoAtual =
+  entidade.entidadeTipo?.nome ??
+  entidade.tipoEntidade ?? // fallback legado só se quiseres muito
+  null;
+
+{tipoAtual && (
+  <Badge>{tipoAtual}</Badge>
+)}
+
+
+Idealmente, se já fizeste migração de dados e todas as entidades têm entidadeTipoId, podes até:
+
+usar apenas entidade.entidadeTipo?.nome e ignorar o legado.
+
+3. Garantir que a query é atualizada após editar
+
+Confirma que, na mutation de update de entidade (React Query):
+
+depois do PATCH ter sucesso, invalidas a query da lista, ex.:
+
+queryClient.invalidateQueries(["entidades"]);
+
+
+Assim, quando alteras o tipo numa entidade e voltas à lista:
+
+os cards são recarregados com os dados novos,
+
+e já vão trazer o entidadeTipo atualizado.
+
+4. Testes que quero que faças
+
+Na app, vai a /admin/empresa → Entidades e confirma que tens 2–3 tipos configurados (ex.: Gabinetes, Distribuidores, Construtores).
+
+Vai à lista de Entidades (menu Entidades):
+
+Verifica se os cards mostram agora o tipo correto (tipo configurado).
+
+Escolhe uma entidade:
+
+Abre em detalhe → confirma o tipo.
+
+Clica em “Editar”, muda o tipo para outro, grava.
+
+Volta à lista:
+
+Esperado: o card dessa entidade já mostra o tipo novo.
+
+5. Relatório desta fase
+
+No relatório, por favor indica:
+
+Que alterações fizeste em GET /api/entidades (confirma o with: { entidadeTipo: true } e que já não usas o campo legado nos cards).
+
+Que ficheiros de frontend mexeste (página de lista + EntidadeCard) e como ficou a lógica que mostra o tipo.
+
+Resultados do teste de editar uma entidade e ver o tipo atualizado no card da lista.
+
+Reforço:
+👉 Não tocar em form/detalhe de entidade (já estão OK).
+👉 O objetivo aqui é só alinhar a lista de entidades com o mesmo tipo configurado que já aparece correto no detalhe.

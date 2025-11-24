@@ -238,6 +238,7 @@ export class DatabaseStorage implements IStorage {
       with: {
         assignedUser: true,
         createdByUser: true,
+        entidadeTipo: true,
       },
     });
   }
