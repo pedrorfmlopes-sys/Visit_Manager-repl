@@ -68,6 +68,7 @@ export default function AdminEntidadeTipos() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/entidade-tipos"] });
       setEditingId(null);
       form.reset();
+      setOpenDialog(false);
     },
     onError: (error: any) => {
       toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });

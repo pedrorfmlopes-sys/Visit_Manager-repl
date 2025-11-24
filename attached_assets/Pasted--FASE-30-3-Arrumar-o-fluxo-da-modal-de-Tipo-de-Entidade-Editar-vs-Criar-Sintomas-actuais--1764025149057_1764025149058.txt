@@ -1,0 +1,251 @@
+🔧 FASE 30.3 – Arrumar o fluxo da modal de “Tipo de Entidade” (Editar vs Criar)
+
+Sintomas actuais:
+
+Em Definições → Empresa → Entidades (Tipos de entidade):
+
+Ao clicar no botão/ícone Editar de um tipo:
+
+aparece imediatamente o toast “Configuração guardada com sucesso”, mesmo sem eu ter alterado nada.
+
+Dentro da modal:
+
+faço alterações, carrego em Atualizar,
+
+aparece de novo o toast,
+
+mas:
+
+a modal não fecha,
+
+o botão passa de “Atualizar” para “Criar”, e fica num estado confuso.
+
+Os ícones já gravam correctamente e aparecem certos nos cards – o problema é só o fluxo da modal / toasts / botões.
+
+🎯 Objetivo:
+
+Ter um fluxo limpo e previsível:
+
+Criar tipo
+
+Clicar em “Novo tipo de entidade” → abre modal vazia
+
+Preencher → Criar
+
+Sucesso → toast uma vez, fecha modal, limpa form, lista actualizada
+
+Editar tipo
+
+Clicar em “Editar” na linha do tipo → abre modal pré-preenchida
+
+Alterar campos → Atualizar
+
+Sucesso → toast uma vez, fecha modal, volta ao modo normal (sem ficar em “Criar”)
+
+Nunca deve aparecer “Configuração guardada com sucesso” só porque cliquei em Editar.
+
+⚠️ Não mexer na lógica de ícones gravados na BD, nem em EntidadeCard/EntidadeDetail.
+Foco exclusivo: componente(s) do CRUD de tipos de entidade em /admin/empresa.
+
+1. Separar claramente “Criar” vs “Editar” no estado da modal
+
+No componente React da secção de Tipos de Entidade:
+
+Garante que tens um estado explícito, por exemplo:
+
+const [dialogOpen, setDialogOpen] = useState(false);
+const [editingTipo, setEditingTipo] = useState<EntidadeTipo | null>(null);
+
+
+Fluxo desejado:
+
+Criar novo tipo:
+
+const handleNovoTipo = () => {
+  setEditingTipo(null);
+  form.reset({ nome: "", cor: defaultCor, icon: "Building2", ativo: true });
+  setDialogOpen(true);
+};
+
+
+Editar tipo existente:
+
+const handleEditarTipo = (tipo: EntidadeTipo) => {
+  setEditingTipo(tipo);
+  form.reset({
+    nome: tipo.nome,
+    cor: tipo.cor,
+    icon: tipo.icon ?? "Building2",
+    ativo: tipo.ativo,
+  });
+  setDialogOpen(true);
+};
+
+
+IMPORTANTE: handleEditarTipo NÃO deve chamar nenhuma mutation, nem função de “guardar”, nem mostrar toast. Apenas abre a modal e faz reset do form.
+
+O título e o texto do botão da modal devem depender de editingTipo:
+
+const isEditing = !!editingTipo;
+const dialogTitle = isEditing ? "Editar Tipo de Entidade" : "Novo Tipo de Entidade";
+const primaryButtonLabel = isEditing ? "Atualizar" : "Criar";
+
+2. Corrigir as mutations de Create e Update (sem confundir com abrir modal)
+
+Usa duas mutations separadas ou uma única mutation parametrizada – o importante é:
+
+A mutation de create só é chamada no onSubmit quando !isEditing.
+
+A mutation de update só é chamada no onSubmit quando isEditing.
+
+Exemplo:
+
+const createMutation = useMutation(createTipoEntidade, {
+  onSuccess: () => {
+    queryClient.invalidateQueries(["entidade-tipos"]);
+    toast.success("Tipo de entidade criado com sucesso");
+    form.reset();
+    setEditingTipo(null);
+    setDialogOpen(false);
+  },
+});
+
+const updateMutation = useMutation(updateTipoEntidade, {
+  onSuccess: () => {
+    queryClient.invalidateQueries(["entidade-tipos"]);
+    toast.success("Tipo de entidade atualizado com sucesso");
+    form.reset();
+    setEditingTipo(null);
+    setDialogOpen(false);
+  },
+});
+
+
+No onSubmit:
+
+const onSubmit = (values: FormValues) => {
+  if (isEditing && editingTipo) {
+    updateMutation.mutate({ id: editingTipo.id, ...values });
+  } else {
+    createMutation.mutate(values);
+  }
+};
+
+
+IMPORTANTE:
+
+Não chames nenhuma destas mutations dentro de handleEditarTipo nem quando a modal abre.
+
+O toast só deve aparecer dentro dos onSuccess das mutations, nunca ao clicar em “Editar”.
+
+3. Garantir que o Alert / toast NÃO dispara ao abrir a modal
+
+Confirma se actualmente tens algum useEffect ou lógica do género:
+
+useEffect(() => {
+  if (isSuccess) {
+    toast.success("Configuração guardada com sucesso");
+  }
+}, [isSuccess]);
+
+
+ligada a uma mutation genérica de “save settings” desta página.
+
+Se o botão de Editar estiver a mexer no mesmo estado isSuccess ou a disparar essa mutation, o toast dispara só por abrir a modal.
+
+Ajusta para que:
+
+Esse toast genérico de “Configuração guardada” seja usado só para toggles de configuração directa (checkboxes, switches, etc.),
+
+e não seja chamado quando o handleEditarTipo é clicado.
+
+4. Comportamento da modal após sucesso
+
+Tanto em create como em update:
+
+No onSuccess:
+
+invalidar query de tipos (["entidade-tipos"]),
+
+mostrar toast apropriado,
+
+fazer form.reset() com defaults,
+
+setEditingTipo(null),
+
+setDialogOpen(false) (fechar modal).
+
+Isto garante que:
+
+a modal fecha sempre depois de uma operação bem sucedida,
+
+se eu voltar a abrir:
+
+“Novo tipo” → vem em modo criar,
+
+“Editar” → vem com os dados correctos daquele tipo.
+
+5. Testes que quero que faças
+
+Editar tipo existente
+
+Clicar no ícone/botão Editar de um tipo:
+
+Esperado:
+
+a modal abre,
+
+não aparece qualquer toast de “Configuração guardada”.
+
+Alterar apenas o ícone e clicar em Atualizar:
+
+Esperado:
+
+um único toast “Tipo de entidade atualizado com sucesso”,
+
+a modal fecha,
+
+na lista o ícone é actualizado,
+
+ao reabrir a modal desse tipo, o ícone seleccionado é o novo.
+
+Criar novo tipo
+
+Clicar em “Novo Tipo de Entidade”:
+
+modal abre vazia (ou com defaults),
+
+botão diz “Criar”.
+
+Preencher nome, cor, ícone → clicar “Criar”:
+
+toast de sucesso,
+
+modal fecha,
+
+novo tipo aparece na lista com ícone correcto,
+
+ao editar esse tipo, modal já vem com os dados preenchidos.
+
+6. Relatório desta fase
+
+No relatório, por favor indica:
+
+Como ficou o estado usado para dialogOpen e editingTipo.
+
+Qual o handler chamado em:
+
+botão “Novo Tipo de Entidade”,
+
+botão/ícone “Editar” na linha.
+
+Como está o onSubmit (quando chama createMutation vs updateMutation).
+
+Que useEffect ou lógica de toast removeste/ajustaste para o toast não disparar ao abrir a modal.
+
+Resultado dos testes (Editar tipo existente / Criar novo tipo).
+
+Objetivo final:
+👉 Abrir modal de edição não dá toast,
+👉 “Atualizar” grava e fecha, mantendo o modo correto,
+👉 “Criar” faz o mesmo para novos tipos.
