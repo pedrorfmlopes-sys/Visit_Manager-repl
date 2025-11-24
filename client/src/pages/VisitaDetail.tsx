@@ -77,6 +77,29 @@ export default function VisitaDetail() {
     enabled: !!visitaId,
   });
 
+  // Delete visita mutation
+  const deleteVisitaMutation = useMutation({
+    mutationFn: async () => {
+      if (!visitaId) throw new Error("Visita ID is required");
+      await apiRequest(`/api/visitas/${visitaId}`, { method: 'DELETE' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
+      toast({
+        title: "Sucesso",
+        description: "Visita eliminada com sucesso",
+      });
+      setLocation("/visitas");
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Falha ao eliminar visita",
+        variant: "destructive",
+      });
+    },
+  });
+
   const { data: tarefas = [] } = useQuery<Tarefa[]>({
     queryKey: ["/api/tarefas"],
     select: (data) => data.filter((t) => t.visitaId === visitaId),
@@ -1275,6 +1298,28 @@ export default function VisitaDetail() {
           >
             <Share2 className="h-4 w-4 mr-2" />
             Partilhar Link
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => {
+              if (confirm("Tem a certeza que deseja eliminar esta visita?")) {
+                deleteVisitaMutation.mutate();
+              }
+            }}
+            disabled={deleteVisitaMutation.isPending}
+            data-testid="button-delete-visita"
+          >
+            {deleteVisitaMutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                A eliminar...
+              </>
+            ) : (
+              <>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Eliminar Visita
+              </>
+            )}
           </Button>
         </div>
       </main>
