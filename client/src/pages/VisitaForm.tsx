@@ -40,10 +40,13 @@ const visitaFormSchema = insertVisitaSchema.extend({
 type VisitaFormData = z.infer<typeof visitaFormSchema>;
 
 export default function VisitaForm() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isOnline = useOnlineStatus();
+  
+  // Get pre-fill data from location state (FASE 15: follow-up visits)
+  const state = (location as any)?.state || {};
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const { location: gpsLocation, error: gpsError, isLoading: gpsLoading, requestLocation } = useGeolocation(true);
@@ -116,9 +119,9 @@ export default function VisitaForm() {
   const form = useForm<VisitaFormData>({
     resolver: zodResolver(visitaFormSchema),
     defaultValues: {
-      entidadeId: "",
-      contactoId: "",
-      dataVisita: new Date(),
+      entidadeId: state.entidadeId || "",
+      contactoId: state.contactoId || "",
+      dataVisita: state.dataVisita ? new Date(state.dataVisita) : new Date(),
       notas: "",
       marcasEntregues: [],
       marcasIds: [],
@@ -439,6 +442,32 @@ export default function VisitaForm() {
               {(audioFile || mediaFiles.length > 0) && " Ficheiros de áudio/media não serão enviados."}
             </AlertDescription>
           </Alert>
+        )}
+        
+        {/* FASE 15: Reference to previous visit */}
+        {state.visitaAnteriorId && (
+          <Card className="mb-4 bg-primary/5 border-primary/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                Referência da Visita Anterior
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div>
+                <span className="text-muted-foreground">Entidade:</span>
+                <p className="font-medium">{state.entidadeName || "—"}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Contacto:</span>
+                <p className="font-medium">{state.contactoName || "—"}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Data anterior:</span>
+                <p className="font-medium">{state.visitaAnteriorData ? format(new Date(state.visitaAnteriorData), "PPP", { locale: pt }) : "—"}</p>
+              </div>
+            </CardContent>
+          </Card>
         )}
         
         <Form {...form}>
