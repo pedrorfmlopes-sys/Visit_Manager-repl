@@ -261,9 +261,8 @@ export function UpdateVisitStatusDialog({
               <Input
                 id="realized-date"
                 type="datetime-local"
-                value={realizedDate}
+                value={realizedDate || new Date().toISOString().slice(0, 16)}
                 onChange={(e) => setRealizedDate(e.target.value)}
-                defaultValue={new Date().toISOString().slice(0, 16)}
                 data-testid="input-realized-date"
               />
               <p className="text-xs text-muted-foreground mt-1">

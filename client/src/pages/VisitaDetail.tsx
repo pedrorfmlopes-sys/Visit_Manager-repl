@@ -1190,7 +1190,7 @@ export default function VisitaDetail() {
                 <CardContent className="space-y-4">
                   <div>
                     <p className="text-sm font-medium">
-                      {format(new Date(localProximaVisita || visita?.proximaVisita), "PPP 'às' HH:mm", { locale: pt })}
+                      {(localProximaVisita || visita?.proximaVisita) && format(new Date(localProximaVisita || visita.proximaVisita!), "PPP 'às' HH:mm", { locale: pt })}
                     </p>
                     <p className="text-xs text-muted-foreground mt-2">
                       Agendada a partir de sugestão IA
@@ -1201,8 +1201,9 @@ export default function VisitaDetail() {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        if (visita?.gabinete && (visita?.proximaVisita || localProximaVisita)) {
-                          downloadNextVisitICS(visita.gabinete, visita.contacto || undefined, new Date(visita?.proximaVisita || localProximaVisita));
+                        const proximaVisitaDate = visita?.proximaVisita || localProximaVisita;
+                        if (visita?.gabinete && proximaVisitaDate) {
+                          downloadNextVisitICS(visita.gabinete, visita.contacto || undefined, new Date(proximaVisitaDate));
                           toast({
                             title: "Exportado",
                             description: "Próxima visita exportada para calendário!",
