@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import DOMPurify from 'dompurify';
-import { ArrowLeft, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles, Bell, Volume2, Trash2, Loader2, Mic } from "lucide-react";
+import { ArrowLeft, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles, Bell, Volume2, Trash2, Loader2, Mic, Plus } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { pt } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,12 @@ interface SuggestedTask {
   prazo_sugerido_dias: number;
 }
 
+interface SuggestedAppointment {
+  titulo: string;
+  descricao: string;
+  dias_para_agendar: number;
+}
+
 export default function VisitaDetail() {
   const [, params] = useRoute("/visitas/:id");
   const [, setLocation] = useLocation();
@@ -53,6 +59,9 @@ export default function VisitaDetail() {
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [pdfProDialogOpen, setPdfProDialogOpen] = useState(false);
   const [suggestedTaskToCreate, setSuggestedTaskToCreate] = useState<SuggestedTask | null>(null);
+  const [suggestedAppointmentToCreate, setSuggestedAppointmentToCreate] = useState<SuggestedAppointment | null>(null);
+  const [appointmentDialogOpen, setAppointmentDialogOpen] = useState(false);
+  const [appointmentTitle, setAppointmentTitle] = useState("");
   const [pdfProOptions, setPdfProOptions] = useState({
     includePhotos: true,
     includeTasks: true,
@@ -306,6 +315,54 @@ export default function VisitaDetail() {
     setSuggestedTaskToCreate(suggestedTask);
     setIsTaskDialogOpen(true);
   };
+
+  const handleCreateSuggestedAppointment = (suggestion: SuggestedTask) => {
+    const appointmentDate = addDays(new Date(), suggestion.prazo_sugerido_dias);
+    const entityName = visita?.entidade?.nome || visita?.gabinete?.nome || "";
+    const proposedTitle = `${suggestion.titulo} — ${entityName}`;
+    
+    setAppointmentTitle(proposedTitle);
+    setSuggestedAppointmentToCreate({
+      titulo: suggestion.titulo,
+      descricao: suggestion.descricao,
+      dias_para_agendar: suggestion.prazo_sugerido_dias,
+    });
+    setAppointmentDialogOpen(true);
+  };
+
+  const createAppointmentMutation = useMutation({
+    mutationFn: async () => {
+      if (!suggestedAppointmentToCreate) throw new Error('No appointment data');
+      
+      const appointmentDate = addDays(new Date(), suggestedAppointmentToCreate.dias_para_agendar);
+      const newVisita: InsertVisita = {
+        dataVisita: appointmentDate,
+        tipoVisita: "presencial",
+        entidadeId: visita?.entidadeId || visita?.gabineteId || undefined,
+        contactoId: visita?.contactoId || undefined,
+        notas: suggestedAppointmentToCreate.descricao,
+      };
+      
+      await apiRequest("POST", "/api/visitas", newVisita);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
+      toast({
+        title: "Sucesso",
+        description: "Visita agendada com sucesso",
+      });
+      setAppointmentDialogOpen(false);
+      setSuggestedAppointmentToCreate(null);
+      setAppointmentTitle("");
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Falha ao agendar visita",
+        variant: "destructive",
+      });
+    },
+  });
 
   const onSubmitTask = (data: InsertTarefa) => {
     createTaskMutation.mutate(data);
@@ -900,15 +957,27 @@ export default function VisitaDetail() {
                               </p>
                             </div>
                           </div>
-                          <Button
-                            size="sm"
-                            onClick={() => handleCreateSuggestedTask(tarefa)}
-                            className="w-full"
-                            data-testid={`button-create-suggested-task-${idx}`}
-                          >
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                            Criar Tarefa
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleCreateSuggestedTask(tarefa)}
+                              className="flex-1"
+                              data-testid={`button-create-suggested-task-${idx}`}
+                            >
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Tarefa
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleCreateSuggestedAppointment(tarefa)}
+                              className="flex-1"
+                              data-testid={`button-schedule-suggested-appointment-${idx}`}
+                            >
+                              <Calendar className="h-3 w-3 mr-1" />
+                              Agendar
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1170,6 +1239,58 @@ export default function VisitaDetail() {
               </div>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={appointmentDialogOpen} onOpenChange={setAppointmentDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Agendar Visita</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="mb-2 block">Título da Visita</Label>
+              <Input
+                value={appointmentTitle}
+                onChange={(e) => setAppointmentTitle(e.target.value)}
+                placeholder="Título da visita agendada"
+                data-testid="input-appointment-title"
+              />
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {suggestedAppointmentToCreate && (
+                <>
+                  <p className="mb-2">
+                    Data sugerida: {format(addDays(new Date(), suggestedAppointmentToCreate.dias_para_agendar), "PPP", { locale: pt })}
+                  </p>
+                  <p>
+                    Descrição: {suggestedAppointmentToCreate.descricao}
+                  </p>
+                </>
+              )}
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setAppointmentDialogOpen(false);
+                  setSuggestedAppointmentToCreate(null);
+                  setAppointmentTitle("");
+                }}
+                data-testid="button-cancel-appointment"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => createAppointmentMutation.mutate()}
+                disabled={createAppointmentMutation.isPending || !appointmentTitle.trim()}
+                data-testid="button-confirm-appointment"
+              >
+                {createAppointmentMutation.isPending ? "A agendar..." : "Agendar"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
