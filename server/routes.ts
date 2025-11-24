@@ -1252,13 +1252,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       let visitas = await storage.getVisitas(empresaId, userId, userRole);
       
-      // Apply query filters (FASE 11)
+      // Apply query filters (FASE 11, FASE 29: Added entidadeId and contactoId)
       const search = req.query.search as string | undefined;
       const from = req.query.from as string | undefined;
       const to = req.query.to as string | undefined;
       const filterUserId = req.query.userId as string | undefined;
       const marcaId = req.query.marcaId as string | undefined;
       const hasAudioToTranscribe = req.query.hasAudioToTranscribe === 'true';
+      const entidadeId = req.query.entidadeId as string | undefined;
+      const contactoId = req.query.contactoId as string | undefined;
       
       visitas = visitas.filter(v => {
         // Search filter
@@ -1290,6 +1292,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Marca filter
         if (marcaId && !v.marcas?.some(m => m.marcaId === marcaId)) return false;
+        
+        // FASE 29: Entidade filter
+        if (entidadeId && v.entidadeId !== entidadeId) return false;
+        
+        // FASE 29: Contacto filter
+        if (contactoId && v.contactoId !== contactoId) return false;
         
         // Audio to transcribe filter
         if (hasAudioToTranscribe) {
@@ -3254,6 +3262,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating marca:", error);
       res.status(500).json({ message: "Failed to update marca" });
+    }
+  });
+
+  // FASE 29: GET /api/admin/entidades - List all entities (admin backoffice)
+  app.get('/api/admin/entidades', requireAdmin, async (req: any, res) => {
+    try {
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const entidades = await storage.getEntidades(empresaId, userId, userRole);
+      res.json(entidades);
+    } catch (error) {
+      console.error("Error fetching admin entidades:", error);
+      res.status(500).json({ message: "Failed to fetch entidades" });
     }
   });
 

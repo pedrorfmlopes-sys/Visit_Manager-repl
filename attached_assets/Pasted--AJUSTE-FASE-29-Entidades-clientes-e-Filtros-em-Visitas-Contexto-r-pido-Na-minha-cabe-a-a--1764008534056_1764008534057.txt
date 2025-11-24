@@ -1,0 +1,263 @@
+🔧 AJUSTE FASE 29 – Entidades (clientes) e Filtros em Visitas
+
+Contexto rápido:
+
+Na minha cabeça, a FASE 29 tinha dois eixos:
+
+Gestão configurável ligada às entidades (clientes).
+
+Mais filtros em Visitas, incluindo Entidade e Contacto, configuráveis por empresa/utilizador.
+
+Pelo que vejo:
+
+Tu implementaste sobretudo tipos de entidade (categories).
+
+Mas o que eu pretendo é:
+
+Admin conseguir criar/alterar/eliminar ENTIDADES (clientes) em modo backoffice.
+
+O módulo de tipos de entidade não deve aparecer como entrada solta no menu principal; deve viver dentro do centro de configurações da empresa.
+
+Em relação aos filtros de visitas, eu não os estou a ver na UI (pelo menos Entidade/Contacto).
+
+Peço portanto que:
+
+Ajustes a parte das ENTIDADES para o que descrevo abaixo.
+
+Garantas que os filtros de Visitas estão implementados e visíveis como pedido.
+
+Confirmes explicitamente, no relatório da FASE 29, o que ficou feito versus o especificado.
+
+🔹 1. Gestão de ENTIDADES (clientes) pelo Admin – Backoffice
+
+Objetivo:
+
+Para admins, quero uma forma centralizada de gerir ENTIDADES (clientes) em modo “backoffice”, com:
+
+Listar todas as entidades da empresa.
+
+Criar nova entidade.
+
+Editar entidades existentes.
+
+Eliminar / desativar entidades (idealmente soft-delete).
+
+⚠️ Importante:
+
+Não me refiro a “tipos de entidade”, mas sim às próprias entidades (clientes, projetos, etc.), que já existem na app.
+
+Hoje já consigo criar/editar entidades pela UI normal, mas:
+
+Quero um ecrã de administração mais completo, visível só para admin.
+
+E quero que, pelo menos para admin, a opção de eliminar (ou desativar) exista.
+
+1.1. Backoffice de Entidades para Admin
+
+Criar uma página apenas para admin, algo como:
+
+/admin/entidades (ou outra rota equivalente).
+
+O que esta página deve ter:
+
+Tabela/listagem com:
+
+Nome da entidade.
+
+Tipo (se existir).
+
+NIF (se existir).
+
+Nº de contactos associados (opcional).
+
+Nº de visitas associadas (opcional).
+
+Ações por linha:
+
+Editar → abre o mesmo EntidadeForm em modo edit.
+
+Eliminar / Desativar:
+
+Para segurança, recomendo:
+
+Implementar um campo ativa na entidade (se ainda não existir) e fazer soft delete.
+
+UI pode usar wording tipo “Arquivar” / “Desativar”, mas a intenção é: admin consegue “retirar” a entidade sem a apagar fisicamente.
+
+Mostrar diálogo de confirmação antes de desativar.
+
+Botão “Nova Entidade”:
+
+Abre EntidadeForm em modo create.
+
+1.2. RBAC / Navegação
+
+Esta página /admin/entidades deve:
+
+Aparecer apenas para role = "admin".
+
+Ser acessível a partir do menu de Admin, idealmente dentro da zona “Empresa” ou como entrada “Entidades (Admin)” na AdminSidebar/AdminDrawer.
+
+O objetivo é ficar claro que isto é uma área de gestão de dados da empresa, não uma vista normal de agente.
+
+🔹 2. Tipos de Entidade – mover para dentro de “Empresa”
+
+Eu estou ok com a existência de tipos de entidade, mas:
+
+Não quero essa gestão exposta como item principal de navegação.
+
+Quero-a dentro do Centro de Configurações da Empresa.
+
+Ajustes pedidos:
+
+Se existir alguma rota/menu principal tipo /tipos-entidade ou entrada de menu visível no BottomNav / Sidebar geral:
+
+Remover esta entrada da navegação principal.
+
+No centro de configurações /admin/empresa:
+
+Criar uma secção/aba apropriada (por exemplo “Entidades & Tipos”) onde:
+
+Se possa gerir os tipos de entidade:
+
+Listar tipos atuais.
+
+Criar novo tipo.
+
+Editar nome/cor.
+
+Ativar/desativar.
+
+Manter RBAC admin-only.
+
+Garantir que:
+
+O EntidadeForm continua a carregar e permitir escolher o tipo de entidade, usando os tipos ativos da empresa.
+
+🔹 3. Filtros de Visitas – Entidade & Contacto + Configuração
+
+Segundo o plano da FASE 29:
+
+Deveríamos ter:
+
+Filtro por Entidade.
+
+Filtro por Contacto.
+
+E estes filtros deveriam ser ativáveis/desativáveis por:
+
+uiSettings.visitas.* (nível empresa).
+
+userSettings.visitasUi.* (nível utilizador, mas nunca passando por cima do que a empresa desligar).
+
+Neste momento:
+
+Eu, utilizador, não estou a ver os filtros de Entidade/Contacto na UI de Visitas.
+
+Peço que faças o seguinte:
+
+3.1. Backend
+
+Confirmar que o endpoint GET /api/visitas aceita e aplica:
+
+entidadeId
+
+contactoId
+
+Se não estiver correto:
+
+Ajustar as queries no storage para aplicar estes filtros (sem quebrar os restantes).
+
+3.2. Frontend – Visitas (Agent)
+
+Em Visitas.tsx / VisitasFilterBar:
+
+Garantir que existem, de forma visível:
+
+Um filtro de Entidade (select com busca):
+
+Pode usar um endpoint tipo /api/entidades para popular (com pesquisa).
+
+Ao selecionar:
+
+Atualiza state + query params (entidadeId=...).
+
+Um filtro de Contacto:
+
+Idealmente dependente da entidade selecionada, ou geral se for mais simples.
+
+Também reflete num parâmetro contactoId=....
+
+Os filtros devem aparecer por defeito, exceto se:
+
+uiSettings.visitas.enableFilterEntidade === false ou
+
+uiSettings.visitas.enableFilterContacto === false, ou
+
+O utilizador desligar explicitamente filtros avançados nas suas userSettings.
+
+3.3. Frontend – AdminVisitas
+
+Em AdminVisitas.tsx:
+
+Replicar a mesma lógica:
+
+Filtros Entidade / Contacto disponíveis (quando ativados em uiSettings).
+
+Estes filtros convivem com os já existentes (utilizador, marca, etc.).
+
+3.4. Integração com Settings
+
+No uiSettings.visitas:
+
+Confirmar que existem (ou criar) flags do género:
+
+enableFilterEntidade
+
+enableFilterContacto
+
+E que, no Centro de Configurações da Empresa, existe UI (switches) para ligar/desligar esses filtros.
+
+Em userSettings.visitasUi:
+
+Garantir pelo menos um toggle “Mostrar filtros avançados em Visitas”.
+
+A lógica final de visibilidade deve ser:
+
+Se empresa desliga um filtro → nunca aparece.
+
+Se empresa liga um filtro:
+
+O utilizador pode desligar tudo como “filtros avançados”, se quiser a UI mais simples.
+
+🔹 4. Pedido de verificação explícita
+
+No relatório desta FASE 29, peço-te que:
+
+Tenhas uma secção do tipo “Checklist FASE 29” com:
+
+Backoffice de Entidades (admin)
+
+ Página /admin/entidades criada.
+
+ Listar/Editar/Desativar entidades a partir daí.
+
+ Link disponível apenas para admins no menu de Admin/Empresa.
+
+Tipos de Entidade
+
+ Gestão de tipos movida para dentro de /admin/empresa.
+
+ Nenhuma entrada solta de “Tipos de Entidade” no menu principal.
+
+Filtros de Visitas
+
+ GET /api/visitas filtra corretamente por entidadeId e contactoId.
+
+ Filtros Entidade/Contacto são visíveis em Visitas (agent) quando ativados.
+
+ Filtros Entidade/Contacto são visíveis em AdminVisitas quando ativados.
+
+ uiSettings e userSettings são respeitados (empresa manda, utilizador só simplifica).
+
+Assim consigo validar facilmente se tudo o que pedimos para a FASE 29 está mesmo implementado e operacional na UI.

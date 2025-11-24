@@ -12,6 +12,25 @@ export default function Visitas() {
   const [, setLocation] = useLocation();
   const [filters, setFilters] = useState<VisitasFilters>({});
 
+  // Fetch available entidades and contactos for filter dropdowns
+  const { data: entidades = [] } = useQuery({
+    queryKey: ["/api/entidades"],
+    queryFn: async () => {
+      const response = await fetch("/api/entidades");
+      if (!response.ok) throw new Error("Failed to fetch entidades");
+      return response.json();
+    },
+  });
+
+  const { data: contactos = [] } = useQuery({
+    queryKey: ["/api/contactos"],
+    queryFn: async () => {
+      const response = await fetch("/api/contactos");
+      if (!response.ok) throw new Error("Failed to fetch contactos");
+      return response.json();
+    },
+  });
+
   // Build query string from filters
   const queryParams = new URLSearchParams();
   if (filters.search) queryParams.set("search", filters.search);
@@ -40,6 +59,8 @@ export default function Visitas() {
           <VisitasFilterBar 
             filters={filters}
             onFilterChange={setFilters}
+            entidades={entidades}
+            contactos={contactos}
           />
         </div>
       </header>

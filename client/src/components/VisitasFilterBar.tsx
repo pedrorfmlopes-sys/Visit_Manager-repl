@@ -32,6 +32,8 @@ export function VisitasFilterBar({
   showAdminFilters = false,
   users = [],
   marcas = [],
+  entidades = [],
+  contactos = [],
 }: VisitasFilterBarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   
@@ -133,6 +135,45 @@ export function VisitasFilterBar({
         <label htmlFor="audio-filter" className="text-sm cursor-pointer">
           Com áudio por transcrever
         </label>
+      </div>
+
+      {/* Entity & Contact filters */}
+      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border">
+        {entidades.length > 0 && (
+          <select
+            value={filters.entidadeId || ""}
+            onChange={(e) =>
+              onFilterChange({ ...filters, entidadeId: e.target.value || undefined })
+            }
+            className="text-sm p-2 rounded border border-input bg-background"
+            data-testid="select-entidade-filter"
+          >
+            <option value="">Todas as entidades</option>
+            {entidades.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.nome}
+              </option>
+            ))}
+          </select>
+        )}
+        
+        {contactos.length > 0 && (
+          <select
+            value={filters.contactoId || ""}
+            onChange={(e) =>
+              onFilterChange({ ...filters, contactoId: e.target.value || undefined })
+            }
+            className="text-sm p-2 rounded border border-input bg-background"
+            data-testid="select-contacto-filter"
+          >
+            <option value="">Todos os contactos</option>
+            {contactos.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nome}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Admin filters */}
