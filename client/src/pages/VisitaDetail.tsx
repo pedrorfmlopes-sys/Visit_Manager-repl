@@ -1250,13 +1250,13 @@ export default function VisitaDetail() {
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Ligada à visita anterior:</p>
                       <Button
-                        variant="ghost"
+                        variant="secondary"
                         size="sm"
                         onClick={() => setLocation(`/visitas/${visita.visitaAnteriorId}`)}
-                        className="text-xs"
+                        className="w-full"
                         data-testid="button-goto-linked-visita"
                       >
-                        <ArrowRight className="h-3 w-3 mr-1" />
+                        <ArrowRight className="h-4 w-4 mr-2" />
                         Ver visita {visita.visitaAnteriorId.slice(0, 8)}...
                       </Button>
                     </div>
