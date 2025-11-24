@@ -1,0 +1,197 @@
+🔧 FASE 33.1 – Corrigir navegação e visibilidade das secções em /admin/empresa
+
+Situação actual (do lado do utilizador):
+
+Visualmente, o Centro de Configurações está com:
+
+barra de secções no topo: “Empresa & Equipa”, “Visitas & Tarefas”, “IA & Produtividade”, “Alertas & Relatórios”, “Integrações”;
+
+tabs internas (Geral / Marcas & Entidades / Utilizadores, etc.).
+
+Mas:
+
+clicar nos botões de secção não muda o conteúdo,
+
+todas as secções continuam a ser renderizadas em simultâneo (se fizeres scroll, vês tudo seguido),
+
+os botões parecem “activos” só visualmente.
+
+No relatório da FASE 33 dizes que:
+
+foi criado um handleSectionClick(sectionId) e que usas query params ?section=empresa|visitas|ia|alertas|integracoes,
+
+tens uma estrutura hierárquica de secções → tabs.
+
+👉 Na prática, o que falta é:
+
+Garantir que o click nas secções actualiza de facto:
+
+o query param section,
+
+e o estado interno currentSection.
+
+Só renderizar o conteúdo da secção actualmente seleccionada.
+
+1. Garantir que currentSection é lido da URL e actualizado ao clicar
+
+No componente AdminEmpresa.tsx, confirma que:
+
+No useEffect inicial (ou logo no início do componente) estás a:
+
+ler section de window.location.search / useLocation / useSearch,
+
+definir um estado currentSection, com default "empresa" se section não existir ou for inválido.
+
+Garante que a função handleSectionClick(sectionId) faz duas coisas:
+
+setCurrentSection(sectionId);
+
+actualiza a URL para /admin/empresa?section=${sectionId} usando o router que estás a usar (wouter / navigate / etc.).
+
+Exemplo conceptual (ajusta ao router real, isto é só para clarificar a intenção):
+
+const [currentSection, setCurrentSection] = useState<SectionId>("empresa");
+const [location, navigate] = useLocation();
+
+useEffect(() => {
+  const params = new URLSearchParams(location.split("?")[1] ?? "");
+  const fromQuery = params.get("section") as SectionId | null;
+  if (fromQuery && sections.some(s => s.id === fromQuery)) {
+    setCurrentSection(fromQuery);
+  } else {
+    setCurrentSection("empresa");
+  }
+}, [location]);
+
+function handleSectionClick(sectionId: SectionId) {
+  setCurrentSection(sectionId);
+  const base = "/admin/empresa";
+  navigate(`${base}?section=${sectionId}`);
+}
+
+
+Garante que:
+
+os botões da barra de secções no topo chamam handleSectionClick("empresa" | "visitas" | ...),
+
+o menu ⚙️ do sidebar também usa essa função ou navega para a URL com section= correcto.
+
+2. Renderizar apenas a secção activa
+
+Neste momento, pelo comportamento, é provável que tenhas algo do género:
+
+return (
+  <>
+    {renderEmpresaSection()}
+    {renderVisitasSection()}
+    {renderIaSection()}
+    {renderAlertasSection()}
+    {renderIntegracoesSection()}
+  </>
+);
+
+
+Isto faz com que todas as secções sejam renderizadas ao mesmo tempo, independentemente da currentSection.
+
+O que quero é que seja algo como:
+
+function renderCurrentSection() {
+  switch (currentSection) {
+    case "empresa":
+      return <EmpresaSectionTabs ... />;
+    case "visitas":
+      return <VisitasSectionTabs ... />;
+    case "ia":
+      return <IaSectionTabs ... />;
+    case "alertas":
+      return <AlertasSectionTabs ... />;
+    case "integracoes":
+      return <IntegracoesSectionTabs ... />;
+    default:
+      return <EmpresaSectionTabs ... />;
+  }
+}
+
+return (
+  <div>
+    {/* barra de secções */}
+    <SectionTabs currentSection={currentSection} onClick={handleSectionClick} />
+
+    {/* conteúdo apenas da secção activa */}
+    {renderCurrentSection()}
+  </div>
+);
+
+
+Ou seja:
+
+só um return da secção com base em currentSection,
+
+nada de renderizar todos os blocos em sequência.
+
+3. Testes que quero que executes
+
+Em /admin/empresa sem query param:
+
+Deve abrir em “Empresa & Equipa” por defeito.
+
+Só ver:
+
+título “Empresa & Equipa”,
+
+tabs internos (Geral / Marcas & Entidades / Utilizadores),
+
+nenhum conteúdo de Visitas, IA, Alertas ou Integrações visível.
+
+Clicar em “Visitas & Tarefas”:
+
+A barra de secções deve marcar “Visitas & Tarefas” como activa.
+
+O conteúdo deve mudar para as tabs dessa secção (Comportamento / Filtros & Listas).
+
+A URL deve ficar /admin/empresa?section=visitas.
+
+O conteúdo anterior de “Empresa & Equipa” deve desaparecer do DOM (não é apenas scroll).
+
+Repetir para:
+
+“IA & Produtividade” → /admin/empresa?section=ia
+
+“Alertas & Relatórios” → /admin/empresa?section=alertas
+
+“Integrações” → /admin/empresa?section=integracoes
+
+Fazer refresh em:
+
+/admin/empresa?section=alertas
+
+Deve abrir directamente na secção “Alertas & Relatórios”.
+
+Confirmar:
+
+O menu ⚙️ Definições no rodapé:
+
+“Empresa & Equipa” → /admin/empresa?section=empresa
+
+“Visitas & Tarefas” → /admin/empresa?section=visitas
+
+etc.
+
+Cada item leva à secção correcta já activa.
+
+4. Relatório FASE 33.1
+
+No relatório, por favor indica:
+
+Como está implementado o estado currentSection (tipo e default).
+
+Como estás a ler e a escrever o query param section.
+
+Como ficou a função que decide que secção renderizar com base em currentSection.
+
+Resultados dos testes do ponto 3 (idealmente mencionando que deixou de se ver “tudo ao mesmo tempo”).
+
+Objetivo final:
+👉 Os botões de secção deixam de ser apenas decorativos,
+👉 só uma secção aparece de cada vez, baseada em section e currentSection,
+👉 A URL reflecte sempre onde o admin está no Centro de Configurações.
