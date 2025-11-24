@@ -53,6 +53,8 @@ export function GoogleCompanySearch({
   const { data, isLoading, isFetching, error } = useQuery<PTEnrichmentResult>({
     queryKey: ['/api/enrichment/pt-intelligent-search', debouncedValue, existingEntityId, tipoEntidade],
     queryFn: async () => {
+      console.log("[DEBUG IA ENTIDADE] request payload:", { debouncedValue, existingEntityId, tipoEntidade });
+      
       const response = await apiRequest('POST', '/api/enrichment/pt-intelligent-search', {
         nome: debouncedValue,
         existingEntityId: existingEntityId,
@@ -61,10 +63,12 @@ export function GoogleCompanySearch({
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Failed to search' }));
+        console.error("[DEBUG IA ENTIDADE] Erro na resposta:", errorData);
         throw new Error(errorData.message || 'PT search failed');
       }
       
       const result = await response.json();
+      console.log("[DEBUG IA ENTIDADE] response:", result);
       
       return {
         fuzzyMatches: result.fuzzyMatches || [],

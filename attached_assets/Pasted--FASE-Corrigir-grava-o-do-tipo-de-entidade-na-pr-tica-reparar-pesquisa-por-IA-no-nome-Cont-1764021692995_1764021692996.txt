@@ -1,0 +1,231 @@
+🔧 FASE – Corrigir gravação do tipo de entidade (na prática) + reparar pesquisa por IA no nome
+
+Contexto:
+
+Já fizeste o PASSO de corrigir a gravação do entidadeTipoId e o relatório diz que está tudo OK (frontend, routes, storage, schema).
+
+Na prática, no uso real da app ainda vejo dois problemas:
+
+Quando edito e guardo uma entidade, o tipo continua errado – parece que ou:
+
+não grava o entidadeTipoId escolhido, ou
+
+a UI continua a mostrar o tipo antigo / errado depois do update.
+
+A pesquisa por IA no nome da entidade deixou de devolver resultados – antes sugeria nomes / entidades, agora carrego no botão de IA e não vem nada.
+
+Quero que nesta fase faças debug real, com logs e testes concretos, e corrijas estas duas coisas.
+
+⚠️ Não tocar em Visitas/Tarefas/Filtros nesta fase.
+Foco exclusivo:
+
+EntidadeForm / EntidadeDetail / rotas de entidade
+
+Pesquisa por IA associada ao nome da entidade
+
+1. Confirmar com LOGS o que está realmente a ser gravado (entidadeTipoId)
+
+No handler de PATCH /api/entidades/:id:
+
+Adiciona logs temporários ANTES de chamar o storage:
+
+console.log("[DEBUG ENTIDADE PATCH] body recebido:", req.body);
+console.log("[DEBUG ENTIDADE PATCH] entidadeTipoId no body:", req.body.entidadeTipoId);
+
+
+No storage.updateEntidade:
+
+Adiciona mais um log ANTES do db.update:
+
+console.log("[DEBUG ENTIDADE UPDATE] entidadeData recebido:", entidadeData);
+
+
+No storage.getEntidade (ou equivalente que busca 1 entidade para o detalhe/edição):
+
+Garante que estás a fazer o JOIN com entidadeTipos (para ter entidade.entidadeTipo),
+
+e adiciona um log:
+
+console.log("[DEBUG ENTIDADE GET] entidade retornada:", entidade);
+
+
+Depois:
+
+Abre a app,
+
+Escolhe uma entidade concreta,
+
+Edita e muda o tipo de entidade,
+
+Grava.
+
+Vê no terminal:
+
+O que foi no body (entidadeTipoId),
+
+O que foi para o update (entidadeData),
+
+O que vem em seguida no GET (se entidade.entidadeTipoId e entidade.entidadeTipo.nome batem certo).
+
+👉 No relatório, quero que copies os 3 logs reais desta operação, para vermos a cadeia completa.
+
+2. Corrigir o fluxo de EDIÇÃO no EntidadeForm (se não estiver a sincronizar)
+
+Em muitos casos, o problema não é a API, é o form em modo edição:
+
+O useForm inicializa com defaultValues,
+
+Quando a existingEntidade chega pelo React Query, se não fizeres reset(...), os valores do form não são atualizados,
+
+Então o que tu vês/alteras pode não ser o que está realmente na BD.
+
+No EntidadeForm.tsx:
+
+Confirma se tens lógica do género:
+
+const form = useForm({ defaultValues: { ... } });
+const { data: existingEntidade } = useQuery(...);
+
+useEffect(() => {
+  if (existingEntidade) {
+    form.reset({
+      // todos os campos, incluindo:
+      entidadeTipoId: existingEntidade.entidadeTipoId ?? null,
+      // ...
+    });
+  }
+}, [existingEntidade, form]);
+
+
+Se NÃO tiveres este useEffect com reset, adiciona-o.
+
+Garante que entidadeTipoId vem de existingEntidade.entidadeTipoId.
+
+Confirma também que, no onSubmit:
+
+estás a mandar exactamente o form.getValues() (ou data do handleSubmit),
+
+não estás a reescrever entidadeTipoId noutra função antes de enviar.
+
+Depois de corrigires:
+
+repete o teste de edição de entidade com os logs no backend,
+
+confirma que:
+
+o entidadeTipoId enviado no PATCH corresponde ao que escolheste no select,
+
+o GET seguinte devolve entidadeTipoId e entidade.entidadeTipo.nome atualizados,
+
+e a UI (detalhe + form) mostram o tipo correto.
+
+3. Repor a pesquisa por IA no nome da entidade
+
+Antes, no campo Nome da Entidade, havia uma funcionalidade de IA que:
+
+pegava no nome/parte do nome,
+
+chamava um endpoint de IA,
+
+devolvia sugestões (nome, talvez dados de empresa) que apareciam na UI.
+
+Agora:
+
+Carrego no botão de IA → não vem resultado nenhum.
+
+O que fazer:
+
+No EntidadeForm.tsx:
+
+Procura a função do botão de IA ligada ao nome da entidade, algo como:
+
+handleAISearchEntidade, handleAISuggestions, onClickIA, etc.
+
+Confirma:
+
+qual é a função que está a ser chamada no onClick do botão,
+
+que endpoint está a ser chamado (ex.: POST /api/ia/entidade-sugestoes ou semelhante),
+
+se há algum try/catch a engolir erros sem mostrar nada.
+
+No backend:
+
+Procura a rota correspondente (ex.: /api/ia/entidade-*).
+
+Garante que:
+
+a rota ainda existe,
+
+não foi renomeada,
+
+continua a usar a mesma path que o frontend está a chamar.
+
+Adiciona logs tanto no frontend como no backend:
+
+Frontend:
+
+console.log("[DEBUG IA ENTIDADE] request payload:", payload);
+console.log("[DEBUG IA ENTIDADE] response:", response);
+
+
+Backend:
+
+console.log("[DEBUG IA ENTIDADE] body recebido:", req.body);
+console.log("[DEBUG IA ENTIDADE] resposta OpenAI/IA:", /* resumo da resposta */);
+
+
+Verifica também as settings de IA no centro de configurações:
+
+Se criaste flags do tipo enableEntidadeAISearch ou algo parecido,
+
+confirma se a lógica no frontend não está a bloquear a chamada por engano (ex.: if (!settings.enableSomething) return;).
+
+Depois:
+
+Testa na UI:
+
+escreve parte de um nome de entidade,
+
+clica no botão de IA,
+
+vê se agora as sugestões aparecem.
+
+Se por algum motivo o modelo/endpoint externo falhar, pelo menos:
+
+mostra um toast/erro visível,
+
+não ficar “silencioso” sem feedback.
+
+4. O que quero ver no relatório desta fase
+
+Para a gravação do tipo de entidade:
+
+Os 3 logs concretos de um teste de edição (body do PATCH, entidadeData no storage, entidade retornada no GET).
+
+Explicação do que estava errado (por ex.: form não fazia reset / entidadeTipoId não ia no PATCH / join no GET estava errado / cache não invalidada, etc.).
+
+O que foi alterado no EntidadeForm e nas rotas/storage para corrigir.
+
+Para a pesquisa por IA no nome:
+
+Qual a função no frontend responsável por essa pesquisa e qual endpoint chama.
+
+Qual o problema encontrado (endpoint errado, rota apagada, flag de config a bloquear, erro silencioso, etc.).
+
+O que foi alterado para a pesquisa voltar a funcionar.
+
+Confirmação de um teste prático onde:
+
+escreves um nome,
+
+clicas no botão de IA,
+
+recebes sugestões visíveis na interface.
+
+⚠️ Por favor, não alteres outras partes da app nesta fase.
+Quero garantir primeiro que:
+
+editar entidades actualiza mesmo o tipo correcto (tanto em BD como em UI),
+
+e que a IA para o nome da entidade volta a funcionar como antes.

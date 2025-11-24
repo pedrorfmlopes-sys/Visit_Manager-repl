@@ -269,8 +269,17 @@ export class DatabaseStorage implements IStorage {
           orderBy: desc(visitas.dataVisita),
           limit: 10,
         },
+        entidadeTipo: true,
       },
     });
+    
+    console.log("[DEBUG ENTIDADE GET] entidade retornada com JOIN:", {
+      id: entidade?.id,
+      nome: entidade?.nome,
+      entidadeTipoId: entidade?.entidadeTipoId,
+      entidadeTipo: entidade?.entidadeTipo,
+    });
+    
     return entidade;
   }
 
@@ -341,6 +350,9 @@ export class DatabaseStorage implements IStorage {
 
   async updateEntidade(id: string, entidadeData: Partial<InsertEntidade>, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<Entidade | undefined> {
     // FASE 2: Always include empresaId in where clause
+    console.log("[DEBUG ENTIDADE UPDATE] entidadeData recebido:", JSON.stringify(entidadeData, null, 2));
+    console.log("[DEBUG ENTIDADE UPDATE] entidadeTipoId:", entidadeData.entidadeTipoId);
+    
     const whereClause = (userId && userRole === 'agent')
       ? and(
           eq(entidades.id, id),
@@ -360,6 +372,10 @@ export class DatabaseStorage implements IStorage {
       .set({ ...entidadeData, updatedAt: new Date() })
       .where(whereClause)
       .returning();
+    
+    console.log("[DEBUG ENTIDADE UPDATE] entidade gravada na BD:", JSON.stringify(entidade, null, 2));
+    console.log("[DEBUG ENTIDADE UPDATE] entidadeTipoId após update:", entidade?.entidadeTipoId);
+    
     return entidade;
   }
 

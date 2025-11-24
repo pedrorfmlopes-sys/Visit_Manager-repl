@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -52,7 +52,7 @@ export default function EntidadeForm() {
 
   const form = useForm<InsertEntidade>({
     resolver: zodResolver(insertEntidadeSchema),
-    defaultValues: entidade || {
+    defaultValues: {
       entidadeTipoId: null,
       nome: "",
       morada: "",
@@ -78,8 +78,39 @@ export default function EntidadeForm() {
       createdByUserId: currentUser?.id,
       assignedUserId: currentUser?.id, // Default to current user
     },
-    values: entidade,
   });
+
+  // PASSO DEBUG: Reset form quando entidade chega (edição)
+  useEffect(() => {
+    if (entidade) {
+      console.log("[EntidadeForm] Resetting form com entidade:", entidade);
+      console.log("[EntidadeForm] entidade.entidadeTipoId:", entidade.entidadeTipoId);
+      form.reset({
+        entidadeTipoId: entidade.entidadeTipoId ?? null,
+        nome: entidade.nome,
+        morada: entidade.morada || "",
+        codigoPostal: entidade.codigoPostal || "",
+        cidade: entidade.cidade || "",
+        telefone: entidade.telefone || "",
+        email: entidade.email || "",
+        website: entidade.website || "",
+        nif: entidade.nif || "",
+        notas: entidade.notas || "",
+        latitude: entidade.latitude || "",
+        longitude: entidade.longitude || "",
+        logoUrl: entidade.logoUrl || "",
+        domain: entidade.domain || "",
+        industry: entidade.industry || "",
+        descricao: entidade.descricao || "",
+        linkedinUrl: entidade.linkedinUrl || "",
+        facebookUrl: entidade.facebookUrl || "",
+        twitterUrl: entidade.twitterUrl || "",
+        instagramUrl: entidade.instagramUrl || "",
+        createdByUserId: entidade.createdByUserId,
+        assignedUserId: entidade.assignedUserId,
+      });
+    }
+  }, [entidade, form]);
 
   const createMutation = useMutation({
     mutationFn: async (data: InsertEntidade) => {
@@ -133,9 +164,13 @@ export default function EntidadeForm() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: InsertEntidade) => {
+      console.log('[EntidadeForm UPDATE] data a enviar:', data);
+      console.log('[EntidadeForm UPDATE] entidadeTipoId:', data.entidadeTipoId);
+      console.log('[EntidadeForm UPDATE] nome:', data.nome);
       await apiRequest("PATCH", `/api/entidades/${entidadeId}`, data);
     },
     onSuccess: () => {
+      console.log('[EntidadeForm UPDATE] Sucesso! Invalidando cache...');
       queryClient.invalidateQueries({ queryKey: ["/api/entidades"] });
       queryClient.invalidateQueries({ queryKey: ["/api/entidades", entidadeId] });
       toast({
@@ -145,6 +180,7 @@ export default function EntidadeForm() {
       setLocation(`/entidades/${entidadeId}`);
     },
     onError: (error: Error) => {
+      console.error('[EntidadeForm UPDATE] Erro:', error);
       if (isUnauthorizedError(error)) {
         toast({
           title: "Não autorizado",

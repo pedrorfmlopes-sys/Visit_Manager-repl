@@ -609,8 +609,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      console.log("[DEBUG ENTIDADE PATCH] body recebido:", JSON.stringify(req.body, null, 2));
+      console.log("[DEBUG ENTIDADE PATCH] entidadeTipoId no body:", req.body.entidadeTipoId);
       const validatedData = insertEntidadeSchema.partial().parse(req.body);
+      console.log("[DEBUG ENTIDADE PATCH] validatedData após parse:", JSON.stringify(validatedData, null, 2));
       const entidade = await storage.updateEntidade(req.params.id, validatedData, empresaId, userId, userRole);
+      console.log("[DEBUG ENTIDADE PATCH] entidade retornada do storage:", JSON.stringify(entidade, null, 2));
       if (!entidade) {
         return res.status(404).json({ message: "Entidade not found or unauthorized" });
       }
@@ -1980,17 +1984,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId, userRole } = await getUserContext(req);
       const { nome, existingEntityId, tipoEntidade } = req.body;
       
+      console.log("[DEBUG IA ENTIDADE] request payload:", { nome, existingEntityId, tipoEntidade, userId });
+      
       if (!nome || typeof nome !== 'string') {
         return res.status(400).json({ message: 'Nome parameter required' });
       }
       
-      if (!tipoEntidade || typeof tipoEntidade !== 'string') {
-        console.log('[PT-Search] Missing tipoEntidade - blocking search for safety');
-        return res.json({
-          fuzzyMatches: [],
-          googleResults: [],
-          enrichmentSource: 'disabled',
-        });
+      // NOTE: tipoEntidade é opcional para novas entidades (user ainda não escolheu tipo)
+      // Se não vier, continua mesmo assim - vai fazer pesquisa genérica
+      if (tipoEntidade && typeof tipoEntidade !== 'string') {
+        console.log('[PT-Search] tipoEntidade veio mas não é string, ignorando:', tipoEntidade);
       }
       
       const input: PTEnrichmentInput = {
@@ -1999,7 +2002,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         existingEntityId,
       };
       
+      console.log('[PT-Search] Calling ptIntelligentSearch with input:', JSON.stringify(input));
       const result = await ptIntelligentSearch(input, storage, userRole);
+      console.log('[PT-Search] ptIntelligentSearch result:', { 
+        fuzzyMatchesCount: result.fuzzyMatches?.length,
+        enrichmentSource: result.enrichmentSource 
+      });
       
       if (result.fuzzyMatches.length === 0) {
         console.log(`[PT-Search] No fuzzy matches for "${nome}", attempting Google Search (user: ${userId}, role: ${userRole}, type: ${tipoEntidade})`);
@@ -2007,6 +2015,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const googleResults = await searchCompanyData(nome);
         
         console.log(`[PT-Search] Google Search returned ${googleResults.length} results`);
+        console.log("[DEBUG IA ENTIDADE] resposta OpenAI/IA:", { googleResults, fuzzyMatches: result.fuzzyMatches });
         
         return res.json({
           ...result,
