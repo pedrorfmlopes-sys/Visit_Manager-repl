@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import DOMPurify from 'dompurify';
-import { ArrowLeft, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles, Bell, Volume2, Trash2, Loader2, Mic, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles, Bell, Volume2, Trash2, Loader2, Mic, Plus } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { pt } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
