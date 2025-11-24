@@ -128,7 +128,7 @@ export default function VisitaForm() {
 
   // Build prefilled notes with header
   const notasComResumo = prefillData.resumoVisitaAnterior && prefillData.visitaAnteriorData
-    ? `***** Resumo da Visita Anterior, efetuada dia ${format(new Date(prefillData.visitaAnteriorData), "dd/MM/yyyy", { locale: pt })} *****\n\n\n${prefillData.resumoVisitaAnterior}`
+    ? `***** Resumo da Visita Anterior, efetuada dia ${format(new Date(prefillData.visitaAnteriorData), "dd/MM/yyyy", { locale: pt })} *****\n\n\n\n${prefillData.resumoVisitaAnterior}`
     : prefillData.resumoVisitaAnterior || "";
 
   const form = useForm<VisitaFormData>({
