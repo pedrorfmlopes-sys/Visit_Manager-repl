@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Empresa } from "@shared/schema";
-import { Upload, Cloud, Settings, MapPin, Bell, Zap } from "lucide-react";
+import { Upload, Cloud, Settings, MapPin, Bell, Zap, Lightbulb } from "lucide-react";
 import { useRef, useState } from "react";
 
 const updateEmpresaSchema = z.object({
@@ -356,6 +356,54 @@ export default function AdminEmpresa() {
 
                   {/* TAB 3: IA & TRANSCRIÇÃO */}
                   <TabsContent value="ia" className="space-y-6 mt-6">
+                    {/* Dashboard Insights - IA */}
+                    <div className="space-y-4 pb-6 border-b">
+                      <FormField
+                        control={form.control}
+                        name="uiSettings"
+                        render={({ field }) => {
+                          const uiSettings = field.value || {};
+                          const isEnabled = uiSettings.enableIA !== false;
+                          return (
+                            <FormItem className="space-y-4">
+                              <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-200 dark:border-amber-900/30">
+                                <div className="flex-1 space-y-2">
+                                  <div className="flex items-center gap-2">
+                                    <Lightbulb className="w-5 h-5 text-amber-600" />
+                                    <FormLabel className="text-base font-semibold cursor-pointer">
+                                      Insights IA no Dashboard
+                                    </FormLabel>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground">
+                                    Ativa ou desativa a geração de insights e recomendações automáticas baseadas em IA no dashboard
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-3">
+                                    {isEnabled
+                                      ? "✓ Os dashboards mostram análises personalizadas por utilizador (agentes) ou agregadas por empresa (admin)"
+                                      : "✗ Os cards de insights mostram uma mensagem informativa sem chamar a IA"}
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    field.onChange({ ...uiSettings, enableIA: !isEnabled });
+                                  }}
+                                  className={`px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                                    isEnabled
+                                      ? "bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-100"
+                                      : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                                  }`}
+                                  data-testid="button-toggle-ia-insights"
+                                >
+                                  {isEnabled ? "Ativado" : "Desativado"}
+                                </button>
+                              </div>
+                            </FormItem>
+                          );
+                        }}
+                      />
+                    </div>
+
                     <div className="space-y-4">
                       <div>
                         <FormLabel className="text-base font-semibold">IA - Resumos e Sugestões</FormLabel>
