@@ -1,7 +1,7 @@
 # Commercial Visits Management PWA
 
 ## Overview
-This Progressive Web Application (PWA) streamlines commercial visit management for field sales professionals. It tracks entities, contacts, and visits, offering AI-powered summaries, audio transcription, automated notifications, geolocation, calendar integration, PDF export, and analytics. The application aims to enhance data quality and provide actionable insights for sales teams. It is a full-stack TypeScript solution with a React frontend, Express backend, and PostgreSQL with Drizzle ORM, built with a mobile-first, multi-tenant architecture and robust security, including user data isolation and Role-Based Access Control (RBAC).
+This Progressive Web Application (PWA) is designed to optimize commercial visit management for field sales professionals. It provides comprehensive tools for tracking entities, contacts, and visits, enhanced with AI-powered summaries, audio transcription, automated notifications, geolocation, calendar integration, PDF export, and advanced analytics. The application aims to significantly improve data quality and provide actionable insights for sales teams. It is built as a full-stack TypeScript solution, featuring a React frontend, an Express backend, and PostgreSQL with Drizzle ORM. Key architectural principles include a mobile-first approach, multi-tenancy with strict user data isolation, and robust Role-Based Access Control (RBAC).
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -9,134 +9,21 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### Frontend Architecture
-A mobile-first React 18 application using TypeScript, Wouter for routing, and Vite. It utilizes Shadcn/ui (New York style) with Radix UI and Tailwind CSS, adhering to Material Design principles. State management is handled by TanStack React Query and React Hook Form with Zod for validation. UI patterns emphasize card-based layouts, search-first interfaces, and Floating Action Buttons (FABs). It features adaptive layouts based on user roles (mobile-first for agents with bottom nav, desktop sidebar for admins, and mobile drawer for admins on small screens). Company-specific themes are supported and applied dynamically.
+A mobile-first React 18 application built with TypeScript, utilizing Wouter for routing and Vite for tooling. It incorporates Shadcn/ui (New York style) with Radix UI and Tailwind CSS, adhering to Material Design principles. State management is handled by TanStack React Query, and form validation uses React Hook Form with Zod. UI patterns emphasize card-based layouts, search-first interfaces, and Floating Action Buttons (FABs). Adaptive layouts are implemented based on user roles, supporting company-specific themes dynamically.
 
 ### Backend Architecture
-An Express.js application in TypeScript, employing session-based authentication with Replit Auth (OpenID Connect) and Passport.js, storing sessions in PostgreSQL. It provides RESTful APIs for authentication, universal entities, contacts, visits (including file uploads and audio transcription), tasks, and analytics. Multer handles file uploads. A robust RBAC system differentiates Admin (all data access) and Agent (owner/assigned data access) roles, enforcing ownership checks across all data operations.
+An Express.js application developed in TypeScript. It uses session-based authentication via Replit Auth (OpenID Connect) and Passport.js, with sessions stored in PostgreSQL. The backend provides RESTful APIs for authentication, universal entities, contacts, visits (including file uploads and audio transcription), tasks, and analytics. Multer is used for file uploads. A robust RBAC system distinguishes between Admin (full data access) and Agent (owner/assigned data access) roles, enforcing ownership checks across all data operations.
 
 ### Database Architecture
-PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities include Users, a universal Entidades system (e.g., Gabinete, Cliente, Distribuidor), Contactos, Visitas (with media, audio, AI summaries, geolocation, and brands), Tarefas (rich text), Lembretes, Marcas (product brands), and Sessions. Relationships are managed via foreign keys. The `visitasMarcas` junction table manages many-to-many relationships. A `visitasAudio` table stores audio clips for visits. The `empresas` table includes `theme` for customization and `mostrarGPS` for GPS visibility control. The `visitaAnteriorId` field in the `visitas` table tracks visit relationships for historical context.
+PostgreSQL with Drizzle ORM provides type-safe schema management. Core entities include Users, a universal `Entidades` system (e.g., Gabinete, Cliente, Distribuidor), Contactos, Visitas (with associated media, audio, AI summaries, geolocation, and brands), Tarefas (rich text), Lembretes, Marcas, and Sessions. Relationships are managed through foreign keys, including a `visitasMarcas` junction table for many-to-many relationships and a `visitasAudio` table for audio clips. The `empresas` table supports dynamic theming and GPS visibility control. A `visitaAnteriorId` field tracks historical visit relationships. Additionally, a new `entidade_tipos` table allows for company-configurable entity types.
 
 ### System Design Choices
-
--   **Multi-tenant Architecture**: Supports multiple companies with complete data isolation.
--   **Role-Based Access Control (RBAC)**: Differentiates Admin and Agent roles with granular access control.
--   **Dynamic Theming**: Companies can select a theme (`light-business`, `dark-pro`).
--   **Audio Transcription**: AI-powered audio transcription for visit notes.
--   **Universal Entidades System**: Flexible system supporting various business entity types.
--   **Rich Text Task Descriptions**: Utilizes TipTap editor with XSS prevention.
--   **Offline Capabilities**: Comprehensive support with IndexedDB for data caching and automatic synchronization.
--   **Geolocation Integration**: Automatic GPS capture for visits.
--   **Calendar Integration**: Generates RFC 5545 compliant `.ics` files.
--   **PDF Export**: Backend-generated PDF reports with photos, AI summaries, and smart pagination.
--   **Advanced Analytics**: RBAC-aware dashboard with KPIs and visualizations.
--   **Universal Contact Recognition Module**: Supports contact import via QR code, vCard, and AI-powered business card scanning.
--   **Google Custom Search Enrichment Module**: Uses Google Custom Search and GPT-4o-mini for company data enrichment.
--   **Intelligent Reminder System**: Proactive engine for visit follow-ups, overdue tasks, and AI-suggested reminders.
--   **PRO Exports Module**: Advanced PDF generation with analytics, charts, and professional executive summaries via OpenAI GPT-4o-mini.
--   **Advanced Filtering**: Comprehensive filtering capabilities for visits and tasks.
--   **Visit Relationship Tracking**: System for creating related visits from scheduled appointments, with complete history tracking.
--   **Full CRUD Operations**: Complete Edit and Delete UI for all entities with role-based access control.
--   **Responsive Admin Layout**: Desktop sidebar adapts to a mobile drawer for optimal UX.
--   **AI-to-Task Conversion**: Direct conversion of AI-suggested tasks to real system tasks with one click, including pre-filled forms and linking to the originating visit.
--   **Real-time Alerts & Badges**: Visual notifications for pending/overdue tasks and today's visits across all navigation surfaces.
--   **Unified Visit Status Management**: Consolidated "Atualizar Estado" dialog with 3 distinct action paths (follow-up, mark done only, cancel appointment) for scheduled visits, with overdue status detection.
--   **Persistent AI Suggestions**: Links created tasks/visits from AI suggestions, maintaining state after page reloads.
--   **Admin Settings Center**: Organized 6-tab settings page with company configuration, logo upload, and UI settings JSON for future extensibility (FASE 22).
--   **Logo Upload**: Direct upload of company logo with preview, type validation (PNG/JPG/SVG/WebP), and automatic database persistence.
-
-## Recent Features (FASE 20-29)
-
-### FASE 20: Unified Visit Status Management
-- Consolidated modal dialog for appointment status changes with 3 visual action paths (follow-up, mark done, cancel)
-- "Overdue appointment" badge for dates in the past
-- 4 distinct card states: Scheduled, Realized, Cancelled, Follow-up created
-
-### FASE 21: Persistent AI Suggestions  
-- AI suggestion cards now persistently link to created tasks/visits via `tarefaId`/`visitaId` stored in JSON
-- State preserved across page reloads (not just local memory)
-- Frontend renders "Ver Tarefa"/"Ver Agendamento" instead of "Criar..." when linked
-
-### FASE 22: Admin Settings Center + Logo Upload
-- 6-tab settings page: Geral, Visitas & Tarefas, IA & Transcrição, Localização & Privacidade, Alertas & UX, Integrações
-- Logo upload endpoint with file validation and automatic URL persistence
-- JSON-based `uiSettings` field for future configuration extensibility
-- Placeholder integrations (Outlook, Planner) ready for future OAuth setup
-
-### FASE 23: IA Insights Dashboard with RBAC + Feature Toggle
-- **Dashboard Insights Card**: AI-powered analysis on dashboard (agent personal, admin team-wide)
-- **RBAC Differentiation**: Storage layer filters data by userId (agent) vs empresaId (admin)
-- **Scope-aware Prompts**: OpenAI prompt adapts language (personal vs team context)
-- **Feature Toggle**: `uiSettings.enableIA` flag controls dashboard insights activation
-- **Settings UI**: Toggle in Admin Settings (IA & Áudio tab) to enable/disable insights
-- **No API Calls When Disabled**: Backend returns message without calling OpenAI when flag is false
-- **Metrics Collection**: Aggregates visits, tasks, top clients, brands over 30-day period
-- **Visual Design**: Amber-themed card with Lightbulb icon, positioned above PDF export
-- **Components**: New `DashboardInsightsCard.tsx`, integrated in Dashboard.tsx and AdminDashboard.tsx
-
-### FASE 24: User Profile & Settings (userSettings + Preferências)
-- **User Settings Schema**: New `userSettings` JSONB field on users table with Zod validation
-- **Settings Structure**: `{ homePage, listDensity, ia: { showVisitSummary, showTaskSuggestions, showDashboardInsights }, notifications: { emailTaskReminders, emailVisitReminders } }`
-- **Dedicated Settings Page**: New `/perfil` page with 4 sections: Perfil (read-only), Interface Preferences, IA Preferences, Notifications
-- **API Endpoints**: `GET /api/user/settings` (fetch), `PATCH /api/user/settings` (update)
-- **Security**: Only users can access/modify their own settings (userId-based isolation)
-- **Navigation**: Link in AgentMore page (agents) and AdminSidebar footer (admins)
-- **Preference Enforcement**: homePage setting will redirect on app launch (placeholder for future implementation)
-- **Respects Company Ceiling**: IA toggles respect enterprise `uiSettings` (user cannot override company-wide settings)
-- **Default Values**: Sensible defaults applied if settings empty or partial
-- **Component**: New `Perfil.tsx` page with form-based UI, proper validation, and error handling
-
-### FASE 26: GPS-based Proximity Visit Suggestions
-- **Backend Endpoint**: `POST /api/visitas/proximidade` calculates nearest entities within 200m radius
-- **Haversine Distance**: server/distanceUtils.ts implements accurate GPS distance calculation in meters
-- **Smart Suggestions**: Returns 3 types: scheduled visits ±5 days, visits without recent activity (60+ days), or null
-- **Storage Method**: `getNearbyVisitSuggestions()` queries entities with coordinates, calculates distances, checks visit history
-- **Frontend Hook**: `useNearbyVisitSuggestions` monitors GPS via Geolocation API with 30s polling interval
-- **RBAC Protection**: Only agents see suggestions, respects `empresa.mostrarGPS` company toggle
-- **4-Hour Cooldown**: Prevents suggestion spam for same entity using in-memory ref storage
-- **UI Component**: `NearbySuggestionSheet` (bottom sheet modal) shows entity name, distance, action buttons
-- **Integration**: Activated in Dashboard with automatic GPS monitoring
-- **User Controls**: Can dismiss suggestions with 4h cooldown or ignore completely
-
-### FASE 27: Performance PRO PDF Report (Dashboard → PDF com IA)
-- **Backend Endpoint**: `GET /api/pdf/performance-pro?scope={agent|empresa}&period={week|month}`
-- **Aggregation Engine**: Collects KPIs (visits, tasks, clients, brands) for specified period with RBAC
-- **Data Analytics**: Top 10 clients by visits, top overdue tasks, task completion %, brand distribution
-- **AI Integration**: Reutiliza `generateDashboardInsights` para análise contextual (agent vs admin tone)
-- **PDF Generator**: New `pdfPerformancePro.ts` with professional layout (cover + KPIs + tables + AI insights + footer)
-- **RBAC Enforcement**: Agents can only request scope=agent; admins can request both scopes
-- **Frontend Integration**: Added "Relatórios PRO (com IA)" buttons to Dashboard and AdminDashboard
-- **Dual Download Options**: "Relatórios Padrão" (existing) + "Relatórios PRO" (new with AI analysis)
-- **Filename**: `performance-pro-{agent|empresa}-YYYYMMDD.pdf`
-- **Design**: Professional PDF with blue headers, KPI cards, data tables, AI insights section
-- **Status**: ✅ VALIDADO - PDFs download e abrem corretamente
-
-### FASE 28: UX Improvements & Admin Tools (Onboarding, Activity Log, Debug)
-- **Onboarding Dashboard**: Non-intrusive tip card on first dashboard access, dismissible, stored in localStorage + userSettings
-- **Activity Log - VisitaDetail**: Histórico section showing: creation info, follow-ups, next visit schedule, linked tasks
-- **Activity Log - TarefaDetail**: Histórico section showing: creation info, current status, due date, related visit
-- **Admin Debug Page**: New `/admin/debug` route (admin-only) with real-time app state monitoring
-- **Debug Endpoint**: `GET /api/admin/debug` returns: app version, DB status, company stats, settings flags, integration status
-- **Admin Tools Card**: New card in AdminDashboard with button to access Debug / Estado da Aplicação
-- **Status**: ✅ IMPLEMENTADO - Onboarding, Activity Logs, Debug tools funcionais
-
-### FASE 29: Types de Entidades Configuráveis & Filtros de Visitas (Em Progresso)
-- **New Table `entidade_tipos`**: Stores company-configurable entity types (id, empresaId, nome, cor, ativo, ordem, timestamps)
-- **Schema Updates**: Added `entidadeTipoId` FK to entidades, relationships, Zod schemas
-- **UISettings Extensions**: Added `visitas` object with filter toggles (enableFilterEntidade, enableFilterContacto, etc)
-- **UserSettings Extensions**: Added `visitasUi` object for user-level filter preferences
-- **Backend APIs**: 
-  - `GET /api/admin/entidade-tipos` - List all types (admin-only)
-  - `POST /api/admin/entidade-tipos` - Create new type
-  - `PATCH /api/admin/entidade-tipos/:id` - Update type
-  - `GET /api/entidade-tipos` - List active types (authenticated users)
-- **Storage Methods**: `getEntidadeTipos()`, `getEntidadeTiposAtivos()`, `getEntidadeTipo()`, `createEntidadeTipo()`, `updateEntidadeTipo()`
-- **Status**: 🔄 IN PROGRESS - Schema + APIs ready, pending UI implementation + filter integration
+The system supports a multi-tenant architecture with complete data isolation and granular Role-Based Access Control (RBAC). It features dynamic company theming, AI-powered audio transcription for visit notes, and a universal `Entidades` system for flexible business entity management. Rich text task descriptions are supported with XSS prevention. The application offers comprehensive offline capabilities with IndexedDB for data caching and automatic synchronization. Geolocation integration automatically captures GPS for visits, and calendar integration generates RFC 5545 `.ics` files. Backend-generated PDF reports include photos, AI summaries, and smart pagination. Advanced analytics dashboards are RBAC-aware. Other features include a universal contact recognition module (QR, vCard, AI business card scanning), Google Custom Search enrichment, an intelligent reminder system, and advanced "PRO" PDF exports with AI-driven executive summaries. The system includes advanced filtering, visit relationship tracking, full CRUD operations with RBAC, and a responsive admin layout. AI suggestions can be converted directly into tasks with pre-filled forms. Real-time alerts and badges provide visual notifications. A unified visit status management system handles scheduled appointments, including overdue detection. AI suggestions are persistent across sessions. An Admin Settings Center allows for company configuration, logo uploads, and UI settings. GPS-based proximity visit suggestions are provided to agents, with a configurable feature toggle for AI insights. User-specific settings are managed via a dedicated profile page. An onboarding dashboard, activity logs, and admin debug tools enhance usability and maintenance. Configurable entity types allow for flexible categorization and filtering of visits.
 
 ## External Dependencies
 
 -   **Neon Database**: Serverless PostgreSQL hosting.
--   **OpenAI API**: Used for Whisper (audio transcription), GPT-4o-mini (visit summaries, email generation, executive PDF summaries).
+-   **OpenAI API**: Used for Whisper (audio transcription) and GPT-4o-mini (visit summaries, email generation, executive PDF summaries).
 -   **Replit Authentication**: OAuth/OIDC provider for user authentication.
 -   **Multer**: Handles file uploads.
 -   **Radix UI**: UI primitives.

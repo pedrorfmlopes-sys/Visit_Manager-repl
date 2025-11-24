@@ -1,0 +1,194 @@
+PASSO 5 – Tipos de Entidade + EntidadeForm sem erros (focado, sem mexer no resto)
+
+Contexto:
+
+Já temos:
+
+Tabela de tipos de entidade no backend.
+
+Página de gestão de tipos em AdminEmpresa (aba Entidades).
+
+Filtros de Visitas e Tarefas ligados às settings (estão OK).
+
+Mas:
+
+O EntidadeForm ainda está frágil (risco de entidadeTipos undefined / problemas no select).
+
+Quero garantir que:
+
+Tipos de entidade são geridos só em /admin/empresa → Entidades.
+
+O formulário de Entidade usa esses tipos de forma estável.
+
+⚠️ Neste PASSO 5:
+
+Não tocar em:
+
+Filtros de Visitas.
+
+Filtros de Tarefas.
+
+Tabs de Filtros em AdminEmpresa (já estão a funcionar para Visitas/Tarefas).
+
+Foco exclusivo:
+
+AdminEntidadeTipos (ou equivalente) em /admin/empresa.
+
+EntidadeForm (criar/editar entidade).
+
+1. Garantir que Tipos de Entidade são geridos só em /admin/empresa
+
+Verifica se existe alguma rota/menu fora de /admin/empresa para gerir tipos de entidade (ex.: /entidade-tipos, entradas soltas na sidebar, etc.).
+
+Se existir:
+
+Remove essa entrada da navegação principal (BottomNav/Sidebar normal).
+
+Mantém a gestão de tipos apenas dentro de /admin/empresa → aba “Entidades”.
+
+Em /admin/empresa → aba “Entidades”:
+
+Confirma que o componente AdminEntidadeTipos (ou equivalente) está:
+
+a listar tipos existentes,
+
+a permitir criar, editar (nome/cor) e ativar/desativar,
+
+sem erros de runtime nem warnings de hooks.
+
+2. Corrigir e estabilizar o EntidadeForm com tipos configuráveis
+
+Objetivo:
+
+O EntidadeForm deve:
+
+continuar a permitir criar/editar entidades como antes;
+
+ter um select “Tipo de Entidade” que usa os tipos configurados;
+
+nunca rebentar por entidadeTipos undefined.
+
+No ficheiro EntidadeForm.tsx:
+
+Adiciona um useQuery (ou hook já existente) para carregar tipos de entidade ativos:
+
+const { data: entidadeTipos = [], isLoading: loadingTipos } = useQuery(/* ... */);
+
+
+Importante:
+
+Usa = [] no destructuring para garantir que entidadeTipos nunca é undefined.
+
+No select de tipos:
+
+Garante que o código é algo nesta linha (pseudo):
+
+{entidadeTipos.length > 0 ? (
+  <Select
+    // value/field ligado a entidadeTipoId
+    // options = entidadeTipos.map(t => ({ value: t.id, label: t.nome }))
+  />
+) : (
+  <p className="text-sm text-muted-foreground">
+    Sem tipos definidos – configure em Definições → Entidades.
+  </p>
+)}
+
+
+Não usar entidadeTipos.map sem antes garantir que é array.
+
+Migração suave do campo antigo:
+
+Se ainda existir um campo “tipoEntidade” “hardcoded” (Gabinete/Distribuidor/etc.):
+
+Mantém esse campo como legado por agora (não apagar dados).
+
+Mas deixa claro visualmente:
+
+Ex.: label “Tipo (legado)” vs “Tipo (configurável)”,
+
+ou coloca o antigo apenas em modo leitura, se já não for relevante para novas entidades.
+
+O mais importante agora é:
+
+entidadeTipoId funcionar sem erros,
+
+o formulário não rebentar,
+
+e novas entidades conseguirem ser criadas/gravadas com um tipo configurável.
+
+Edição de Entidade:
+
+Garante que, ao editar:
+
+o entidadeTipoId vem preenchido com o valor atual (se existir na BD),
+
+o select mostra o tipo correto.
+
+3. Testes manuais que quero que faças
+
+Gestão de Tipos em AdminEmpresa
+
+Ir a /admin/empresa → aba “Entidades”.
+
+Criar 2–3 tipos novos (ex.: Gabinete, Distribuidor, Construtor).
+
+Desativar 1 tipo e garantir que:
+
+na lista aparece claro qual está ativo/inativo.
+
+Criar Entidade
+
+Ir a “Nova Entidade”.
+
+Verificar:
+
+Select “Tipo de Entidade” mostra apenas os tipos ativos.
+
+Consigo criar uma entidade com um tipo escolhido.
+
+Não aparece erro de JS no console (nada de .map em undefined).
+
+Editar Entidade
+
+Abrir uma entidade já existente.
+
+Verificar:
+
+Se tiver entidadeTipoId definido, o select mostra o tipo correto.
+
+Alterar o tipo e gravar → persistido na BD.
+
+Sem tipos definidos
+
+Desativar todos os tipos em AdminEmpresa.
+
+Abrir “Nova Entidade”.
+
+Esperado:
+
+O select de tipo não rebenta.
+
+Mostra a mensagem “Sem tipos definidos – configure em Definições → Entidades.” (ou similar).
+
+Continua a ser possível criar a entidade (sem tipo configurado).
+
+4. Relatório deste PASSO 5
+
+No relatório desta mini-fase, por favor inclui:
+
+Ficheiros alterados (ex.: AdminEntidadeTipos.tsx, EntidadeForm.tsx, etc.).
+
+Como estás a carregar entidadeTipos no form (mostrar o default = []).
+
+Como ficou o bloco do select de “Tipo de Entidade”.
+
+Resultado dos testes 1–4 (passou/falhou + observações).
+
+Reforço:
+👉 Neste PASSO 5, não mexer em filtros de Visitas/Tarefas, nem nas tabs de Filtros (isso já está OK).
+O foco é apenas:
+
+gestão de tipos de entidade dentro de /admin/empresa,
+
+e EntidadeForm a usar esses tipos de forma estável, sem erros.
