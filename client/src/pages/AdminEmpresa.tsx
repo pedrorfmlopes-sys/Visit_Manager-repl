@@ -15,6 +15,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Empresa } from "@shared/schema";
 import { Upload, Cloud, Settings, MapPin, Bell, Zap, Lightbulb } from "lucide-react";
 import { useRef, useState } from "react";
+import AdminEntidadeTipos from "@/pages/AdminEntidadeTipos";
 
 const updateEmpresaSchema = z.object({
   nome: z.string().min(1, "Nome obrigatório"),
@@ -165,13 +166,15 @@ export default function AdminEmpresa() {
             <Form {...form}>
               <form onSubmit={form.handleSubmit((data) => updateMutation.mutate(data))} className="space-y-6">
                 <Tabs defaultValue="geral" className="w-full">
-                  <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 gap-2 h-auto">
-                    <TabsTrigger value="geral" data-testid="tab-settings-geral">Geral</TabsTrigger>
-                    <TabsTrigger value="visitas" data-testid="tab-settings-visitas">Visitas & Tarefas</TabsTrigger>
-                    <TabsTrigger value="ia" data-testid="tab-settings-ia">IA & Áudio</TabsTrigger>
-                    <TabsTrigger value="localizacao" data-testid="tab-settings-localizacao">Localização</TabsTrigger>
-                    <TabsTrigger value="alertas" data-testid="tab-settings-alertas">Alertas & UX</TabsTrigger>
-                    <TabsTrigger value="integrações" data-testid="tab-settings-integrações">Integrações</TabsTrigger>
+                  <TabsList className="grid w-full grid-cols-2 lg:grid-cols-8 gap-1 h-auto">
+                    <TabsTrigger value="geral" data-testid="tab-settings-geral" className="text-xs">Geral</TabsTrigger>
+                    <TabsTrigger value="visitas" data-testid="tab-settings-visitas" className="text-xs">Visitas & Tarefas</TabsTrigger>
+                    <TabsTrigger value="ia" data-testid="tab-settings-ia" className="text-xs">IA & Áudio</TabsTrigger>
+                    <TabsTrigger value="localizacao" data-testid="tab-settings-localizacao" className="text-xs">Localização</TabsTrigger>
+                    <TabsTrigger value="alertas" data-testid="tab-settings-alertas" className="text-xs">Alertas & UX</TabsTrigger>
+                    <TabsTrigger value="integrações" data-testid="tab-settings-integrações" className="text-xs">Integrações</TabsTrigger>
+                    <TabsTrigger value="entidades" data-testid="tab-settings-entidades" className="text-xs">Entidades</TabsTrigger>
+                    <TabsTrigger value="filtros" data-testid="tab-settings-filtros" className="text-xs">Filtros</TabsTrigger>
                   </TabsList>
 
                   {/* TAB 1: GERAL - Identidade & Logo */}
@@ -611,6 +614,150 @@ export default function AdminEmpresa() {
                       </div>
                     </div>
                   </TabsContent>
+
+                  {/* TAB 7: ENTIDADES - Tipos de Entidade */}
+                  <TabsContent value="entidades" className="space-y-6 mt-6">
+                    <AdminEntidadeTipos />
+                  </TabsContent>
+
+                  {/* TAB 8: FILTROS - Controle por módulo */}
+                  <TabsContent value="filtros" className="space-y-6 mt-6">
+                    <div className="space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        Configure quais filtros estão disponíveis em cada módulo
+                      </p>
+
+                      <Tabs defaultValue="visitas-filter" className="w-full">
+                        <TabsList className="grid w-full grid-cols-4">
+                          <TabsTrigger value="entidades-filter" data-testid="tab-filter-entidades">Entidades</TabsTrigger>
+                          <TabsTrigger value="contactos-filter" data-testid="tab-filter-contactos">Contactos</TabsTrigger>
+                          <TabsTrigger value="visitas-filter" data-testid="tab-filter-visitas">Visitas</TabsTrigger>
+                          <TabsTrigger value="tarefas-filter" data-testid="tab-filter-tarefas">Tarefas</TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="entidades-filter" className="space-y-4 mt-4">
+                          <div className="space-y-3">
+                            <div className="flex items-start gap-2">
+                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-tipo-entidade" />
+                              <div>
+                                <p className="font-medium text-sm">Filtro por Tipo de Entidade</p>
+                                <p className="text-xs text-muted-foreground">Permite filtrar por tipos configurados</p>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-search-entidades" />
+                              <div>
+                                <p className="font-medium text-sm">Pesquisa por Nome</p>
+                                <p className="text-xs text-muted-foreground">Filtro de pesquisa rápida</p>
+                              </div>
+                            </div>
+                          </div>
+                        </TabsContent>
+
+                        <TabsContent value="contactos-filter" className="space-y-4 mt-4">
+                          <div className="space-y-3">
+                            <div className="flex items-start gap-2">
+                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-entidade-contacto" />
+                              <div>
+                                <p className="font-medium text-sm">Filtro por Entidade</p>
+                                <p className="text-xs text-muted-foreground">Filtrar contactos por entidade associada</p>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-cargo" />
+                              <div>
+                                <p className="font-medium text-sm">Filtro por Cargo</p>
+                                <p className="text-xs text-muted-foreground">Filtrar por função/cargo</p>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-search-contactos" />
+                              <div>
+                                <p className="font-medium text-sm">Pesquisa por Nome</p>
+                                <p className="text-xs text-muted-foreground">Filtro de pesquisa rápida</p>
+                              </div>
+                            </div>
+                          </div>
+                        </TabsContent>
+
+                        <TabsContent value="visitas-filter" className="space-y-4 mt-4">
+                          <div className="space-y-3">
+                            <div className="flex items-start gap-2">
+                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-date-quick" />
+                              <div>
+                                <p className="font-medium text-sm">Filtro Datas (Hoje / Semana / 30 dias)</p>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-user-visitas" />
+                              <div>
+                                <p className="font-medium text-sm">Filtro por Utilizador</p>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-marca-visitas" />
+                              <div>
+                                <p className="font-medium text-sm">Filtro por Marca</p>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-entidade-visitas" />
+                              <div>
+                                <p className="font-medium text-sm">Filtro por Entidade</p>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-contacto-visitas" />
+                              <div>
+                                <p className="font-medium text-sm">Filtro por Contacto</p>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-audio-visitas" />
+                              <div>
+                                <p className="font-medium text-sm">Filtro por Áudio (Com áudio por transcrever)</p>
+                              </div>
+                            </div>
+                          </div>
+                        </TabsContent>
+
+                        <TabsContent value="tarefas-filter" className="space-y-4 mt-4">
+                          <div className="space-y-3">
+                            <div className="flex items-start gap-2">
+                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-status-tarefas" />
+                              <div>
+                                <p className="font-medium text-sm">Filtro por Status</p>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-overdue" />
+                              <div>
+                                <p className="font-medium text-sm">Filtro Tarefas em Atraso</p>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-assigned-user" />
+                              <div>
+                                <p className="font-medium text-sm">Filtro por Utilizador Atribuído</p>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-entidade-tarefas" />
+                              <div>
+                                <p className="font-medium text-sm">Filtro por Entidade</p>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-filter-visita-tarefas" />
+                              <div>
+                                <p className="font-medium text-sm">Filtro por Visita</p>
+                              </div>
+                            </div>
+                          </div>
+                        </TabsContent>
+                      </Tabs>
+                    </div>
+                  </TabsContent>
                 </Tabs>
 
                 <Button
@@ -629,3 +776,6 @@ export default function AdminEmpresa() {
     </div>
   );
 }
+
+// FASE 29: Import AdminEntidadeTipos temporarily (will be extracted as component)
+// This will be moved to a separate component file in the future

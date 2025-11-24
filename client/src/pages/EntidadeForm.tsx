@@ -21,7 +21,7 @@ import { syncManager } from "@/lib/syncManager";
 import { GoogleCompanySearch } from "@/components/GoogleCompanySearch";
 import { fillEntityForm, type PTEnrichmentResult } from "@/lib/enrichmentUtils";
 
-const tipoOptions = [
+const legacyTipoOptions = [
   { value: "Gabinete", label: "Gabinete de Arquitetura", icon: Building2 },
   { value: "Distribuidor", label: "Distribuidor", icon: Package },
   { value: "Parceiro", label: "Parceiro Comercial", icon: Briefcase },
@@ -61,6 +61,7 @@ export default function EntidadeForm() {
     resolver: zodResolver(insertEntidadeSchema),
     defaultValues: entidade || {
       tipoEntidade: "Gabinete",
+      entidadeTipoId: undefined,
       nome: "",
       morada: "",
       codigoPostal: "",
@@ -409,21 +410,52 @@ export default function EntidadeForm() {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
+              name="entidadeTipoId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tipo de Entidade (Configurado)</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <FormControl>
+                      <SelectTrigger className="h-12" data-testid="select-entidade-tipo-id">
+                        <SelectValue placeholder="Selecione o tipo ou deixe em branco" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="">Sem tipo</SelectItem>
+                      {entidadeTipos.map((tipo) => (
+                        <SelectItem key={tipo.id} value={tipo.id} data-testid={`option-tipo-${tipo.id}`}>
+                          {tipo.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {entidadeTipos.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Sem tipos definidos – configure em Definições → Entidades
+                    </p>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="tipoEntidade"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Tipo de Entidade *</FormLabel>
+                  <FormLabel>Tipo de Entidade (Legado) *</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <SelectTrigger className="h-12" data-testid="select-tipo-entidade">
+                      <SelectTrigger className="h-12" data-testid="select-tipo-entidade-legado">
                         <SelectValue placeholder="Selecione o tipo" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {tipoOptions.map((option) => {
+                      {legacyTipoOptions.map((option) => {
                         const Icon = option.icon;
                         return (
-                          <SelectItem key={option.value} value={option.value} data-testid={`option-tipo-${option.value}`}>
+                          <SelectItem key={option.value} value={option.value} data-testid={`option-tipo-legado-${option.value}`}>
                             <div className="flex items-center gap-2">
                               <Icon className="h-4 w-4" />
                               {option.label}
@@ -433,6 +465,9 @@ export default function EntidadeForm() {
                       })}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Campo legado mantido para compatibilidade. Use o novo "Tipo de Entidade (Configurado)" para maior flexibilidade.
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}

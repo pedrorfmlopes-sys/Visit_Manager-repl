@@ -1,0 +1,246 @@
+🔧 FASE 29 – Correção / Arrumar a Casa: Tipos de Entidades + Filtros + Settings
+
+Contexto:
+
+Já implementaste a base de tipos de entidade no backend e algumas flags de filtros em uiSettings/userSettings.
+
+Mas a UI ainda não reflete o que eu pretendo, e a organização das definições não está coesa.
+
+Vou detalhar o que quero e peço-te para ajustares a FASE 29 em conformidade.
+
+1. Tipos de Entidade = Etiquetas configuráveis, NÃO um módulo separado
+
+O que eu quero:
+
+“Entidades” aqui significa tipos de entidade (etiquetas/segmentos da empresa) como:
+
+Gabinetes, Distribuidores, Parceiros, Construtores, Outros…
+
+Estes tipos são apenas etiquetas para classificar as entidades (clientes).
+
+A criação/edição das entidades (clientes) em si mantém-se como já estava; não quero um CRUD novo para entidades, quero um CRUD limpo para os tipos.
+
+O que peço que faças:
+
+Se existir alguma página ou entrada de menu principal só para “tipos de entidade”, retira-a da navegação principal (BottomNav / Sidebar geral).
+
+Em /admin/empresa (Centro de Configurações), cria uma nova aba/subsecção:
+
+Nome sugerido: “Entidades”.
+
+Dentro dessa aba, criar uma UI de gestão de Tipos de Entidade:
+
+Lista com:
+
+nome,
+
+ativo,
+
+cor (se implementaste),
+
+ordem (se existir).
+
+Ações:
+
+Adicionar tipo → abre pequeno formulário (nome obrigatório, cor opcional).
+
+Editar tipo → renomear/cor.
+
+Ativar/desativar tipo (soft delete).
+
+RBAC:
+
+Só role = "admin" pode ver/editar esta aba.
+
+Garantir que o EntidadeForm:
+
+Continua a funcionar como antes;
+
+Tem um campo “Tipo de entidade” que usa os tipos ativos da empresa (via teu endpoint já existente);
+
+Se não houver nenhum tipo configurado, o select deve permitir “Sem tipo” e/ou mostrar mensagem: “Sem tipos definidos – configure em Definições → Entidades”.
+
+2. Centralizar TODAS as definições em /admin/empresa
+
+Objetivo:
+
+Não quero opções de configuração espalhadas no menu principal.
+
+Tudo o que é “definições” (Empresa, Marcas, Utilizadores, Tipos de Entidade, Filtros, IA, etc.) deve viver dentro do Centro de Configurações/AdminEmpresa.
+
+O que fazer:
+
+Rever a navegação:
+
+Confirmar que:
+
+Empresa, Utilizadores, Marcas, Tipos de Entidade, Filtros… aparecem apenas como:
+
+abas/subabas dentro de /admin/empresa,
+
+ou links claramente dentro da secção de Admin/Definições,
+
+e não surgem como itens soltos no menu principal de navegação do dia-a-dia.
+
+Se houver alguma página de “tipos de entidade” isolada usada só para setup:
+
+Integrá-la dentro do /admin/empresa (aba Entidades).
+
+Remover a entrada solta da sidebar/bottom nav do layout principal.
+
+3. Tab “Filtros” em Empresa, separada por Entidades / Contactos / Visitas / Tarefas
+
+Objetivo:
+
+Quero um sítio único onde, como admin, consigo dizer:
+
+que filtros existem para Entidades, Contactos, Visitas e Tarefas;
+
+e ligar/desligar esses filtros.
+
+Depois, a nível de utilizador, este só pode simplificar ainda mais, nunca reativar algo que a empresa desligou.
+
+O que peço:
+
+Em /admin/empresa, criar uma nova aba: “Filtros”.
+
+Dentro desta aba “Filtros”, criar 4 sub-tabs:
+
+Entidades
+
+Contactos
+
+Visitas
+
+Tarefas
+
+Para cada sub-tab, mostrar toggles que refletem uiSettings:
+
+Entidades:
+
+Exemplo de flags (ajusta aos filtros que já existem na lista de entidades):
+
+uiSettings.entidades.enableFilterTipoEntidade
+
+uiSettings.entidades.enableFilterSearch
+
+uiSettings.entidades.enableFilterLocalidade (se fizer sentido).
+
+Contactos:
+
+Exemplo:
+
+uiSettings.contactos.enableFilterEntidade
+
+uiSettings.contactos.enableFilterCargo
+
+uiSettings.contactos.enableFilterSearch.
+
+Visitas (aqui já temos base):
+
+uiSettings.visitas.enableFilterDateQuick (Hoje / Semana / 30 dias)
+
+uiSettings.visitas.enableFilterUser (admin)
+
+uiSettings.visitas.enableFilterMarca
+
+uiSettings.visitas.enableFilterEntidade
+
+uiSettings.visitas.enableFilterContacto
+
+uiSettings.visitas.enableFilterHasAudio
+
+Tarefas:
+
+uiSettings.tarefas.enableFilterStatus (Todas/Pendentes/Concluídas)
+
+uiSettings.tarefas.enableFilterOverdue
+
+uiSettings.tarefas.enableFilterAssignedUser
+
+uiSettings.tarefas.enableFilterEntidade
+
+uiSettings.tarefas.enableFilterVisita
+
+Lógica de funcionamento:
+
+Se um toggle estiver OFF em uiSettings:
+
+O filtro correspondente não aparece em lado nenhum (lists de agent/admin).
+
+Se estiver ON:
+
+O filtro fica disponível, mas o utilizador ainda pode escondê-lo via userSettings.visitasUi ou equivalente (por exemplo, “não mostrar filtros avançados”).
+
+4. Filtros de Visitas – Entidade & Contacto visíveis e funcionais
+
+O backend já suporta entidadeId e contactoId em GET /api/visitas.
+Agora preciso que a UI reflita isso:
+
+Em Visitas (agent):
+
+Na VisitasFilterBar:
+
+Adicionar filtro Entidade:
+
+Select com pesquisa (pode usar /api/entidades?search=...).
+
+Ao escolher uma entidade:
+
+atualiza state local,
+
+atualiza query param entidadeId.
+
+Adicionar filtro Contacto:
+
+Pode ser:
+
+dependente da entidade selecionada,
+
+ou um typeahead geral de contactos.
+
+Atualiza query param contactoId.
+
+Estes filtros:
+
+só aparecem se uiSettings.visitas.enableFilterEntidade / enableFilterContacto estiverem true;
+
+se o utilizador desligar “filtros avançados” nas suas definições pessoais, podem ser escondidos.
+
+Em AdminVisitas:
+
+Replicar os mesmos filtros Entidade/Contacto (quando ativados em uiSettings).
+
+Continuam a coexistir com filtros por utilizador, marca, datas, etc.
+
+5. Checklist no relatório da FASE 29 (correção)
+
+No novo relatório desta fase, por favor inclui um bloco “Checklist FASE 29 (Correção)” e assinala explicitamente:
+
+Tipos de Entidade / Entidades (Definições)
+
+ Tipos de entidade geridos dentro de /admin/empresa → aba “Entidades”.
+
+ Nenhuma opção de Tipos/Entidades de configuração exposta no menu principal.
+
+ EntidadeForm mostra campo “Tipo de entidade” com lista de tipos ativos.
+
+Aba Filtros
+
+ Criada aba “Filtros” em /admin/empresa.
+
+ Sub-tabs para Entidades, Contactos, Visitas, Tarefas.
+
+ Toggles ligados a uiSettings.* conforme descrito.
+
+Filtros de Visitas (Entidade/Contacto)
+
+ GET /api/visitas confirmado a filtrar por entidadeId e contactoId.
+
+ Filtros Entidade/Contacto visíveis em Visitas (agent) quando ativados.
+
+ Filtros Entidade/Contacto visíveis em AdminVisitas quando ativados.
+
+ Filtros obedecem às flags de uiSettings e ao toggle de “filtros avançados” do utilizador.
+
+Obrigado! Isto deve alinhar a FASE 29 com a organização que pretendo: tudo o que é definição dentro de /admin/empresa, tipos de entidades como etiquetas configuráveis, e filtros totalmente controlados por settings de empresa + utilizador.

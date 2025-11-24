@@ -99,6 +99,15 @@ export const empresas = pgTable("empresas", {
     "enableAlertRibbon": true,
     "enableBadges": true,
     "refreshInterval": 60,
+    "entidades": {
+      "enableFilterTipoEntidade": true,
+      "enableFilterSearch": true
+    },
+    "contactos": {
+      "enableFilterEntidade": true,
+      "enableFilterCargo": true,
+      "enableFilterSearch": true
+    },
     "visitas": {
       "enableFilterDateQuick": true,
       "enableFilterUser": true,
@@ -106,6 +115,13 @@ export const empresas = pgTable("empresas", {
       "enableFilterEntidade": true,
       "enableFilterContacto": true,
       "enableFilterHasAudio": true
+    },
+    "tarefas": {
+      "enableFilterStatus": true,
+      "enableFilterOverdue": true,
+      "enableFilterAssignedUser": true,
+      "enableFilterEntidade": true,
+      "enableFilterVisita": true
     }
   }'`),
   createdAt: timestamp("created_at").defaultNow(),
