@@ -45,7 +45,7 @@ PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities in
 -   **Admin Settings Center**: Organized 6-tab settings page with company configuration, logo upload, and UI settings JSON for future extensibility (FASE 22).
 -   **Logo Upload**: Direct upload of company logo with preview, type validation (PNG/JPG/SVG/WebP), and automatic database persistence.
 
-## Recent Features (FASE 20-24)
+## Recent Features (FASE 20-26)
 
 ### FASE 20: Unified Visit Status Management
 - Consolidated modal dialog for appointment status changes with 3 visual action paths (follow-up, mark done, cancel)
@@ -85,6 +85,18 @@ PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities in
 - **Respects Company Ceiling**: IA toggles respect enterprise `uiSettings` (user cannot override company-wide settings)
 - **Default Values**: Sensible defaults applied if settings empty or partial
 - **Component**: New `Perfil.tsx` page with form-based UI, proper validation, and error handling
+
+### FASE 26: GPS-based Proximity Visit Suggestions
+- **Backend Endpoint**: `POST /api/visitas/proximidade` calculates nearest entities within 200m radius
+- **Haversine Distance**: server/distanceUtils.ts implements accurate GPS distance calculation in meters
+- **Smart Suggestions**: Returns 3 types: scheduled visits ±5 days, visits without recent activity (60+ days), or null
+- **Storage Method**: `getNearbyVisitSuggestions()` queries entities with coordinates, calculates distances, checks visit history
+- **Frontend Hook**: `useNearbyVisitSuggestions` monitors GPS via Geolocation API with 30s polling interval
+- **RBAC Protection**: Only agents see suggestions, respects `empresa.mostrarGPS` company toggle
+- **4-Hour Cooldown**: Prevents suggestion spam for same entity using in-memory ref storage
+- **UI Component**: `NearbySuggestionSheet` (bottom sheet modal) shows entity name, distance, action buttons
+- **Integration**: Activated in Dashboard with automatic GPS monitoring
+- **User Controls**: Can dismiss suggestions with 4h cooldown or ignore completely
 
 ## External Dependencies
 

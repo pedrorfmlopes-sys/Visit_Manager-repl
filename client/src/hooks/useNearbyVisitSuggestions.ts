@@ -49,12 +49,12 @@ export function useNearbyVisitSuggestions() {
             const { latitude, longitude } = position.coords;
 
             try {
-              const response = await apiRequest('/api/visitas/proximidade', {
-                method: 'POST',
-                body: { lat: latitude, lng: longitude },
+              const response = await apiRequest('POST', '/api/visitas/proximidade', {
+                lat: latitude,
+                lng: longitude,
               });
 
-              const data = await response.json();
+              const data = await response.json() as { sugestao: NearbySuggestion | null };
 
               if (data.sugestao) {
                 // Check cooldown
