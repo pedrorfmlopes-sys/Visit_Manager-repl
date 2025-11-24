@@ -1,0 +1,150 @@
+🔧 FASE 32.2 – Melhorar menu “Definições” no rodapé (multi-opções em PT)
+
+Contexto:
+
+Após a FASE 32, o botão ⚙️ Definições no rodapé abre um DropdownMenu.
+
+Actualmente o conteúdo do menu é:
+
+DropdownMenuLabel: "Definições"
+
+1 único item clicável: “Centro de Configurações da Empresa”.
+
+O utilizador quer um menu mais parecido com um “painel de conta” (como o menu do ChatGPT), com várias opções em português e o título apenas como cabeçalho, não como texto de um único item.
+
+🎯 Objetivo:
+
+Manter um só botão “Definições” visível no rodapé do sidebar.
+
+Ao clicar:
+
+abrir um menu para cima com várias opções, todas bem separadas e legíveis.
+
+por agora, apenas “Configurações da Empresa” precisa de ser funcional.
+
+As restantes entradas podem ser placeholders (desativadas), mas já com labels em PT.
+
+1. Estrutura do menu de Definições (conteúdo)
+
+Ajustar o conteúdo do DropdownMenu para algo como:
+
+Header (não clicável):
+
+Definições
+
+Grupo Empresa:
+
+Configurações da Empresa → navega para /admin/empresa
+
+Grupo Utilizador (placeholders para futuro):
+
+As minhas definições (desativado)
+
+Notificações (desativado)
+
+Ajuda & feedback (pode abrir uma página/URL mais tarde; por agora pode ficar desativado)
+
+Requisitos:
+
+O header “Definições” deve ser um DropdownMenuLabel não clicável.
+
+Pelo menos 1 separador (DropdownMenuSeparator) para separar:
+
+“Configurações da Empresa”
+
+da secção de itens de utilizador.
+
+Os itens podem ter ícones (exemplos):
+
+Configurações da Empresa → Building2 ou Settings
+
+As minhas definições → User
+
+Notificações → Bell
+
+Ajuda & feedback → HelpCircle ou MessageCircle
+
+Para os placeholders:
+
+usar disabled ou onClick={} vazio, mas já deixar a estrutura preparada.
+
+Exemplo conceptual (ajusta ao teu código real – não é preciso copiar à letra):
+
+<DropdownMenuContent side="top" align="start">
+  <DropdownMenuLabel>Definições</DropdownMenuLabel>
+  <DropdownMenuSeparator />
+  <DropdownMenuItem onClick={() => navigate("/admin/empresa")}>
+    <Settings className="mr-2 h-4 w-4" />
+    <span>Configurações da Empresa</span>
+  </DropdownMenuItem>
+  <DropdownMenuSeparator />
+  <DropdownMenuItem disabled>
+    <User className="mr-2 h-4 w-4" />
+    <span>As minhas definições</span>
+  </DropdownMenuItem>
+  <DropdownMenuItem disabled>
+    <Bell className="mr-2 h-4 w-4" />
+    <span>Notificações</span>
+  </DropdownMenuItem>
+  <DropdownMenuItem disabled>
+    <HelpCircle className="mr-2 h-4 w-4" />
+    <span>Ajuda &amp; feedback</span>
+  </DropdownMenuItem>
+</DropdownMenuContent>
+
+2. Comportamento do botão de trigger
+
+O botão “Definições” no rodapé deve continuar simples:
+
+ícone Settings + label “Definições”.
+
+Sem alterar o comportamento actual do resto do sidebar.
+
+O menu deve abrir para cima (side="top") e alinhar com o botão.
+
+3. Testes a fazer
+
+No sidebar:
+
+Verificar que continua a haver apenas um botão “Definições” no rodapé.
+
+Ao clicar em “Definições”:
+
+O menu abre com:
+
+Título “Definições” (não clicável),
+
+Item “Configurações da Empresa” (clicável),
+
+Separador,
+
+Itens:
+
+“As minhas definições” (desativado),
+
+“Notificações” (desativado),
+
+“Ajuda & feedback” (desativado).
+
+Clicar em “Configurações da Empresa”:
+
+Deve navegar para /admin/empresa como antes.
+
+Clicar nos placeholders:
+
+Não deve causar erro nem navegação (apenas feedback de disabled).
+
+4. Relatório
+
+No relatório da FASE 32.2, por favor descreve:
+
+Como ficou o JSX do DropdownMenuContent (sem precisar colar tudo, apenas a estrutura).
+
+Que ícones e labels estão a ser usados para cada item.
+
+Resultado dos testes do ponto 3.
+
+Objetivo final:
+👉 Um único botão ⚙️ “Definições” no rodapé,
+👉 Ao clicar, abre um menu “limpo” e legível com várias opções (em português),
+👉 “Configurações da Empresa” continua funcional; o resto preparado para fases futuras.

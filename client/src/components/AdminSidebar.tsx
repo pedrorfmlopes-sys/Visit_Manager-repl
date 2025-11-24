@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Building2, Users, CheckCircle2, Bell, Settings, LogOut, Calendar } from "lucide-react";
+import { LayoutDashboard, Building2, Users, CheckCircle2, Bell, Settings, LogOut, Calendar, User, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -8,6 +8,7 @@ import {
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuItem,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
 import { useTodaySummary } from "@/hooks/use-today-summary";
@@ -130,12 +131,36 @@ export function AdminSidebar() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align="start" className="w-56">
-              <DropdownMenuLabel>Definições</DropdownMenuLabel>
+              <DropdownMenuLabel className="py-2">Definições</DropdownMenuLabel>
+              
+              <DropdownMenuSeparator />
+              
+              {/* Empresa Section */}
               <DropdownMenuItem
                 onClick={handleNavigateToSettings}
                 data-testid="menu-item-settings-empresa"
+                className="cursor-pointer"
               >
-                Centro de Configurações da Empresa
+                <Building2 className="h-4 w-4 mr-2" />
+                <span>Configurações da Empresa</span>
+              </DropdownMenuItem>
+              
+              <DropdownMenuSeparator />
+              
+              {/* Utilizador Section */}
+              <DropdownMenuItem disabled data-testid="menu-item-my-settings">
+                <User className="h-4 w-4 mr-2" />
+                <span>As minhas definições</span>
+              </DropdownMenuItem>
+              
+              <DropdownMenuItem disabled data-testid="menu-item-notifications">
+                <Bell className="h-4 w-4 mr-2" />
+                <span>Notificações</span>
+              </DropdownMenuItem>
+              
+              <DropdownMenuItem disabled data-testid="menu-item-help">
+                <HelpCircle className="h-4 w-4 mr-2" />
+                <span>Ajuda &amp; feedback</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
