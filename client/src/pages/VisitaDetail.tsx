@@ -390,7 +390,7 @@ export default function VisitaDetail() {
 
   const createAppointmentMutation = useMutation({
     mutationFn: async () => {
-      if (!suggestedTaskToCreate || !appointmentDate || !visitaId) throw new Error('No appointment data');
+      if (!appointmentDate || !visitaId) throw new Error('No appointment data');
       
       // Update the current visit with the next appointment date
       const response = await apiRequest("PATCH", `/api/visitas/${visitaId}`, {
