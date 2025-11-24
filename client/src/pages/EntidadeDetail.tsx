@@ -354,7 +354,7 @@ export default function EntidadeDetail() {
             <div>
               <h1 className="text-xl font-semibold text-foreground">{entidade.nome}</h1>
               <Badge variant="outline" className="mt-1 no-default-hover-elevate no-default-active-elevate" data-testid="badge-tipo">
-                {tipoLabels[entidade.tipoEntidade]}
+                {tipoLabels[entidade.tipoEntidade] || "Tipo indefinido"}
               </Badge>
             </div>
           </div>

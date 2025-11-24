@@ -61,7 +61,7 @@ export default function EntidadeForm() {
     resolver: zodResolver(insertEntidadeSchema),
     defaultValues: entidade || {
       tipoEntidade: "Gabinete",
-      entidadeTipoId: undefined,
+      entidadeTipoId: null,
       nome: "",
       morada: "",
       codigoPostal: "",

@@ -364,8 +364,9 @@ export const insertEntidadeSchema = createInsertSchema(entidades).omit({
   lastEnrichedAt: true,
   enrichmentSource: true,
   pendingEnrichment: true,
-  entidadeTipoId: true, // Set by form, optional
 }).extend({
+  // PASSO 6: Make entidadeTipoId explicitly optional/nullable for old entities
+  entidadeTipoId: z.string().uuid().optional().nullable(),
   // Add validation for coordinates (empty string treated as null)
   latitude: z.string().regex(/^-?([0-9]{1,2}|1[0-7][0-9]|180)(\.[0-9]+)?$/).or(z.literal("")).optional().nullable(),
   longitude: z.string().regex(/^-?([0-9]{1,2}|1[0-7][0-9]|180)(\.[0-9]+)?$/).or(z.literal("")).optional().nullable(),

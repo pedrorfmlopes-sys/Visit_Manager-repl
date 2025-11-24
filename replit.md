@@ -1,7 +1,7 @@
 # Commercial Visits Management PWA
 
 ## Overview
-This Progressive Web Application (PWA) is designed to optimize commercial visit management for field sales professionals. It provides comprehensive tools for tracking entities, contacts, and visits, enhanced with AI-powered summaries, audio transcription, automated notifications, geolocation, calendar integration, PDF export, and advanced analytics. The application aims to significantly improve data quality and provide actionable insights for sales teams. It is built as a full-stack TypeScript solution, featuring a React frontend, an Express backend, and PostgreSQL with Drizzle ORM. Key architectural principles include a mobile-first approach, multi-tenancy with strict user data isolation, and robust Role-Based Access Control (RBAC).
+This Progressive Web Application (PWA) streamlines commercial visit management for field sales professionals. It tracks entities, contacts, and visits, offering AI-powered summaries, audio transcription, automated notifications, geolocation, calendar integration, PDF export, and analytics. The application aims to enhance data quality and provide actionable insights for sales teams. It is a full-stack TypeScript solution with a React frontend, Express backend, and PostgreSQL with Drizzle ORM, built with a mobile-first, multi-tenant architecture and robust security, including user data isolation and Role-Based Access Control (RBAC).
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -9,21 +9,47 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### Frontend Architecture
-A mobile-first React 18 application built with TypeScript, utilizing Wouter for routing and Vite for tooling. It incorporates Shadcn/ui (New York style) with Radix UI and Tailwind CSS, adhering to Material Design principles. State management is handled by TanStack React Query, and form validation uses React Hook Form with Zod. UI patterns emphasize card-based layouts, search-first interfaces, and Floating Action Buttons (FABs). Adaptive layouts are implemented based on user roles, supporting company-specific themes dynamically.
+A mobile-first React 18 application using TypeScript, Wouter for routing, and Vite. It utilizes Shadcn/ui (New York style) with Radix UI and Tailwind CSS, adhering to Material Design principles. State management is handled by TanStack React Query and React Hook Form with Zod for validation. UI patterns emphasize card-based layouts, search-first interfaces, and Floating Action Buttons (FABs). It features adaptive layouts based on user roles (mobile-first for agents with bottom nav, desktop sidebar for admins, and mobile drawer for admins on small screens). Company-specific themes are supported and applied dynamically.
 
 ### Backend Architecture
-An Express.js application developed in TypeScript. It uses session-based authentication via Replit Auth (OpenID Connect) and Passport.js, with sessions stored in PostgreSQL. The backend provides RESTful APIs for authentication, universal entities, contacts, visits (including file uploads and audio transcription), tasks, and analytics. Multer is used for file uploads. A robust RBAC system distinguishes between Admin (full data access) and Agent (owner/assigned data access) roles, enforcing ownership checks across all data operations.
+An Express.js application in TypeScript, employing session-based authentication with Replit Auth (OpenID Connect) and Passport.js, storing sessions in PostgreSQL. It provides RESTful APIs for authentication, universal entities, contacts, visits (including file uploads and audio transcription), tasks, and analytics. Multer handles file uploads. A robust RBAC system differentiates Admin (all data access) and Agent (owner/assigned data access) roles, enforcing ownership checks across all data operations.
 
 ### Database Architecture
-PostgreSQL with Drizzle ORM provides type-safe schema management. Core entities include Users, a universal `Entidades` system (e.g., Gabinete, Cliente, Distribuidor), Contactos, Visitas (with associated media, audio, AI summaries, geolocation, and brands), Tarefas (rich text), Lembretes, Marcas, and Sessions. Relationships are managed through foreign keys, including a `visitasMarcas` junction table for many-to-many relationships and a `visitasAudio` table for audio clips. The `empresas` table supports dynamic theming and GPS visibility control. A `visitaAnteriorId` field tracks historical visit relationships. Additionally, a new `entidade_tipos` table allows for company-configurable entity types.
+PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities include Users, a universal Entidades system (e.g., Gabinete, Cliente, Distribuidor), Contactos, Visitas (with media, audio, AI summaries, geolocation, and brands), Tarefas (rich text), Lembretes, Marcas (product brands), and Sessions. Relationships are managed via foreign keys. The `visitasMarcas` junction table manages many-to-many relationships. A `visitasAudio` table stores audio clips for visits. The `empresas` table includes `theme` for customization and `mostrarGPS` for GPS visibility control. The `visitaAnteriorId` field in the `visitas` table tracks visit relationships for historical context. Configurable `entidade_tipos` allows for dynamic entity categorization.
 
 ### System Design Choices
-The system supports a multi-tenant architecture with complete data isolation and granular Role-Based Access Control (RBAC). It features dynamic company theming, AI-powered audio transcription for visit notes, and a universal `Entidades` system for flexible business entity management. Rich text task descriptions are supported with XSS prevention. The application offers comprehensive offline capabilities with IndexedDB for data caching and automatic synchronization. Geolocation integration automatically captures GPS for visits, and calendar integration generates RFC 5545 `.ics` files. Backend-generated PDF reports include photos, AI summaries, and smart pagination. Advanced analytics dashboards are RBAC-aware. Other features include a universal contact recognition module (QR, vCard, AI business card scanning), Google Custom Search enrichment, an intelligent reminder system, and advanced "PRO" PDF exports with AI-driven executive summaries. The system includes advanced filtering, visit relationship tracking, full CRUD operations with RBAC, and a responsive admin layout. AI suggestions can be converted directly into tasks with pre-filled forms. Real-time alerts and badges provide visual notifications. A unified visit status management system handles scheduled appointments, including overdue detection. AI suggestions are persistent across sessions. An Admin Settings Center allows for company configuration, logo uploads, and UI settings. GPS-based proximity visit suggestions are provided to agents, with a configurable feature toggle for AI insights. User-specific settings are managed via a dedicated profile page. An onboarding dashboard, activity logs, and admin debug tools enhance usability and maintenance. Configurable entity types allow for flexible categorization and filtering of visits.
+- **Multi-tenant Architecture**: Supports multiple companies with complete data isolation.
+- **Role-Based Access Control (RBAC)**: Differentiates Admin and Agent roles with granular access control.
+- **Dynamic Theming**: Companies can select a theme.
+- **AI-powered Features**: Audio transcription, visit summaries, email generation, executive PDF summaries, AI-powered dashboard insights, and AI-suggested reminders.
+- **Universal Entidades System**: Flexible system supporting various business entity types, with configurable entity types.
+- **Rich Text Task Descriptions**: Utilizes TipTap editor with XSS prevention.
+- **Offline Capabilities**: Comprehensive support with IndexedDB for data caching and automatic synchronization.
+- **Geolocation Integration**: Automatic GPS capture for visits and proximity-based visit suggestions.
+- **Calendar Integration**: Generates RFC 5545 compliant `.ics` files.
+- **PDF Export**: Backend-generated PDF reports (standard and PRO with AI analysis) with photos, AI summaries, and smart pagination.
+- **Advanced Analytics**: RBAC-aware dashboard with KPIs and visualizations.
+- **Universal Contact Recognition Module**: Supports contact import via QR code, vCard, and AI-powered business card scanning.
+- **Google Custom Search Enrichment Module**: Uses Google Custom Search and GPT-4o-mini for company data enrichment.
+- **Intelligent Reminder System**: Proactive engine for visit follow-ups, overdue tasks, and AI-suggested reminders.
+- **Advanced Filtering**: Comprehensive filtering capabilities for visits and tasks, with configurable task filters.
+- **Visit Relationship Tracking**: System for creating related visits from scheduled appointments, with complete history tracking.
+- **Full CRUD Operations**: Complete Edit and Delete UI for all entities with role-based access control.
+- **Responsive Admin Layout**: Desktop sidebar adapts to a mobile drawer.
+- **AI-to-Task Conversion**: Direct conversion of AI-suggested tasks to real system tasks with one click.
+- **Real-time Alerts & Badges**: Visual notifications for pending/overdue tasks and today's visits.
+- **Unified Visit Status Management**: Consolidated dialog for managing scheduled visit statuses (follow-up, mark done, cancel).
+- **Persistent AI Suggestions**: Links created tasks/visits from AI suggestions, maintaining state after page reloads.
+- **Admin Settings Center**: Organized settings page for company configuration, logo upload, and UI settings.
+- **User Profile & Settings**: Dedicated page for user-specific preferences including UI, AI, and notifications.
+- **Onboarding Dashboard**: Non-intrusive tip card on first dashboard access.
+- **Activity Log**: Historical tracking for visits and tasks.
+- **Admin Debug Page**: Admin-only route for real-time application state monitoring.
 
 ## External Dependencies
 
 -   **Neon Database**: Serverless PostgreSQL hosting.
--   **OpenAI API**: Used for Whisper (audio transcription) and GPT-4o-mini (visit summaries, email generation, executive PDF summaries).
+-   **OpenAI API**: Used for Whisper (audio transcription), GPT-4o-mini (visit summaries, email generation, executive PDF summaries, dashboard insights).
 -   **Replit Authentication**: OAuth/OIDC provider for user authentication.
 -   **Multer**: Handles file uploads.
 -   **Radix UI**: UI primitives.

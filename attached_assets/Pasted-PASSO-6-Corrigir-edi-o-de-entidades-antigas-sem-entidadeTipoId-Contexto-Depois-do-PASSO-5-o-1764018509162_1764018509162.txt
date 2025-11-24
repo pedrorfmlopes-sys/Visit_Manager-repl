@@ -1,0 +1,216 @@
+PASSO 6 – Corrigir edição de entidades antigas (sem entidadeTipoId)
+
+Contexto:
+
+Depois do PASSO 5, o sistema de tipos configuráveis ficou estável para entidades novas.
+
+Mas, ao editar entidades antigas (criadas antes deste sistema, sem entidadeTipoId), estou a ter erros.
+
+O problema é que essas entidades:
+
+só têm o campo legado tipoEntidade,
+
+entidadeTipoId é null,
+
+e algum ponto do código (API ou React) está a assumir que entidadeTipoId/entidadeTipo existem sempre.
+
+⚠️ Neste PASSO 6:
+
+Não tocar em Visitas, Tarefas, Filtros, nem noutras tabs.
+
+Foco exclusivo:
+
+Edição de Entidade (GET/PUT/Detail/Form),
+
+Garantir que entidades sem entidadeTipoId funcionam sem erros.
+
+1. Backend – tornar entidadeTipoId realmente opcional em update
+
+Verifica no backend:
+
+no schema Zod/TypeScript da entidade (ex.: entidadeUpdateSchema),
+
+e no handler PATCH /api/entidades/:id ou equivalente,
+
+se entidadeTipoId está como:
+
+obrigatório (z.string()), ou
+
+opcional (z.string().optional().nullable()).
+
+O que eu quero:
+
+entidadeTipoId tem de ser opcional e nullable em:
+
+schema de validação,
+
+tipo do input,
+
+chamada ao Drizzle.
+
+Exemplo (pseudo):
+
+entidadeTipoId: z.string().uuid().optional().nullable()
+
+
+No storage.updateEntidade (ou função equivalente):
+
+Se o payload vier sem entidadeTipoId:
+
+não deve mandar undefined e rebentar,
+
+deve aceitar null ou simplesmente não atualizar esse campo.
+
+Teste backend rápido:
+
+Faz um PATCH a uma entidade antiga sem entidadeTipoId no corpo,
+
+Confirma que o update não rebenta com 500 e a entidade continua válida.
+
+2. Frontend – EntidadeDetail: não assumir que tipo existe
+
+Abre o componente EntidadeDetail.tsx (ou equivalente).
+
+Procura qualquer sítio onde faças algo do género:
+
+entidade.entidadeTipo.nome
+
+ou assumes que entidade.entidadeTipo existe sempre para mostrar um badge.
+
+Altera para ser defensivo, por exemplo:
+
+{entidade.entidadeTipo ? (
+  <Badge>{entidade.entidadeTipo.nome}</Badge>
+) : entidade.tipoEntidade ? (
+  <Badge variant="outline">
+    {entidade.tipoEntidade} {/* tipo legado */}
+  </Badge>
+) : null}
+
+
+Objetivo:
+
+Se tiver tipo configurável → mostra esse;
+
+Se não tiver, mas tiver tipo legado → mostra o tipo legado;
+
+Se não tiver nenhum → não mostra nada, mas não rebenta.
+
+3. Frontend – EntidadeForm (modo edição) a lidar com null
+
+No EntidadeForm.tsx, verifica:
+
+como são definidos os defaultValues/initialValues quando vais editar uma entidade existente.
+
+Em particular:
+
+Garante que entidadeTipoId é inicializado como:
+
+existing.entidadeTipoId ?? null (ou undefined),
+
+nunca como algo que cause warning de controlled/uncontrolled.
+
+Exemplo (pseudo):
+
+const form = useForm({
+  defaultValues: {
+    nome: entidade?.nome ?? "",
+    entidadeTipoId: entidade?.entidadeTipoId ?? null,
+    tipoEntidade: entidade?.tipoEntidade ?? "",
+    // ...
+  }
+});
+
+
+No <Select> de “Tipo de Entidade (Configurado)`:
+
+Garante que:
+
+aceita null/undefined como “Sem tipo”,
+
+não tenta forçar value que não existe nas opções.
+
+Teste importante:
+
+Editar uma entidade antiga que não tem entidadeTipoId:
+
+O form abre,
+
+select de tipo configurável aparece vazio (opcional),
+
+tipo legado pode aparecer num campo separado (se mantiveres),
+
+ao gravar, não rebenta e mantém-se sem tipo configurável (a não ser que eu escolha um).
+
+4. (Opcional) Migração suave usando tipo legado
+
+Se for simples, uma otimização gira seria:
+
+Quando estou a editar uma entidade antiga:
+
+Se entidadeTipoId é null, mas tipoEntidade tem um valor,
+
+E esse valor corresponde ao nome de um tipo configurável existente,
+
+O select pode vir pre-selecionado com esse tipo.
+
+Pseudo:
+
+const matchingTipo = entidadeTipos.find(
+  t => t.nome.toLowerCase() === entidade.tipoEntidade?.toLowerCase()
+);
+
+const defaultEntidadeTipoId = entidade.entidadeTipoId ?? matchingTipo?.id ?? null;
+
+
+Não é obrigatório para resolver o bug, mas melhora muito a UX na migração.
+
+5. Testes que quero que executes
+
+Cenário A – Entidade antiga sem entidadeTipoId
+
+Garante que tens pelo menos 1 entidade antiga (sem entidadeTipoId na BD, apenas com tipoEntidade).
+
+Abre /entidades/:id (detail):
+
+A página abre sem erros.
+
+Se implementares o fallback, vês o tipo legado num badge.
+
+Clica “Editar”:
+
+O formulário abre sem erros.
+
+O campo “Tipo de Entidade (Configurado)” está vazio ou com o tipo auto-mapeado (se fizeste a otimização).
+
+Ao gravar, o update não rebenta (nem 500, nem erros TS/React).
+
+Cenário B – Entidade nova com entidadeTipoId
+
+Cria uma entidade nova com um tipo configurável selecionado.
+
+Abre o detalhe:
+
+Vês o badge com o tipo configurável.
+
+Edita a entidade:
+
+O select mostra o tipo correto.
+
+Consegues alterar/limpar o tipo e gravar sem erros.
+
+6. Relatório do PASSO 6
+
+No relatório desta mini-fase, por favor indica:
+
+Onde ajustaste o backend (schema/rota de update) para tornar entidadeTipoId realmente opcional.
+
+Que alterações fizeste em EntidadeDetail.tsx (ou equivalente) para não assumir que o tipo existe sempre.
+
+Como ficaste a inicializar entidadeTipoId em EntidadeForm no modo edição.
+
+Resultados dos testes A e B (passou/falhou, com notas).
+
+Reforço:
+👉 PASSO 6 = resolver edição de entidades antigas sem quebrar nada.
+Nada de mexer em Visitas/Tarefas/Filtros/outros módulos nesta fase.
