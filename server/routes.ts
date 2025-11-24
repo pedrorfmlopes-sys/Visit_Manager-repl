@@ -3276,6 +3276,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // FASE 26: Nearby visit suggestions by GPS proximity
+  app.post('/api/visitas/proximidade', isAuthenticated, async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+
+      const { lat, lng } = req.body;
+      
+      if (typeof lat !== 'number' || typeof lng !== 'number') {
+        return res.status(400).json({ message: "Invalid coordinates" });
+      }
+
+      const sugestao = await storage.getNearbyVisitSuggestions(empresaId, lat, lng, 200);
+      
+      res.json({ sugestao });
+    } catch (error) {
+      console.error("Error getting nearby suggestions:", error);
+      res.status(500).json({ message: "Failed to get nearby suggestions" });
+    }
+  });
+
   // FASE 24: User settings endpoints
   app.get('/api/user/settings', isAuthenticated, async (req: any, res) => {
     try {

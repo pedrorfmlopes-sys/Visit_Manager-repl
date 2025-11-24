@@ -1,0 +1,254 @@
+FASE 26 – Localização & Sugestões de Visita por Proximidade
+
+Objetivo:
+
+Usar o GPS (quando a empresa tiver mostrarGPS = true e o agente der permissão) para:
+
+Detetar quando o utilizador está perto de uma entidade conhecida.
+
+Verificar se há visitas agendadas para essa entidade numa janela ±5 dias da data marcada.
+
+Se não houver, verificar se já passou muito tempo desde a última visita.
+
+Mostrar uma notificação/sugestão inteligente:
+
+“Queres abrir a visita agendada?”
+
+ou “Queres registar/agendar uma nova visita?”
+
+Dados de base – Entidades com localização
+
+Garantir que a tabela entidades tem forma de representar localização:
+
+Idealmente:
+
+latitude (number | null)
+
+longitude (number | null)
+
+Se ainda não existir, adicionar estes campos ao schema (Drizzle + migration).
+
+A partir do momento em que estes campos existam:
+
+O cálculo de “entidades próximas” deve basear-se em lat/lng.
+
+Se uma entidade não tiver coordenadas, ignora-se na lógica de proximidade.
+
+Nota: não é necessário implementar geocoding automático nesta fase – assume que as entidades podem já ter lat/lng (introduzidos manualmente ou por outra fase).
+
+Backend – Endpoint para “visitas relevantes por proximidade”
+
+Criar um endpoint específico que faz a lógica de negócio dada uma posição GPS.
+
+Sugerido:
+
+POST /api/visitas/proximidade
+
+Request body:
+
+{
+  "lat": 40.12345,
+  "lng": -8.54321
+}
+
+
+Comportamento:
+
+Determinar entidades próximas:
+
+Usar empresaId do contexto para filtrar apenas entidades da empresa.
+
+Calcular distância entre (lat,lng) atual e as coordenadas das entidades (latitude, longitude).
+
+Usar um raio configurável (p.ex. 200 metros). Podes hardcode nesta fase ou ler de uiSettings.localizacao.raioMetros, se existir.
+
+Obter a entidade mais próxima dentro do raio (ou um pequeno top N).
+
+Para cada entidade candidata (começando pela mais próxima):
+
+Obter visitas dessa entidade (limitando a período relevante).
+
+Definir:
+
+hoje = data atual (sem hora).
+
+Janela de agendamento: hoje - 5 dias até hoje + 5 dias.
+
+Caso A – visita agendada na janela ±5 dias:
+
+Encontrar visita com dataVisita ou campo de agendamento equivalente dentro desta janela.
+
+Se existir:
+
+Marcar tipoSugestao = "visita_agendada".
+
+Incluir no payload:
+
+visitaId
+
+dataVisita
+
+entidadeNome
+
+Caso B – sem visita agendada, mas última visita antiga:
+
+Obter última visita realizada dessa entidade (por data).
+
+Se a última visita tiver sido há mais de N dias (ex.: 60):
+
+Marcar tipoSugestao = "sem_visita_recente".
+
+Incluir:
+
+entidadeId
+
+entidadeNome
+
+diasDesdeUltimaVisita
+
+Resposta:
+
+{
+  "sugestao": null | {
+    "tipo": "visita_agendada" | "sem_visita_recente",
+    "entidadeId": "...",
+    "entidadeNome": "...",
+    "visitaId": "...",           // só no caso "visita_agendada"
+    "dataVisita": "2025-11-24",  // só no caso "visita_agendada"
+    "diasDesdeUltimaVisita": 90  // só no caso "sem_visita_recente"
+  }
+}
+
+
+Respeitar sempre:
+
+empresaId (multi-tenant).
+
+userId / role. Neste caso, basta filtrar por empresa, porque as visitas da entidade são de interesse para qualquer agent dessa empresa.
+
+Frontend – Agente: detetar localização e chamar endpoint
+
+Apenas para o layout de agent (mobile-first):
+
+Criar um pequeno hook, ex.: useNearbyVisitSuggestions, que:
+
+Só é ativo se:
+
+empresa.mostrarGPS === true,
+
+O utilizador aceitou partilhar localização (via navigator.geolocation).
+
+A cada X minutos (ex.: 5 min) faz:
+
+Pede posição atual (getCurrentPosition ou watchPosition simplificado).
+
+Chama POST /api/visitas/proximidade com lat/lng.
+
+Se a resposta vier com sugestao != null, atualiza um estado interno.
+
+Implementar um cooldown para não chatear o utilizador:
+
+Guardar em localStorage algo como lastSuggestionForEntidade[entidadeId] = timestamp.
+
+Se já foi feita uma sugestão para a mesma entidade nas últimas X horas (ex.: 4h), não mostrar nada.
+
+UI – Modal/Sheet de sugestão de visita
+
+Quando o hook tiver uma sugestao, deve mostrar uma UI claramente visível mas não intrusiva demais:
+
+Sugestão tipo A – “visita_agendada”:
+
+Texto:
+
+“Estás perto de [entidadeNome].
+Tens uma visita agendada para [dataVisita formatada].
+O que queres fazer?”
+
+Botões:
+
+Abrir visita agendada → navega para /visitas/:visitaId.
+
+Criar nova visita → abre VisitaForm pré-preenchido com entidade/contacto.
+
+Ignorar → fecha, regista em localStorage para não mostrar de novo tão cedo.
+
+Sugestão tipo B – “sem_visita_recente”:
+
+Texto:
+
+“Estás perto de [entidadeNome] e não registas visita há [X] dias.
+Queres registar ou agendar uma visita?”
+
+Botões:
+
+Criar visita agora → abre VisitaForm com dataVisita = hoje.
+
+Agendar visita → abre diálogo simples de data/hora para criar nova visita agendada.
+
+Ignorar → idem.
+
+UI sugerida:
+
+Sheet/Modal simples (pode usar componentes do shadcn de Dialog/Sheet).
+
+Só para agents; admins não precisam ver isto.
+
+Respeito pelas Settings (empresa + utilizador)
+
+empresa.mostrarGPS:
+
+Se estiver false, o hook useNearbyVisitSuggestions não faz nada (nem tenta pedir GPS).
+
+userSettings (FASE 24):
+
+Podes adicionar opcionalmente uma flag:
+
+userSettings.localizacao.enableNearbySuggestions (default true).
+
+Se o utilizador desligar isto nas suas definições, o hook não mostra sugestões, mesmo com GPS ativo.
+
+Testes esperados
+
+Cenário 1 – Visita agendada nos ±5 dias:
+
+Entidade com lat/lng próximo da posição simulada.
+
+Visita agendada para essa entidade para 2 dias antes ou depois da data atual.
+
+Com GPS ativo:
+
+O agent aproxima-se da morada.
+
+A app chama /api/visitas/proximidade.
+
+Sugestão tipo “visita_agendada” aparece.
+
+Ao clicar em “Abrir visita agendada” → navega para detalhe da visita correta.
+
+Cenário 2 – Sem visita recente:
+
+Entidade com lat/lng, última visita há > 60 dias, sem novas visitas agendadas.
+
+Ao aproximar-se, a app sugere criar/agendar visita.
+
+Cenário 3 – Cooldown:
+
+Após clicar em “Ignorar”, não voltar a mostrar a mesma sugestão para essa entidade durante algumas horas.
+
+Cenário 4 – GPS/Settings:
+
+Com mostrarGPS = false na empresa ou com o toggle do utilizador desligado:
+
+Nenhuma sugestão de proximidade é mostrada.
+
+Documentar no replit.md como:
+
+“FASE 26 – Localização & Sugestões de Visita por Proximidade”, com:
+
+Campos novos (latitude/longitude).
+
+Endpoint /api/visitas/proximidade.
+
+Lógica da janela ±5 dias.
+
+Comportamento de sugestão nos agentes.

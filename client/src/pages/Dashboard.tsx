@@ -10,8 +10,10 @@ import { pt } from "date-fns/locale";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useToast } from "@/hooks/use-toast";
+import { useNearbyVisitSuggestions } from "@/hooks/useNearbyVisitSuggestions";
 import { AlertRibbon } from "@/components/AlertRibbon";
 import { DashboardInsightsCard } from "@/components/DashboardInsightsCard";
+import { NearbySuggestionSheet } from "@/components/NearbySuggestionSheet";
 import type { VisitaWithRelations } from "@shared/schema";
 
 interface DashboardStats {
@@ -28,6 +30,7 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const isAdmin = useIsAdmin();
   const { toast } = useToast();
+  const { suggestion, dismissSuggestion } = useNearbyVisitSuggestions();
   
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard"],
@@ -74,6 +77,7 @@ export default function Dashboard() {
   };
 
   return (
+    <>
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-10 bg-card border-b border-card-border px-4 py-4">
         <div className="flex items-center justify-between max-w-2xl mx-auto">
@@ -293,5 +297,7 @@ export default function Dashboard() {
         ) : null}
       </main>
     </div>
+    <NearbySuggestionSheet suggestion={suggestion} onDismiss={dismissSuggestion} />
+    </>
   );
 }

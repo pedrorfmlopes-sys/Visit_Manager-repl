@@ -32,6 +32,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, gte, sql, or, and } from "drizzle-orm";
+import { haversineDistance } from "./distanceUtils";
 
 export interface IStorage {
   // Empresas (Multi-tenant)
@@ -1081,6 +1082,82 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return updated;
+  }
+
+  // FASE 26: Get nearby visit suggestions by GPS proximity
+  async getNearbyVisitSuggestions(empresaId: string, lat: number, lng: number, radiusMeters: number = 200): Promise<any> {
+    // Get all entidades for company with coordinates
+    const entidades_list = await db.query.entidades.findMany({
+      where: and(
+        eq(entidades.empresaId, empresaId),
+        and(
+          sql`${entidades.latitude} IS NOT NULL`,
+          sql`${entidades.longitude} IS NOT NULL`
+        )
+      ),
+      with: {
+        visitas: {
+          orderBy: desc(visitas.dataVisita),
+          limit: 10,
+        }
+      }
+    });
+
+    // Calculate distances and find nearest entidade within radius
+    const entidadesWithDistance = entidades_list
+      .map(e => {
+        const elat = parseFloat(e.latitude as any);
+        const elng = parseFloat(e.longitude as any);
+        const distance = haversineDistance(lat, lng, elat, elng);
+        return { ...e, distance };
+      })
+      .filter(e => e.distance <= radiusMeters)
+      .sort((a, b) => a.distance - b.distance);
+
+    if (entidadesWithDistance.length === 0) {
+      return null;
+    }
+
+    const nearestEntidade = entidadesWithDistance[0];
+    const today = new Date();
+    const fiveJointDateAgo = new Date(today);
+    fiveJointDateAgo.setDate(fiveJointDateAgo.getDate() - 5);
+    const fiveDaysFromNow = new Date(today);
+    fiveDaysFromNow.setDate(fiveDaysFromNow.getDate() + 5);
+
+    // Check for scheduled visits within ±5 days
+    const agendadaVisita = nearestEntidade.visitas.find((v: any) => {
+      const vDate = new Date(v.dataVisita);
+      return vDate >= fiveJointDateAgo && vDate <= fiveDaysFromNow;
+    });
+
+    if (agendadaVisita) {
+      return {
+        tipo: 'visita_agendada',
+        entidadeId: nearestEntidade.id,
+        entidadeNome: nearestEntidade.nome,
+        visitaId: agendadaVisita.id,
+        dataVisita: agendadaVisita.dataVisita.toISOString().split('T')[0],
+        distanciaMetros: Math.round(nearestEntidade.distance),
+      };
+    }
+
+    // Check for old visits (no recent visit in 60+ days)
+    const lastVisita = nearestEntidade.visitas[0];
+    if (lastVisita) {
+      const daysSinceLastVisit = Math.floor((today.getTime() - new Date(lastVisita.dataVisita).getTime()) / (1000 * 60 * 60 * 24));
+      if (daysSinceLastVisit > 60) {
+        return {
+          tipo: 'sem_visita_recente',
+          entidadeId: nearestEntidade.id,
+          entidadeNome: nearestEntidade.nome,
+          diasDesdeUltimaVisita: daysSinceLastVisit,
+          distanciaMetros: Math.round(nearestEntidade.distance),
+        };
+      }
+    }
+
+    return null;
   }
 
   // Legacy Marcas (deprecated - for migration purposes)
