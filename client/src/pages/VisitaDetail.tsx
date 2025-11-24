@@ -365,11 +365,13 @@ export default function VisitaDetail() {
       return response;
     },
     onSuccess: (response: any) => {
+      console.log("🎯 Appointment mutation success! Response:", response);
       if (visitaId) setCreatedAppointmentId(visitaId);
       queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
       if (visitaId) {
         queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
         // Force refetch to get updated proximaVisita
+        console.log("🔄 Refetching visit with ID:", visitaId);
         queryClient.refetchQueries({ queryKey: ["/api/visitas", visitaId] });
       }
       
