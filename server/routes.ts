@@ -1577,6 +1577,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // FASE 15: Update visita (e.g., proximaVisita for appointments)
+  // FASE 20: Support proximaVisitaStatus and proximaVisitaStatusData
   app.patch('/api/visitas/:id', isAuthenticated, async (req: any, res) => {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
@@ -1588,11 +1589,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.body.proximaVisita !== undefined) {
         updates.proximaVisita = req.body.proximaVisita ? new Date(req.body.proximaVisita) : null;
       }
+      if (req.body.proximaVisitaStatus !== undefined) {
+        updates.proximaVisitaStatus = req.body.proximaVisitaStatus;
+      }
+      if (req.body.proximaVisitaStatusData !== undefined) {
+        updates.proximaVisitaStatusData = req.body.proximaVisitaStatusData ? new Date(req.body.proximaVisitaStatusData) : null;
+      }
       if (req.body.entidadeId !== undefined) {
         updates.entidadeId = req.body.entidadeId;
       }
       if (req.body.contactoId !== undefined) {
         updates.contactoId = req.body.contactoId || null;
+      }
+      if (req.body.visitaAnteriorId !== undefined) {
+        updates.visitaAnteriorId = req.body.visitaAnteriorId || null;
       }
       if (req.body.dataVisita !== undefined) {
         updates.dataVisita = new Date(req.body.dataVisita);
