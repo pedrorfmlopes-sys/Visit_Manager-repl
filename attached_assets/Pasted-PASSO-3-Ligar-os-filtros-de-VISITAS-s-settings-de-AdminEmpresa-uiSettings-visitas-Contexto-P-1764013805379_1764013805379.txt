@@ -1,0 +1,190 @@
+PASSO 3 – Ligar os filtros de VISITAS às settings de AdminEmpresa (uiSettings.visitas)
+
+Contexto:
+
+PASSO 1: Backend /api/visitas já filtra corretamente por entidadeId e contactoId (testes A/B/C OK).
+
+PASSO 2: Frontend de Visitas (agent + admin) já tem filtros de Entidade/Contacto a funcionar e a enviar os query params certos.
+
+No Centro de Configurações → aba “Filtros” → tab “Visitas” eu já vejo os switches (data rápida, utilizador, marca, entidade, contacto, áudio…), mas:
+
+Estejam marcados ou desmarcados, na página de Visitas aparecem sempre todos os filtros.
+
+O que quero agora neste PASSO 3:
+
+Só VISITAS.
+
+NÃO tocar ainda em:
+
+Entidades / Contactos / Tarefas (tabs de filtros).
+
+EntidadeForm, AdminEntidadeTipos, etc.
+
+Objetivo: a VisitasFilterBar (agent + admin) só mostrar filtros que estejam ativados em uiSettings.visitas.
+
+1. Confirmar como acedes às uiSettings no frontend
+
+Já deves ter um sítio onde tens o user/empresa no frontend (ex.: useAuth()).
+
+Confirma qual a forma mais simples de obter uiSettings.visitas dentro de:
+
+Visitas.tsx (agent),
+
+AdminVisitas.tsx (admin),
+
+e/ou diretamente em VisitasFilterBar.
+
+Algo como (pseudo):
+
+const { user } = useAuth();
+const uiSettings = user?.empresa?.uiSettings;
+const visitasSettings = uiSettings?.visitas;
+
+
+Se já tens este objeto disponível noutro lado (e.g. via props), usa o que já tens – o importante é não fazer chamadas duplicadas ao backend se não for preciso.
+
+2. Passar as flags de uiSettings.visitas para a VisitasFilterBar
+
+Em Visitas.tsx (agent):
+
+Depois de obteres visitasSettings, passa um objeto com as flags para a FilterBar, por exemplo:
+
+<VisitasFilterBar
+  filters={filters}
+  onChange={setFilters}
+  settings={visitasSettings}
+/>
+
+
+O nome da prop pode ser settings, visitasSettings ou outro, mas deixa claro que são as settings de VISITAS.
+
+Em AdminVisitas.tsx:
+
+Faz o mesmo:
+
+obtém uiSettings.visitas e passa-as para a mesma VisitasFilterBar ou para a barra de filtros que estiveres a usar.
+
+3. Condicionar a renderização dos filtros dentro de VisitasFilterBar
+
+Abre VisitasFilterBar.tsx.
+
+Atualiza o tipo de props para incluir as settings, ex.:
+
+type VisitasFilterBarProps = {
+  filters: ...;
+  onChange: (...args) => void;
+  settings?: {
+    enableFilterDateQuick?: boolean;
+    enableFilterUser?: boolean;
+    enableFilterMarca?: boolean;
+    enableFilterEntidade?: boolean;
+    enableFilterContacto?: boolean;
+    enableFilterHasAudio?: boolean;
+  };
+};
+
+
+Dentro do componente, define defaults seguros para o caso de as settings virem undefined (para não rebentar se ainda não houver nada configurado):
+
+const s = settings ?? {};
+const showDateQuick   = s.enableFilterDateQuick   ?? true;
+const showUser        = s.enableFilterUser        ?? true;
+const showMarca       = s.enableFilterMarca       ?? true;
+const showEntidade    = s.enableFilterEntidade    ?? true;
+const showContacto    = s.enableFilterContacto    ?? true;
+const showHasAudio    = s.enableFilterHasAudio    ?? true;
+
+
+Agora, para cada bloco de filtro, condiciona a renderização:
+
+Exemplo:
+
+{showDateQuick && (
+  // botões Hoje / Semana / 30 dias
+)}
+
+{showUser && (
+  // select de utilizador (na versão admin)
+)}
+
+{showMarca && (
+  // select de marca
+)}
+
+{showEntidade && (
+  // select de entidade
+)}
+
+{showContacto && (
+  // select de contacto
+)}
+
+{showHasAudio && (
+  // checkbox "Com áudio por transcrever"
+)}
+
+
+Muito importante:
+
+Não remover a lógica de atualização de filtros (onChange) que já existe.
+
+Só envolver os blocos de UI em if (showX).
+
+4. Ignorar por agora userSettings (filtros avançados)
+
+Neste PASSO 3, não precisamos ainda de ligar userSettings (tipo “Mostrar filtros avançados”).
+
+Podes deixar a lógica só dependente de uiSettings.visitas.*.
+
+Mais tarde, num passo separado, podemos adicionar a camada de userSettings por cima (empresa manda; utilizador pode esconder ainda mais).
+
+5. Testes que quero que faças
+
+Vai a /admin/empresa → aba “Filtros” → tab “Visitas”.
+
+Desmarca, por exemplo:
+
+“Filtro por Entidade”
+
+“Filtro por Contacto”
+
+Guarda as configurações da empresa.
+
+Abre a página de Visitas como agent:
+
+Esperado:
+
+Faltam os filtros de Entidade/Contacto na barra de filtros.
+
+Abre a página de AdminVisitas:
+
+Esperado:
+
+Também faltam os filtros Entidade/Contacto.
+
+Volta a /admin/empresa → “Filtros” → “Visitas”:
+
+Volta a marcar Entidade/Contacto.
+
+Guarda.
+
+Recarrega Visitas (agent) e AdminVisitas:
+
+Esperado:
+
+Filtros de Entidade/Contacto voltam a aparecer e a funcionar normalmente.
+
+6. Relatório deste PASSO 3
+
+No relatório desta mini-fase, por favor inclui:
+
+Onde vais buscar uiSettings.visitas (useAuth, props, etc.).
+
+Como estás a passar estas settings para a VisitasFilterBar.
+
+Como condicionaste os blocos de UI (showEntidade, showContacto, etc.).
+
+Resultado dos testes 1–7 descritos acima (passou/falhou).
+
+Reforço:
+👉 Neste PASSO 3 não tocar em Entidades/Contactos/Tarefas (outras tabs de filtros), nem em EntidadeForm, nem em AdminEntidadeTipos – queremos apenas que a página de Visitas respeite as settings de filtros de Visitas.

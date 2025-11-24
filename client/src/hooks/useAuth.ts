@@ -8,6 +8,16 @@ export interface AuthUser extends User {
     logoUrl?: string;
     mostrarMarcasEmVisitas: boolean;
     theme?: "light-business" | "dark-pro";
+    uiSettings?: {
+      visitas?: {
+        enableFilterDateQuick?: boolean;
+        enableFilterUser?: boolean;
+        enableFilterMarca?: boolean;
+        enableFilterEntidade?: boolean;
+        enableFilterContacto?: boolean;
+        enableFilterHasAudio?: boolean;
+      };
+    };
   } | null;
 }
 

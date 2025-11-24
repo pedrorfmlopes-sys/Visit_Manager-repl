@@ -89,6 +89,7 @@ export default function AdminVisitas() {
             marcas={empresa?.mostrarMarcasEmVisitas ? marcas : []}
             entidades={entidades}
             contactos={contactos}
+            visitasSettings={empresa?.uiSettings?.visitas}
           />
         </div>
       </header>

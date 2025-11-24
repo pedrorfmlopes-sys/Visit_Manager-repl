@@ -311,6 +311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           logoUrl: empresa.logoUrl,
           mostrarMarcasEmVisitas: empresa.mostrarMarcasEmVisitas,
           theme: empresa.theme,
+          uiSettings: empresa.uiSettings,
         } : null,
       });
     } catch (error) {

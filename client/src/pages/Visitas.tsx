@@ -7,10 +7,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
 import { VisitasFilterBar, type VisitasFilters } from "@/components/VisitasFilterBar";
 import type { VisitaWithRelations } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Visitas() {
   const [, setLocation] = useLocation();
   const [filters, setFilters] = useState<VisitasFilters>({});
+  const { empresa } = useAuth();
 
   // Fetch available entidades and contactos for filter dropdowns
   const { data: entidades = [] } = useQuery({
@@ -61,6 +63,7 @@ export default function Visitas() {
             onFilterChange={setFilters}
             entidades={entidades}
             contactos={contactos}
+            visitasSettings={empresa?.uiSettings?.visitas}
           />
         </div>
       </header>
