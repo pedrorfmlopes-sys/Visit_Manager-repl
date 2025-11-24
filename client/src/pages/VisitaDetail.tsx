@@ -1258,7 +1258,7 @@ export default function VisitaDetail() {
                         data-testid="button-goto-linked-visita"
                       >
                         <ArrowRight className="h-4 w-4 mr-2" />
-                        Ver visita {visita.visitaAnteriorId.slice(0, 8)}...
+                        Ver Visita
                       </Button>
                     </div>
                   )}
