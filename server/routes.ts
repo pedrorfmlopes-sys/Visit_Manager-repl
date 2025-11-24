@@ -1448,6 +1448,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         linkVisita: randomUUID().substring(0, 8),
         transcricaoAudio: null as string | null,
         resumoIa: null as string | null,
+        // FASE 15: Add visitaAnteriorId for follow-up visits
+        visitaAnteriorId: req.body.visitaAnteriorId || null,
       };
 
       // Handle audio file
