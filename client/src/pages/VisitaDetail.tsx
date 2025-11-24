@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import DOMPurify from 'dompurify';
-import { ArrowLeft, ArrowRight, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles, Bell, Volume2, Trash2, Loader2, Mic, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles, Bell, Volume2, Trash2, Loader2, Mic, Plus, X } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { pt } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -105,6 +105,29 @@ export default function VisitaDetail() {
       toast({
         title: "Erro",
         description: "Falha ao eliminar visita",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // FASE 15: Delete scheduled appointment (clear proximaVisita)
+  const deleteScheduledAppointmentMutation = useMutation({
+    mutationFn: async () => {
+      if (!visitaId) throw new Error("Visita ID is required");
+      await apiRequest('PATCH', `/api/visitas/${visitaId}`, { proximaVisita: null });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
+      setLocalProximaVisita(null);
+      toast({
+        title: "Sucesso",
+        description: "Agendamento removido com sucesso",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Falha ao remover agendamento",
         variant: "destructive",
       });
     },
@@ -1125,11 +1148,21 @@ export default function VisitaDetail() {
         {/* FASE 15: Próxima Visita Agendada - After AI Analysis */}
         {(visita?.proximaVisita || localProximaVisita) && (
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-primary" />
                 Próxima Visita Agendada
               </CardTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => deleteScheduledAppointmentMutation.mutate()}
+                disabled={deleteScheduledAppointmentMutation.isPending}
+                data-testid="button-delete-scheduled-appointment"
+                className="h-8 w-8"
+              >
+                <X className="h-4 w-4 text-destructive" />
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
