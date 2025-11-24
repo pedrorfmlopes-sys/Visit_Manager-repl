@@ -3405,18 +3405,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // FASE 28: Admin Debug Endpoint
   app.get('/api/admin/debug', requireAdmin, async (req: any, res) => {
     try {
-      const { empresaId } = await getUserContext(req);
+      const { empresaId, userId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
 
       // Database connectivity check
       const dbOk = true; // Simple connectivity test
 
-      // Get stats for the company
-      const users = await storage.getUsersByEmpresa(empresaId);
-      const entidades = await storage.getEntidadesByEmpresa(empresaId);
-      const contactos = await storage.getContactosByEmpresa(empresaId);
-      const visitas = await storage.getVisitasByEmpresa(empresaId);
-      const tarefas = await storage.getTarefasByEmpresa(empresaId);
+      // Get stats for the company (admin role has access to all)
+      const users = await storage.getUtilizadoresByEmpresa(empresaId);
+      const entidades = await storage.getEntidades(empresaId, userId, 'admin');
+      const contactos = await storage.getContactos(empresaId, userId, 'admin');
+      const visitas = await storage.getVisitas(empresaId, userId, 'admin');
+      const tarefas = await storage.getTarefas(empresaId, userId, 'admin');
 
       // Calculate last 30 days visitas
       const thirtyDaysAgo = subDays(new Date(), 30);
