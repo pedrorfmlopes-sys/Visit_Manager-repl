@@ -404,10 +404,11 @@ export default function EntidadeDetail() {
               variant="ghost"
               size="icon"
               onClick={() => deleteEntidadeMutation.mutate()}
-              disabled={deleteEntidadeMutation.isPending}
+              disabled={true}
               data-testid="button-deletar"
+              title="Entidades só podem ser eliminadas pelo Admin nas configurações"
             >
-              <Trash2 className="h-5 w-5 text-destructive" />
+              <Trash2 className="h-5 w-5 text-muted-foreground opacity-50" />
             </Button>
           </div>
         </div>

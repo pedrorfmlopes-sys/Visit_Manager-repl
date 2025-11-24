@@ -233,10 +233,11 @@ export default function ContactoDetail() {
               variant="ghost"
               size="icon"
               onClick={() => deleteContactoMutation.mutate()}
-              disabled={deleteContactoMutation.isPending}
+              disabled={true}
               data-testid="button-deletar"
+              title="Contactos só podem ser eliminados pelo Admin nas configurações"
             >
-              <Trash2 className="h-5 w-5 text-destructive" />
+              <Trash2 className="h-5 w-5 text-muted-foreground opacity-50" />
             </Button>
           </div>
         </div>
