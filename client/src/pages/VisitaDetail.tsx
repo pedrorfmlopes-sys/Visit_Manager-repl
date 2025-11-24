@@ -1296,13 +1296,13 @@ export default function VisitaDetail() {
               />
             </div>
             <div className="text-sm text-muted-foreground">
-              {suggestedAppointmentToCreate && (
+              {suggestedTaskToCreate && (
                 <>
                   <p className="mb-2">
-                    Data sugerida: {format(addDays(new Date(), suggestedAppointmentToCreate.dias_para_agendar), "PPP", { locale: pt })}
+                    Data sugerida: {format(addDays(new Date(), suggestedTaskToCreate.prazo_sugerido_dias), "PPP", { locale: pt })}
                   </p>
                   <p>
-                    Descrição: {suggestedAppointmentToCreate.descricao}
+                    Descrição: {suggestedTaskToCreate.descricao}
                   </p>
                 </>
               )}
@@ -1313,7 +1313,7 @@ export default function VisitaDetail() {
                 variant="outline"
                 onClick={() => {
                   setAppointmentDialogOpen(false);
-                  setSuggestedAppointmentToCreate(null);
+                  setSuggestedTaskToCreate(null);
                   setAppointmentTitle("");
                 }}
                 data-testid="button-cancel-appointment"
