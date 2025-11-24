@@ -1251,7 +1251,7 @@ export default function VisitaDetail() {
                     <div>
                       <p className="text-sm text-muted-foreground mb-2">Ligada à visita anterior:</p>
                       <Button
-                        variant="outline"
+                        variant="default"
                         size="sm"
                         onClick={() => setLocation(`/visitas/${visita.visitaAnteriorId}`)}
                         className="w-full"
