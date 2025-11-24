@@ -69,3 +69,21 @@ PostgreSQL with Drizzle ORM is used for type-safe schema management. Core entiti
 - **Resultado**: Criação de tipos com ícone 100% funcional, 6 testes passados
 - **Status**: ✅ Migração executada, app restarted, sistema operacional
 
+### FASE 33: Sistema de Secções com Query Parameters (✅ Completo)
+- **Objetivo**: Refactor AdminEmpresa.tsx com navegação hierárquica de 5 secções principais
+- **Arquitetura**: Query params navigation (?section=empresa|visitas|ia|alertas|integracoes)
+- **Secções Implementadas**:
+  1. **Empresa & Equipa**: Geral (info + tema/logo), Marcas & Entidades (AdminMarcas + AdminEntidadeTipos), Utilizadores (AdminUsers)
+  2. **Visitas & Tarefas**: Comportamento (marcas, follow-ups), Filtros & Listas (13 filtros por módulo)
+  3. **IA & Produtividade**: IA Visitas (insights, resumos, sugestões), Áudio & Transcrição (gravação, transcrição, idioma)
+  4. **Alertas & Relatórios**: Alertas & UX (ribbons, badges, intervalo), Localização (GPS, privacidade)
+  5. **Integrações**: Microsoft 365, Google, Outros (placeholders)
+- **Filtros Avançados Implementados** (13 totais):
+  - Entidades: Tipo de Entidade, Pesquisa
+  - Contactos: Entidade, Cargo, Pesquisa
+  - Visitas: Datas, Utilizador, Marca, Entidade, Contacto, Áudio
+  - Tarefas: Status, Overdue, Utilizador Atribuído, Entidade, Visita
+- **Mudanças AdminSidebar**: Menu dropdown consolidado com 5 items + ícones (Building2, Calendar, Lightbulb, Bell, Zap)
+- **Stats**: AdminSidebar 218 linhas, AdminEmpresa ~600 linhas, 0 LSP errors, 5 secções, 8+ tabs internos
+- **Status**: ✅ Completo, testes navegação OK, query params funcional, UI consolidada
+
