@@ -268,6 +268,21 @@ Criar relatório PRO de performance ao nível do dashboard, combinando KPIs do p
 
 ---
 
-**Status**: ✅ FASE 27 COMPLETA
+## 🐛 Bug Fixes
+
+### PDF Buffer Conversion
+- **Problema**: PDFs baixavam mas não abriam (arquivo inválido)
+- **Causa**: `doc.output('arraybuffer')` precisa conversão explícita com `Buffer.from()`
+- **Solução**: Linha 141 em `pdfPerformancePro.ts`
+  ```typescript
+  // ANTES: return this.doc.output('arraybuffer') as any as Buffer;
+  // DEPOIS: return Buffer.from(this.doc.output('arraybuffer'));
+  ```
+- **Status**: ✅ RESOLVIDO - PDFs abrem corretamente
+
+---
+
+**Status**: ✅ FASE 27 COMPLETA E VALIDADA
 **Data**: Novembro 24, 2025
-**Testes**: Pronto para validação
+**Testes**: ✅ Validação de utilizador confirmada
+**PDF Download**: ✅ Funcional 100%
