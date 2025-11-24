@@ -1153,16 +1153,17 @@ export default function VisitaDetail() {
                   variant="default"
                   size="sm"
                   onClick={() => {
-                    // Navigate to new visit form with pre-filled data
-                    setLocation("/visitas/nova", {
-                      visitaAnteriorId: visitaId,
-                      dataVisita: localProximaVisita || visita?.proximaVisita,
-                      entidadeId: visita?.entidadeId || visita?.gabineteId,
-                      contactoId: visita?.contactoId,
-                      entidadeName: visita?.gabinete?.nome || visita?.entidade?.nome,
-                      contactoName: visita?.contacto?.nome,
-                      visitaAnteriorData: visita?.dataVisita,
+                    // Navigate to new visit form with pre-filled data (via query params)
+                    const params = new URLSearchParams({
+                      visitaAnteriorId: visitaId || "",
+                      dataVisita: (localProximaVisita || visita?.proximaVisita)?.toString() || "",
+                      entidadeId: visita?.entidadeId || visita?.gabineteId || "",
+                      contactoId: visita?.contactoId || "",
+                      entidadeName: visita?.gabinete?.nome || visita?.entidade?.nome || "",
+                      contactoName: visita?.contacto?.nome || "",
+                      visitaAnteriorData: visita?.dataVisita?.toString() || "",
                     });
+                    setLocation(`/visitas/nova?${params.toString()}`);
                   }}
                   data-testid="button-mark-scheduled-visit-done"
                 >

@@ -45,8 +45,17 @@ export default function VisitaForm() {
   const queryClient = useQueryClient();
   const isOnline = useOnlineStatus();
   
-  // Get pre-fill data from location state (FASE 15: follow-up visits)
-  const state = (location as any)?.state || {};
+  // Get pre-fill data from query params (FASE 15: follow-up visits)
+  const queryParams = new URLSearchParams(location.split('?')[1] || '');
+  const prefillData = {
+    visitaAnteriorId: queryParams.get('visitaAnteriorId') || '',
+    dataVisita: queryParams.get('dataVisita') ? new Date(queryParams.get('dataVisita')!) : null,
+    entidadeId: queryParams.get('entidadeId') || '',
+    contactoId: queryParams.get('contactoId') || '',
+    entidadeName: queryParams.get('entidadeName') || '',
+    contactoName: queryParams.get('contactoName') || '',
+    visitaAnteriorData: queryParams.get('visitaAnteriorData') ? new Date(queryParams.get('visitaAnteriorData')!) : null,
+  };
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const { location: gpsLocation, error: gpsError, isLoading: gpsLoading, requestLocation } = useGeolocation(true);
@@ -119,9 +128,9 @@ export default function VisitaForm() {
   const form = useForm<VisitaFormData>({
     resolver: zodResolver(visitaFormSchema),
     defaultValues: {
-      entidadeId: state.entidadeId || "",
-      contactoId: state.contactoId || "",
-      dataVisita: state.dataVisita ? new Date(state.dataVisita) : new Date(),
+      entidadeId: prefillData.entidadeId || "",
+      contactoId: prefillData.contactoId || "",
+      dataVisita: prefillData.dataVisita || new Date(),
       notas: "",
       marcasEntregues: [],
       marcasIds: [],
@@ -445,7 +454,7 @@ export default function VisitaForm() {
         )}
         
         {/* FASE 15: Reference to previous visit */}
-        {state.visitaAnteriorId && (
+        {prefillData.visitaAnteriorId && (
           <Card className="mb-4 bg-primary/5 border-primary/20">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
@@ -456,15 +465,15 @@ export default function VisitaForm() {
             <CardContent className="space-y-2 text-sm">
               <div>
                 <span className="text-muted-foreground">Entidade:</span>
-                <p className="font-medium">{state.entidadeName || "—"}</p>
+                <p className="font-medium">{prefillData.entidadeName || "—"}</p>
               </div>
               <div>
                 <span className="text-muted-foreground">Contacto:</span>
-                <p className="font-medium">{state.contactoName || "—"}</p>
+                <p className="font-medium">{prefillData.contactoName || "—"}</p>
               </div>
               <div>
                 <span className="text-muted-foreground">Data anterior:</span>
-                <p className="font-medium">{state.visitaAnteriorData ? format(new Date(state.visitaAnteriorData), "PPP", { locale: pt }) : "—"}</p>
+                <p className="font-medium">{prefillData.visitaAnteriorData ? format(new Date(prefillData.visitaAnteriorData), "PPP", { locale: pt }) : "—"}</p>
               </div>
             </CardContent>
           </Card>
