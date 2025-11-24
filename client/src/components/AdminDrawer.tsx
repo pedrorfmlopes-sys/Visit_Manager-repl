@@ -23,6 +23,7 @@ const adminSidebarItems = [
   { path: "/admin/empresa", icon: Building2, label: "Empresa" },
   { path: "/admin/utilizadores", icon: Users, label: "Utilizadores" },
   { path: "/admin/marcas", icon: FileText, label: "Marcas" },
+  { path: "/admin/entidades", icon: Building2, label: "Entidades (Backoffice)" },
 ];
 
 interface AdminDrawerProps {
