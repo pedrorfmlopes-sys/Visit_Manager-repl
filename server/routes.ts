@@ -1613,6 +1613,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.body.marcasEntregues !== undefined) {
         updates.marcasEntregues = req.body.marcasEntregues || [];
       }
+      // FASE 21: Support tarefasSugeridasIA for AI suggestion linking
+      if (req.body.tarefasSugeridasIA !== undefined) {
+        updates.tarefasSugeridasIA = req.body.tarefasSugeridasIA;
+      }
       
       if (Object.keys(updates).length === 0) {
         return res.status(400).json({ message: "No valid fields to update" });

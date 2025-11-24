@@ -1,0 +1,137 @@
+Bug FASE 21 – Sugestões IA não estão a refletir o estado persistente
+
+Contexto:
+
+FASE 21 deveria tornar as sugestões IA “persistentes”:
+
+Quando eu crio uma tarefa ou um agendamento a partir de uma sugestão IA,
+
+O ID da tarefa/visita é guardado na BD,
+
+E ao reabrir a visita o card dessa sugestão deve mostrar “Ver tarefa” / “Ver agendamento” com os dados reais, em vez do botão “Criar…”.
+
+Neste momento, o comportamento ainda não está correto.
+
+1. Como reproduzir o problema
+
+Abrir uma visita que tenha resumo/sugestões IA.
+
+Na secção de sugestões:
+
+Clicar em “Criar tarefa” numa das sugestões.
+
+Confirmar o diálogo, tarefa é criada com sucesso.
+
+Ainda sem recarregar:
+
+O botão muda (ex.: “Tarefa criada”) – ok.
+
+Agora:
+
+Recarregar a página ou sair da visita e voltar a abri-la.
+
+Resultado atual:
+
+O card dessa sugestão volta a mostrar “Criar tarefa” / “Agendar visita” como se nada tivesse sido criado.
+
+Ou seja: parece que a ligação tarefa/visita criada não está a ser usada quando renderizamos os cards das sugestões após um reload.
+
+2. Comportamento esperado
+
+Para cada sugestão IA:
+
+Se NUNCA foi usada:
+
+Mostrar os botões:
+
+“Criar tarefa”
+
+“Agendar visita” (se aplicável ao tipo da sugestão).
+
+Se já foi criada uma tarefa a partir dessa sugestão:
+
+A sugestão deve vir da API com um campo tipo tarefaId (ou equivalente).
+
+O card deve mostrar:
+
+Badge: “Tarefa criada”.
+
+Estado real da tarefa (pending/done/overdue) e, se possível, o prazo.
+
+Em vez de “Criar tarefa”, mostrar:
+
+Botão “Ver tarefa” que navega para o detalhe dessa tarefa, ou
+
+Apenas texto/estado, mas em qualquer caso não voltar a mostrar “Criar tarefa”.
+
+Se já foi criado um agendamento/visita a partir dessa sugestão:
+
+A sugestão deve vir da API com um campo tipo visitaId / agendamentoId.
+
+O card deve mostrar:
+
+“Visita agendada para [data/hora]”.
+
+Badge de “Agendada” ou similar.
+
+Botão “Ver visita” (ou link).
+
+Novamente: não deve voltar a aparecer “Agendar visita” para essa sugestão.
+
+Este comportamento tem de ser persistente:
+
+Se eu recarregar a página,
+
+Se fechar a app e voltar amanhã,
+
+Aquele card de sugestão IA continua a refletir o estado real da tarefa/visita a que está ligado.
+
+3. O que provavelmente está a faltar
+
+Pelos sintomas, provavelmente está a acontecer uma destas coisas:
+
+O ID de tarefa/visita está a ser guardado na BD, mas:
+
+O endpoint que carrega o resumo/sugestões (GET /api/visitas/:id ou similar) não está a devolver esses IDs junto com as sugestões.
+
+Ou está a devolver, mas o componente que renderiza os cards não está a ler esses campos.
+
+O frontend ainda está a depender apenas do map em memória (tipo createdSuggestedMap) e não reconstrói esse estado a partir da resposta da API.
+
+4. Pedido de ajuste
+
+Verifica o modelo de dados que é devolvido no detalhe da visita quando há sugestões IA (o campo onde guardaste tarefasSugeridasIA / agendamentosSugeridosIA).
+
+Garante que, para cada sugestão, vêm campos do tipo:
+
+tarefaId (se a sugestão já foi usada para criar uma tarefa),
+
+visitaId / agendamentoId (se foi usada para criar uma visita/agendamento).
+
+No componente de UI das sugestões:
+
+Em vez de depender de um estado local temporário,
+
+Renderizar o card com base diretamente nesses campos vindos da API:
+
+Se tiver tarefaId → mostrar “Ver tarefa” + estado da tarefa.
+
+Se tiver visitaId → mostrar “Ver visita” + data.
+
+Se não tiver nenhum → mostrar “Criar tarefa” / “Agendar visita”.
+
+Podes rever a implementação da FASE 21 para garantir que:
+
+A relação sugestão ↔ tarefa/visita é persistida corretamente na BD.
+
+Os cards são renderizados com base nos dados vindos do backend, e não apenas no estado local momentâneo.
+
+Depois de corrigir, o teste chave é:
+
+Criar uma tarefa a partir de uma sugestão.
+
+Confirmar que o card muda.
+
+Recarregar a página / voltar à visita.
+
+Ver que o card continua a mostrar “Ver tarefa” (ou equivalente), sem voltar a mostrar “Criar tarefa”.
