@@ -1557,6 +1557,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // FASE 15: Update visita (e.g., proximaVisita for appointments)
+  app.patch('/api/visitas/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const updates: any = {};
+      if (req.body.proximaVisita !== undefined) {
+        updates.proximaVisita = req.body.proximaVisita ? new Date(req.body.proximaVisita) : null;
+      }
+      
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ message: "No valid fields to update" });
+      }
+      
+      const updated = await storage.updateVisita(req.params.id, updates, empresaId, userId, userRole);
+      if (!updated) {
+        return res.status(404).json({ message: "Visita not found" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating visita:", error);
+      res.status(500).json({ message: "Failed to update visita" });
+    }
+  });
+
   app.delete('/api/visitas/:id', isAuthenticated, async (req: any, res) => {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
