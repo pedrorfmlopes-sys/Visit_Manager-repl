@@ -1487,11 +1487,11 @@ export default function VisitaDetail() {
                 Cancelar
               </Button>
               <Button
-                onClick={() => createAppointmentMutation.mutate()}
-                disabled={createAppointmentMutation.isPending || !appointmentTitle.trim() || !appointmentDate}
+                onClick={() => scheduleAppointmentMutation.mutate()}
+                disabled={scheduleAppointmentMutation.isPending || !appointmentTitle.trim() || !appointmentDate}
                 data-testid="button-confirm-appointment"
               >
-                {createAppointmentMutation.isPending ? "A agendar..." : "Agendar"}
+                {scheduleAppointmentMutation.isPending ? "A agendar..." : "Agendar"}
               </Button>
             </div>
           </div>
