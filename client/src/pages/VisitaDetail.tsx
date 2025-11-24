@@ -1149,28 +1149,41 @@ export default function VisitaDetail() {
                   <Calendar className="h-4 w-4 mr-2" />
                   Adicionar ao Calendário
                 </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => {
-                    // Navigate to new visit form with pre-filled data (via query params)
-                    const params = new URLSearchParams({
-                      visitaAnteriorId: visitaId || "",
-                      dataVisita: (localProximaVisita || visita?.proximaVisita)?.toString() || "",
-                      entidadeId: visita?.entidadeId || visita?.gabineteId || "",
-                      contactoId: visita?.contactoId || "",
-                      entidadeName: visita?.gabinete?.nome || visita?.entidade?.nome || "",
-                      contactoName: visita?.contacto?.nome || "",
-                      visitaAnteriorData: visita?.dataVisita?.toString() || "",
-                      resumoVisitaAnterior: visita?.resumoIa || "",
-                    });
-                    setLocation(`/visitas/nova?${params.toString()}`);
-                  }}
-                  data-testid="button-mark-scheduled-visit-done"
-                >
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Marcar como Realizado
-                </Button>
+                {/* FASE 15: Show navigation button if follow-up visit exists, otherwise show "Mark as Done" */}
+                {visita?.visitasPosteriores && visita.visitasPosteriores.length > 0 ? (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => setLocation(`/visitas/${visita.visitasPosteriores[0].id}`)}
+                    data-testid="button-goto-visita-posterior-main"
+                  >
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                    Ir para a Visita Realizada
+                  </Button>
+                ) : (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => {
+                      // Navigate to new visit form with pre-filled data (via query params)
+                      const params = new URLSearchParams({
+                        visitaAnteriorId: visitaId || "",
+                        dataVisita: (localProximaVisita || visita?.proximaVisita)?.toString() || "",
+                        entidadeId: visita?.entidadeId || visita?.gabineteId || "",
+                        contactoId: visita?.contactoId || "",
+                        entidadeName: visita?.gabinete?.nome || visita?.entidade?.nome || "",
+                        contactoName: visita?.contacto?.nome || "",
+                        visitaAnteriorData: visita?.dataVisita?.toString() || "",
+                        resumoVisitaAnterior: visita?.resumoIa || "",
+                      });
+                      setLocation(`/visitas/nova?${params.toString()}`);
+                    }}
+                    data-testid="button-mark-scheduled-visit-done"
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Marcar como Realizado
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
