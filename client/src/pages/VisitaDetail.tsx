@@ -1168,7 +1168,7 @@ export default function VisitaDetail() {
             <CardContent className="space-y-4">
               <div>
                 <p className="text-sm font-medium">
-                  {format(new Date(localProximaVisita || visita?.proximaVisita), "PPP 'às' HH:mm", { locale: pt })}
+                  {(localProximaVisita || visita?.proximaVisita) && format(new Date(localProximaVisita || visita?.proximaVisita!), "PPP 'às' HH:mm", { locale: pt })}
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
                   Agendada a partir de sugestão IA
@@ -1179,8 +1179,9 @@ export default function VisitaDetail() {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    if (visita?.gabinete && (visita?.proximaVisita || localProximaVisita)) {
-                      downloadNextVisitICS(visita.gabinete, visita.contacto || undefined, new Date(visita?.proximaVisita || localProximaVisita));
+                    const proximaData = localProximaVisita || visita?.proximaVisita;
+                    if (visita?.gabinete && proximaData) {
+                      downloadNextVisitICS(visita.gabinete, visita.contacto || undefined, new Date(proximaData));
                       toast({
                         title: "Exportado",
                         description: "Próxima visita exportada para calendário!",
@@ -1208,18 +1209,10 @@ export default function VisitaDetail() {
                     variant="default"
                     size="sm"
                     onClick={() => {
-                      // Navigate to new visit form with pre-filled data (via query params)
-                      const params = new URLSearchParams({
-                        visitaAnteriorId: visitaId || "",
-                        dataVisita: (localProximaVisita || visita?.proximaVisita)?.toString() || "",
-                        entidadeId: visita?.entidadeId || visita?.gabineteId || "",
-                        contactoId: visita?.contactoId || "",
-                        entidadeName: visita?.gabinete?.nome || visita?.entidade?.nome || "",
-                        contactoName: visita?.contacto?.nome || "",
-                        visitaAnteriorData: visita?.dataVisita?.toString() || "",
-                        resumoVisitaAnterior: visita?.resumoIa || "",
-                      });
-                      setLocation(`/visitas/nova?${params.toString()}`);
+                      // Open appointment date picker dialog
+                      setAppointmentDate(new Date(localProximaVisita || visita?.proximaVisita!));
+                      setAppointmentTitle(`Seguimento - ${visita?.gabinete?.nome || visita?.entidade?.nome || "Entidade"}`);
+                      setAppointmentDialogOpen(true);
                     }}
                     data-testid="button-mark-scheduled-visit-done"
                   >
