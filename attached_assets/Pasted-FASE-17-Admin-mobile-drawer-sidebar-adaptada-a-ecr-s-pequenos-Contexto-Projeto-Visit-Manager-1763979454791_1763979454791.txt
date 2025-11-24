@@ -1,0 +1,125 @@
+FASE 17 – Admin mobile drawer (sidebar adaptada a ecrãs pequenos)
+
+Contexto:
+
+Projeto: Visit Manager multi-empresa.
+
+Estado atual relevante:
+
+Já existe MainLayout que escolhe o layout com base em user.role.
+
+Para role === "admin" existe um layout desktop com AdminSidebar fixa à esquerda + AdminDashboard e restantes páginas.
+
+Este layout funciona muito bem em desktop, mas em mobile a sidebar fixa ocupa demasiado espaço.
+
+Objetivo desta fase:
+
+Tornar o layout de admin usável em mobile, trocando a sidebar fixa por um drawer que abre/fecha com um botão de menu (hambúrguer) no topo.
+
+Não alterar nada no layout do agente (agent continua com BottomNav + FAB).
+
+Tarefas técnicas:
+
+Detectar “modo mobile” para admin
+
+Ajustar o layout do admin (onde AdminSidebar é usado) para suportar duas variantes:
+
+Desktop / ecrã largo: mantém a sidebar fixa, como já está.
+
+Mobile / ecrã estreito: sidebar fica escondida e passa a ser um drawer lateral.
+
+A deteção pode ser:
+
+via CSS (classes responsivas Tailwind), e/ou
+
+um pequeno hook de useMediaQuery se já existir algo parecido no projeto.
+
+Criar um “AdminDrawer” reutilizando o conteúdo da AdminSidebar
+
+Reutilizar a mesma estrutura de links da AdminSidebar para construir um menu lateral deslizante (drawer) em mobile:
+
+O conteúdo deve ser o mesmo (Dashboard, Entidades, Contactos, Visitas, Tarefas, Lembretes, Relatórios, Empresa, Utilizadores, Marcas).
+
+O drawer deve:
+
+abrir a partir da esquerda,
+
+cobrir o ecrã com um backdrop semitransparente,
+
+fechar ao clicar fora ou ao clicar num item de navegação.
+
+Em desktop, o drawer não deve ser usado (sidebar normal continua).
+
+Top bar / botão hambúrguer
+
+No layout admin (zona superior do conteúdo), adicionar um top bar consistente com o tema atual:
+
+Lado esquerdo:
+
+Em mobile: botão hambúrguer que abre/fecha o drawer.
+
+Em desktop: pode mostrar só o logo/nome da app.
+
+Centro/direita:
+
+Nome da empresa.
+
+Nome do utilizador (e/ou avatar inicial).
+
+Botão de logout (ou menu que o inclua), se ainda não existir no top bar.
+
+Em mobile:
+
+O botão hambúrguer deve ficar sempre acessível (sticky top).
+
+Integração com temas (light-business / dark-pro)
+
+O top bar e o drawer devem:
+
+Usar as mesmas classes/helpers (ex.: vm-card, vm-muted, etc.) para respeitar o tema da empresa.
+
+Garantir boa legibilidade em ambos os temas.
+
+Comportamento com o conteúdo principal
+
+Em mobile:
+
+Quando o drawer está fechado, o conteúdo deve ocupar a largura total do ecrã.
+
+Quando o drawer abre, o conteúdo pode ficar por trás do overlay (evitar “espremer” o conteúdo).
+
+Em desktop:
+
+Nada muda em relação ao layout atual: sidebar fixa + zona de conteúdo.
+
+Testes esperados
+
+Login como admin em desktop:
+
+Sidebar fixa visível, comportamento atual mantido.
+
+Top bar visível com info de empresa/utilizador.
+
+Login como admin em mobile (ou janela muito estreita):
+
+Sidebar fixa já não aparece.
+
+Top bar mostra botão hambúrguer.
+
+Ao clicar no hambúrguer → abre drawer com o menu completo (mesmas entradas da AdminSidebar).
+
+Ao clicar num item → navega para a página correta e o drawer fecha.
+
+Login como agente:
+
+Layout do agente (BottomNav + FAB) não é afetado.
+
+Restrições:
+
+Não criar endpoints backend novos.
+
+Não alterar lógica de autenticação ou multi-empresa.
+
+Limitar as alterações à camada de layout/admin (MainLayout + AdminSidebar + novos componentes de drawer/top bar).
+
+Manter o comportamento atual em desktop inalterado, apenas melhorar a experiência em mobile.
