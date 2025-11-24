@@ -445,6 +445,58 @@ export default function VisitaDetail() {
     },
   });
 
+  // FASE 15: Mutation to mark scheduled appointment as completed and create follow-up visit
+  const markAsCompletedMutation = useMutation({
+    mutationFn: async () => {
+      if (!visitaId || !visita?.proximaVisita) throw new Error('No appointment data');
+      
+      // Prepare follow-up visit data
+      const formData = new FormData();
+      formData.append("entidadeId", visita?.entidadeId || visita?.gabineteId || "");
+      formData.append("contactoId", visita?.contactoId || "");
+      formData.append("dataVisita", new Date(visita.proximaVisita).toISOString());
+      formData.append("visitaAnteriorId", visitaId);
+      
+      // Add pre-filled notes with reference to previous visit
+      const previousSummary = visita?.resumoIa ? `<p>Referência à visita anterior: ${visita.resumoIa}</p><p></p><p></p>` : "<p></p><p></p><p></p>";
+      formData.append("notas", previousSummary);
+      
+      // Create the follow-up visit
+      const response = await apiRequest("POST", "/api/visitas", formData);
+      return response;
+    },
+    onSuccess: async (response: any) => {
+      console.log("✅ Follow-up visit created successfully:", response);
+      
+      // Invalidate caches
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/visitas"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] }),
+        visitaId && queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId, "posteriores"] }),
+      ]);
+      
+      // Wait a moment for cache updates
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      toast({
+        title: "Sucesso",
+        description: "Visita marcada como realizado. Nova visita criada!",
+      });
+      
+      // Navigate to the newly created visit
+      if (response?.id) {
+        setLocation(`/visitas/${response.id}`);
+      }
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Falha ao marcar como realizado",
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmitTask = (data: InsertTarefa) => {
     createTaskMutation.mutate(data);
   };
@@ -1208,16 +1260,12 @@ export default function VisitaDetail() {
                   <Button
                     variant="default"
                     size="sm"
-                    onClick={() => {
-                      // Open appointment date picker dialog
-                      setAppointmentDate(new Date(localProximaVisita || visita?.proximaVisita!));
-                      setAppointmentTitle(`Seguimento - ${visita?.gabinete?.nome || visita?.entidade?.nome || "Entidade"}`);
-                      setAppointmentDialogOpen(true);
-                    }}
+                    onClick={() => markAsCompletedMutation.mutate()}
+                    disabled={markAsCompletedMutation.isPending}
                     data-testid="button-mark-scheduled-visit-done"
                   >
                     <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Marcar como Realizado
+                    {markAsCompletedMutation.isPending ? "A criar..." : "Marcar como Realizado"}
                   </Button>
                 )}
               </div>
