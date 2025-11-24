@@ -1,0 +1,329 @@
+FASE 27 – Relatório PRO de Performance (Dashboard → PDF com IA)
+
+Contexto:
+
+App: Visit Manager multi-empresa, com:
+
+Relatórios PDF existentes (visitas / períodos) + PDF PRO por visita.
+
+Dashboard com:
+
+KPI cards (visitas, tarefas, atrasos, etc.).
+
+Cards CRM (Visitas desta semana, Tarefas em atraso, Clientes chave).
+
+Card “IA Insights” (FASE 23) com recomendações geradas pela IA.
+
+Card “Exportar Relatórios PDF” no fundo do dashboard (FASE 22).
+
+Objetivo agora:
+
+Criar um Relatório PRO de Performance ao nível do Dashboard (não de uma visita específica).
+
+Esse relatório deve:
+
+Combinar KPIs do período escolhido (semanal/mensal, agente/empresa),
+
+Gráficos/tabelas simples (se já houver base para isso),
+
+E um bloco de recomendações IA (reutilizando a lógica de IA Insights).
+
+Exportável em PDF a partir do dashboard (Agent e Admin).
+
+⚠️ Importante:
+
+Não quebrar os PDFs existentes (relatórios simples + PDF PRO de visita).
+
+Esta FASE é um relatório extra, mais “consultor”.
+
+1. Backend – Endpoint de Relatório PRO de Performance
+
+Criar um novo endpoint para gerar o PDF PRO do dashboard.
+
+Sugestão:
+
+GET /api/pdf/performance-pro
+
+Query params:
+
+scope=agent|empresa
+
+period=week|month
+
+Comportamento:
+
+Determinar o contexto:
+
+empresaId via getUserContext.
+
+userId e role.
+
+Interpretar scope:
+
+Se scope=agent:
+
+Usar dados só desse utilizador (visitas/tarefas criadas/atribuídas).
+
+Se scope=empresa:
+
+Apenas permitido para role = "admin":
+
+Usar dados agregados da empresa (todos os utilizadores).
+
+Se um agent tentar scope=empresa, devolver 403 ou normalizar para scope=agent.
+
+Interpretar period:
+
+week → últimos 7 dias (ou semana corrente, desde segunda-feira).
+
+month → últimos 30 dias ou mês corrente (define uma abordagem clara).
+
+Devolver no relatório quais as datas concretas (from/to).
+
+Agregar métricas chave:
+
+Nº de visitas realizadas no período.
+
+Nº de visitas agendadas para o período seguinte.
+
+Nº de tarefas:
+
+criadas,
+
+concluídas,
+
+em atraso.
+
+Top N clientes por nº de visitas.
+
+Top N marcas (se simples de obter).
+
+Obter texto de IA de performance:
+
+Reutilizar o mesmo tipo de prompt da FASE 23 (IA Insights), mas adaptado para PDF:
+
+Incluir no prompt as métricas agregadas (JSON).
+
+Pedir um texto com:
+
+Secção “O que está a correr bem”.
+
+Secção “Riscos e pontos críticos”.
+
+Lista de 3–7 recomendações práticas.
+
+Escrever em português de Portugal, tom profissional mas direto.
+
+Gerar o PDF:
+
+Estrutura mínima (podes usar a mesma lib já usada nos PDFs anteriores):
+
+Capa / título:
+
+“Relatório PRO de Performance”
+
+Nome da empresa
+
+Nome do utilizador (se scope=agent)
+
+Período analisado (datas from/to, + tipo: semana/mês)
+
+Secção 1: KPIs principais (valores com mini descrições).
+
+Secção 2: Tabelas simples (ex.: top clientes, tarefas em atraso).
+
+Secção 3: Texto IA de Insights/Recomendações.
+
+Opcional: Pequenos gráficos se já houver suporte (mas não obrigatório nesta fase).
+
+Resposta:
+
+Content-Type: application/pdf
+
+Download com nome tipo:
+
+performance-pro-agent-YYYYMMDD.pdf
+
+performance-pro-empresa-YYYYMMDD.pdf
+
+RBAC:
+
+Agent:
+
+Pode pedir apenas scope=agent.
+
+Admin:
+
+Pode pedir scope=agent (para si próprio) ou scope=empresa.
+
+2. Frontend – Botões “Relatório PRO” no Dashboard
+
+Adicionar novos botões ao card de exportação de relatórios já existente.
+
+AgentDashboard:
+
+No card de export PDF (onde já existem “Relatório semanal/mensal”):
+
+Adicionar botão:
+
+“Relatório PRO (Mês)” → chama /api/pdf/performance-pro?scope=agent&period=month.
+
+Opcionalmente outro para a semana:
+
+“Relatório PRO (Semana)” → scope=agent&period=week.
+
+AdminDashboard:
+
+No card de export PDF da empresa:
+
+Adicionar:
+
+“Relatório PRO (Mês – Empresa)” → scope=empresa&period=month.
+
+“Relatório PRO (Semana – Empresa)” → scope=empresa&period=week.
+
+Opcionalmente, podes também mostrar os PRO ao nível do próprio admin (scope=agent), mas o mínimo é os de empresa.
+
+Comportamento UI:
+
+Botão faz window.open ou trigger de download (como os PDFs atuais).
+
+Manter consistência visual (mesmo estilo dos botões de PDF já existentes).
+
+Se o backend devolver erro (ex.: falta de dados), mostrar toast amigável.
+
+3. Integração com IA e Settings
+
+Reutilizar a mesma infra de IA já usada para:
+
+Resumos de visita.
+
+IA Insights no dashboard.
+
+Respeitar settings de IA da empresa (uiSettings):
+
+Se a IA para “dashboard insights / performance” estiver desativada:
+
+O endpoint pode:
+
+Ou devolver relatório sem secção IA (só KPIs),
+
+Ou devolver 400/403 com mensagem adequada.
+
+O frontend, opcionalmente:
+
+Pode desativar ou esconder os botões PRO (fica ao teu critério, desde que documentado).
+
+4. Estrutura sugerida do Relatório PRO (conteúdo)
+
+Sugestão de layout de conteúdo (para o PDF):
+
+Cabeçalho / Capa
+
+Logo da empresa (se existir).
+
+Título: “Relatório PRO de Performance Comercial”.
+
+Subtítulo:
+
+“Agente: [Nome]” ou “Empresa: [Nome]”.
+
+Período: data início – data fim.
+
+Secção 1 – KPIs do Período
+
+Visitas realizadas: X
+
+Visitas agendadas (próximos 7/30 dias): Y
+
+Tarefas criadas / concluídas / em atraso.
+
+% de tarefas em atraso.
+
+Nº de clientes diferentes visitados.
+
+Secção 2 – Distribuições
+
+Lista (tabela simples) dos top clientes (nome + nº de visitas + última visita).
+
+Lista das principais tarefas em atraso (título + dias de atraso).
+
+Se disponível: top marcas trabalhadas.
+
+Secção 3 – Insights IA
+
+Título: “Análise IA do Desempenho”.
+
+Texto IA com:
+
+O que está a correr bem.
+
+Riscos / fragilidades.
+
+Recomendações práticas (bullets).
+
+Rodapé
+
+Data/hora de geração.
+
+Nome do utilizador ou empresa.
+
+Nota tipo:
+
+“Relatório gerado automaticamente com base nos dados registados no Visit Manager.”
+
+5. Testes esperados
+
+Cenário Agent:
+
+Entrar como agent no dashboard.
+
+No card de export PDF:
+
+Clicar em “Relatório PRO (Mês)”.
+
+Resultado:
+
+Download de PDF com dados apenas desse user.
+
+Secção de insights IA faz sentido para o seu padrão de visitas/tarefas.
+
+Cenário Admin (Empresa):
+
+Entrar como admin no AdminDashboard.
+
+No card de export:
+
+Clicar em “Relatório PRO (Mês – Empresa)”.
+
+PDF com:
+
+Visão agregada da empresa.
+
+Texto IA a falar em “equipa/empresa”, não em “tu”.
+
+Cenário IA desativada:
+
+Desativar IA para dashboard/performance nas settings da empresa.
+
+Confirmar:
+
+O comportamento definido (botão desativado ou relatório sem secção IA) é consistente.
+
+Nada rebenta.
+
+6. Documentação
+
+No final, por favor:
+
+Atualiza o replit.md com uma secção “FASE 27 – Relatório PRO de Performance”.
+
+Descreve:
+
+Endpoint /api/pdf/performance-pro (parâmetros, RBAC).
+
+Diferença entre scope=agent e scope=empresa.
+
+Onde estão os botões no dashboard (agent/admin).
+
+Estrutura do PDF (kpis + tabelas + IA).

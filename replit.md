@@ -45,7 +45,7 @@ PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities in
 -   **Admin Settings Center**: Organized 6-tab settings page with company configuration, logo upload, and UI settings JSON for future extensibility (FASE 22).
 -   **Logo Upload**: Direct upload of company logo with preview, type validation (PNG/JPG/SVG/WebP), and automatic database persistence.
 
-## Recent Features (FASE 20-26)
+## Recent Features (FASE 20-27)
 
 ### FASE 20: Unified Visit Status Management
 - Consolidated modal dialog for appointment status changes with 3 visual action paths (follow-up, mark done, cancel)
@@ -97,6 +97,18 @@ PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities in
 - **UI Component**: `NearbySuggestionSheet` (bottom sheet modal) shows entity name, distance, action buttons
 - **Integration**: Activated in Dashboard with automatic GPS monitoring
 - **User Controls**: Can dismiss suggestions with 4h cooldown or ignore completely
+
+### FASE 27: Performance PRO PDF Report (Dashboard → PDF com IA)
+- **Backend Endpoint**: `GET /api/pdf/performance-pro?scope={agent|empresa}&period={week|month}`
+- **Aggregation Engine**: Collects KPIs (visits, tasks, clients, brands) for specified period with RBAC
+- **Data Analytics**: Top 10 clients by visits, top overdue tasks, task completion %, brand distribution
+- **AI Integration**: Reutiliza `generateDashboardInsights` para análise contextual (agent vs admin tone)
+- **PDF Generator**: New `pdfPerformancePro.ts` with professional layout (cover + KPIs + tables + AI insights + footer)
+- **RBAC Enforcement**: Agents can only request scope=agent; admins can request both scopes
+- **Frontend Integration**: Added "Relatórios PRO (com IA)" buttons to Dashboard and AdminDashboard
+- **Dual Download Options**: "Relatórios Padrão" (existing) + "Relatórios PRO" (new with AI analysis)
+- **Filename**: `performance-pro-{agent|empresa}-YYYYMMDD.pdf`
+- **Design**: Professional PDF with blue headers, KPI cards, data tables, AI insights section
 
 ## External Dependencies
 

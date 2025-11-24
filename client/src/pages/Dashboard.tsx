@@ -40,6 +40,42 @@ export default function Dashboard() {
     window.location.href = "/api/logout";
   };
 
+  const handleDownloadPerformancePro = async (period: 'week' | 'month', scope: 'agent' | 'empresa') => {
+    try {
+      const response = await fetch(`/api/pdf/performance-pro?period=${period}&scope=${scope}`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate report');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const fileName = `Relatorio-PRO-${period === 'month' ? 'Mensal' : 'Semanal'}-${scope === 'empresa' ? 'Empresa' : 'Pessoal'}-${new Date().toISOString().split('T')[0]}.pdf`;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Relatório PRO Exportado",
+        description: "PDF descarregado com sucesso!",
+      });
+    } catch (error) {
+      console.error('Error downloading PRO report:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao gerar relatório PRO. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleDownloadReport = async (reportType: 'monthly' | 'weekly', scope: 'agent' | 'company') => {
     try {
       const response = await fetch(`/api/pdf/reports/${reportType}/${scope}`, {
@@ -243,50 +279,110 @@ export default function Dashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    variant="default"
-                    onClick={() => handleDownloadReport('monthly', 'agent')}
-                    data-testid="button-report-monthly-agent"
-                    className="w-full"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Mensal
-                  </Button>
-                  <Button
-                    variant="default"
-                    onClick={() => handleDownloadReport('weekly', 'agent')}
-                    data-testid="button-report-weekly-agent"
-                    className="w-full"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Semanal
-                  </Button>
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Relatórios Padrão</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      variant="default"
+                      onClick={() => handleDownloadReport('monthly', 'agent')}
+                      data-testid="button-report-monthly-agent"
+                      className="w-full"
+                      size="sm"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Mensal
+                    </Button>
+                    <Button
+                      variant="default"
+                      onClick={() => handleDownloadReport('weekly', 'agent')}
+                      data-testid="button-report-weekly-agent"
+                      className="w-full"
+                      size="sm"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Semanal
+                    </Button>
+                  </div>
+                </div>
+                <Separator />
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Relatórios PRO (com IA)</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => handleDownloadPerformancePro('month', 'agent')}
+                      data-testid="button-report-pro-monthly"
+                      className="w-full"
+                      size="sm"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      PRO Mensal
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleDownloadPerformancePro('week', 'agent')}
+                      data-testid="button-report-pro-weekly"
+                      className="w-full"
+                      size="sm"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      PRO Semanal
+                    </Button>
+                  </div>
                 </div>
                 {isAdmin && (
                   <>
                     <Separator />
-                    <div className="space-y-2">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase">Empresa (Admin)</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <Button
-                          variant="outline"
-                          onClick={() => handleDownloadReport('monthly', 'company')}
-                          data-testid="button-report-monthly-company"
-                          className="w-full"
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          Mensal
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => handleDownloadReport('weekly', 'company')}
-                          data-testid="button-report-weekly-company"
-                          className="w-full"
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          Semanal
-                        </Button>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Empresa (Admin) - Padrão</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <Button
+                            variant="outline"
+                            onClick={() => handleDownloadReport('monthly', 'company')}
+                            data-testid="button-report-monthly-company"
+                            className="w-full"
+                            size="sm"
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Mensal
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => handleDownloadReport('weekly', 'company')}
+                            data-testid="button-report-weekly-company"
+                            className="w-full"
+                            size="sm"
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Semanal
+                          </Button>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Empresa (Admin) - PRO</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <Button
+                            variant="outline"
+                            onClick={() => handleDownloadPerformancePro('month', 'empresa')}
+                            data-testid="button-report-pro-monthly-empresa"
+                            className="w-full"
+                            size="sm"
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            PRO Mensal
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => handleDownloadPerformancePro('week', 'empresa')}
+                            data-testid="button-report-pro-weekly-empresa"
+                            className="w-full"
+                            size="sm"
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            PRO Semanal
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </>

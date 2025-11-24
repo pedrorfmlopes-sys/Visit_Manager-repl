@@ -3276,6 +3276,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // FASE 27: Performance PRO PDF Report
+  app.get('/api/pdf/performance-pro', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+
+      const { scope = 'agent', period = 'month' } = req.query;
+
+      // RBAC: agents can only request scope=agent
+      if (userRole === 'agent' && scope === 'empresa') {
+        return res.status(403).json({ message: "Agentes podem apenas gerar relatórios pessoais" });
+      }
+
+      // Determine date range
+      const to = new Date();
+      const from = period === 'week' ? subDays(to, 7) : subDays(to, 30);
+
+      // Get visitas in period
+      const visitas = await storage.getVisitasInPeriod(from, to, empresaId, userId, userRole);
+      const tarefas = await storage.getTarefasInPeriod(from, to, empresaId, userId, userRole);
+
+      // Get next 7 days visitas
+      const nextWeek = new Date(to.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const visitasProximas = await storage.getVisitasInPeriod(to, nextWeek, empresaId, userId, userRole);
+
+      // Calculate client stats
+      const clientStats: { [key: string]: { nome: string; count: number; ultimaVisita?: Date } } = {};
+      visitas.forEach((v: any) => {
+        const key = v.entidade?.id || 'unknown';
+        if (!clientStats[key]) {
+          clientStats[key] = { nome: v.entidade?.nome || 'Desconhecido', count: 0, ultimaVisita: new Date(v.dataVisita) };
+        }
+        clientStats[key].count++;
+        if (new Date(v.dataVisita) > clientStats[key].ultimaVisita!) {
+          clientStats[key].ultimaVisita = new Date(v.dataVisita);
+        }
+      });
+
+      const clientesChave = Object.values(clientStats)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10)
+        .map(c => ({
+          nome: c.nome,
+          visitCount: c.count,
+          ultimaVisita: c.ultimaVisita ? format(c.ultimaVisita, 'd MMM', { locale: pt }) : undefined
+        }));
+
+      // Calculate task stats
+      const tarefasConcluidas = tarefas.filter((t: any) => t.status === 'done').length;
+      const tarefasEmAtraso = tarefas.filter((t: any) => t.status === 'pending' && t.dueDate && new Date(t.dueDate) < new Date());
+      const percentagemAtraso = tarefas.length > 0 ? (tarefasEmAtraso.length / tarefas.length) * 100 : 0;
+
+      const tarefasEmAtrasoDetalhes = tarefasEmAtraso
+        .slice(0, 10)
+        .map((t: any) => ({
+          titulo: t.descricao || 'Sem título',
+          diasAtraso: Math.floor((new Date().getTime() - new Date(t.dueDate).getTime()) / (1000 * 60 * 60 * 24))
+        }));
+
+      // Calculate brand stats
+      const brandStats: { [key: string]: number } = {};
+      visitas.forEach((v: any) => {
+        if (v.marcas && Array.isArray(v.marcas)) {
+          v.marcas.forEach((m: any) => {
+            const marca = m.nome || m;
+            brandStats[marca] = (brandStats[marca] || 0) + 1;
+          });
+        }
+      });
+
+      const marcasMaisTrabalhadas = Object.entries(brandStats)
+        .map(([marca, count]) => ({ marca, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+
+      // Get current user and empresa
+      const user = await storage.getUser(userId);
+      const empresa = await storage.getEmpresa(empresaId);
+
+      // Generate IA insights using same infrastructure as dashboard
+      const insightsText = await generateDashboardInsights({
+        scope: scope === 'empresa' ? 'admin' : 'agent',
+        userName: scope === 'empresa' ? empresa?.nome : user?.firstName,
+        metrics: {
+          visitasRealizadas: visitas.length,
+          visitasAgendadas: visitasProximas.length,
+          tarefasCriadas: tarefas.length,
+          tarefasConcluidas,
+          tarefasEmAtraso: tarefasEmAtraso.length,
+          clientesChave,
+          marcasMaisTrabalhadas,
+        },
+      });
+
+      // Generate PDF
+      const { generatePerformanceProPDF } = await import('./pdfPerformancePro');
+      const pdfBuffer = await generatePerformanceProPDF({
+        period: { from, to },
+        metrics: {
+          visitasRealizadas: visitas.length,
+          visitasAgendadas: visitasProximas.length,
+          tarefasCriadas: tarefas.length,
+          tarefasConcluidas,
+          tarefasEmAtraso: tarefasEmAtraso.length,
+          percentagemAtraso,
+          clientesChave,
+          tarefasEmAtrasoDetalhes,
+          marcasMaisTrabalhadas,
+        },
+        insights: insightsText,
+        empresa: { nome: empresa?.nome || 'Empresa', logoUrl: empresa?.logoUrl || undefined },
+        user: user ? { nome: user.firstName || user.email || 'Agente', email: user.email || '' } : undefined,
+        scope: scope === 'empresa' ? 'empresa' : 'agent',
+      });
+
+      const fileName = `performance-pro-${scope === 'empresa' ? 'empresa' : 'agent'}-${format(new Date(), 'yyyyMMdd')}.pdf`;
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('[PDF Performance PRO] Error:', error);
+      res.status(500).json({ message: 'Erro ao gerar relatório PRO' });
+    }
+  });
+
   // FASE 26: Nearby visit suggestions by GPS proximity
   app.post('/api/visitas/proximidade', isAuthenticated, async (req: any, res) => {
     try {
