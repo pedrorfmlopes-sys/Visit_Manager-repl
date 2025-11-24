@@ -1,16 +1,29 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Edit2, Trash2, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Edit2, Trash2, Building2, Store, Factory, Briefcase, Users, Home, Handshake, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { insertEntidadeTipoSchema, type EntidadeTipo } from "@shared/schema";
+
+// FASE 30: Icon map for display
+const iconOptions = [
+  { name: 'Building2', label: 'Edifício', component: Building2 },
+  { name: 'Store', label: 'Loja', component: Store },
+  { name: 'Factory', label: 'Fábrica', component: Factory },
+  { name: 'Briefcase', label: 'Negócio', component: Briefcase },
+  { name: 'Users', label: 'Pessoas', component: Users },
+  { name: 'Home', label: 'Casa', component: Home },
+  { name: 'Handshake', label: 'Parceria', component: Handshake },
+  { name: 'Package', label: 'Pacote', component: Package },
+];
 
 export default function AdminEntidadeTipos() {
   const { toast } = useToast();
@@ -27,6 +40,7 @@ export default function AdminEntidadeTipos() {
     defaultValues: {
       nome: "",
       cor: "#3b82f6",
+      icon: "Building2", // FASE 30: Default icon
       ativo: true,
       ordem: 0,
     },
@@ -152,6 +166,36 @@ export default function AdminEntidadeTipos() {
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="icon"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Ícone</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || "Building2"}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Escolhe ícone" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {iconOptions.map((option) => {
+                            const IconComponent = option.component;
+                            return (
+                              <SelectItem key={option.name} value={option.name}>
+                                <div className="flex items-center gap-2">
+                                  <IconComponent className="h-4 w-4" />
+                                  <span>{option.label}</span>
+                                </div>
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
                   {editingId ? "Atualizar" : "Criar"}
                 </Button>
@@ -169,41 +213,48 @@ export default function AdminEntidadeTipos() {
         </Card>
       ) : (
         <div className="space-y-2">
-          {tipos.map((tipo) => (
-            <Card key={tipo.id} className="hover-elevate">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 flex-1">
-                    <div
-                      className="w-4 h-4 rounded"
-                      style={{ backgroundColor: tipo.cor || "#3b82f6" }}
-                    />
-                    <span className="font-medium">{tipo.nome}</span>
-                    {!tipo.ativo && (
-                      <span className="text-xs text-muted-foreground">(inativo)</span>
-                    )}
+          {tipos.map((tipo) => {
+            // FASE 30: Get icon component for this type
+            const iconOption = iconOptions.find(opt => opt.name === (tipo.icon || 'Building2'));
+            const IconComponent = iconOption?.component || Building2;
+            
+            return (
+              <Card key={tipo.id} className="hover-elevate">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 flex-1">
+                      <div
+                        className="w-4 h-4 rounded"
+                        style={{ backgroundColor: tipo.cor || "#3b82f6" }}
+                      />
+                      <IconComponent className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">{tipo.nome}</span>
+                      {!tipo.ativo && (
+                        <span className="text-xs text-muted-foreground">(inativo)</span>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() => handleEdit(tipo)}
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="destructive"
+                        onClick={() => setDeletingId(tipo.id)}
+                        disabled={!tipo.ativo}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      onClick={() => handleEdit(tipo)}
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="destructive"
-                      onClick={() => setDeletingId(tipo.id)}
-                      disabled={!tipo.ativo}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 

@@ -227,6 +227,7 @@ export const entidadeTipos = pgTable("entidade_tipos", {
   empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: 'cascade' }),
   nome: varchar("nome", { length: 255 }).notNull(),
   cor: varchar("cor", { length: 20 }), // hex or color tag, optional
+  icon: varchar("icon", { length: 50 }).default("Building2"), // FASE 30: Icon name for this type
   ativo: boolean("ativo").default(true).notNull(),
   ordem: integer("ordem").default(0),
   createdAt: timestamp("created_at").defaultNow(),
@@ -241,11 +242,25 @@ export const entidadeTiposRelations = relations(entidadeTipos, ({ one, many }) =
   entidades: many(entidades),
 }));
 
+// FASE 30: Supported icons for entity types
+export const entidadeTipoIconEnum = z.enum([
+  'Building2',
+  'Store',
+  'Factory',
+  'Briefcase',
+  'Users',
+  'Home',
+  'Handshake',
+  'Package',
+]);
+
 export const insertEntidadeTipoSchema = createInsertSchema(entidadeTipos).omit({
   id: true,
   empresaId: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  icon: entidadeTipoIconEnum.optional(),
 });
 
 export type InsertEntidadeTipo = z.infer<typeof insertEntidadeTipoSchema>;

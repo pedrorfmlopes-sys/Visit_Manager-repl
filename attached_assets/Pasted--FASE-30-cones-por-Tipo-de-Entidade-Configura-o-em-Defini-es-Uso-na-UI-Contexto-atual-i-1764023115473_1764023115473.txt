@@ -1,0 +1,202 @@
+🔧 FASE 30 – Ícones por Tipo de Entidade (Configuração em Definições + Uso na UI)
+
+Contexto atual (importante):
+
+Já existe o sistema completo de tipos de entidade configuráveis, com:
+
+tabela entidade_tipos,
+
+CRUD em /admin/empresa → Entidades,
+
+entidades.entidadeTipoId e relação entidade.entidadeTipo,
+
+cards/listas/detalhes a mostrar entidade.entidadeTipo.nome.
+
+Os cards de Entidades já usam um ícone, mas com base em nomes antigos / legado.
+
+🎯 Objetivo desta fase:
+
+Permitir ao Admin escolher um ícone para cada tipo de entidade, na página de Definições → Entidades.
+
+Usar esse ícone em:
+
+Cards da lista de entidades,
+
+Detalhe da entidade (badge do tipo),
+
+Situações onde mostras “Nome da entidade (Tipo)” em selects (Contactos, Visitas), se fizer sentido.
+
+Manter tudo simples: lista curta de ícones lucide pré-definidos.
+
+⚠️ Muito importante:
+
+Não alterar o comportamento funcional de tipos/entidades (já está estável).
+
+Apenas estender com o campo icon e ligar isso à UI.
+
+1. Base de dados – adicionar campo icon a entidade_tipos
+
+No shared/schema.ts, na tabela entidadeTipos, adiciona um campo:
+
+icon: varchar("icon").default("Building2") (ou nome que aches melhor).
+
+Atualiza o schema Zod insertEntidadeTipoSchema para incluir icon como:
+
+opcional (optional()),
+
+string com enum restrita numa lista de ícones suportados (ex.: "Building2" | "Store" | "Factory" | "Briefcase" | "Users" | "Home").
+
+Garante que:
+
+se o admin não escolher nenhum ícone, ficas com um default "Building2".
+
+2. Definições → Entidades (Admin) – escolher ícone por tipo
+
+Na página de Admin Tipos de Entidade (dentro de /admin/empresa → aba Entidades):
+
+Adiciona, na linha/row de cada tipo, um campo para escolher o ícone.
+
+UX sugerida:
+
+um Select / Popover com 6–8 opções de ícones lucide (por ex.: Building2, Factory, Store, Briefcase, Users, Home, Handshake, etc.),
+
+cada opção mostra ícone + nome amigável (Gabinete, Distribuidor, etc. não precisam de coincidir com o nome técnico do ícone).
+
+Ao editar/guardar um tipo:
+
+o PATCH /api/entidade-tipos/:id deve aceitar e guardar o campo icon.
+
+certifica-te que create e update não rebentam se o icon vier vazio (usa default).
+
+Atualiza React Query:
+
+Após criar/editar tipo, invalida ["/api/entidade-tipos"] como já estás a fazer com os outros campos.
+
+Resultado esperado:
+
+Na tabela/lista de tipos de entidade, consigo:
+
+ver qual ícone está associado,
+
+editar e mudar o ícone,
+
+gravar e ver isso refletido na UI.
+
+3. EntidadeCard – usar entidade.entidadeTipo.icon em vez de lógica antiga
+
+No componente EntidadeCard.tsx:
+
+atualmente já tens uma lógica que escolhe o ícone com base no tipo (nome). Nesta fase:
+
+passa a prioridade a ser:
+
+entidade.entidadeTipo?.icon (string com nome do ícone),
+
+fallback para "Building2" se não existir.
+
+Define um map local:
+
+const iconMap = {
+  Building2,
+  Factory,
+  Store,
+  Briefcase,
+  Users,
+  Home,
+  Handshake,
+};
+const iconName = entidade.entidadeTipo?.icon ?? "Building2";
+const TipoIcon = iconMap[iconName as keyof typeof iconMap] ?? Building2;
+
+
+Usa TipoIcon no badge do tipo, mantendo o resto da estrutura (texto com o nome do tipo continua a vir de entidade.entidadeTipo.nome).
+
+Resultado esperado:
+
+Se o admin mudar o ícone do tipo "Gabinete" para Factory, todos os cards de entidades desse tipo passam a mostrar o novo ícone automaticamente.
+
+4. Detalhe da Entidade – mostrar o ícone ao lado do tipo
+
+No EntidadeDetail.tsx:
+
+onde hoje mostras o badge com entidade.entidadeTipo.nome,
+
+passa a incluir também o ícone:
+
+a mesma lógica de iconMap,
+
+ícone pequeno (h-3 w-3 ou h-4 w-4) dentro do Badge.
+
+Não é preciso alterar mais nada no detalhe – só enriquecer com o ícone.
+
+5. Selects de Entidade em Contactos / Visitas (opcional mas simples)
+
+No ContactoForm.tsx e VisitaForm.tsx, onde listas entidades em dropdowns:
+
+opcionalmente, se for simples:
+
+adiciona o ícone antes do nome, usando o mesmo iconMap e entidade.entidadeTipo.icon.
+
+se for trabalhoso demais nesta fase, podes deixar isto para um “passo B” e focar em EntidadeCard + Detalhe.
+
+6. Testes que quero que faças
+
+Testar Definições → Entidades
+
+Criar/editar 3 tipos: Gabinete (ícone Building2), Distribuidor (Store), Construtor (Factory).
+
+Gravar.
+
+Confirmar que aparecem os ícones escolhidos na lista de tipos.
+
+Testar lista de Entidades (cards)
+
+Abrir menu Entidades.
+
+Ver cada card:
+
+ícone corresponde ao tipo configurado,
+
+texto do tipo continua correcto.
+
+Mudar o ícone em Definições de um tipo usado em várias entidades:
+
+ao voltar à lista, cards já mostram o novo ícone.
+
+Testar Detalhe da Entidade
+
+Abrir entidade em detalhe.
+
+Ver se o badge do tipo mostra o mesmo ícone que o card.
+
+(Opcional) Testar selects
+
+Em ContactoForm / VisitaForm, se implementares ícones nos selects:
+
+confirmar que ícone e nome batem com o tipo configurado.
+
+7. Relatório desta fase
+
+No relatório, por favor descreve:
+
+As mudanças no shared/schema.ts (campo icon em entidade_tipos + schema Zod).
+
+As alterações em:
+
+página de Definições → Entidades (onde o admin escolhe o ícone),
+
+EntidadeCard.tsx,
+
+EntidadeDetail.tsx,
+
+e se mexeste em ContactoForm / VisitaForm.
+
+Lista dos ícones suportados e como estão mapeados (tabela iconName → componente lucide).
+
+Resultados dos testes (passo 6) com indicação clara de OK/KO.
+
+⚠️ Reforço:
+
+Não mexer no modelo funcional de tipos/entidades (associação, filtros, etc. já estão correctos).
+
+Esta fase é puramente de apresentação/configuração de ícones.

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, MapPin, Phone, Mail, Globe, Edit, Building2, Users, UserCircle, Calendar, Sparkles, Linkedin, Facebook, Instagram, Share2, MessageCircle, Link as LinkIcon, Copy, FileText, Bell, AlertCircle, Download, Trash2 } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, Mail, Globe, Edit, Building2, Users, UserCircle, Calendar, Sparkles, Linkedin, Facebook, Instagram, Share2, MessageCircle, Link as LinkIcon, Copy, FileText, Bell, AlertCircle, Download, Trash2, Store, Factory, Home, Handshake, Package, Briefcase } from "lucide-react";
 import { SiX } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -347,7 +347,16 @@ export default function EntidadeDetail() {
             <div>
               <h1 className="text-xl font-semibold text-foreground">{entidade.nome}</h1>
               {entidade.entidadeTipo && (
-                <Badge variant="outline" className="mt-1 no-default-hover-elevate no-default-active-elevate" data-testid="badge-tipo">
+                <Badge variant="outline" className="mt-1 no-default-hover-elevate no-default-active-elevate flex items-center gap-1 w-fit" data-testid="badge-tipo">
+                  {/* FASE 30: Show icon from entidade.entidadeTipo.icon */}
+                  {(() => {
+                    const iconMap = {
+                      Building2, Store, Factory, Briefcase, Users, Home, Handshake, Package,
+                    };
+                    const iconName = entidade.entidadeTipo.icon ?? "Building2";
+                    const IconComponent = iconMap[iconName as keyof typeof iconMap] ?? Building2;
+                    return <IconComponent className="h-3 w-3" />;
+                  })()}
                   {entidade.entidadeTipo.nome}
                 </Badge>
               )}

@@ -1,4 +1,4 @@
-import { Building2, ChevronRight, Mail, Phone, MapPin, User, Package, Briefcase, Construction, UserCheck } from "lucide-react";
+import { Building2, ChevronRight, Mail, Phone, MapPin, User, Package, Briefcase, Construction, UserCheck, Store, Factory, Home, Handshake, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -10,13 +10,19 @@ interface EntidadeCardProps {
   showSyncStatus?: boolean;
 }
 
-const tipoIcons = {
-  Gabinete: Building2,
-  Distribuidor: Package,
-  Parceiro: Briefcase,
-  Construtor: Construction,
+// FASE 30: Icon map for entity type display
+const iconMap = {
+  Building2,
+  Store,
+  Factory,
+  Briefcase,
+  Users,
+  Home,
+  Handshake,
+  Package,
 };
 
+// Legacy mapping (fallback)
 const tipoLabels = {
   Gabinete: "Gabinete",
   Distribuidor: "Distribuidor",
@@ -32,9 +38,10 @@ export function EntidadeCard({ entidade, onClick, showSyncStatus = false }: Enti
     .join("")
     .toUpperCase();
 
-  // Use configured type (entidadeTipo), fallback to legacy field
+  // FASE 30: Use icon from entidade.entidadeTipo.icon, fallback to Building2
+  const iconName = entidade.entidadeTipo?.icon ?? "Building2";
+  const TipoIcon = iconMap[iconName as keyof typeof iconMap] ?? Building2;
   const tipoNome = entidade.entidadeTipo?.nome ?? entidade.tipoEntidade ?? "Desconhecido";
-  const TipoIcon = tipoIcons[tipoNome as keyof typeof tipoIcons] || Building2;
 
   return (
     <Card
