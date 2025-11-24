@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Building2, Users, FileText, Package, Calendar, LogOut, BarChart, Link2, Download } from "lucide-react";
+import { Building2, Users, FileText, Package, Calendar, LogOut, BarChart, Link2, Download, Lightbulb, X } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,6 +14,8 @@ import { useNearbyVisitSuggestions } from "@/hooks/useNearbyVisitSuggestions";
 import { AlertRibbon } from "@/components/AlertRibbon";
 import { DashboardInsightsCard } from "@/components/DashboardInsightsCard";
 import { NearbySuggestionSheet } from "@/components/NearbySuggestionSheet";
+import { useState } from "react";
+import { apiRequest } from "@/lib/queryClient";
 import type { VisitaWithRelations } from "@shared/schema";
 
 interface DashboardStats {
@@ -31,10 +33,25 @@ export default function Dashboard() {
   const isAdmin = useIsAdmin();
   const { toast } = useToast();
   const { suggestion, dismissSuggestion } = useNearbyVisitSuggestions();
+  const [showDashboardTip, setShowDashboardTip] = useState(true);
   
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard"],
   });
+
+  const handleDismissDashboardTip = async () => {
+    try {
+      await apiRequest("PATCH", "/api/user/settings", {
+        userSettings: {
+          onboarding: { seenDashboardTips: true }
+        }
+      });
+      setShowDashboardTip(false);
+      localStorage.setItem("seenDashboardTips", "true");
+    } catch (error) {
+      console.error("Error updating settings:", error);
+    }
+  };
 
   const handleLogout = () => {
     window.location.href = "/api/logout";
@@ -148,6 +165,29 @@ export default function Dashboard() {
       <AlertRibbon />
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+        {/* Onboarding Tip */}
+        {showDashboardTip && !localStorage.getItem("seenDashboardTips") && (
+          <Card className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30">
+            <CardContent className="pt-6 flex items-start gap-3">
+              <Lightbulb className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
+                  Dica: Aqui encontras um resumo do teu dia. Usa os filtros e os relatórios PDF/PRO para acompanhar o teu desempenho.
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleDismissDashboardTip}
+                className="flex-shrink-0"
+                data-testid="button-dismiss-dashboard-tip"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {isLoading ? (
           <>
             <div className="grid grid-cols-2 gap-3">

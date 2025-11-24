@@ -1822,6 +1822,63 @@ export default function VisitaDetail() {
         defaultTemplate="followup_pos_visita"
       />
 
+      {/* Activity Log */}
+      {visita && (
+        <Card data-testid="card-activity-log" className="mt-6">
+          <CardHeader>
+            <CardTitle className="text-lg">Histórico desta Visita</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            {visita.createdByUserId && (
+              <div className="flex gap-2">
+                <div className="text-muted-foreground">•</div>
+                <div>
+                  <p className="text-foreground">Criada por <span className="font-medium">{visita.createdByUserId}</span></p>
+                  <p className="text-xs text-muted-foreground">{visita.dataVisita ? format(new Date(visita.dataVisita), "PPp", { locale: pt }) : "Data desconhecida"}</p>
+                </div>
+              </div>
+            )}
+            {visita.visitaAnteriorId && (
+              <div className="flex gap-2">
+                <div className="text-muted-foreground">•</div>
+                <div>
+                  <p className="text-foreground">Follow-up de visita anterior</p>
+                  <p className="text-xs text-muted-foreground">ID: {visita.visitaAnteriorId}</p>
+                </div>
+              </div>
+            )}
+            {visita.proximaVisita && (
+              <div className="flex gap-2">
+                <div className="text-muted-foreground">•</div>
+                <div>
+                  <p className="text-foreground">Próxima visita agendada para</p>
+                  <p className="text-xs text-muted-foreground">{format(new Date(visita.proximaVisita), "PPp", { locale: pt })}</p>
+                </div>
+              </div>
+            )}
+            {visita.tarefas && visita.tarefas.length > 0 && (
+              <>
+                <Separator className="my-2" />
+                <div>
+                  <p className="font-medium text-foreground mb-2">Tarefas Relacionadas:</p>
+                  <div className="space-y-1 ml-4">
+                    {visita.tarefas.map((tarefa: any) => (
+                      <div key={tarefa.id} className="text-xs">
+                        <p className="text-foreground">{tarefa.descricao}</p>
+                        <p className="text-muted-foreground">
+                          {tarefa.status === 'done' ? '✓ Concluída' : '○ Pendente'} 
+                          {tarefa.dueDate && ` · Vence ${format(new Date(tarefa.dueDate), "d MMM", { locale: pt })}`}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Dialog open={pdfProDialogOpen} onOpenChange={setPdfProDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>

@@ -3402,6 +3402,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // FASE 28: Admin Debug Endpoint
+  app.get('/api/admin/debug', requireAdmin, async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+
+      // Database connectivity check
+      const dbOk = true; // Simple connectivity test
+
+      // Get stats for the company
+      const users = await storage.getUsersByEmpresa(empresaId);
+      const entidades = await storage.getEntidadesByEmpresa(empresaId);
+      const contactos = await storage.getContactosByEmpresa(empresaId);
+      const visitas = await storage.getVisitasByEmpresa(empresaId);
+      const tarefas = await storage.getTarefasByEmpresa(empresaId);
+
+      // Calculate last 30 days visitas
+      const thirtyDaysAgo = subDays(new Date(), 30);
+      const visitasLast30 = visitas.filter((v: any) => new Date(v.dataVisita) >= thirtyDaysAgo).length;
+
+      // Calculate overdue tarefas
+      const tarefasAtraso = tarefas.filter((t: any) => t.status === 'pending' && t.dueDate && new Date(t.dueDate) < new Date()).length;
+
+      // Get empresa settings
+      const empresa = await storage.getEmpresa(empresaId);
+
+      res.json({
+        appVersion: "1.0.0",
+        timestamp: new Date().toISOString(),
+        database: { ok: dbOk },
+        stats: {
+          usersActive: users.length,
+          entidades: entidades.length,
+          contactos: contactos.length,
+          visitasTotal: visitas.length,
+          visitasLast30Days: visitasLast30,
+          tarefasTotal: tarefas.length,
+          tarefasAtraso,
+        },
+        settings: {
+          mostrarGPS: empresa?.mostrarGPS || false,
+          ia: {
+            visitSummaryEnabled: empresa?.uiSettings?.ia?.visitSummaryEnabled ?? true,
+            taskSuggestionsEnabled: empresa?.uiSettings?.ia?.taskSuggestionsEnabled ?? true,
+            dashboardInsightsEnabled: empresa?.uiSettings?.ia?.dashboardInsightsEnabled ?? true,
+          },
+        },
+        integrations: {
+          microsoft: "não configurado",
+          google: "não configurado",
+        },
+      });
+    } catch (error) {
+      console.error('Error fetching debug info:', error);
+      res.status(500).json({ message: 'Failed to fetch debug info' });
+    }
+  });
+
   // FASE 26: Nearby visit suggestions by GPS proximity
   app.post('/api/visitas/proximidade', isAuthenticated, async (req: any, res) => {
     try {

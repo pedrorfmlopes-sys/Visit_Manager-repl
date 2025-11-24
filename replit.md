@@ -45,7 +45,7 @@ PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities in
 -   **Admin Settings Center**: Organized 6-tab settings page with company configuration, logo upload, and UI settings JSON for future extensibility (FASE 22).
 -   **Logo Upload**: Direct upload of company logo with preview, type validation (PNG/JPG/SVG/WebP), and automatic database persistence.
 
-## Recent Features (FASE 20-27)
+## Recent Features (FASE 20-28)
 
 ### FASE 20: Unified Visit Status Management
 - Consolidated modal dialog for appointment status changes with 3 visual action paths (follow-up, mark done, cancel)
@@ -110,6 +110,15 @@ PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities in
 - **Filename**: `performance-pro-{agent|empresa}-YYYYMMDD.pdf`
 - **Design**: Professional PDF with blue headers, KPI cards, data tables, AI insights section
 - **Status**: ✅ VALIDADO - PDFs download e abrem corretamente
+
+### FASE 28: UX Improvements & Admin Tools (Onboarding, Activity Log, Debug)
+- **Onboarding Dashboard**: Non-intrusive tip card on first dashboard access, dismissible, stored in localStorage + userSettings
+- **Activity Log - VisitaDetail**: Histórico section showing: creation info, follow-ups, next visit schedule, linked tasks
+- **Activity Log - TarefaDetail**: Histórico section showing: creation info, current status, due date, related visit
+- **Admin Debug Page**: New `/admin/debug` route (admin-only) with real-time app state monitoring
+- **Debug Endpoint**: `GET /api/admin/debug` returns: app version, DB status, company stats, settings flags, integration status
+- **Admin Tools Card**: New card in AdminDashboard with button to access Debug / Estado da Aplicação
+- **Status**: ✅ IMPLEMENTADO - Onboarding, Activity Logs, Debug tools funcionais
 
 ## External Dependencies
 

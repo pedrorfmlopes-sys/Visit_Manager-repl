@@ -1,0 +1,311 @@
+FASE 28 – Melhorias de UX e Ferramentas de Admin (Onboarding, Activity Log, Debug)
+
+Contexto:
+
+App: Visit Manager multi-empresa, já com:
+
+Dashboards avançados, IA (visitas, tarefas, insights), relatórios PDF, FASE 26 de proximidade, FASE 27 de performance PRO.
+
+Centro de Configurações da Empresa (/admin/empresa) e /perfil com userSettings.
+
+Objetivo desta fase:
+
+Melhorar a experiência de primeira utilização (onboarding/dicas).
+
+Dar melhor visibilidade a alterações nas visitas/tarefas (Activity Log).
+
+Criar uma página de Debug/Admin que ajude a ver rapidamente o estado da app (para troubleshooting).
+
+⚠️ Muito importante:
+
+Não quebrar fluxos existentes.
+
+Tudo deve continuar a respeitar multi-empresa + RBAC.
+
+1. Onboarding & Dicas (UX)
+
+Objetivo: Ajudar novos utilizadores a perceberem a app, sem os chatear para sempre.
+
+1.1. Estrutura de estado (localStorage / userSettings)
+
+Adicionar ao userSettings (se ainda não existir) algo do género:
+
+userSettings.onboarding = { seenDashboardTips: boolean, seenVisitsTips: boolean }
+
+Se preferires, podes guardar estas flags só em localStorage, mas idealmente:
+
+Leituras rápidas (tipo “já viu isto?”) podem ir a localStorage.
+
+userSettings serve para uma visão mais consistente a longo prazo.
+
+1.2. Dashboard – primeiro acesso
+
+Quando o utilizador entra no dashboard pela primeira vez (ou enquanto não tiver seenDashboardTips === true):
+
+Mostrar um pequeno “tour”/hint não intrusivo, por exemplo um card ou alert simples no topo dos cards:
+
+Algo tipo:
+
+“Dica: Aqui encontras um resumo do teu dia. Usa os filtros e os relatórios PDF/PRO para acompanhar o teu desempenho.”
+
+Botão: “Percebi” → ao clicar:
+
+Atualiza userSettings.onboarding.seenDashboardTips = true (PATCH /api/user/settings)
+ou marca em localStorage (desde que não volte a aparecer para esse user).
+
+Não usar modal gigante, manter simples tipo info card.
+
+1.3. VisitaDetail – dicas de IA
+
+Quando o utilizador vê a secção de IA numa visita (resumo, sugestões, etc.) pela primeira vez:
+
+Mostrar uma pequena info no próprio card, algo como:
+
+“Dica: A IA pode ajudar a resumir a visita e sugerir tarefas. Podes desligar estas secções nas tuas Definições → Preferências de IA.”
+
+Botão/link “Não mostrar novamente”:
+
+Atualiza userSettings.onboarding.seenVisitsTips = true.
+
+Se userSettings.ia.showVisitSummary === false E userSettings.ia.showTaskSuggestions === false, não mostrar esta dica (deixa de fazer sentido).
+
+2. Activity Log (Histórico de alterações)
+
+Objetivo: Ver num só sítio “quem fez o quê” numa visita/tarefa.
+
+2.1. Modelo de dados
+
+Reutilizar o que já existir de timestamps/createdBy, mas acrescentar uma pequena camada de UI de “log”.
+
+Sem fazer uma mega tabela de audit para já. Nesta fase pode ser um log derivado dos dados existentes:
+
+Para VisitaDetail:
+
+Na parte inferior da página (antes dos PDFs), criar uma secção:
+
+Título: “Histórico desta visita”.
+
+Conteúdo:
+
+Linha 1: “Criada por [user] em [data/hora].”
+
+Linha 2: Se houve follow-up/agendamentos:
+
+“Follow-up criado em [data].”
+
+“Marcação de próxima visita em [data].”
+
+Linha 3: “Última atualização em [data/hora].”
+
+Se houver tarefas ligadas à visita:
+
+Mostrar uma lista compacta:
+
+“[data] – Tarefa ‘X’ criada por [user] (estado: pendente/concluída).”
+
+Estes dados podem ser obtidos de:
+
+Campos já existentes (createdAt, updatedAt, proximaVisita, visitaAnteriorId, etc.).
+
+Tarefas associadas à visita (GET /api/tarefas?visitaId=...).
+
+Para Tarefas:
+
+Na TarefaDetail:
+
+Secção “Histórico da tarefa”:
+
+“Criada por [user] em [data].”
+
+“Última atualização em [data].”
+
+“Estado atual: pendente/concluída (desde [data]).”
+
+Se existir alguma informação de completedAt ou equivalente, usar.
+
+⚠️ Nesta fase, não é obrigatório criar uma tabela nova de activity_log.
+Podemos fazer um “log computado” com base nos dados já existentes + tarefas da visita.
+
+3. Página de Debug/Admin
+
+Objetivo: Uma página apenas para admins, para ajudar a ver o estado da app e diagnosticar problemas rápidos.
+
+3.1. Rota e RBAC
+
+Nova rota backend: GET /api/admin/debug:
+
+Acesso apenas role = "admin".
+
+Nova página frontend: /admin/debug:
+
+Apenas acessível a admins via AdminSidebar/AdminDrawer.
+
+3.2. Conteúdo do endpoint /api/admin/debug
+
+Informação de alto nível (sem nada sensível, mantendo segurança):
+
+Versões:
+
+Versão da app (string fixa num env/const, ex: APP_VERSION).
+
+Data/hora do último deploy (se fácil de expor como string).
+
+Estado da base de dados (verificação básica):
+
+Tentativa simples de query (ex.: SELECT 1) com resultado OK/Erro.
+
+Contagens por empresa (para a empresa atual):
+
+nº de utilizadores ativos.
+
+nº de entidades.
+
+nº de contactos.
+
+nº de visitas (total e últimos 30 dias).
+
+nº de tarefas (total e em atraso).
+
+Flags de settings:
+
+empresa.mostrarGPS.
+
+Booleanos de IA em uiSettings (ex.: ia.visitSummaryEnabled, ia.dashboardInsightsEnabled).
+
+Estado de integrações (placeholders apenas):
+
+integrations.microsoft.connected = true|false (por agora pode ser sempre false ou “não configurado”).
+
+integrations.google.connected = true|false.
+
+Isto prepara terreno para as integrações futuras (FASE 25+).
+
+Resposta tipo:
+
+{
+  "appVersion": "x.y.z",
+  "timestamp": "2025-11-24T10:00:00Z",
+  "database": { "ok": true },
+  "stats": {
+    "usersActive": 3,
+    "entidades": 120,
+    "contactos": 340,
+    "visitasTotal": 1500,
+    "visitasLast30Days": 120,
+    "tarefasTotal": 300,
+    "tarefasAtraso": 25
+  },
+  "settings": {
+    "mostrarGPS": true,
+    "ia": {
+      "visitSummaryEnabled": true,
+      "taskSuggestionsEnabled": true,
+      "dashboardInsightsEnabled": true
+    }
+  },
+  "integrations": {
+    "microsoft": "não configurado",
+    "google": "não configurado"
+  }
+}
+
+
+3.3. UI da página /admin/debug
+
+Layout tipo “admin tools”:
+
+Card “Estado da aplicação”:
+
+Versão, timestamp, DB ok/erro (badge verde/vermelho).
+
+Card “Estatísticas da empresa”:
+
+Tabela simples com as contagens.
+
+Card “Settings relevantes”:
+
+Mostrar GPS (on/off).
+
+IA (on/off por domínio).
+
+Card “Integrações”:
+
+Mostrar estado textual: “não configurado”, “ligado”, etc. (por agora placeholder).
+
+Não é preciso editar nada aqui, só leitura.
+
+4. Integração com navegação
+
+AdminSidebar/AdminDrawer:
+
+Adicionar uma entrada em “Admin”:
+
+“Debug / Ferramentas” → /admin/debug.
+
+Agent:
+
+Não vê nem a rota nem o link.
+
+5. Testes esperados
+
+Onboarding Dashboard
+
+Criar um utilizador novo.
+
+Entrar no dashboard:
+
+Ver a dica inicial.
+
+Clicar em “Percebi”.
+
+Recarregar → dica já não aparece.
+
+Onboarding IA nas visitas
+
+Abrir uma visita com IA ativa.
+
+Ver a dica na secção de IA.
+
+Clicar “Não mostrar novamente”.
+
+Abrir outra visita → dica não volta.
+
+Activity Log
+
+Criar uma visita, associar tarefas, marcar follow-up.
+
+Ver em VisitaDetail:
+
+Histórico faz sentido (quem criou, última atualização, tarefas ligadas).
+
+Ver TarefaDetail:
+
+Histórico da tarefa coerente.
+
+Página /admin/debug
+
+Entrar como admin:
+
+Aceder a “Debug / Ferramentas”.
+
+Ver cards com estado da app, stats, settings e integrações.
+
+Entrar como agent:
+
+Não ver o link.
+
+Se tentar entrar via URL, receber 403 ou redirect.
+
+6. Documentação
+
+Atualizar replit.md com:
+
+Seção “FASE 28 – UX & Admin Tools”.
+
+Descrição de:
+
+Onboarding (flags, onde aparecem).
+
+Activity Log (onde fica, que dados mostra).
+
+/admin/debug e o que devolve.

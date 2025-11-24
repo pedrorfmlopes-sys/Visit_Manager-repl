@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Building2, Users, FileText, CheckCircle2, Calendar, AlertCircle, Zap, TrendingUp, ArrowRight, Download } from "lucide-react";
+import { Building2, Users, FileText, CheckCircle2, Calendar, AlertCircle, Zap, TrendingUp, ArrowRight, Download, Settings } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -505,6 +505,27 @@ export default function AdminDashboard() {
 
       {/* IA Insights */}
       <DashboardInsightsCard />
+
+      {/* Admin Tools */}
+      <Card data-testid="card-admin-tools" className="border-amber-300/30 bg-amber-50 dark:bg-amber-950/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Settings className="h-5 w-5 text-amber-600 dark:text-amber-500" />
+            Ferramentas de Admin
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Button
+            variant="outline"
+            onClick={() => setLocation("/admin/debug")}
+            data-testid="button-admin-debug"
+            className="w-full"
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Debug / Estado da Aplicação
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* PDF Reports - FINAL */}
       <Card data-testid="card-reports" className="border-primary/30 bg-primary/5">

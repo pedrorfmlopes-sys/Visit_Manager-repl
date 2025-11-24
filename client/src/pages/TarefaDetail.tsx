@@ -490,6 +490,48 @@ export default function TarefaDetail() {
             </>
           )}
         </Card>
+
+        {/* Activity Log */}
+        {tarefa && (
+          <Card data-testid="card-task-activity-log" className="mb-6">
+            <div className="p-6 space-y-3 text-sm border-b">
+              <h2 className="font-semibold">Histórico da Tarefa</h2>
+              {tarefa.createdByUserId && (
+                <div className="flex gap-2">
+                  <div className="text-muted-foreground">•</div>
+                  <div>
+                    <p className="text-foreground">Criada por <span className="font-medium">{tarefa.createdByUserId}</span></p>
+                  </div>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <div className="text-muted-foreground">•</div>
+                <div>
+                  <p className="text-foreground">
+                    Estado atual: <span className="font-medium">{tarefa.status === 'done' ? '✓ Concluída' : '○ Pendente'}</span>
+                  </p>
+                </div>
+              </div>
+              {tarefa.dueDate && (
+                <div className="flex gap-2">
+                  <div className="text-muted-foreground">•</div>
+                  <div>
+                    <p className="text-foreground">Vence em</p>
+                    <p className="text-xs text-muted-foreground">{format(new Date(tarefa.dueDate), "PPp", { locale: pt })}</p>
+                  </div>
+                </div>
+              )}
+              {tarefa.visitaId && (
+                <div className="flex gap-2">
+                  <div className="text-muted-foreground">•</div>
+                  <div>
+                    <p className="text-foreground">Relacionada com uma visita</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
       </main>
 
       <Dialog open={showPlannerDialog} onOpenChange={setShowPlannerDialog}>

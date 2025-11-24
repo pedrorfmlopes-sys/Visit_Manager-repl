@@ -37,6 +37,7 @@ import QRScanner from "@/pages/QRScanner";
 import AdminEmpresa from "@/pages/AdminEmpresa";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminMarcas from "@/pages/AdminMarcas";
+import AdminDebug from "@/pages/AdminDebug";
 import AgentMore from "@/pages/AgentMore";
 import Perfil from "@/pages/Perfil";
 // import MicrosoftIntegration from "@/pages/MicrosoftIntegration"; // Disabled: requires valid Azure credentials
@@ -138,6 +139,7 @@ function Router() {
             <Route path="/admin/empresa" component={() => <AdminRoute component={AdminEmpresa} />} />
             <Route path="/admin/utilizadores" component={() => <AdminRoute component={AdminUsers} />} />
             <Route path="/admin/marcas" component={() => <AdminRoute component={AdminMarcas} />} />
+            <Route path="/admin/debug" component={() => <AdminRoute component={AdminDebug} />} />
           </>
         )}
         
