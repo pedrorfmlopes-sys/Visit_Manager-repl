@@ -4,7 +4,6 @@ import { AdminTopBar } from "@/components/AdminTopBar";
 import { AdminDrawerMenu } from "@/components/AdminDrawer";
 import { BottomNav } from "@/components/BottomNav";
 import { SyncIndicator } from "@/components/SyncIndicator";
-import { AlertRibbon } from "@/components/AlertRibbon";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -52,9 +51,6 @@ export function MainLayout({ children }: MainLayoutProps) {
             )
           )}
 
-          {/* Alert Ribbon */}
-          <AlertRibbon />
-
           <main className="flex-1 overflow-y-auto">
             {children}
           </main>
@@ -81,9 +77,6 @@ export function MainLayout({ children }: MainLayoutProps) {
           </div>
         </header>
       )}
-
-      {/* Alert Ribbon */}
-      <AlertRibbon />
 
       <main className="max-w-2xl mx-auto">
         {children}

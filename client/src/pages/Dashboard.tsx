@@ -10,6 +10,7 @@ import { pt } from "date-fns/locale";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useToast } from "@/hooks/use-toast";
+import { AlertRibbon } from "@/components/AlertRibbon";
 import type { VisitaWithRelations } from "@shared/schema";
 
 interface DashboardStats {
@@ -101,6 +102,9 @@ export default function Dashboard() {
           </div>
         </div>
       </header>
+
+      {/* Alert Ribbon - between title and KPI cards */}
+      <AlertRibbon />
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
         {isLoading ? (

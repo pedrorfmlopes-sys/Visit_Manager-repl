@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
 import { format, startOfWeek, endOfWeek, subDays } from "date-fns";
 import { pt } from "date-fns/locale";
+import { AlertRibbon } from "@/components/AlertRibbon";
 import type { VisitaWithRelations, Tarefa } from "@shared/schema";
 
 interface DashboardStats {
@@ -206,6 +207,9 @@ export default function AdminDashboard() {
           </Button>
         )}
       </div>
+
+      {/* Alert Ribbon - between title and KPI cards */}
+      <AlertRibbon />
 
       {/* KPIs */}
       {isLoading ? (
