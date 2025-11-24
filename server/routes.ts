@@ -2943,13 +2943,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // FASE 22: POST /api/admin/empresa/logo - Upload company logo
+  app.post('/api/admin/empresa/logo', requireAdmin, upload.single('file'), async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      if (!req.file) {
+        return res.status(400).json({ message: "No file provided" });
+      }
+      
+      // Validate file type (PNG, JPG, SVG only)
+      const allowedMimes = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
+      if (!allowedMimes.includes(req.file.mimetype)) {
+        fs.unlinkSync(req.file.path); // Delete uploaded file
+        return res.status(400).json({ message: "Invalid file type. Only PNG, JPG, SVG, and WebP allowed" });
+      }
+      
+      // Construct URL to uploaded file
+      const fileUrl = `/uploads/${req.file.filename}`;
+      
+      // Update empresa with new logo URL
+      const updated = await storage.updateEmpresa(empresaId, { logoUrl: fileUrl });
+      if (!updated) {
+        fs.unlinkSync(req.file.path);
+        return res.status(404).json({ message: "Empresa not found" });
+      }
+      
+      res.json({ logoUrl: fileUrl });
+    } catch (error) {
+      console.error("Error uploading logo:", error);
+      if (req.file) fs.unlinkSync(req.file.path);
+      res.status(500).json({ message: "Failed to upload logo" });
+    }
+  });
+
   // PATCH /api/admin/empresa - Update company config
+  // FASE 22: Added support for uiSettings
   app.patch('/api/admin/empresa', requireAdmin, async (req: any, res) => {
     try {
       const { empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       
-      const { nome, nif, email, telefone, logoUrl, mostrarMarcasEmVisitas, theme } = req.body;
+      const { nome, nif, email, telefone, logoUrl, mostrarMarcasEmVisitas, mostrarGPS, theme, uiSettings } = req.body;
       
       // Validate theme if provided
       if (theme !== undefined && !["light-business", "dark-pro"].includes(theme)) {
@@ -2963,7 +2999,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (telefone !== undefined) updateData.telefone = telefone;
       if (logoUrl !== undefined) updateData.logoUrl = logoUrl;
       if (mostrarMarcasEmVisitas !== undefined) updateData.mostrarMarcasEmVisitas = mostrarMarcasEmVisitas;
+      if (mostrarGPS !== undefined) updateData.mostrarGPS = mostrarGPS;
       if (theme !== undefined) updateData.theme = theme;
+      if (uiSettings !== undefined) updateData.uiSettings = uiSettings; // FASE 22
       
       const updated = await storage.updateEmpresa(empresaId, updateData);
       if (!updated) {

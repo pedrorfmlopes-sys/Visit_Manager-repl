@@ -1,0 +1,321 @@
+FASE 22 – Admin Settings Center + Upload de Logo
+
+FASE 22 – Centro de Configurações da Empresa (Admin) + Upload de Logo
+
+Contexto:
+
+Projeto: Visit Manager multi-empresa.
+
+Estado atual relevante:
+
+Já existe /admin/empresa onde se edita:
+
+Dados base da empresa (nome, NIF, contacto, etc.).
+
+theme ("light-business" / "dark-pro").
+
+mostrarMarcasEmVisitas (flag para mostrar/esconder campo de marcas nas visitas).
+
+Na BD já existem também:
+
+mostrarGPS em empresas (FASE 15).
+
+Existem várias funcionalidades que dependem de “comportamento de empresa”:
+
+IA (resumos, sugestões de tarefas, agendamentos).
+
+Áudio + transcrição.
+
+Alertas & badges (FASE 19).
+
+Follow-ups & próxima visita (FASE 15/20).
+
+Objetivo desta fase:
+
+Transformar /admin/empresa num Centro de Configurações organizado em separadores:
+
+Geral
+
+Visitas & Tarefas
+
+IA & Transcrição
+
+Localização & Privacidade
+
+Alertas & UX
+
+Integrações (placeholder para Office/Planner no futuro)
+
+Implementar upload de logo da empresa (em vez de só campo de texto).
+
+Reaproveitar os campos que já existem, sem quebrar nada.
+
+Organização visual: tabs / secções em /admin/empresa
+
+Reestruturar a página /admin/empresa para usar tabs (ex.: shadcn Tabs) com:
+
+Geral
+
+Visitas & Tarefas
+
+IA & Transcrição
+
+Localização & Privacidade
+
+Alertas & UX
+
+Integrações (só UI por agora)
+
+O formulário continua a trabalhar com o mesmo objeto empresa vindo do backend.
+
+Os saves podem ser:
+
+um único botão “Guardar alterações” que grava tudo, ou
+
+botão de guardar por tab (tu escolhes o mais simples/coerente com a página atual).
+
+Tab “Geral” – Identidade & Logo
+
+Campos:
+
+Nome da empresa
+
+NIF
+
+Email
+
+Telefone
+
+Tema (já existente):
+
+Select com "Tema claro (Business)" / "Tema escuro (Pro)" → theme.
+
+Logo da empresa (novo comportamento):
+
+Mostrar:
+
+Preview da imagem atual se logoUrl existir (ex.: quadrado/retângulo com max-height 40–80px).
+
+Botão “Carregar novo logo”.
+
+Ao escolher ficheiro:
+
+Enviar para um endpoint de upload (ver ponto 3).
+
+Ao receber o URL final, atualizar o campo logoUrl da empresa e mostrar o preview.
+
+Tipo de ficheiros permitidos:
+
+PNG, JPG, SVG preferencialmente.
+
+Não é preciso redimensionar no backend:
+
+Guardar a imagem e, no frontend, controlar o tamanho via CSS (ex.: max-height no header/sidebar).
+
+Upload de logo – backend
+
+Implementar um fluxo simples para upload do logo:
+
+Endpoint sugerido (pode ser este ou outro desde que documentes):
+
+POST /api/admin/empresa/logo
+
+Esperado:
+
+Recebe multipart/form-data com o ficheiro (file).
+
+Valida tipo/base64/mime básico.
+
+Faz upload para o storage que já estiver a ser usado (por exemplo Supabase Storage / bucket).
+
+Devolve:
+
+{ logoUrl: "https://..." }.
+
+Depois do upload:
+
+Atualizar a tabela empresas com o logoUrl devolvido.
+
+Se for mais simples, podes:
+
+Reutilizar o endpoint PATCH /api/admin/empresa para receber logoUrl depois de o upload estar feito.
+
+O importante é:
+
+Haver um modo simples de enviar o ficheiro e guardar o URL final.
+
+Tab “Visitas & Tarefas”
+
+Objetivo: agrupar comportamento relacionado com visitas/tarefas.
+
+Campos sugeridos (usa flags e campos que já existem sempre que possível):
+
+Marcas nas visitas (já existe):
+
+Checkbox:
+
+“Mostrar seleção de marcas nas visitas” → mostrarMarcasEmVisitas.
+
+Follow-ups / histórico:
+
+Checkbox:
+
+“Ativar cadeia de follow-up entre visitas (visitaAnteriorId)”
+(se desligado, pode apenas esconder a parte de follow-up na UI, sem mexer na BD).
+
+Tarefas (comportamento padrão):
+
+Select ou radio:
+
+“Tarefas criadas a partir de visitas são atribuídas por defeito a:”
+
+O utilizador que criou (default).
+
+Outro utilizador (se já tiveres forma fácil de o escolher).
+
+Prazo padrão para tarefas sugeridas pela IA (quando não vem nos dados da sugestão):
+
+Input numérico: “Prazo padrão (em dias)” → ex.: defaultIaTaskDays.
+
+Se for demasiado trabalho mexer na BD agora, podes deixar este campo só em frontend por enquanto.
+
+Tab “IA & Transcrição”
+
+Objetivo: controlo fino sobre onde a IA é usada.
+
+Campos sugeridos:
+
+IA nas visitas:
+
+Checkbox:
+
+“Ativar geração de resumo da visita por IA”
+
+Checkbox:
+
+“Ativar sugestões de tarefas por IA”
+
+Modo de uso da IA:
+
+Checkbox:
+
+“Permitir criar tarefas diretamente a partir das sugestões da IA”
+(se desligado, apenas mostra as sugestões mas não permite criar).
+
+Transcrição de áudio:
+
+Checkbox:
+
+“Permitir gravação de áudio nas visitas”
+
+Checkbox:
+
+“Transcrever automaticamente após gravar ou fazer upload”
+
+Select:
+
+“Idioma preferencial da transcrição” (ex.: pt-PT, es-ES, en-GB).
+
+Sempre que fizer sentido, podes mapear estes campos para uma estrutura JSON de config em empresas (ex.: iaConfig, audioConfig), para não multiplicar muitas colunas na tabela – mas mantém o PATCH/GET simples de usar.
+
+Tab “Localização & Privacidade”
+
+Objetivo: centralizar flags de GPS e privacidade.
+
+Campos:
+
+Localização:
+
+Checkbox:
+
+“Ativar funcionalidades de GPS nesta empresa” → liga/desliga mostrarGPS.
+
+Texto informativo:
+
+Apenas texto estático (não precisa de BD):
+
+Explicar que, se a localização for ativada no futuro, isso pode registar a posição ao marcar visitas como realizadas.
+
+Já existe o campo mostrarGPS na BD, apenas expor aqui de forma clara.
+
+Tab “Alertas & UX”
+
+Objetivo: dar algum controlo à empresa sobre os avisos internos.
+
+Campos sugeridos:
+
+AlertRibbon global:
+
+Checkbox:
+
+“Mostrar barra de alertas (tarefas em atraso / tarefas de hoje) nos dashboards”.
+
+Badges:
+
+Checkbox:
+
+“Mostrar badges com contagens no BottomNav (agentes)”.
+
+Checkbox:
+
+“Mostrar badges com contagens na sidebar/drawer (admins)”.
+
+Intervalo de atualização dos indicadores de hoje:
+
+Select:
+
+1 min / 2 min / 5 min (podes mapear para um valor em segundos e usar isso no hook useTodaySummary).
+
+Se der muito trabalho expor tudo, começa pelos toggles mais simples (AlertRibbon on/off) e pelo intervalo de refresh; os restantes podem ser marcados como “para uso futuro” com UI já pronta.
+
+Tab “Integrações”
+
+Apenas preparar o terreno para o futuro (Office/Planner), sem mexer ainda nas chaves.
+
+UI sugerida:
+
+Outlook / Microsoft 365:
+
+Badge de estado: “Desligado / Em configuração / Ativo” (por agora sempre “Desligado”).
+
+Texto curto a explicar que a sincronização com calendário e tarefas será configurada aqui.
+
+Planner / To-Do:
+
+Idem, só com texto e estado.
+
+Nenhuma chamada real de API aqui por enquanto – apenas layout e placeholders.
+
+Testes esperados
+
+Abrir /admin/empresa como admin:
+
+Ver tabs divididas (Geral, Visitas & Tarefas, IA & Transcrição, etc.).
+
+Mudar campos, clicar em guardar, ver alterações persistirem após reload.
+
+Upload de logo:
+
+Carregar uma imagem.
+
+Ver preview atualizado.
+
+Ver logo da empresa atualizado na sidebar/top bar sem quebrar layout.
+
+Após reload/login, o logo mantém-se.
+
+Flags existentes:
+
+mostrarMarcasEmVisitas, mostrarGPS e theme continuam a funcionar exatamente como antes.
+
+RBAC:
+
+Apenas utilizadores admin conseguem aceder/editar estas configs.
+
+Restrições:
+
+Não quebrar o que já está implementado nas fases anteriores.
+
+Reutilizar o endpoint /api/admin/empresa sempre que possível, eventualmente adicionando um endpoint de upload específico para o logo.
+
+Manter a lógica de multi-empresa e RBAC exatamente como está.
