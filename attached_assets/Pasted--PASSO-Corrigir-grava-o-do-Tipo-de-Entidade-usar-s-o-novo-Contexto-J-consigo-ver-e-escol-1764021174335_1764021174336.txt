@@ -1,0 +1,164 @@
+🔧 PASSO – Corrigir gravação do Tipo de Entidade (usar só o novo)
+
+Contexto:
+
+Já consigo ver e escolher os tipos de entidade criados em /admin/empresa → Entidades.
+
+No EntidadeForm aparece o campo “Entidade” com a dropdown correta.
+
+Mas quando gravo:
+
+a entidade continua a ficar com o tipo antigo (“legado”),
+
+ou seja, o valor escolhido na dropdown não fica realmente associado.
+
+🎯 Objetivo deste passo:
+
+Garantir que, ao criar/editar uma entidade:
+
+o campo escolhido na dropdown (tipo configurado) é guardado em entidadeTipoId,
+
+esse valor é o que aparece depois ao voltar a abrir a entidade,
+
+o campo legado tipoEntidade já não influencia nada no comportamento atual.
+
+1. Frontend – garantir que o form envia entidadeTipoId (e não sobrescreve com legado)
+
+No EntidadeForm.tsx, verifica:
+
+o schema usado pelo react-hook-form / Zod:
+
+entidadeTipoId tem de estar incluído no formValues como string ou string|null.
+
+a função onSubmit:
+
+garante que o payload enviado no fetch/mutate inclui entidadeTipoId.
+
+Confirma que:
+
+não estás a mandar tipoEntidade no body (a não ser que seja mesmo só para histórico),
+
+e que não existe nenhuma lógica tipo:
+
+tipoEntidade: formValues.tipoEntidade || formValues.entidadeTipoIdNome
+
+
+que possa voltar a enfiar o valor antigo no lado do servidor.
+
+Em resumo:
+
+Para CREATE:
+
+body deve incluir entidadeTipoId (ou null se nada for selecionado).
+
+Para UPDATE:
+
+body deve incluir entidadeTipoId atualizado (ou null para limpar).
+
+2. Backend – update/insert a gravar entidadeTipoId de verdade
+
+No handler de criação de entidade (POST /api/entidades ou similar):
+
+Confirma que:
+
+o schema de input inclui entidadeTipoId como opcional/nullable,
+
+o insert na tabela entidades grava entidadeTipoId no campo correto.
+
+No handler de edição de entidade (PATCH /api/entidades/:id):
+
+Confirma que:
+
+também aceita entidadeTipoId no body,
+
+passa esse valor para o update no storage/Drizzle.
+
+Verifica se ainda existe alguma lógica que faz:
+
+copiar tipoEntidade para algum lado,
+
+ou calcular tipoEntidade a partir do tipo novo.
+
+Para este passo:
+
+entidadeTipoId é a fonte de verdade,
+
+tipoEntidade deve ser ignorado no update normal (pode ficar só na BD como legado/histórico).
+
+3. Garantir que o detalhe mostra também o tipo novo
+
+No EntidadeDetail.tsx:
+
+Garante que o badge ou texto que mostra o tipo da entidade vem de:
+
+entidade.entidadeTipo?.nome
+
+Se ainda estiver a mostrar entidade.tipoEntidade como principal, troca a prioridade:
+
+primeiro tenta entidade.entidadeTipo.nome,
+
+só se não existir é que podes mostrar o legado (temporariamente).
+
+4. Testes que quero que faças
+
+Teste A – Criar entidade nova
+
+Em /admin/empresa → Entidades, certifica-te que tens vários tipos ativos (ex.: Gabinetes, Distribuidores, Construtores).
+
+Vai a Nova Entidade:
+
+Preenche os dados,
+
+Escolhe “Gabinetes” no campo “Entidade”,
+
+Grava.
+
+Abre o detalhe dessa entidade:
+
+Esperado: o tipo mostrado é “Gabinetes”.
+
+Clica em “Editar”:
+
+Esperado: o select está com “Gabinetes” selecionado.
+
+Teste B – Editar entidade existente e mudar o tipo
+
+Abre uma entidade que já exista.
+
+Edita e muda o campo “Entidade” de “Gabinetes” para “Distribuidores”.
+
+Grava.
+
+Volta ao detalhe:
+
+Esperado: agora mostra “Distribuidores”.
+
+Volta a entrar em editar:
+
+Esperado: o select vem com “Distribuidores”.
+
+Teste C – Garantir que o legado não manda
+
+Confirma, diretamente na BD (ou via log/console), que:
+
+entidadeTipoId está a mudar,
+
+tipoEntidade não está a ser reescrito de forma a “anular” o novo tipo.
+
+5. Relatório desta correção
+
+No relatório desta mini-fase, por favor indica:
+
+Que campos vão agora no body de create/update (confirma que entidadeTipoId está lá).
+
+Que alterações fizeste nas rotas de backend para gravar entidadeTipoId.
+
+Como ficou o detalhe da entidade (que campo mostra).
+
+Resultado dos testes A, B e C (passou/falhou).
+
+⚠️ Nota:
+
+Nesta fase não peço para apagar a coluna tipoEntidade da BD,
+
+Só quero que, do ponto de vista da app, o tipo que conta é o novo (via entidadeTipoId), e que o legado deixe de “mandar” no que se vê e se grava.
