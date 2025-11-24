@@ -126,13 +126,18 @@ export default function VisitaForm() {
     enabled: empresa?.mostrarMarcasEmVisitas ?? false,
   });
 
+  // Build prefilled notes with header
+  const notasComResumo = prefillData.resumoVisitaAnterior && prefillData.visitaAnteriorData
+    ? `====================Resumo da Visita Anterior, efetuada dia ${format(new Date(prefillData.visitaAnteriorData), "dd/MM/yyyy", { locale: pt })} ====================\n\n${prefillData.resumoVisitaAnterior}`
+    : prefillData.resumoVisitaAnterior || "";
+
   const form = useForm<VisitaFormData>({
     resolver: zodResolver(visitaFormSchema),
     defaultValues: {
       entidadeId: prefillData.entidadeId || "",
       contactoId: prefillData.contactoId || "",
       dataVisita: prefillData.dataVisita || new Date(),
-      notas: prefillData.resumoVisitaAnterior || "",
+      notas: notasComResumo,
       marcasEntregues: [],
       marcasIds: [],
       proximaVisita: undefined,
