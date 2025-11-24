@@ -1162,6 +1162,7 @@ export default function VisitaDetail() {
                       entidadeName: visita?.gabinete?.nome || visita?.entidade?.nome || "",
                       contactoName: visita?.contacto?.nome || "",
                       visitaAnteriorData: visita?.dataVisita?.toString() || "",
+                      resumoVisitaAnterior: visita?.resumoIa || "",
                     });
                     setLocation(`/visitas/nova?${params.toString()}`);
                   }}

@@ -55,6 +55,7 @@ export default function VisitaForm() {
     entidadeName: queryParams.get('entidadeName') || '',
     contactoName: queryParams.get('contactoName') || '',
     visitaAnteriorData: queryParams.get('visitaAnteriorData') ? new Date(queryParams.get('visitaAnteriorData')!) : null,
+    resumoVisitaAnterior: queryParams.get('resumoVisitaAnterior') || '',
   };
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
@@ -131,7 +132,7 @@ export default function VisitaForm() {
       entidadeId: prefillData.entidadeId || "",
       contactoId: prefillData.contactoId || "",
       dataVisita: prefillData.dataVisita || new Date(),
-      notas: "",
+      notas: prefillData.resumoVisitaAnterior || "",
       marcasEntregues: [],
       marcasIds: [],
       proximaVisita: undefined,
@@ -475,6 +476,12 @@ export default function VisitaForm() {
                 <span className="text-muted-foreground">Data anterior:</span>
                 <p className="font-medium">{prefillData.visitaAnteriorData ? format(new Date(prefillData.visitaAnteriorData), "PPP", { locale: pt }) : "—"}</p>
               </div>
+              {prefillData.resumoVisitaAnterior && (
+                <div>
+                  <span className="text-muted-foreground">Resumo anterior:</span>
+                  <p className="font-medium text-xs line-clamp-2 mt-1">{prefillData.resumoVisitaAnterior}</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
