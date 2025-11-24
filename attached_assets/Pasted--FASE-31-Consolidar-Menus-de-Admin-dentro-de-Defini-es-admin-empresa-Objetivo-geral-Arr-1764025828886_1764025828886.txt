@@ -1,0 +1,203 @@
+🔧 FASE 31 – Consolidar Menus de Admin dentro de Definições (/admin/empresa)
+
+🎯 Objetivo geral:
+Arrumar a navegação de admin para que:
+
+todas as configurações da empresa fiquem concentradas em /admin/empresa (Centro de Configurações),
+
+o sidebar/admin menu não tenha páginas de “definições soltas”,
+
+a experiência seja:
+
+Admin → vê “Definições” como um só item no sidebar,
+
+dentro de Definições tem abas/submenus: Empresa, Utilizadores, Marcas, Tipos de Entidade, Filtros, IA, etc.
+
+⚠️ Muito importante:
+
+Não alterar a lógica de negócios, nem RBAC, nem endpoints.
+
+Apenas reorganizar a navegação + layout para que tudo o que é admin/config viva dentro de /admin/empresa.
+
+1. Sidebar Admin – deixar só “Definições” (Empresa) para configurações
+
+Abre o componente da sidebar admin (AdminSidebar.tsx ou equivalente).
+
+Na secção ADMIN:
+
+Atualmente há provavelmente itens como:
+
+Empresa
+
+Utilizadores
+
+Marcas
+
+(eventualmente outros)
+
+Ajusta para:
+
+Ter apenas um item “Definições” (ou “Empresa”, desde que claro que é o Centro de Configurações), que aponta para /admin/empresa.
+
+Remover do sidebar:
+
+links diretos para /admin/utilizadores
+
+links diretos para /admin/marcas
+
+e qualquer outro link que seja essencialmente “configuração”.
+
+Resultado esperado:
+
+Na sidebar admin, o utilizador vê:
+
+Dashboard
+
+Entidades
+
+Contactos
+
+Visitas
+
+Tarefas
+
+Lembretes
+
+Definições (1 item único para tudo o que é configurações)
+
+2. Centro de Configurações – agrupar Empresa / Utilizadores / Marcas / Entidades
+
+Em /admin/empresa já existe um “Centro de Configurações” com várias abas (Geral, Visitas & Tarefas, IA & Áudio, Localização, Alertas & UX, Integrações, Entidades, etc.).
+
+O que quero nesta fase:
+
+Dentro de /admin/empresa, organizar as tabs/submenus de forma clara:
+
+Geral → Nome empresa, NIF, email, telefone, tema, logo
+
+Utilizadores → gestão de utilizadores (lista, criar, alterar role, ativar/desativar)
+
+Marcas → gestão de marcas (lista, criar, ativar/desativar)
+
+Entidades → Tipos de Entidade configuráveis (nome, cor, ícone, ativo)
+
+Visitas & Tarefas → settings de follow-up, defaults, etc.
+
+IA & Áudio → settings IA, resumos, sugestões, gravação/transcrição
+
+Localização & Privacidade
+
+Alertas & UX
+
+Integrações (placeholders para Outlook, Google, etc.)
+
+Reutilizar as páginas existentes:
+
+O conteúdo atual de:
+
+/admin/utilizadores → deve passar a ser o conteúdo da aba Utilizadores dentro de /admin/empresa.
+
+/admin/marcas → deve ser o conteúdo da aba Marcas dentro de /admin/empresa.
+
+Tipos de Entidade (que já tens a gerir dentro de Definições) → devem ficar na aba Entidades.
+
+Ou seja, não reescrever a lógica, apenas mover/reutilizar os componentes para dentro da estrutura de tabs do Centro de Configurações.
+
+3. Rotas antigas → redirecionar para o novo Centro de Configurações
+
+No router (App.tsx ou onde defines as rotas):
+
+Se ainda existirem rotas:
+
+/admin/utilizadores
+
+/admin/marcas
+
+Ajustar para:
+
+ou remover essas rotas,
+
+ou transformá-las em redirect para /admin/empresa com o tab certo, por ex.:
+
+/admin/utilizadores → /admin/empresa?tab=utilizadores
+
+/admin/marcas → /admin/empresa?tab=marcas
+
+Se usares query param tab, garante que:
+
+/admin/empresa?tab=utilizadores abre o Centro de Configurações com a aba Utilizadores activa,
+
+idem para tab=marcas, tab=entidades, etc.
+
+4. UX/Admin: acesso único às definições
+
+Garante que:
+
+Em qualquer sítio da app onde existiam links/botões “Gerir Utilizadores”, “Gerir Marcas”, etc.:
+
+agora apontam para /admin/empresa?tab=utilizadores ou /admin/empresa?tab=marcas.
+
+Isso inclui, por exemplo:
+
+se no topo/footers de páginas existirem links tipo “Ver todos os utilizadores” ou “Configurar marcas”.
+
+Resultado esperado:
+
+O admin tem a sensação de que:
+
+tudo o que é “arrumar a casa” está em Definições,
+
+o resto do sidebar é só para operações do dia-a-dia (visitas, tarefas, etc.).
+
+5. Testes que quero que faças
+
+Como Admin:
+
+Abre o menu lateral:
+
+Verifica que já não existem itens separados “Utilizadores” e “Marcas”.
+
+Vê apenas um item “Definições” (ou “Empresa” se mantiveres esse nome).
+
+Entra em /admin/empresa:
+
+Confirma que lá dentro tens, pelo menos, estas tabs:
+
+Geral, Utilizadores, Marcas, Entidades, Visitas & Tarefas, IA & Áudio, Localização, Alertas & UX, Integrações.
+
+Em cada uma:
+
+Geral → dados da empresa + tema + logo
+
+Utilizadores → mesma UI de gestão de utilizadores que tinhas antes
+
+Marcas → mesma UI de gestão de marcas que tinhas antes
+
+Entidades → tipos de entidade com nome, cor, ícone, ativo
+
+Se ainda tentares ir a /admin/utilizadores ou /admin/marcas:
+
+Esperado:
+
+ou não existem mais essas rotas,
+
+ou redirecionam para /admin/empresa com a tab correta (sem partir).
+
+6. Relatório desta fase
+
+No relatório, por favor descreve:
+
+Como ficou a estrutura do sidebar admin (lista final de itens).
+
+Como ficou o Centro de Configurações:
+
+que tabs existem e que componentes foram reutilizados dentro de cada tab.
+
+O que fizeste às rotas /admin/utilizadores e /admin/marcas (removidas? redirecionadas?).
+
+Resultado dos testes de navegação como admin.
+
+Objetivo final:
+👉 Tudo o que é configuração/admin passa a viver dentro de /admin/empresa,
+👉 O sidebar de admin fica limpo e organizado,
+👉 Não há mais “menus de definições” espalhados fora do Centro de Configurações.

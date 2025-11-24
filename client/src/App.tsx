@@ -137,8 +137,6 @@ function Router() {
         {isAdmin && (
           <>
             <Route path="/admin/empresa" component={() => <AdminRoute component={AdminEmpresa} />} />
-            <Route path="/admin/utilizadores" component={() => <AdminRoute component={AdminUsers} />} />
-            <Route path="/admin/marcas" component={() => <AdminRoute component={AdminMarcas} />} />
             <Route path="/admin/debug" component={() => <AdminRoute component={AdminDebug} />} />
           </>
         )}

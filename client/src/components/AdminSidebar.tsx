@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Building2, Users, FileText, CheckCircle2, Bell, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, Building2, Users, CheckCircle2, Bell, Settings, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
@@ -15,9 +15,7 @@ const sidebarItems = [
 ];
 
 const adminSidebarItems = [
-  { path: "/admin/empresa", icon: Building2, label: "Empresa" },
-  { path: "/admin/utilizadores", icon: Users, label: "Utilizadores" },
-  { path: "/admin/marcas", icon: FileText, label: "Marcas" },
+  { path: "/admin/empresa", icon: Settings, label: "Definições" },
 ];
 
 export function AdminSidebar() {

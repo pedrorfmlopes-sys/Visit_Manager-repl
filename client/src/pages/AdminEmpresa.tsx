@@ -12,10 +12,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Empresa } from "@shared/schema";
+import type { Empresa, User, Marca } from "@shared/schema";
 import { Upload, Cloud, Settings, MapPin, Bell, Zap, Lightbulb } from "lucide-react";
 import { useRef, useState } from "react";
 import AdminEntidadeTipos from "@/pages/AdminEntidadeTipos";
+import AdminUsers from "@/pages/AdminUsers";
+import AdminMarcas from "@/pages/AdminMarcas";
 
 const updateEmpresaSchema = z.object({
   nome: z.string().min(1, "Nome obrigatório"),
@@ -166,8 +168,10 @@ export default function AdminEmpresa() {
             <Form {...form}>
               <form onSubmit={form.handleSubmit((data) => updateMutation.mutate(data))} className="space-y-6">
                 <Tabs defaultValue="geral" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 lg:grid-cols-8 gap-1 h-auto">
+                  <TabsList className="grid w-full grid-cols-2 lg:grid-cols-10 gap-1 h-auto">
                     <TabsTrigger value="geral" data-testid="tab-settings-geral" className="text-xs">Geral</TabsTrigger>
+                    <TabsTrigger value="utilizadores" data-testid="tab-settings-utilizadores" className="text-xs">Utilizadores</TabsTrigger>
+                    <TabsTrigger value="marcas" data-testid="tab-settings-marcas" className="text-xs">Marcas</TabsTrigger>
                     <TabsTrigger value="visitas" data-testid="tab-settings-visitas" className="text-xs">Visitas & Tarefas</TabsTrigger>
                     <TabsTrigger value="ia" data-testid="tab-settings-ia" className="text-xs">IA & Áudio</TabsTrigger>
                     <TabsTrigger value="localizacao" data-testid="tab-settings-localizacao" className="text-xs">Localização</TabsTrigger>
@@ -176,6 +180,16 @@ export default function AdminEmpresa() {
                     <TabsTrigger value="entidades" data-testid="tab-settings-entidades" className="text-xs">Entidades</TabsTrigger>
                     <TabsTrigger value="filtros" data-testid="tab-settings-filtros" className="text-xs">Filtros</TabsTrigger>
                   </TabsList>
+
+                  {/* TAB -1: UTILIZADORES */}
+                  <TabsContent value="utilizadores" className="mt-6">
+                    <AdminUsers />
+                  </TabsContent>
+
+                  {/* TAB 0: MARCAS */}
+                  <TabsContent value="marcas" className="mt-6">
+                    <AdminMarcas />
+                  </TabsContent>
 
                   {/* TAB 1: GERAL - Identidade & Logo */}
                   <TabsContent value="geral" className="space-y-6 mt-6">
