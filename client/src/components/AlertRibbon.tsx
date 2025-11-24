@@ -31,7 +31,7 @@ export function AlertRibbon() {
   const textColor = tarefasAtrasadas > 0 ? "text-destructive" : "text-accent";
 
   return (
-    <div className={`${alertColor} border-b border-destructive/20 sticky top-0 z-30`}>
+    <div className={`${alertColor} border-b border-destructive/20`}>
       <div className="flex items-center justify-between px-4 py-3 max-w-4xl mx-auto">
         <div className="flex items-center gap-3">
           <Icon className={`h-5 w-5 flex-shrink-0 ${textColor}`} />

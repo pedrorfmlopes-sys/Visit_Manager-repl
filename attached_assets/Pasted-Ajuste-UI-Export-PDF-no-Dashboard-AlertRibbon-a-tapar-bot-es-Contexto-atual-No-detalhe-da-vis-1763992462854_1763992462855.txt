@@ -1,0 +1,89 @@
+Ajuste UI – Export PDF no Dashboard + AlertRibbon a tapar botões
+
+Contexto atual:
+
+No detalhe da visita:
+
+O botão para exportar PDF aparece no fim da página e está a funcionar → ✅ ok.
+
+No Dashboard:
+
+Antes das últimas fases eu tinha botões visíveis para exportar relatórios PDF (ex.: relatórios de visitas/tarefas a partir do dashboard).
+
+Agora esses botões desapareceram – já não tenho forma de exportar PDF a partir do Dashboard.
+
+Alertas (AlertRibbon):
+
+A barra de notificações/alertas no topo está a ser renderizada de forma a tapar os botões que existem no topo do ecrã (por ex.: botões de ações no header/top bar do dashboard).
+
+✅ O que está OK:
+
+Backend de PDF e botão de PDF no detalhe da visita: não mexer, está funcional.
+
+❌ O que precisa de ajuste:
+
+1️⃣ Repor botões de Exportar PDF no Dashboard
+
+Preciso de ter novamente, no Dashboard, botões visíveis para exportar relatórios em PDF, tal como tinha antes das refactors.
+
+Pode ser, por exemplo:
+
+Uma pequena barra de ações por cima dos cards (logo abaixo do título do dashboard),
+
+Com um ou mais botões, ex.:
+
+“Exportar relatório de visitas (PDF)”
+
+“Exportar relatório de tarefas (PDF)” (ou o que fizer sentido com o que já existia).
+
+Importante:
+
+Estes botões devem estar sempre visíveis no Dashboard (tanto para admin como para agent, conforme o comportamento anterior).
+
+Devem chamar os mesmos endpoints de PDF que já estão a ser usados no detalhe da visita (não é preciso reinventar o backend, só expor a ação no Dashboard).
+
+2️⃣ AlertRibbon não pode tapar os botões do topo
+
+Neste momento, a barra de alertas está a ser renderizada de forma a ficar por cima da top bar / header, escondendo botões que estão lá (especialmente no Dashboard).
+
+O comportamento desejado é:
+
+A AlertRibbon deve aparecer dentro da área de conteúdo, logo abaixo do título do dashboard / header, sem sobrepor o header nem os botões de ações.
+
+Sugestão de implementação:
+
+Em vez de usar position: fixed / sticky por cima de tudo, renderizar a AlertRibbon:
+
+Dentro do content container (por ex. logo após o título “Dashboard”),
+
+Empurrando o conteúdo para baixo (layout normal), sem tapar nada.
+
+Manter o mesmo estilo visual (cores, mensagens), apenas mudar a posição/z-index para não ocupar o espaço dos botões.
+
+3️⃣ Coisas a confirmar no fim:
+
+No Dashboard (admin e agent):
+
+Ver os botões de Exportar PDF no topo do conteúdo.
+
+Clicar → exportar corretamente o(s) PDF(s).
+
+AlertRibbon:
+
+Continuar a aparecer quando há tarefas em atraso/hoje.
+
+Mas nunca sobrepor a top bar ou os botões de ação.
+
+Em mobile e desktop o comportamento deve manter a visibilidade dos botões.
+
+Resumo:
+
+PDF:
+
+Detalhe de visita → está ok, manter.
+
+Dashboard → voltar a ter botões de exportação bem visíveis.
+
+Alertas:
+
+AlertRibbon deve ficar abaixo do header/título dentro do conteúdo, não colado ao topo a tapar botões.
