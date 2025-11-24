@@ -102,6 +102,8 @@ export interface IStorage {
   getEntidadeTipo(id: string, empresaId: string): Promise<EntidadeTipo | undefined>;
   createEntidadeTipo(tipo: InsertEntidadeTipo, empresaId: string): Promise<EntidadeTipo>;
   updateEntidadeTipo(id: string, tipo: Partial<InsertEntidadeTipo>, empresaId: string): Promise<EntidadeTipo | undefined>;
+  // PASSO 7: Migration function
+  migrateEntidadeTipos(): Promise<{ empresasProcessadas: number; entidadesMigradas: number; tiposCriados: number }>;
   
   // FASE 6: Audio management
   addAudioToVisita(visitaId: string, fileUrl: string, empresaId: string): Promise<VisitasAudio>;
@@ -1063,6 +1065,76 @@ export class DatabaseStorage implements IStorage {
       ))
       .returning()
       .then((res) => res[0]);
+  }
+
+  // PASSO 7: Migration - Convert legacy tipoEntidade to entidadeTipoId
+  async migrateEntidadeTipos(): Promise<{ empresasProcessadas: number; entidadesMigradas: number; tiposCriados: number }> {
+    const empresas_list = await this.getAllEmpresas();
+    let totalEntidadesMigradas = 0;
+    let totalTiposCriados = 0;
+
+    for (const empresa of empresas_list) {
+      // Get all distinct tipoEntidade values for this empresa (ignoring null and empty strings)
+      const distinct_tipos = await db
+        .select({ tipoEntidade: entidades.tipoEntidade })
+        .from(entidades)
+        .where(and(
+          eq(entidades.empresaId, empresa.id),
+          sql`${entidades.tipoEntidade} IS NOT NULL AND ${entidades.tipoEntidade} != ''`
+        ))
+        .distinct();
+
+      for (const row of distinct_tipos) {
+        const legacyTipo = row.tipoEntidade;
+        if (!legacyTipo) continue;
+
+        // Check if entidade_tipo already exists
+        let tipoId = await db
+          .select({ id: entidadeTipos.id })
+          .from(entidadeTipos)
+          .where(and(
+            eq(entidadeTipos.empresaId, empresa.id),
+            eq(entidadeTipos.nome, legacyTipo)
+          ))
+          .then((res) => res[0]?.id);
+
+        // If not, create it
+        if (!tipoId) {
+          const newTipo = await db
+            .insert(entidadeTipos)
+            .values({
+              empresaId: empresa.id,
+              nome: legacyTipo,
+              cor: '#808080', // Default gray color
+              ativo: true,
+              ordem: 0,
+            })
+            .returning()
+            .then((res) => res[0]);
+          tipoId = newTipo.id;
+          totalTiposCriados++;
+        }
+
+        // Update all entidades with this tipoEntidade and null entidadeTipoId to point to the new tipo
+        const updateResult = await db
+          .update(entidades)
+          .set({ entidadeTipoId: tipoId })
+          .where(and(
+            eq(entidades.empresaId, empresa.id),
+            eq(entidades.tipoEntidade, legacyTipo),
+            sql`${entidades.entidadeTipoId} IS NULL`
+          ))
+          .returning();
+
+        totalEntidadesMigradas += updateResult.length;
+      }
+    }
+
+    return {
+      empresasProcessadas: empresas_list.length,
+      entidadesMigradas: totalEntidadesMigradas,
+      tiposCriados: totalTiposCriados,
+    };
   }
 
   async getMarcasByEmpresaAtiva(empresaId: string): Promise<Marca[]> {

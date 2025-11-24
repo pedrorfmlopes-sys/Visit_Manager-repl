@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
-import { ArrowLeft, Loader2, WifiOff, Building2, User, Package, Construction, Briefcase, MapPin, RefreshCw } from "lucide-react";
+import { ArrowLeft, Loader2, WifiOff, MapPin, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,13 +20,6 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { syncManager } from "@/lib/syncManager";
 import { GoogleCompanySearch } from "@/components/GoogleCompanySearch";
 import { fillEntityForm, type PTEnrichmentResult } from "@/lib/enrichmentUtils";
-
-const legacyTipoOptions = [
-  { value: "Gabinete", label: "Gabinete de Arquitetura", icon: Building2 },
-  { value: "Distribuidor", label: "Distribuidor", icon: Package },
-  { value: "Parceiro", label: "Parceiro Comercial", icon: Briefcase },
-  { value: "Construtor", label: "Construtor / Empreiteiro", icon: Construction },
-];
 
 export default function EntidadeForm() {
   const [, setLocation] = useLocation();
@@ -60,7 +53,6 @@ export default function EntidadeForm() {
   const form = useForm<InsertEntidade>({
     resolver: zodResolver(insertEntidadeSchema),
     defaultValues: entidade || {
-      tipoEntidade: "Gabinete",
       entidadeTipoId: null,
       nome: "",
       morada: "",
@@ -442,40 +434,6 @@ export default function EntidadeForm() {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="tipoEntidade"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tipo de Entidade (Legado) *</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger className="h-12" data-testid="select-tipo-entidade-legado">
-                        <SelectValue placeholder="Selecione o tipo" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {legacyTipoOptions.map((option) => {
-                        const Icon = option.icon;
-                        return (
-                          <SelectItem key={option.value} value={option.value} data-testid={`option-tipo-legado-${option.value}`}>
-                            <div className="flex items-center gap-2">
-                              <Icon className="h-4 w-4" />
-                              {option.label}
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Campo legado mantido para compatibilidade. Use o novo "Tipo de Entidade (Configurado)" para maior flexibilidade.
-                  </p>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             {/* Assigned User Field - Admin Only */}
             {isAdmin && (
               <FormField
@@ -512,60 +470,55 @@ export default function EntidadeForm() {
             <FormField
               control={form.control}
               name="nome"
-              render={({ field }) => {
-                const tipoEntidade = form.watch("tipoEntidade");
-                
-                return (
-                  <FormItem>
-                    <div className="flex items-center justify-between gap-2">
-                      <FormLabel>Nome *</FormLabel>
-                      {isEdit && isOnline && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleManualEnrich}
-                          disabled={isEnriching || !field.value}
-                          className="h-8"
-                          data-testid="button-refresh-web"
-                        >
-                          {isEnriching ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <RefreshCw className="h-4 w-4" />
-                          )}
-                          <span className="ml-1">Atualizar da Web</span>
-                        </Button>
-                      )}
-                    </div>
-                    <FormControl>
-                      {isEdit ? (
-                        <Input
-                          {...field}
-                          placeholder="Nome da entidade"
-                          className="h-12"
-                          data-testid="input-nome"
-                        />
-                      ) : (
-                        <GoogleCompanySearch
-                          value={field.value}
-                          onChange={field.onChange}
-                          onSelect={handlePTCompanySelect}
-                          tipoEntidade={tipoEntidade}
-                          placeholder="Nome da empresa..."
-                          className="h-12"
-                        />
-                      )}
-                    </FormControl>
-                    {!isOnline && !isEdit && (
-                      <FormDescription className="text-xs text-muted-foreground">
-                        Pesquisa inteligente funciona offline usando dados locais
-                      </FormDescription>
+              render={({ field }) => (
+                <FormItem>
+                  <div className="flex items-center justify-between gap-2">
+                    <FormLabel>Nome *</FormLabel>
+                    {isEdit && isOnline && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleManualEnrich}
+                        disabled={isEnriching || !field.value}
+                        className="h-8"
+                        data-testid="button-refresh-web"
+                      >
+                        {isEnriching ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4" />
+                        )}
+                        <span className="ml-1">Atualizar da Web</span>
+                      </Button>
                     )}
-                    <FormMessage />
-                  </FormItem>
-                );
-              }}
+                  </div>
+                  <FormControl>
+                    {isEdit ? (
+                      <Input
+                        {...field}
+                        placeholder="Nome da entidade"
+                        className="h-12"
+                        data-testid="input-nome"
+                      />
+                    ) : (
+                      <GoogleCompanySearch
+                        value={field.value}
+                        onChange={field.onChange}
+                        onSelect={handlePTCompanySelect}
+                        placeholder="Nome da empresa..."
+                        className="h-12"
+                      />
+                    )}
+                  </FormControl>
+                  {!isOnline && !isEdit && (
+                    <FormDescription className="text-xs text-muted-foreground">
+                      Pesquisa inteligente funciona offline usando dados locais
+                    </FormDescription>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
             />
 
             <FormField

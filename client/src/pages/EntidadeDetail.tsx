@@ -23,13 +23,6 @@ import { apiRequest } from "@/lib/queryClient";
 import type { EntidadeWithRelations, Lembrete } from "@shared/schema";
 import { useState } from "react";
 
-const tipoLabels: Record<string, string> = {
-  Gabinete: "Gabinete",
-  Distribuidor: "Distribuidor",
-  Parceiro: "Parceiro",
-  Construtor: "Construtor",
-};
-
 export default function EntidadeDetail() {
   const [, params] = useRoute("/entidades/:id");
   const [, setLocation] = useLocation();
@@ -353,9 +346,11 @@ export default function EntidadeDetail() {
             </Button>
             <div>
               <h1 className="text-xl font-semibold text-foreground">{entidade.nome}</h1>
-              <Badge variant="outline" className="mt-1 no-default-hover-elevate no-default-active-elevate" data-testid="badge-tipo">
-                {tipoLabels[entidade.tipoEntidade] || "Tipo indefinido"}
-              </Badge>
+              {entidade.entidadeTipo && (
+                <Badge variant="outline" className="mt-1 no-default-hover-elevate no-default-active-elevate" data-testid="badge-tipo">
+                  {entidade.entidadeTipo.nome}
+                </Badge>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">

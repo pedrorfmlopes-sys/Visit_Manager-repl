@@ -3362,6 +3362,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PASSO 7: POST /api/admin/entidades/migrar-tipos - Migrate legacy tipoEntidade to entidadeTipoId
+  app.post('/api/admin/entidades/migrar-tipos', requireAdmin, async (req: any, res) => {
+    try {
+      const result = await storage.migrateEntidadeTipos();
+      res.json({
+        message: "Migration completed successfully",
+        ...result,
+      });
+    } catch (error) {
+      console.error("Error migrating entidade tipos:", error);
+      res.status(500).json({ message: "Failed to migrate entidade tipos", error: String(error) });
+    }
+  });
+
   // GET /api/marcas - List active brands (public endpoint, authenticated but no admin required)
   app.get('/api/marcas', isAuthenticated, async (req: any, res) => {
     try {
