@@ -45,7 +45,7 @@ PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities in
 -   **Admin Settings Center**: Organized 6-tab settings page with company configuration, logo upload, and UI settings JSON for future extensibility (FASE 22).
 -   **Logo Upload**: Direct upload of company logo with preview, type validation (PNG/JPG/SVG/WebP), and automatic database persistence.
 
-## Recent Features (FASE 20-23)
+## Recent Features (FASE 20-24)
 
 ### FASE 20: Unified Visit Status Management
 - Consolidated modal dialog for appointment status changes with 3 visual action paths (follow-up, mark done, cancel)
@@ -73,6 +73,18 @@ PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities in
 - **Metrics Collection**: Aggregates visits, tasks, top clients, brands over 30-day period
 - **Visual Design**: Amber-themed card with Lightbulb icon, positioned above PDF export
 - **Components**: New `DashboardInsightsCard.tsx`, integrated in Dashboard.tsx and AdminDashboard.tsx
+
+### FASE 24: User Profile & Settings (userSettings + Preferências)
+- **User Settings Schema**: New `userSettings` JSONB field on users table with Zod validation
+- **Settings Structure**: `{ homePage, listDensity, ia: { showVisitSummary, showTaskSuggestions, showDashboardInsights }, notifications: { emailTaskReminders, emailVisitReminders } }`
+- **Dedicated Settings Page**: New `/perfil` page with 4 sections: Perfil (read-only), Interface Preferences, IA Preferences, Notifications
+- **API Endpoints**: `GET /api/user/settings` (fetch), `PATCH /api/user/settings` (update)
+- **Security**: Only users can access/modify their own settings (userId-based isolation)
+- **Navigation**: Link in AgentMore page (agents) and AdminSidebar footer (admins)
+- **Preference Enforcement**: homePage setting will redirect on app launch (placeholder for future implementation)
+- **Respects Company Ceiling**: IA toggles respect enterprise `uiSettings` (user cannot override company-wide settings)
+- **Default Values**: Sensible defaults applied if settings empty or partial
+- **Component**: New `Perfil.tsx` page with form-based UI, proper validation, and error handling
 
 ## External Dependencies
 

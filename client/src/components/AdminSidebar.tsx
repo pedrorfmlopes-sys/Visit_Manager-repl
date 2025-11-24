@@ -131,6 +131,15 @@ export function AdminSidebar() {
       {/* Footer */}
       <div className="p-4 border-t border-card-border space-y-2">
         <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+        <Link href="/perfil">
+          <button
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-xs text-muted-foreground hover:text-foreground hover-elevate transition-colors"
+            data-testid="button-admin-settings"
+          >
+            <Settings className="h-4 w-4" />
+            Definições
+          </button>
+        </Link>
         <Button
           variant="ghost"
           size="sm"

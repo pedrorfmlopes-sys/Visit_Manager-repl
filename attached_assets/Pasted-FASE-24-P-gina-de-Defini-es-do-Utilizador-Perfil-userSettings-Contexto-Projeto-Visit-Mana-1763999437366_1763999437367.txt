@@ -1,0 +1,300 @@
+FASE 24 – Página de Definições do Utilizador (Perfil) + userSettings
+
+Contexto:
+
+Projeto: Visit Manager multi-empresa (Replit).
+
+Já existe um Centro de Configurações da Empresa em /admin/empresa com:
+
+uiSettings (JSON) na tabela empresas.
+
+Abas: Geral, Visitas & Tarefas, IA & Áudio, Localização & Privacidade, Alertas & UX, Integrações.
+
+Temos RBAC:
+
+role = "agent" com layout mobile-first (BottomNav + FAB).
+
+role = "admin" com AdminSidebar + AdminDrawer + Dashboard CRM.
+
+Já há várias funcionalidades parametrizáveis a nível de empresa (IA, alertas, GPS, etc.).
+
+Objetivo desta fase:
+
+Criar uma página de Definições do Utilizador / Perfil (para agent e admin) com:
+
+Dados básicos do utilizador.
+
+Preferências pessoais de interface (página inicial, densidade, etc.).
+
+Preferências pessoais de IA (mostrar/ocultar blocos IA).
+
+Preferências básicas de notificações (pelo menos guardadas em BD, mesmo que ainda não usadas).
+
+Tudo isto deve ser guardado num novo campo userSettings por utilizador (sem mexer em uiSettings da empresa).
+
+⚠️ Muito importante:
+
+Settings da empresa (uiSettings) continuam a ser o “teto máximo”:
+
+Se a empresa desativar uma funcionalidade (ex.: IA nas visitas), o utilizador não pode reativar nas suas settings.
+
+O utilizador só pode afinar/limitar para si funcionalidades que a empresa já permitiu.
+
+Schema – userSettings em users
+
+Adicionar ao schema (Drizzle + Zod) um campo userSettings na tabela de utilizadores:
+
+Tipo: JSON / jsonb (ou equivalente).
+
+Opcional (nullable), com default vazio.
+
+Estrutura sugerida (podes usar algo assim como base):
+
+userSettings = {
+  homePage: "dashboard" | "hoje" | "visitas" | "tarefas",
+  listDensity: "comfortable" | "compact",
+  ia: {
+    showVisitSummary: boolean,
+    showTaskSuggestions: boolean,
+    showDashboardInsights: boolean
+  },
+  notifications: {
+    emailTaskReminders: boolean,
+    emailVisitReminders: boolean
+  }
+}
+
+
+Podes manter a estrutura flexível (não precisa de ser rigidamente tipada em todos os campos, mas garante que há defaults sensatos).
+
+API – Endpoints de settings do utilizador
+
+Criar endpoints REST simples para o utilizador autenticado:
+
+GET /api/user/settings
+
+Usa o contexto do utilizador (userId) via auth existente.
+
+Devolve:
+
+Dados básicos: nome, email, role.
+
+userSettings com defaults aplicados (se estiver vazio ou parcial).
+
+PATCH /api/user/settings
+
+Permite atualizar apenas as preferências do próprio utilizador.
+
+Corpo esperado:
+
+Um objeto parcial com as chaves dentro de userSettings (não é necessário enviar tudo).
+
+Validações:
+
+Não permitir alterar role, empresaId ou outros campos críticos – apenas userSettings.
+
+Respeitar o “teto” da empresa:
+
+Ex.: se a empresa tiver uiSettings.ia.visitSummaryEnabled = false, então:
+
+Mesmo que o utilizador mande ia.showVisitSummary = true, isso deve ser ignorado ou normalizado para false no backend ou frontend.
+
+RBAC:
+
+Apenas o próprio utilizador pode ler/editar /api/user/settings (sem acesso cruzado).
+
+Frontend – Nova página “Perfil / Definições”
+
+Criar uma página dedicada às definições do utilizador, por exemplo:
+
+Rota: /perfil ou /definicoes (escolhe o que estiver mais consistente com o resto da app).
+
+Conteúdo da página (organiza por secções / cards):
+
+Secção “Perfil”
+
+Mostrar:
+
+Nome do utilizador.
+
+Email.
+
+Role (Agent / Admin).
+
+Empresa (nome).
+
+Neste momento, não é necessário editar nome/email aqui (só leitura está OK).
+
+Secção “Preferências de Interface”
+
+Campo “Página inicial ao abrir a app”:
+
+Select:
+
+Dashboard
+
+Hoje
+
+Visitas
+
+Tarefas
+
+Mapeia para userSettings.homePage.
+
+Campo “Densidade das listas”:
+
+Radio/segmented:
+
+“Confortável” → comfortable
+
+“Compacta” → compact
+
+Mapeia para userSettings.listDensity.
+
+Mais tarde isto será usado para ajustar classes das listas (para já, basta guardar).
+
+Secção “Preferências de IA”
+
+Três toggles (separados, mas respeitando settings da empresa):
+
+“Mostrar resumo da visita gerado por IA” → ia.showVisitSummary
+
+“Mostrar sugestões de tarefas geradas por IA” → ia.showTaskSuggestions
+
+“Mostrar insights IA no dashboard” → ia.showDashboardInsights
+
+Se a empresa tiver IA desativada para algum destes domínios (via uiSettings):
+
+O toggle deve aparecer desativado e desabilitado, com texto tipo:
+
+“Desativado pelas definições da empresa”.
+
+Não chamar o endpoint de insights IA se estiver globalmente off.
+
+Secção “Notificações” (para já só persistência)
+
+Checkboxes:
+
+“Receber lembretes de tarefas por email” → notifications.emailTaskReminders
+
+“Receber lembretes de visitas por email” → notifications.emailVisitReminders
+
+Nesta fase, é suficiente:
+
+Guardar estes valores em userSettings.notifications.
+
+Não precisas de implementar envio real de emails já – isso pode ser outra fase.
+
+UX:
+
+Botão “Guardar” no fim da página.
+
+Mostrar toast de sucesso/erro.
+
+Navegação – Onde o utilizador acede a estas definições
+
+Para agentes (mobile-first):
+
+No menu “Mais” / secção de perfil que já existe:
+
+Adicionar uma opção clara: “Perfil & Definições” → navega para /perfil (ou rota equivalente).
+
+Para admins (sidebar/drawer):
+
+Na AdminSidebar / AdminDrawer:
+
+Adicionar um item na secção de conta/utilizador, algo como:
+
+“As minhas definições” ou “Perfil”.
+
+Este item deve abrir a mesma página de settings do utilizador.
+
+Importante:
+
+Não misturar estas definições com /admin/empresa (empresa ≠ utilizador).
+
+Comportamentos que devem começar a respeitar userSettings
+
+Mesmo que seja um passo simples, já queremos começar a usar userSettings em 2 pontos:
+
+Página inicial ao abrir (homePage)
+
+Quando o utilizador faz login ou abre a app:
+
+Se tiver userSettings.homePage definido:
+
+Redirecionar para:
+
+dashboard → Dashboard atual.
+
+hoje → vista “Hoje” / “Home” do agente.
+
+visitas → lista de visitas.
+
+tarefas → lista de tarefas.
+
+Se não tiver nada, manter o comportamento atual (provavelmente Dashboard).
+
+IA nas visitas (a nível de UI)
+
+Na VisitaDetail:
+
+Só mostrar o bloco de Resumo IA da visita se:
+
+A empresa tiver IA para visitas ativa, e
+
+userSettings.ia.showVisitSummary !== false.
+
+Só mostrar o bloco de Sugestões IA → Tarefas/Agendamentos se:
+
+A empresa permitir IA para sugestões, e
+
+userSettings.ia.showTaskSuggestions !== false.
+
+Ou seja, se o utilizador desligar essas flags nas suas definições, deixa de ver esses blocos, mesmo que a empresa tenha IA ligada (mas nunca o contrário).
+
+Testes esperados
+
+Abrir a app como agent:
+
+Ir a “Perfil & Definições”.
+
+Alterar:
+
+Página inicial para “Tarefas”.
+
+Desligar “Mostrar sugestões de tarefas geradas por IA”.
+
+Guardar.
+
+Recarregar / relogar:
+
+A app deve abrir na lista de Tarefas.
+
+No detalhe da visita, já não devem aparecer as sugestões IA (apenas o resto da visita).
+
+Abrir como admin:
+
+Aceder às mesmas definições via item da sidebar/drawer.
+
+Confirmar que as alterações de userSettings só afetam esse utilizador, não a empresa.
+
+IA desligada a nível de empresa:
+
+Nas settings da empresa, desativar IA para visitas/dashboard.
+
+Ver:
+
+Toggles na secção de IA das definições do utilizador aparecem desativados e com texto “Desativado pela empresa”.
+
+Resumo IA, sugestões IA e dashboard insights não aparecem mesmo que os toggles do utilizador estivessem “true”.
+
+Documentação
+
+No final, atualiza o replit.md com:
+
+Nova secção para FASE 24 – User/Agent Settings & Perfil.
+
+Descrição dos novos campos (userSettings), endpoints (/api/user/settings) e comportamento.
+
+Como userSettings interage com uiSettings (empresa manda, utilizador refina).

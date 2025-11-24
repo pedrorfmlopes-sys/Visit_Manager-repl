@@ -107,6 +107,10 @@ export interface IStorage {
   createUtilizador(userData: UpsertUser): Promise<User>;
   updateUtilizador(id: string, userData: Partial<UpsertUser>, empresaId: string): Promise<User | undefined>;
 
+  // FASE 24: User settings management
+  getUserSettings(userId: string): Promise<User | undefined>;
+  updateUserSettings(userId: string, settings: any): Promise<User | undefined>;
+
   // Legacy Marcas (deprecated - for migration)
   getMarcas(): Promise<Marca[]>;
   
@@ -1059,6 +1063,22 @@ export class DatabaseStorage implements IStorage {
       .update(users)
       .set({ ...userData, updatedAt: new Date() })
       .where(and(eq(users.id, id), eq(users.empresaId, empresaId)))
+      .returning();
+    return updated;
+  }
+
+  // FASE 24: User settings management
+  async getUserSettings(userId: string): Promise<User | undefined> {
+    return await db.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
+  }
+
+  async updateUserSettings(userId: string, settings: any): Promise<User | undefined> {
+    const [updated] = await db
+      .update(users)
+      .set({ userSettings: settings, updatedAt: new Date() })
+      .where(eq(users.id, userId))
       .returning();
     return updated;
   }

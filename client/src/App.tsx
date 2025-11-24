@@ -38,6 +38,7 @@ import AdminEmpresa from "@/pages/AdminEmpresa";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminMarcas from "@/pages/AdminMarcas";
 import AgentMore from "@/pages/AgentMore";
+import Perfil from "@/pages/Perfil";
 // import MicrosoftIntegration from "@/pages/MicrosoftIntegration"; // Disabled: requires valid Azure credentials
 
 // Protected admin route component
@@ -121,6 +122,7 @@ function Router() {
         
         {/* Agent-specific routes */}
         <Route path="/agente-mais" component={AgentMore} />
+        <Route path="/perfil" component={Perfil} />
         
         {/* Lembretes and Analytics */}
         <Route path="/lembretes" component={Lembretes} />

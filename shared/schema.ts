@@ -126,6 +126,20 @@ export const users = pgTable("users", {
   role: userRoleEnum("role").notNull().default('agent'),
   ativo: boolean("ativo").default(true).notNull(), // FASE 3: User activation toggle
   empresaId: varchar("empresa_id").references(() => empresas.id, { onDelete: 'cascade' }), // NOVO: FK para empresas
+  // FASE 24: User-level settings (preferences, IA toggles, notifications)
+  userSettings: jsonb("user_settings").default(sql`'{
+    "homePage": "dashboard",
+    "listDensity": "comfortable",
+    "ia": {
+      "showVisitSummary": true,
+      "showTaskSuggestions": true,
+      "showDashboardInsights": true
+    },
+    "notifications": {
+      "emailTaskReminders": false,
+      "emailVisitReminders": false
+    }
+  }'`),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -142,8 +156,37 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   lembretes: many(lembretes),
 }));
 
+// FASE 24: User settings schema
+export const userSettingsSchema = z.object({
+  homePage: z.enum(['dashboard', 'hoje', 'visitas', 'tarefas']).default('dashboard'),
+  listDensity: z.enum(['comfortable', 'compact']).default('comfortable'),
+  ia: z.object({
+    showVisitSummary: z.boolean().default(true),
+    showTaskSuggestions: z.boolean().default(true),
+    showDashboardInsights: z.boolean().default(true),
+  }).default({}).optional(),
+  notifications: z.object({
+    emailTaskReminders: z.boolean().default(false),
+    emailVisitReminders: z.boolean().default(false),
+  }).default({}).optional(),
+}).partial().default({});
+
+export type UserSettings = z.infer<typeof userSettingsSchema>;
+
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+// Response type for GET /api/user/settings
+export const userSettingsResponseSchema = z.object({
+  id: z.string(),
+  nome: z.string(),
+  email: z.string().optional(),
+  role: z.enum(['admin', 'agent']),
+  empresaNome: z.string(),
+  userSettings: userSettingsSchema,
+});
+
+export type UserSettingsResponse = z.infer<typeof userSettingsResponseSchema>;
 
 // REFAITA: Marcas (Brands) table - agora com empresaId, codigo, ativa
 export const marcas = pgTable("marcas", {

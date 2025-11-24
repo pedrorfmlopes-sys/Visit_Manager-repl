@@ -3276,6 +3276,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // FASE 24: User settings endpoints
+  app.get('/api/user/settings', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, empresa } = await getUserContext(req);
+      const user = await storage.getUserSettings(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const userSettings = typeof user.userSettings === 'string' 
+        ? JSON.parse(user.userSettings) 
+        : user.userSettings || {};
+
+      res.json({
+        id: user.id,
+        nome: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+        email: user.email,
+        role: user.role,
+        empresaNome: empresa?.nome || '',
+        userSettings,
+      });
+    } catch (error) {
+      console.error("Error fetching user settings:", error);
+      res.status(500).json({ message: "Failed to fetch user settings" });
+    }
+  });
+
+  app.patch('/api/user/settings', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, empresa } = await getUserContext(req);
+      const updates = req.body;
+
+      // Only allow updating userSettings, not critical fields
+      const allowedKeys = ['userSettings', 'homePage', 'listDensity', 'ia', 'notifications'];
+      let newSettings: any = {};
+
+      // Get current settings
+      const user = await storage.getUserSettings(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const currentSettings = typeof user.userSettings === 'string'
+        ? JSON.parse(user.userSettings)
+        : user.userSettings || {};
+
+      // Merge updates (only allowed keys)
+      if (updates.userSettings) {
+        newSettings = { ...currentSettings, ...updates.userSettings };
+      } else {
+        // Handle flat updates (homePage, ia, notifications, listDensity at root level)
+        newSettings = { ...currentSettings };
+        if (updates.homePage) newSettings.homePage = updates.homePage;
+        if (updates.listDensity) newSettings.listDensity = updates.listDensity;
+        if (updates.ia) newSettings.ia = { ...newSettings.ia, ...updates.ia };
+        if (updates.notifications) newSettings.notifications = { ...newSettings.notifications, ...updates.notifications };
+      }
+
+      const updated = await storage.updateUserSettings(userId, newSettings);
+      if (!updated) {
+        return res.status(500).json({ message: "Failed to update settings" });
+      }
+
+      res.json({
+        id: updated.id,
+        nome: `${updated.firstName || ''} ${updated.lastName || ''}`.trim(),
+        email: updated.email,
+        role: updated.role,
+        empresaNome: empresa?.nome || '',
+        userSettings: newSettings,
+      });
+    } catch (error) {
+      console.error("Error updating user settings:", error);
+      res.status(500).json({ message: "Failed to update user settings" });
+    }
+  });
+
   // Serve uploaded files
   app.use('/uploads', isAuthenticated, (req, res, next) => {
     const filePath = path.join('/tmp/uploads', req.path);

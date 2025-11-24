@@ -57,12 +57,15 @@ export default function AgentMore() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        {/* Perfil */}
+        {/* Perfil & Definições */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Perfil</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Perfil & Definições
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             <div>
               <p className="text-sm text-muted-foreground">Nome</p>
               <p className="text-base font-medium text-foreground">
@@ -81,21 +84,15 @@ export default function AgentMore() {
                 {user?.empresa?.nome || 'Sem empresa'}
               </p>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Definições - Placeholder */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Settings className="h-5 w-5" />
-              Definições
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Funcionalidades adicionais em breve...
-            </p>
+            <Button
+              variant="outline"
+              className="w-full mt-4"
+              onClick={() => setLocation('/perfil')}
+              data-testid="button-go-settings"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Abrir Definições Completas
+            </Button>
           </CardContent>
         </Card>
 
