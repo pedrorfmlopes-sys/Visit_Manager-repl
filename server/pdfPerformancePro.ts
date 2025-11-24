@@ -135,7 +135,7 @@ class PerformanceProDocument {
   }
 
   getBuffer(): Buffer {
-    return this.doc.output('arraybuffer') as any as Buffer;
+    return Buffer.from(this.doc.output('arraybuffer'));
   }
 }
 
