@@ -126,9 +126,9 @@ export default function VisitaForm() {
     enabled: empresa?.mostrarMarcasEmVisitas ?? false,
   });
 
-  // Build prefilled notes with header (FASE 15: add line breaks for better formatting)
+  // Build prefilled notes with header (FASE 15: use HTML paragraphs for RichTextEditor)
   const notasComResumo = prefillData.resumoVisitaAnterior && prefillData.visitaAnteriorData
-    ? `***** Resumo da Visita Anterior, efetuada dia ${format(new Date(prefillData.visitaAnteriorData), "dd/MM/yyyy", { locale: pt })} *****\n\n\n\n\n\n${prefillData.resumoVisitaAnterior}`
+    ? `<p><strong>***** Resumo da Visita Anterior, efetuada dia ${format(new Date(prefillData.visitaAnteriorData), "dd/MM/yyyy", { locale: pt })} *****</strong></p><p></p><p></p><p>${prefillData.resumoVisitaAnterior}</p>`
     : prefillData.resumoVisitaAnterior || "";
 
   const form = useForm<VisitaFormData>({
