@@ -229,7 +229,7 @@ export function UpdateVisitStatusDialog({
             <p className="text-sm text-muted-foreground">
               A nova visita será criada com base na data agendada:{" "}
               <strong>
-                {format(new Date(visita.proximaVisita), "PPP 'às' HH:mm", { locale: pt })}
+                {visita.proximaVisita && format(new Date(visita.proximaVisita), "PPP 'às' HH:mm", { locale: pt })}
               </strong>
             </p>
             <div className="flex gap-3">
