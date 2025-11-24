@@ -1169,71 +1169,165 @@ export default function VisitaDetail() {
           </CardContent>
         </Card>
 
-        {/* FASE 20: Próxima Visita Agendada - Refactored with Update Status Dialog */}
-        {(visita?.proximaVisita || localProximaVisita) && (
+        {/* FASE 20: Próxima Visita Agendada - Never disappears, just changes state */}
+        {(visita?.proximaVisita || localProximaVisita || visita?.proximaVisitaStatus) && (
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-primary" />
-                Próxima Visita Agendada
-                {visita?.proximaVisita && isBefore(new Date(visita.proximaVisita), startOfDay(new Date())) && (
-                  <Badge variant="destructive" className="ml-2 text-xs" data-testid="badge-overdue-appointment">
-                    <AlertTriangle className="h-3 w-3 mr-1" />
-                    Em Atraso
-                  </Badge>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm font-medium">
-                  {format(new Date(localProximaVisita || visita?.proximaVisita), "PPP 'às' HH:mm", { locale: pt })}
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Agendada a partir de sugestão IA
-                </p>
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    if (visita?.gabinete && (visita?.proximaVisita || localProximaVisita)) {
-                      downloadNextVisitICS(visita.gabinete, visita.contacto || undefined, new Date(visita?.proximaVisita || localProximaVisita));
-                      toast({
-                        title: "Exportado",
-                        description: "Próxima visita exportada para calendário!",
-                      });
-                    }
-                  }}
-                  data-testid="button-export-proxima"
-                >
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Adicionar ao Calendário
-                </Button>
-                {/* FASE 20: Main CTA - Update Status Dialog */}
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => setUpdateStatusDialogOpen(true)}
-                  data-testid="button-update-visit-status"
-                >
-                  Atualizar Estado
-                </Button>
-                {/* FASE 15: Show navigation button if follow-up visit exists */}
-                {visitaWithPosteriores?.visitasPosteriores && visitaWithPosteriores.visitasPosteriores.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setLocation(`/visitas/${visitaWithPosteriores.visitasPosteriores[0].id}`)}
-                    data-testid="button-goto-visita-posterior-main"
-                  >
-                    <ArrowRight className="h-4 w-4 mr-2" />
-                    Ir para a Visita Realizada
-                  </Button>
-                )}
-              </div>
-            </CardContent>
+            {/* STATE 1: AGENDADA (default) */}
+            {(!visita?.proximaVisitaStatus || visita.proximaVisitaStatus === 'agendada') && (visita?.proximaVisita || localProximaVisita) && (
+              <>
+                <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-primary" />
+                    Próxima Visita Agendada
+                    {visita?.proximaVisita && isBefore(new Date(visita.proximaVisita), startOfDay(new Date())) && (
+                      <Badge variant="destructive" className="ml-2 text-xs" data-testid="badge-overdue-appointment">
+                        <AlertTriangle className="h-3 w-3 mr-1" />
+                        Em Atraso
+                      </Badge>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <p className="text-sm font-medium">
+                      {format(new Date(localProximaVisita || visita?.proximaVisita), "PPP 'às' HH:mm", { locale: pt })}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Agendada a partir de sugestão IA
+                    </p>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (visita?.gabinete && (visita?.proximaVisita || localProximaVisita)) {
+                          downloadNextVisitICS(visita.gabinete, visita.contacto || undefined, new Date(visita?.proximaVisita || localProximaVisita));
+                          toast({
+                            title: "Exportado",
+                            description: "Próxima visita exportada para calendário!",
+                          });
+                        }
+                      }}
+                      data-testid="button-export-proxima"
+                    >
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Adicionar ao Calendário
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => setUpdateStatusDialogOpen(true)}
+                      data-testid="button-update-visit-status"
+                    >
+                      Atualizar Estado
+                    </Button>
+                  </div>
+                </CardContent>
+              </>
+            )}
+
+            {/* STATE 2: REALIZADA */}
+            {visita?.proximaVisitaStatus === 'realizada' && (
+              <>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-success" />
+                    Visita Marcada como Realizada
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Data:</p>
+                    <p className="text-sm font-medium">
+                      {visita.proximaVisitaStatusData 
+                        ? format(new Date(visita.proximaVisitaStatusData), "PPP 'às' HH:mm", { locale: pt })
+                        : "Data não registada"
+                      }
+                    </p>
+                  </div>
+                  {visita.visitaAnteriorId && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Ligada à visita anterior:</p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setLocation(`/visitas/${visita.visitaAnteriorId}`)}
+                        className="text-xs"
+                        data-testid="button-goto-linked-visita"
+                      >
+                        <ArrowRight className="h-3 w-3 mr-1" />
+                        Ver visita {visita.visitaAnteriorId.slice(0, 8)}...
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </>
+            )}
+
+            {/* STATE 3: CANCELADA */}
+            {visita?.proximaVisitaStatus === 'cancelada' && (
+              <>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <X className="h-4 w-4 text-destructive" />
+                    Agendamento Cancelado
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Cancelado em:</p>
+                    <p className="text-sm font-medium">
+                      {visita.proximaVisitaStatusData 
+                        ? format(new Date(visita.proximaVisitaStatusData), "PPP 'às' HH:mm", { locale: pt })
+                        : "Data não registada"
+                      }
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Podes criar um novo agendamento quando necessário.
+                  </p>
+                </CardContent>
+              </>
+            )}
+
+            {/* STATE 4: SEGUIMENTO_CRIADO */}
+            {visita?.proximaVisitaStatus === 'seguimento_criado' && visitaWithPosteriores?.visitasPosteriores && visitaWithPosteriores.visitasPosteriores.length > 0 && (
+              <>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-success" />
+                    Follow-up Criado
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Criado em:</p>
+                    <p className="text-sm font-medium">
+                      {visita.proximaVisitaStatusData 
+                        ? format(new Date(visita.proximaVisitaStatusData), "PPP 'às' HH:mm", { locale: pt })
+                        : "Data não registada"
+                      }
+                    </p>
+                  </div>
+                  <div className="pt-2">
+                    {visitaWithPosteriores.visitasPosteriores.map((visitaPosterior) => (
+                      <Button
+                        key={visitaPosterior.id}
+                        variant="default"
+                        size="sm"
+                        onClick={() => setLocation(`/visitas/${visitaPosterior.id}`)}
+                        className="w-full"
+                        data-testid={`button-goto-follow-up-${visitaPosterior.id}`}
+                      >
+                        <ArrowRight className="h-4 w-4 mr-2" />
+                        Abrir Follow-up
+                      </Button>
+                    ))}
+                  </div>
+                </CardContent>
+              </>
+            )}
           </Card>
         )}
 

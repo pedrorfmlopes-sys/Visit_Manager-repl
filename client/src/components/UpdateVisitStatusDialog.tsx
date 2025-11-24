@@ -52,10 +52,15 @@ export function UpdateVisitStatusDialog({
     },
   });
 
-  // Mutation: Create follow-up visit (existing logic)
+  // Mutation: Create follow-up visit (existing logic) + mark status
   const createFollowUpMutation = useMutation({
     mutationFn: async () => {
       if (!visita) throw new Error("Visita is required");
+      // First, update the status to 'seguimento_criado'
+      await apiRequest("PATCH", `/api/visitas/${visita.id}`, {
+        proximaVisitaStatus: "seguimento_criado",
+        proximaVisitaStatusData: new Date(),
+      });
       const params = new URLSearchParams({
         visitaAnteriorId: visita.id,
         dataVisita: (visita.proximaVisita)?.toString() || "",
@@ -86,6 +91,8 @@ export function UpdateVisitStatusDialog({
       await apiRequest("PATCH", `/api/visitas/${visita.id}`, {
         dataVisita: dateToSet,
         proximaVisita: null,
+        proximaVisitaStatus: "realizada",
+        proximaVisitaStatusData: new Date(),
         visitaAnteriorId: associateToVisita && selectedVisitaId ? selectedVisitaId : undefined,
       });
     },
@@ -113,6 +120,8 @@ export function UpdateVisitStatusDialog({
       if (!visita) throw new Error("Visita is required");
       await apiRequest("PATCH", `/api/visitas/${visita.id}`, {
         proximaVisita: null,
+        proximaVisitaStatus: "cancelada",
+        proximaVisitaStatusData: new Date(),
       });
     },
     onSuccess: () => {

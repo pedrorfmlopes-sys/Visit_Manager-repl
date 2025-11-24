@@ -375,6 +375,8 @@ export const visitas = pgTable("visitas", {
   audioUrl: varchar("audio_url", { length: 500 }),
   mediaUrls: text("media_urls").array(),
   proximaVisita: timestamp("proxima_visita"),
+  proximaVisitaStatus: varchar("proxima_visita_status", { length: 50 }).default('agendada'), // FASE 20: 'agendada', 'realizada', 'cancelada', 'seguimento_criado'
+  proximaVisitaStatusData: timestamp("proxima_visita_status_data"), // FASE 20: When the status was set
   visitaAnteriorId: varchar("visita_anterior_id").references(() => visitas.id, { onDelete: 'set null' }), // FASE 15: Link to previous visit for relationship tracking
   linkVisita: varchar("link_visita", { length: 100 }).unique(),
   resumoIa: text("resumo_ia"),
@@ -461,6 +463,8 @@ export const insertVisitaSchema = createInsertSchema(visitas).omit({
   syncError: true,
   outlookEventId: true,
   lastCalendarSyncAt: true,
+  proximaVisitaStatus: true, // FASE 20: Set by backend
+  proximaVisitaStatusData: true, // FASE 20: Set by backend
 });
 
 export type InsertVisita = z.infer<typeof insertVisitaSchema>;
