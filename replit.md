@@ -55,6 +55,51 @@ Preferred communication style: Simple, everyday language.
 - ✅ Responsivo desktop/mobile
 - ✅ Data-testids para automatização
 
+### FASE 15 Implementation (Visit Relationship & History Tracking) - COMPLETED 24/11/2025
+
+**Objetivo:** Implementar sistema de relacionamento e histórico de visitas onde agendamentos podem ser marcados como realizados e gerar novas visitas relacionadas.
+
+**Implementação:**
+
+1. **Database Schema Updates:**
+   - Adicionado campo `visitaAnteriorId` na tabela `visitas` para rastrear relacionamento com visita anterior
+   - Adicionado campo `mostrarGPS` na tabela `empresas` para controlar visibilidade de GPS (default: false)
+   - Relações Drizzle ORM: `visitaAnterior` (one) e `visitasPosteriores` (many) para tracking de histórico
+
+2. **Frontend Features:**
+   - **Card "Próxima Visita"** - Mostra data/hora agendada com two action buttons:
+     - "Adicionar ao Calendário" - Exporta para calendário
+     - "Marcar como Realizado" - Cria nova visita relacionada a partir do agendamento
+   - **AI Appointment Flow:**
+     - IA gera sugestões de agendamento com data, título e descrição
+     - Utilizador clica "Agendar Visita"
+     - Dialog permite mudar data/hora da visita agendada
+     - PATCH `/api/visitas/:id` atualiza `proximaVisita` da visita atual (não cria nova visita)
+     - Card mostra badge com data do agendamento
+   - **Mark Completed Flow:**
+     - Clica "Marcar como Realizado"
+     - POST `/api/visitas` cria nova visita com `dataVisita` = `proximaVisita`
+     - Nova visita tem notas com referência à visita anterior
+     - Navega automaticamente para a nova visita
+     - Assim fica um histórico de visitas relacionadas
+   - **GPS Location Card:**
+     - Escondido por defecto (comentado com `false &&`)
+     - Pode ser habilitado em futuro via setting `empresa.mostrarGPS`
+     - Controlado admin settings
+
+3. **Data Flow:**
+   - Agendamento: `sugestão IA` → `proximaVisita` field atualizado (PATCH)
+   - Realização: `Marcar como Realizado` → nova visita criada com histórico (POST + navegação)
+   - Histórico: Visitas ligadas via `visitaAnteriorId` para rastreamento completo
+
+4. **Result:**
+   - ✅ Sistema de agendamento integrado na visita (não cria separadamente)
+   - ✅ Histórico de visitas relacionadas com `visitaAnteriorId`
+   - ✅ "Marcar como Realizado" cria nova visita e navega automaticamente
+   - ✅ GPS card desabilitado por defecto (pode ser toggle em future via admin settings)
+   - ✅ Database migrada com sucesso
+   - ✅ Frontend refetch após agendamento para mostrar card atualizado
+
 ## System Architecture
 
 ### Frontend Architecture
@@ -64,7 +109,7 @@ A mobile-first React 18 application using TypeScript, Wouter for routing, and Vi
 An Express.js application in TypeScript, employing session-based authentication with Replit Auth (OpenID Connect) and Passport.js, storing sessions in PostgreSQL. It provides RESTful APIs for authentication, universal entities, contacts, visits (including file uploads and audio transcription), tasks, and analytics. Multer handles file uploads. A robust RBAC system differentiates Admin (all data access) and Agent (owner/assigned data access) roles, enforcing ownership checks across all data operations.
 
 ### Database Architecture
-PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities include Users, a universal Entidades system (e.g., Gabinete, Cliente, Distribuidor), Contactos, Visitas (with media, audio, AI summaries, geolocation, and brands), Tarefas (rich text), Lembretes, Marcas (product brands), and Sessions. Relationships are managed via foreign keys, and data integrity is maintained with timestamp tracking. A `visitasMarcas` junction table manages many-to-many relationships between visits and brands. A `visitasAudio` table stores audio clips for visits, supporting transcription status. The `empresas` table includes a `theme` field for company-wide theme customization.
+PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities include Users, a universal Entidades system (e.g., Gabinete, Cliente, Distribuidor), Contactos, Visitas (with media, audio, AI summaries, geolocation, and brands), Tarefas (rich text), Lembretes, Marcas (product brands), and Sessions. Relationships are managed via foreign keys, and data integrity is maintained with timestamp tracking. A `visitasMarcas` junction table manages many-to-many relationships between visits and brands. A `visitasAudio` table stores audio clips for visits, supporting transcription status. The `empresas` table includes a `theme` field for company-wide theme customization and `mostrarGPS` for GPS visibility control.
 
 ### System Design Choices
 
@@ -75,7 +120,7 @@ PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities in
 -   **Universal Entidades System**: Flexible system supporting various business entity types.
 -   **Rich Text Task Descriptions**: Utilizes TipTap editor for comprehensive formatting, with XSS prevention.
 -   **Offline Capabilities**: Comprehensive support with IndexedDB for data caching and automatic synchronization.
--   **Geolocation Integration**: Automatic GPS capture for visits.
+-   **Geolocation Integration**: Automatic GPS capture for visits (can be hidden via admin settings).
 -   **Calendar Integration**: Generates RFC 5545 compliant `.ics` files.
 -   **PDF Export**: Backend-generated PDF reports with photos, AI summaries, and smart pagination.
 -   **Advanced Analytics**: RBAC-aware dashboard with KPIs and visualizations.
@@ -84,6 +129,7 @@ PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities in
 -   **Intelligent Reminder System**: Proactive engine for visit follow-ups, overdue tasks, and AI-suggested reminders.
 -   **PRO Exports Module**: Advanced PDF generation with analytics, charts, and professional executive summaries via OpenAI GPT-4o-mini.
 -   **Advanced Filtering**: Comprehensive filtering capabilities for visits and tasks based on various criteria (search, status, date, user, brand, entity).
+-   **Visit Relationship Tracking**: System for creating related visits from scheduled appointments, with complete history tracking via `visitaAnteriorId`.
 
 ## External Dependencies
 

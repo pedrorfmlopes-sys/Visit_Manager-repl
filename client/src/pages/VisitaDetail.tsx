@@ -344,7 +344,11 @@ export default function VisitaDetail() {
     onSuccess: (response: any) => {
       if (visitaId) setCreatedAppointmentId(visitaId);
       queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
-      if (visitaId) queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
+      if (visitaId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
+        // Force refetch to get updated proximaVisita
+        queryClient.refetchQueries({ queryKey: ["/api/visitas", visitaId] });
+      }
       
       // Register in created suggestions map
       if (suggestedTaskToCreate && appointmentDate) {
@@ -1112,7 +1116,8 @@ export default function VisitaDetail() {
           </CardContent>
         </Card>
 
-        {gpsLocation && (
+        {/* FASE 15: GPS Location - Hidden by default, can be enabled in admin settings */}
+        {false && gpsLocation && (
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
