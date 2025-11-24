@@ -59,6 +59,7 @@ export default function VisitaDetail() {
   const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
   const [createdTaskId, setCreatedTaskId] = useState<string | null>(null);
   const [createdAppointmentId, setCreatedAppointmentId] = useState<string | null>(null);
+  const [localProximaVisita, setLocalProximaVisita] = useState<Date | null>(null);
   const [createdSuggestedMap, setCreatedSuggestedMap] = useState<Map<string, { type: 'tarefa' | 'agendamento', status?: string, date?: Date }>>(new Map());
   const [pdfProOptions, setPdfProOptions] = useState({
     includePhotos: true,
@@ -366,6 +367,12 @@ export default function VisitaDetail() {
     },
     onSuccess: (response: any) => {
       console.log("🎯 Appointment mutation success! Response:", response);
+      
+      // Update local state immediately to show card
+      if (appointmentDate) {
+        setLocalProximaVisita(appointmentDate);
+      }
+      
       if (visitaId) setCreatedAppointmentId(visitaId);
       queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
       if (visitaId) {
@@ -1142,7 +1149,7 @@ export default function VisitaDetail() {
         </Card>
 
         {/* FASE 15: Próxima Visita Agendada - After AI Analysis */}
-        {visita.proximaVisita && (
+        {(visita?.proximaVisita || localProximaVisita) && (
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
@@ -1153,7 +1160,7 @@ export default function VisitaDetail() {
             <CardContent className="space-y-4">
               <div>
                 <p className="text-sm font-medium">
-                  {format(new Date(visita.proximaVisita), "PPP 'às' HH:mm", { locale: pt })}
+                  {format(new Date(localProximaVisita || visita?.proximaVisita), "PPP 'às' HH:mm", { locale: pt })}
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
                   Agendada a partir de sugestão IA
@@ -1163,7 +1170,15 @@ export default function VisitaDetail() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleExportNextVisit}
+                  onClick={() => {
+                    if (visita?.gabinete && (visita?.proximaVisita || localProximaVisita)) {
+                      downloadNextVisitICS(visita.gabinete, visita.contacto || undefined, new Date(visita?.proximaVisita || localProximaVisita));
+                      toast({
+                        title: "Exportado",
+                        description: "Próxima visita exportada para calendário!",
+                      });
+                    }
+                  }}
                   data-testid="button-export-proxima"
                 >
                   <Calendar className="h-4 w-4 mr-2" />
@@ -1489,7 +1504,11 @@ export default function VisitaDetail() {
                 Cancelar
               </Button>
               <Button
-                onClick={() => createAppointmentMutation.mutate()}
+                onClick={() => {
+                  console.log("❌ Button clicked! appointmentDate:", appointmentDate, "title:", appointmentTitle);
+                  console.log("✅ Calling createAppointmentMutation.mutate()");
+                  createAppointmentMutation.mutate();
+                }}
                 disabled={createAppointmentMutation.isPending || !appointmentTitle.trim() || !appointmentDate}
                 data-testid="button-confirm-appointment"
               >
