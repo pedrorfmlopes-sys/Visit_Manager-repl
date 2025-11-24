@@ -165,6 +165,12 @@ export default function VisitaForm() {
     },
     onSuccess: async (visitaData) => {
       queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
+      
+      // FASE 15: Invalidate previous visit query if this is a follow-up visit
+      const visitaAnteriorId = new URLSearchParams(window.location.search).get('visitaAnteriorId');
+      if (visitaAnteriorId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaAnteriorId] });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/entidades"] });
       queryClient.refetchQueries({ queryKey: ["/api/entidades"] });
