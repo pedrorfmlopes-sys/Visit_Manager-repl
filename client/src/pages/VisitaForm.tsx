@@ -40,12 +40,16 @@ const visitaFormSchema = insertVisitaSchema.extend({
 type VisitaFormData = z.infer<typeof visitaFormSchema>;
 
 export default function VisitaForm() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [, params] = useRoute("/visitas/:id");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isOnline = useOnlineStatus();
-  const isEdit = params?.id && params.id !== "nova";
+  
+  // Extract ID from URL path (works for both /visitas/:id and /visitas/:id/editar)
+  const visitaIdFromPath = location.split('/')[2]; // Get ID from /visitas/ID/...
+  const visitaId = params?.id || (visitaIdFromPath && visitaIdFromPath !== "nova" ? visitaIdFromPath : null);
+  const isEdit = visitaId && visitaId !== "nova";
   
   // Get pre-fill data from query params (FASE 15: follow-up visits)
   const queryParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
@@ -130,7 +134,7 @@ export default function VisitaForm() {
 
   // Load existing visit data when in edit mode
   const { data: existingVisita } = useQuery({
-    queryKey: ["/api/visitas", params?.id],
+    queryKey: ["/api/visitas", visitaId],
     enabled: !!isEdit,
   });
 
@@ -175,7 +179,7 @@ export default function VisitaForm() {
 
   const updateMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const response = await fetch(`/api/visitas/${params?.id}`, {
+      const response = await fetch(`/api/visitas/${visitaId}`, {
         method: "PATCH",
         body: formData,
         credentials: "include",
@@ -190,7 +194,7 @@ export default function VisitaForm() {
     },
     onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/visitas", params?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       
       toast({
@@ -198,7 +202,7 @@ export default function VisitaForm() {
         description: "Visita atualizada com sucesso!",
       });
       
-      setLocation(`/visitas/${params?.id}`);
+      setLocation(`/visitas/${visitaId}`);
     },
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
