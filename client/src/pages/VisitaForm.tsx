@@ -128,7 +128,7 @@ export default function VisitaForm() {
 
   // Build prefilled notes with header (FASE 15: use HTML paragraphs for RichTextEditor)
   const notasComResumo = prefillData.resumoVisitaAnterior && prefillData.visitaAnteriorData
-    ? `<p><strong>***** Resumo da Visita Anterior, efetuada dia ${format(new Date(prefillData.visitaAnteriorData), "dd/MM/yyyy", { locale: pt })} *****</strong></p><p></p><p>${prefillData.resumoVisitaAnterior}</p>`
+    ? `<p></p><p></p><p><strong>***** Resumo da Visita Anterior, efetuada dia ${format(new Date(prefillData.visitaAnteriorData), "dd/MM/yyyy", { locale: pt })} *****</strong></p><p></p><p>${prefillData.resumoVisitaAnterior}</p>`
     : prefillData.resumoVisitaAnterior || "";
 
   const form = useForm<VisitaFormData>({
