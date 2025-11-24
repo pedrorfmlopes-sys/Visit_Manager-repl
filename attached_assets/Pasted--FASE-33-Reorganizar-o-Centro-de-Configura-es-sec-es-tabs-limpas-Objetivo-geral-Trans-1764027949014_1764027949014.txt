@@ -1,0 +1,315 @@
+🔧 FASE 33 – Reorganizar o Centro de Configurações (secções + tabs limpas)
+
+🎯 Objetivo geral:
+Transformar o centro de configurações atual (/admin/empresa) num layout organizado por secções, com poucos nomes curtos e tabs simples, em vez da linha gigante de tabs coladas.
+
+Também quero que o menu ⚙️ Definições do rodapé passe a abrir diretamente a secção certa usando um query param (?section=...).
+
+1. Navegação a partir do menu ⚙️ Definições
+
+O menu de Definições (no rodapé) já existe e hoje só tem “Configurações da Empresa” ativo.
+
+Ajusta o conteúdo desse menu para:
+
+Empresa & Equipa → /admin/empresa?section=empresa
+
+Visitas & Tarefas → /admin/empresa?section=visitas
+
+IA & Produtividade → /admin/empresa?section=ia
+
+Alertas & Relatórios → /admin/empresa?section=alertas
+
+Integrações → /admin/empresa?section=integracoes
+
+Requisitos:
+
+O label do menu deve ficar algo como:
+
+“Empresa & Equipa”
+
+“Visitas & Tarefas”
+
+“IA & Produtividade”
+
+“Alertas & Relatórios”
+
+“Integrações”
+
+Cada item deve chamar navigate("/admin/empresa?section=...").
+
+Se o utilizador não for admin, podes:
+
+esconder as entradas que não façam sentido, ou
+
+deixá-las desativadas.
+(Para já, assumimos admin como principal utilizador deste centro.)
+
+2. Estrutura interna de /admin/empresa – Secções + Tabs
+
+Quero que /admin/empresa passe a ter:
+
+Um “selector de secção” (nav vertical ou tabs grandes) baseado em section:
+
+empresa
+
+visitas
+
+ia
+
+alertas
+
+integracoes
+
+Dentro de cada secção, tabs curtas (2–3 máx) com o conteúdo que já existe hoje, só reorganizado.
+
+2.1. Lógica base do section
+
+No componente principal do Centro de Configurações (a página de /admin/empresa):
+
+Lê o query param section da location / searchParams.
+
+Se não houver, usar por defeito: section = "empresa".
+
+Cria uma estrutura tipo:
+
+const sections = [
+  { id: "empresa", label: "Empresa & Equipa", icon: Building2 },
+  { id: "visitas", label: "Visitas & Tarefas", icon: CalendarCheck },
+  { id: "ia", label: "IA & Produtividade", icon: Sparkles },
+  { id: "alertas", label: "Alertas & Relatórios", icon: Bell },
+  { id: "integracoes", label: "Integrações", icon: PlugZap },
+] as const;
+
+
+No layout da página, à esquerda (ou no topo se for mobile), mostra esta lista como nav de secções:
+
+secção seleccionada = section atual.
+
+clicar numa secção deve:
+
+atualizar a URL (/admin/empresa?section=...),
+
+e atualizar o estado interno (para manter sincronizado).
+
+Não é obrigatório ser nav vertical; pode ser um componente tipo Tabs com orientation="vertical" ou uma side-nav simples. O importante é:
+
+secções claramente separadas,
+
+nomes curtos,
+
+só uma linha de tabs por secção.
+
+3. Conteúdo de cada secção (reusar o que já existe)
+
+A ideia é reaproveitar os componentes existentes (Geral, Marcas, Utilizadores, IA & Áudio, Alertas, Filtros, etc.), apenas mudando onde são renderizados.
+
+3.1. Secção empresa – Empresa & Equipa
+
+Tabs internas:
+
+Geral
+
+Campos atuais:
+
+Nome da empresa, NIF, email, telefone
+
+Tema da aplicação (light-business / dark-pro)
+
+Upload / preview do logo
+
+Reutiliza o componente atual de “Geral” (sem alterar a lógica).
+
+Marcas & Entidades
+
+Dentro desta tab, coloca:
+
+Gestão de Marcas (lista, criar, editar, ativar/desativar)
+
+Gestão de Tipos de Entidade (nome, cor, ícone, ativo)
+
+Podes usar 2 cards ou 2 subtabs internos (Marcas / Tipos de Entidade), mas planeia visualmente como “mesma família”.
+
+Utilizadores
+
+Gestão de utilizadores que hoje estava em /admin/utilizadores / tab “Utilizadores”:
+
+lista
+
+criar
+
+alterar role
+
+ativar/desativar
+
+Tudo o que é “identidade da empresa + equipa” vive aqui.
+
+3.2. Secção visitas – Visitas & Tarefas
+
+Tabs internas:
+
+Comportamento
+
+Regras de follow-up / “Próxima visita” (cards que já tens de scheduling).
+
+Defaults de duração ou parâmetros de criação (se já existirem).
+
+Filtros & Listas
+
+Todos os toggles de uiSettings que já criaste:
+
+Filtros de VISITAS (datas rápidas, utilizador, marca, entidade, contacto, áudio).
+
+Filtros de TAREFAS (estado, atraso, utilizador, entidade, visita).
+
+Filtros de ENTIDADES/CONTACTOS (tipo, etc.).
+
+Organizar com subtítulos:
+
+“Filtros de Visitas”
+
+“Filtros de Tarefas”
+
+“Filtros de Entidades & Contactos”
+
+Aqui o admin configura como as vistas/listas se apresentam e se comportam.
+
+3.3. Secção ia – IA & Produtividade
+
+Tabs internas:
+
+IA de Visitas
+
+Opções relativas a:
+
+Resumos automáticos de visita por IA,
+
+Sugestões de tarefas por IA,
+
+PDFs PRO / “aconselhamento” da IA (quando existir).
+
+Reutilizar os toggles/fields que já tens na parte de IA.
+
+Áudio & Transcrição
+
+Tudo o que é:
+
+Ativar/desativar gravação áudio,
+
+Transcrição (manual/automática),
+
+Língua/regiões se existirem.
+
+Tudo o que “turbo-carrega” a produtividade (IA + áudio) fica agrupado aqui.
+
+3.4. Secção alertas – Alertas & Relatórios
+
+Tabs internas:
+
+Alertas & UX
+
+Configuração da AlertRibbon (mostrar/ocultar).
+
+Badges de tarefas/visitas (se estão activos, intervalos de refresh, etc.).
+
+Qualquer outro toggle de UX de alertas.
+
+Relatórios
+
+Botões/config de export PDF:
+
+PDF Mensal
+
+PDF Semanal
+
+PDF Pro (quando aplicável)
+
+(No futuro) agendamento de envio por email.
+
+3.5. Secção integracoes – Integrações
+
+Tabs internas:
+
+Microsoft 365
+
+Placeholders/fields actuais para Outlook / Planner / To Do.
+
+Google
+
+Placeholders para Calendar / Contacts.
+
+Outros
+
+Espaço para futuras integrações (mesmo que agora seja só texto “em breve”).
+
+Aqui não precisas de implementar novas integrações; só reorganizar o que já tens de forma clara, e deixar espaço limpo para o futuro.
+
+4. UX e Responsividade
+
+Em desktop:
+
+Preferência: nav de secções vertical à esquerda (tipo lista) e tabs internas em cima da área de conteúdo.
+
+Em mobile:
+
+Podes usar:
+
+secções como tabs horizontais,
+
+ou um Select/dropdown para escolher secção.
+
+Garantir:
+
+Título “Centro de Configurações” mantém-se,
+
+Subtítulo genérico tipo “Gerencie as definições da sua empresa” continua ok.
+
+5. O que não deve mudar
+
+Nenhum endpoint backend (/api/admin/empresa, /api/admin/utilizadores, /api/admin/marcas, etc.).
+
+Lógica de gravação das configs (apenas movemos a UI).
+
+RBAC: /admin/empresa continua apenas para admin.
+
+6. Testes a fazer
+
+A partir do menu ⚙️:
+
+Clicar em:
+
+“Empresa & Equipa” → abre /admin/empresa?section=empresa
+
+“Visitas & Tarefas” → /admin/empresa?section=visitas
+
+“IA & Produtividade” → /admin/empresa?section=ia
+
+“Alertas & Relatórios” → /admin/empresa?section=alertas
+
+“Integrações” → /admin/empresa?section=integracoes
+
+Dentro de cada secção:
+
+Confirmar que as tabs e conteúdos correspondem ao mapa acima.
+
+Verificar que todos os campos antes existentes ainda estão acessíveis (nada desapareceu, só mudou de “prateleira”).
+
+Refresh da página:
+
+Se eu recarregar /admin/empresa?section=visitas, deve manter-se na secção “Visitas & Tarefas”.
+
+7. Relatório da FASE 33
+
+No relatório, por favor inclui:
+
+Como ficou o objecto/array de sections (ids + labels).
+
+Screenshot ou descrição das tabs internas por secção.
+
+Que componentes existentes foram movidos para cada secção/tab.
+
+Como ficou o conteúdo do menu ⚙️ Definições (lista final de opções + section correspondente).
+
+Objetivo final:
+👉 Menu de Definições simples, com poucas entradas claras;
+👉 Centro de Configurações organizado por grandes temas (Empresa, Visitas, IA, Alertas, Integrações);
+👉 Nada de “linha infinita” de tabs ilegíveis.

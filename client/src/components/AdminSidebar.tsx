@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Building2, Users, CheckCircle2, Bell, Settings, LogOut, Calendar, User, HelpCircle } from "lucide-react";
+import { LayoutDashboard, Building2, Users, CheckCircle2, Bell, Settings, LogOut, Calendar, User, HelpCircle, Zap, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -32,8 +32,8 @@ export function AdminSidebar() {
     window.location.href = "/api/logout";
   };
 
-  const handleNavigateToSettings = () => {
-    setLocation("/admin/empresa");
+  const handleNavigateToSection = (section: string) => {
+    setLocation(`/admin/empresa?section=${section}`);
   };
 
   return (
@@ -130,37 +130,72 @@ export function AdminSidebar() {
                 Definições
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="start" className="w-56">
-              <DropdownMenuLabel className="py-2">Definições</DropdownMenuLabel>
+            <DropdownMenuContent side="top" align="start" className="w-64">
+              <DropdownMenuLabel className="py-2">Configurações</DropdownMenuLabel>
               
               <DropdownMenuSeparator />
               
-              {/* Empresa Section */}
+              {/* Empresa */}
               <DropdownMenuItem
-                onClick={handleNavigateToSettings}
-                data-testid="menu-item-settings-empresa"
+                onClick={() => handleNavigateToSection("empresa")}
+                data-testid="menu-item-empresa"
                 className="cursor-pointer"
               >
                 <Building2 className="h-4 w-4 mr-2" />
-                <span>Configurações da Empresa</span>
+                <span>Empresa &amp; Equipa</span>
+              </DropdownMenuItem>
+              
+              {/* Visitas */}
+              <DropdownMenuItem
+                onClick={() => handleNavigateToSection("visitas")}
+                data-testid="menu-item-visitas"
+                className="cursor-pointer"
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                <span>Visitas &amp; Tarefas</span>
+              </DropdownMenuItem>
+              
+              {/* IA */}
+              <DropdownMenuItem
+                onClick={() => handleNavigateToSection("ia")}
+                data-testid="menu-item-ia"
+                className="cursor-pointer"
+              >
+                <Lightbulb className="h-4 w-4 mr-2" />
+                <span>IA &amp; Produtividade</span>
+              </DropdownMenuItem>
+              
+              {/* Alertas */}
+              <DropdownMenuItem
+                onClick={() => handleNavigateToSection("alertas")}
+                data-testid="menu-item-alertas"
+                className="cursor-pointer"
+              >
+                <Bell className="h-4 w-4 mr-2" />
+                <span>Alertas &amp; Relatórios</span>
+              </DropdownMenuItem>
+              
+              {/* Integrações */}
+              <DropdownMenuItem
+                onClick={() => handleNavigateToSection("integracoes")}
+                data-testid="menu-item-integracoes"
+                className="cursor-pointer"
+              >
+                <Zap className="h-4 w-4 mr-2" />
+                <span>Integrações</span>
               </DropdownMenuItem>
               
               <DropdownMenuSeparator />
               
-              {/* Utilizador Section */}
+              {/* Perfil */}
               <DropdownMenuItem disabled data-testid="menu-item-my-settings">
                 <User className="h-4 w-4 mr-2" />
                 <span>As minhas definições</span>
               </DropdownMenuItem>
               
-              <DropdownMenuItem disabled data-testid="menu-item-notifications">
-                <Bell className="h-4 w-4 mr-2" />
-                <span>Notificações</span>
-              </DropdownMenuItem>
-              
               <DropdownMenuItem disabled data-testid="menu-item-help">
                 <HelpCircle className="h-4 w-4 mr-2" />
-                <span>Ajuda &amp; feedback</span>
+                <span>Ajuda &amp; Feedback</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

@@ -13,8 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Empresa, User, Marca } from "@shared/schema";
-import { Upload, Cloud, Settings, MapPin, Bell, Zap, Lightbulb } from "lucide-react";
-import { useRef, useState } from "react";
+import { Upload, Building2, Bell, Zap, Lightbulb, MapPin, Calendar, PlugZap } from "lucide-react";
+import { useRef, useState, useMemo } from "react";
+import { useLocation } from "wouter";
 import AdminEntidadeTipos from "@/pages/AdminEntidadeTipos";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminMarcas from "@/pages/AdminMarcas";
@@ -33,11 +34,25 @@ const updateEmpresaSchema = z.object({
 
 type UpdateEmpresaForm = z.infer<typeof updateEmpresaSchema>;
 
+// Sections configuration
+const SECTIONS = [
+  { id: "empresa", label: "Empresa & Equipa", icon: Building2 },
+  { id: "visitas", label: "Visitas & Tarefas", icon: Calendar },
+  { id: "ia", label: "IA & Produtividade", icon: Lightbulb },
+  { id: "alertas", label: "Alertas & Relatórios", icon: Bell },
+  { id: "integracoes", label: "Integrações", icon: PlugZap },
+] as const;
+
 export default function AdminEmpresa() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [location, setLocation] = useLocation();
+
+  // Read section from query param
+  const urlParams = new URLSearchParams(location.split("?")[1] || "");
+  const currentSection = (urlParams.get("section") || "empresa") as typeof SECTIONS[number]["id"];
 
   const { data: empresa, isLoading, error } = useQuery<Empresa>({
     queryKey: ["/api/admin/empresa"],
@@ -79,7 +94,6 @@ export default function AdminEmpresa() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!["image/png", "image/jpeg", "image/svg+xml", "image/webp"].includes(file.type)) {
       toast({
         title: "Tipo de ficheiro inválido",
@@ -89,14 +103,12 @@ export default function AdminEmpresa() {
       return;
     }
 
-    // Show preview
     const reader = new FileReader();
     reader.onload = (e) => {
       setLogoPreview(e.target?.result as string);
     };
     reader.readAsDataURL(file);
 
-    // Upload
     setUploading(true);
     try {
       const formData = new FormData();
@@ -115,7 +127,6 @@ export default function AdminEmpresa() {
       form.setValue("logoUrl", data.logoUrl);
       toast({ title: "Logo carregado com sucesso" });
       
-      // Invalidate queries to refresh
       queryClient.invalidateQueries({ queryKey: ["/api/admin/empresa"] });
     } catch (error: any) {
       toast({
@@ -123,7 +134,6 @@ export default function AdminEmpresa() {
         description: error.message,
         variant: "destructive",
       });
-      setLogoPreview(null);
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
@@ -156,9 +166,13 @@ export default function AdminEmpresa() {
 
   const currentLogo = logoPreview || empresa?.logoUrl;
 
+  const handleSectionClick = (sectionId: string) => {
+    setLocation(`/admin/empresa?section=${sectionId}`);
+  };
+
   return (
     <div className="min-h-screen pb-32 pt-4">
-      <div className="max-w-4xl mx-auto px-4">
+      <div className="max-w-6xl mx-auto px-4">
         <Card>
           <CardHeader>
             <CardTitle data-testid="text-admin-settings-title">Centro de Configurações</CardTitle>
@@ -167,745 +181,853 @@ export default function AdminEmpresa() {
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit((data) => updateMutation.mutate(data))} className="space-y-6">
-                <Tabs defaultValue="geral" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 lg:grid-cols-10 gap-1 h-auto">
-                    <TabsTrigger value="geral" data-testid="tab-settings-geral" className="text-xs">Geral</TabsTrigger>
-                    <TabsTrigger value="utilizadores" data-testid="tab-settings-utilizadores" className="text-xs">Utilizadores</TabsTrigger>
-                    <TabsTrigger value="marcas" data-testid="tab-settings-marcas" className="text-xs">Marcas</TabsTrigger>
-                    <TabsTrigger value="visitas" data-testid="tab-settings-visitas" className="text-xs">Visitas & Tarefas</TabsTrigger>
-                    <TabsTrigger value="ia" data-testid="tab-settings-ia" className="text-xs">IA & Áudio</TabsTrigger>
-                    <TabsTrigger value="localizacao" data-testid="tab-settings-localizacao" className="text-xs">Localização</TabsTrigger>
-                    <TabsTrigger value="alertas" data-testid="tab-settings-alertas" className="text-xs">Alertas & UX</TabsTrigger>
-                    <TabsTrigger value="integrações" data-testid="tab-settings-integrações" className="text-xs">Integrações</TabsTrigger>
-                    <TabsTrigger value="entidades" data-testid="tab-settings-entidades" className="text-xs">Entidades</TabsTrigger>
-                    <TabsTrigger value="filtros" data-testid="tab-settings-filtros" className="text-xs">Filtros</TabsTrigger>
-                  </TabsList>
+                
+                {/* Section Navigation */}
+                <div className="flex gap-2 pb-4 border-b overflow-x-auto">
+                  {SECTIONS.map((section) => {
+                    const Icon = section.icon;
+                    const isActive = currentSection === section.id;
+                    return (
+                      <button
+                        key={section.id}
+                        onClick={() => handleSectionClick(section.id)}
+                        data-testid={`button-section-${section.id}`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
+                          isActive
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                        }`}
+                      >
+                        <Icon className="h-4 w-4" />
+                        {section.label}
+                      </button>
+                    );
+                  })}
+                </div>
 
-                  {/* TAB -1: UTILIZADORES */}
-                  <TabsContent value="utilizadores" className="mt-6">
-                    <AdminUsers />
-                  </TabsContent>
-
-                  {/* TAB 0: MARCAS */}
-                  <TabsContent value="marcas" className="mt-6">
-                    <AdminMarcas />
-                  </TabsContent>
-
-                  {/* TAB 1: GERAL - Identidade & Logo */}
-                  <TabsContent value="geral" className="space-y-6 mt-6">
-                    <div className="space-y-4">
-                      <h3 className="font-semibold">Informações Gerais</h3>
+                {/* Section: EMPRESA & EQUIPA */}
+                {currentSection === "empresa" && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Empresa & Equipa</h3>
                       
-                      <FormField
-                        control={form.control}
-                        name="nome"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Nome da Empresa</FormLabel>
-                            <FormControl>
-                              <Input {...field} data-testid="input-settings-nome" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="nif"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>NIF</FormLabel>
-                            <FormControl>
-                              <Input {...field} value={field.value || ""} data-testid="input-settings-nif" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="email"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Email</FormLabel>
-                            <FormControl>
-                              <Input type="email" {...field} value={field.value || ""} data-testid="input-settings-email" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="telefone"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Telefone</FormLabel>
-                            <FormControl>
-                              <Input {...field} value={field.value || ""} data-testid="input-settings-telefone" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <div className="space-y-4 pt-6 border-t">
-                      <h3 className="font-semibold">Tema & Logo</h3>
-
-                      <FormField
-                        control={form.control}
-                        name="theme"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Tema da Aplicação</FormLabel>
-                            <Select value={field.value} onValueChange={field.onChange}>
-                              <FormControl>
-                                <SelectTrigger data-testid="select-settings-theme">
-                                  <SelectValue placeholder="Selecione um tema" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="light-business">Tema claro (Business)</SelectItem>
-                                <SelectItem value="dark-pro">Tema escuro (Pro)</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <div className="space-y-3">
-                        <FormLabel>Logo da Empresa</FormLabel>
-                        {currentLogo && (
-                          <div className="flex items-center gap-4">
-                            <img
-                              src={currentLogo}
-                              alt="Logo preview"
-                              className="h-16 max-w-xs object-contain rounded border"
-                              data-testid="img-logo-preview"
-                            />
-                            <span className="text-sm text-muted-foreground">Logo atual</span>
-                          </div>
-                        )}
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/png,image/jpeg,image/svg+xml,image/webp"
-                          onChange={handleLogoUpload}
-                          className="hidden"
-                          data-testid="input-logo-file"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => fileInputRef.current?.click()}
-                          disabled={uploading}
-                          data-testid="button-upload-logo"
-                          className="gap-2"
-                        >
-                          <Upload className="w-4 h-4" />
-                          {uploading ? "A carregar..." : "Carregar novo logo"}
-                        </Button>
-                        <p className="text-xs text-muted-foreground">
-                          PNG, JPG, SVG ou WebP. Máx 50MB
-                        </p>
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  {/* TAB 2: VISITAS & TAREFAS */}
-                  <TabsContent value="visitas" className="space-y-6 mt-6">
-                    <div className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="mostrarMarcasEmVisitas"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                                data-testid="checkbox-mostrar-marcas"
-                              />
-                            </FormControl>
-                            <div className="space-y-1">
-                              <FormLabel className="font-normal cursor-pointer">
-                                Mostrar seleção de marcas nas visitas
-                              </FormLabel>
-                              <p className="text-sm text-muted-foreground">
-                                Permite aos agentes selecionar e rastrear marcas entregues
-                              </p>
-                            </div>
-                          </FormItem>
-                        )}
-                      />
-
-                      <div className="pt-4 border-t space-y-4">
-                        <div>
-                          <FormLabel>Follow-ups e Histórico de Visitas</FormLabel>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Permite criar visitas de acompanhamento e rastrear a cadeia de visitas
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm">Cadeia de follow-ups:</span>
-                          <Badge variant="secondary">Ativado</Badge>
-                        </div>
-                      </div>
-
-                      <div className="pt-4 border-t space-y-4">
-                        <div>
-                          <FormLabel>Tarefas Padrão</FormLabel>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Configure o comportamento padrão ao criar tarefas
-                          </p>
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          Tarefas criadas pelo utilizador autenticado
-                        </div>
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  {/* TAB 3: IA & TRANSCRIÇÃO */}
-                  <TabsContent value="ia" className="space-y-6 mt-6">
-                    {/* Dashboard Insights - IA */}
-                    <div className="space-y-4 pb-6 border-b">
-                      <FormField
-                        control={form.control}
-                        name="uiSettings"
-                        render={({ field }) => {
-                          const uiSettings = field.value || {};
-                          const isEnabled = uiSettings.enableIA !== false;
-                          return (
-                            <FormItem className="space-y-4">
-                              <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-200 dark:border-amber-900/30">
-                                <div className="flex-1 space-y-2">
-                                  <div className="flex items-center gap-2">
-                                    <Lightbulb className="w-5 h-5 text-amber-600" />
-                                    <FormLabel className="text-base font-semibold cursor-pointer">
-                                      Insights IA no Dashboard
-                                    </FormLabel>
-                                  </div>
-                                  <p className="text-sm text-muted-foreground">
-                                    Ativa ou desativa a geração de insights e recomendações automáticas baseadas em IA no dashboard
-                                  </p>
-                                  <p className="text-xs text-muted-foreground mt-3">
-                                    {isEnabled
-                                      ? "✓ Os dashboards mostram análises personalizadas por utilizador (agentes) ou agregadas por empresa (admin)"
-                                      : "✗ Os cards de insights mostram uma mensagem informativa sem chamar a IA"}
-                                  </p>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    field.onChange({ ...uiSettings, enableIA: !isEnabled });
-                                  }}
-                                  className={`px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                                    isEnabled
-                                      ? "bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-100"
-                                      : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                                  }`}
-                                  data-testid="button-toggle-ia-insights"
-                                >
-                                  {isEnabled ? "Ativado" : "Desativado"}
-                                </button>
-                              </div>
-                            </FormItem>
-                          );
-                        }}
-                      />
-                    </div>
-
-                    <div className="space-y-4">
-                      <div>
-                        <FormLabel className="text-base font-semibold">IA - Resumos e Sugestões</FormLabel>
-                        <p className="text-sm text-muted-foreground mt-2">
-                          Controle a utilização de inteligência artificial nas suas visitas
-                        </p>
-                      </div>
-
-                      <div className="pt-2 border-t space-y-3">
-                        <div className="flex items-start gap-2">
-                          <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-ia-resumo" />
-                          <div>
-                            <p className="font-medium text-sm">Geração de resumo da visita por IA</p>
-                            <p className="text-xs text-muted-foreground">Gera automaticamente resumos das visitas</p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-start gap-2">
-                          <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-ia-sugestoes" />
-                          <div>
-                            <p className="font-medium text-sm">Sugestões de tarefas por IA</p>
-                            <p className="text-xs text-muted-foreground">Sugere tarefas de acompanhamento</p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-start gap-2">
-                          <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-ia-criar-tarefas" />
-                          <div>
-                            <p className="font-medium text-sm">Criar tarefas diretamente das sugestões</p>
-                            <p className="text-xs text-muted-foreground">Permite criar tarefas com um clique</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-6 border-t space-y-4">
-                      <div>
-                        <FormLabel className="text-base font-semibold">Áudio & Transcrição</FormLabel>
-                        <p className="text-sm text-muted-foreground mt-2">
-                          Configure a gravação e transcrição de áudio
-                        </p>
-                      </div>
-
-                      <div className="pt-2 border-t space-y-3">
-                        <div className="flex items-start gap-2">
-                          <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-audio-gravacao" />
-                          <div>
-                            <p className="font-medium text-sm">Permitir gravação de áudio nas visitas</p>
-                            <p className="text-xs text-muted-foreground">Os agentes podem gravar notas de áudio</p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-start gap-2">
-                          <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-audio-transcracao" />
-                          <div>
-                            <p className="font-medium text-sm">Transcrição automática de áudio</p>
-                            <p className="text-xs text-muted-foreground">Transcreve automaticamente para texto</p>
-                          </div>
-                        </div>
-
-                        <div>
-                          <FormLabel className="text-sm">Idioma preferencial da transcrição</FormLabel>
-                          <Select defaultValue="pt-PT">
-                            <SelectTrigger className="mt-2" data-testid="select-audio-language">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pt-PT">Português (Portugal)</SelectItem>
-                              <SelectItem value="pt-BR">Português (Brasil)</SelectItem>
-                              <SelectItem value="en-GB">English (UK)</SelectItem>
-                              <SelectItem value="es-ES">Español</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  {/* TAB 4: LOCALIZAÇÃO & PRIVACIDADE */}
-                  <TabsContent value="localizacao" className="space-y-6 mt-6">
-                    <div className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="mostrarGPS"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                                data-testid="checkbox-mostrar-gps"
-                              />
-                            </FormControl>
-                            <div className="space-y-1">
-                              <FormLabel className="font-normal cursor-pointer">
-                                Ativar funcionalidades de GPS nesta empresa
-                              </FormLabel>
-                              <p className="text-sm text-muted-foreground">
-                                Permite rastrear a localização das visitas
-                              </p>
-                            </div>
-                          </FormItem>
-                        )}
-                      />
-
-                      <div className="pt-6 border-t bg-blue-50 dark:bg-blue-950 p-4 rounded-lg space-y-2">
-                        <p className="font-medium text-sm flex items-center gap-2">
-                          <MapPin className="w-4 h-4" />
-                          Informações sobre Localização
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Se a localização estiver ativada, o sistema pode registar a posição aproximada ao marcar visitas como realizadas. Isto ajuda no acompanhamento e análise de padrões de visita. Os dados de localização são armazenados de forma privada e apenas acessíveis aos administradores da empresa.
-                        </p>
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  {/* TAB 5: ALERTAS & UX */}
-                  <TabsContent value="alertas" className="space-y-6 mt-6">
-                    <div className="space-y-4">
-                      <div>
-                        <FormLabel className="text-base font-semibold">Alertas & Notificações</FormLabel>
-                        <p className="text-sm text-muted-foreground mt-2">
-                          Configure como os alertas são mostrados
-                        </p>
-                      </div>
-
-                      <div className="pt-2 border-t space-y-3">
-                        <div className="flex items-start gap-2">
-                          <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-alert-ribbon" />
-                          <div>
-                            <p className="font-medium text-sm">Mostrar barra de alertas nos dashboards</p>
-                            <p className="text-xs text-muted-foreground">
-                              Exibe tarefas em atraso e visitas de hoje em destaque
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-start gap-2">
-                          <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-badges-nav" />
-                          <div>
-                            <p className="font-medium text-sm">Mostrar badges na navegação</p>
-                            <p className="text-xs text-muted-foreground">
-                              Exibe contagens de tarefas pendentes e visitas de hoje
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-6 border-t space-y-4">
-                      <div>
-                        <FormLabel>Intervalo de atualização dos indicadores</FormLabel>
-                        <p className="text-sm text-muted-foreground mt-2">
-                          Com que frequência os números são atualizados
-                        </p>
-                      </div>
-                      <Select defaultValue="60">
-                        <SelectTrigger data-testid="select-refresh-interval">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="60">1 minuto</SelectItem>
-                          <SelectItem value="120">2 minutos</SelectItem>
-                          <SelectItem value="300">5 minutos</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </TabsContent>
-
-                  {/* TAB 6: INTEGRAÇÕES */}
-                  <TabsContent value="integrações" className="space-y-6 mt-6">
-                    <div className="space-y-4">
-                      <p className="text-sm text-muted-foreground">
-                        Sincronize dados com as suas aplicações favoritas
-                      </p>
-
-                      <div className="pt-4 border-t space-y-4">
-                        <div className="flex items-start justify-between p-4 border rounded-lg">
-                          <div className="space-y-1">
-                            <p className="font-medium">Microsoft Outlook / 365</p>
-                            <p className="text-sm text-muted-foreground">
-                              Sincronize o seu calendário e tarefas
-                            </p>
-                          </div>
-                          <Badge variant="outline">Desligado</Badge>
-                        </div>
-
-                        <div className="flex items-start justify-between p-4 border rounded-lg">
-                          <div className="space-y-1">
-                            <p className="font-medium">Microsoft Planner / To-Do</p>
-                            <p className="text-sm text-muted-foreground">
-                              Sincronize tarefas com o Planner
-                            </p>
-                          </div>
-                          <Badge variant="outline">Desligado</Badge>
-                        </div>
-
-                        <div className="bg-amber-50 dark:bg-amber-950 p-4 rounded-lg">
-                          <p className="text-sm font-medium">Mais integrações em breve</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Novas integrações estão a ser desenvolvidas. Contacte o suporte para saber mais.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  {/* TAB 7: ENTIDADES - Tipos de Entidade */}
-                  <TabsContent value="entidades" className="space-y-6 mt-6">
-                    <AdminEntidadeTipos />
-                  </TabsContent>
-
-                  {/* TAB 8: FILTROS - Controle por módulo */}
-                  <TabsContent value="filtros" className="space-y-6 mt-6">
-                    <div className="space-y-4">
-                      <p className="text-sm text-muted-foreground">
-                        Configure quais filtros estão disponíveis em cada módulo
-                      </p>
-
-                      <Tabs defaultValue="visitas-filter" className="w-full">
-                        <TabsList className="grid w-full grid-cols-4">
-                          <TabsTrigger value="entidades-filter" data-testid="tab-filter-entidades">Entidades</TabsTrigger>
-                          <TabsTrigger value="contactos-filter" data-testid="tab-filter-contactos">Contactos</TabsTrigger>
-                          <TabsTrigger value="visitas-filter" data-testid="tab-filter-visitas">Visitas</TabsTrigger>
-                          <TabsTrigger value="tarefas-filter" data-testid="tab-filter-tarefas">Tarefas</TabsTrigger>
+                      {/* Tabs: Geral, Marcas & Entidades, Utilizadores */}
+                      <Tabs defaultValue="geral" className="w-full">
+                        <TabsList className="grid w-full grid-cols-3">
+                          <TabsTrigger value="geral" data-testid="tab-empresa-geral">Geral</TabsTrigger>
+                          <TabsTrigger value="marcas-entidades" data-testid="tab-empresa-marcas">Marcas &amp; Entidades</TabsTrigger>
+                          <TabsTrigger value="utilizadores" data-testid="tab-empresa-utilizadores">Utilizadores</TabsTrigger>
                         </TabsList>
 
-                        {/* ENTIDADES FILTERS */}
-                        <TabsContent value="entidades-filter" className="space-y-4 mt-4">
+                        {/* Geral */}
+                        <TabsContent value="geral" className="space-y-6 mt-6">
                           <div className="space-y-4">
+                            <h4 className="font-semibold">Informações Gerais</h4>
+                            
                             <FormField
                               control={form.control}
-                              name="uiSettings.entidades.enableFilterTipoEntidade"
+                              name="nome"
                               render={({ field }) => (
-                                <FormItem className="flex items-start gap-3">
+                                <FormItem>
+                                  <FormLabel>Nome da Empresa</FormLabel>
                                   <FormControl>
-                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-tipo-entidade" />
+                                    <Input {...field} data-testid="input-settings-nome" />
                                   </FormControl>
-                                  <div>
-                                    <FormLabel>Filtro por Tipo de Entidade</FormLabel>
-                                    <p className="text-xs text-muted-foreground">Permite filtrar por tipos configurados</p>
-                                  </div>
+                                  <FormMessage />
                                 </FormItem>
                               )}
                             />
+
                             <FormField
                               control={form.control}
-                              name="uiSettings.entidades.enableFilterSearch"
+                              name="nif"
                               render={({ field }) => (
-                                <FormItem className="flex items-start gap-3">
+                                <FormItem>
+                                  <FormLabel>NIF</FormLabel>
                                   <FormControl>
-                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-search-entidades" />
+                                    <Input {...field} value={field.value || ""} data-testid="input-settings-nif" />
                                   </FormControl>
-                                  <div>
-                                    <FormLabel>Pesquisa por Nome</FormLabel>
-                                    <p className="text-xs text-muted-foreground">Filtro de pesquisa rápida</p>
-                                  </div>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="email"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Email</FormLabel>
+                                  <FormControl>
+                                    <Input type="email" {...field} value={field.value || ""} data-testid="input-settings-email" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="telefone"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Telefone</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} value={field.value || ""} data-testid="input-settings-telefone" />
+                                  </FormControl>
+                                  <FormMessage />
                                 </FormItem>
                               )}
                             />
                           </div>
-                        </TabsContent>
 
-                        {/* CONTACTOS FILTERS */}
-                        <TabsContent value="contactos-filter" className="space-y-4 mt-4">
-                          <div className="space-y-4">
+                          <div className="space-y-4 pt-6 border-t">
+                            <h4 className="font-semibold">Tema & Logo</h4>
+
                             <FormField
                               control={form.control}
-                              name="uiSettings.contactos.enableFilterEntidade"
+                              name="theme"
                               render={({ field }) => (
-                                <FormItem className="flex items-start gap-3">
-                                  <FormControl>
-                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-entidade-contacto" />
-                                  </FormControl>
-                                  <div>
-                                    <FormLabel>Filtro por Entidade</FormLabel>
-                                    <p className="text-xs text-muted-foreground">Filtrar contactos por entidade associada</p>
-                                  </div>
+                                <FormItem>
+                                  <FormLabel>Tema da Aplicação</FormLabel>
+                                  <Select value={field.value} onValueChange={field.onChange}>
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-settings-theme">
+                                        <SelectValue placeholder="Selecione um tema" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="light-business">Tema claro (Business)</SelectItem>
+                                      <SelectItem value="dark-pro">Tema escuro (Pro)</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
                                 </FormItem>
                               )}
                             />
-                            <FormField
-                              control={form.control}
-                              name="uiSettings.contactos.enableFilterCargo"
-                              render={({ field }) => (
-                                <FormItem className="flex items-start gap-3">
-                                  <FormControl>
-                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-cargo" />
-                                  </FormControl>
-                                  <div>
-                                    <FormLabel>Filtro por Cargo</FormLabel>
-                                    <p className="text-xs text-muted-foreground">Filtrar por função/cargo</p>
-                                  </div>
-                                </FormItem>
+
+                            <div className="space-y-3">
+                              <FormLabel>Logo da Empresa</FormLabel>
+                              {currentLogo && (
+                                <div className="flex items-center gap-4">
+                                  <img
+                                    src={currentLogo}
+                                    alt="Logo preview"
+                                    className="h-16 max-w-xs object-contain rounded border"
+                                    data-testid="img-logo-preview"
+                                  />
+                                  <span className="text-sm text-muted-foreground">Logo atual</span>
+                                </div>
                               )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="uiSettings.contactos.enableFilterSearch"
-                              render={({ field }) => (
-                                <FormItem className="flex items-start gap-3">
-                                  <FormControl>
-                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-search-contactos" />
-                                  </FormControl>
-                                  <div>
-                                    <FormLabel>Pesquisa por Nome</FormLabel>
-                                    <p className="text-xs text-muted-foreground">Filtro de pesquisa rápida</p>
-                                  </div>
-                                </FormItem>
-                              )}
-                            />
+                              <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                                onChange={handleLogoUpload}
+                                className="hidden"
+                                data-testid="input-logo-file"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={uploading}
+                                data-testid="button-upload-logo"
+                                className="gap-2"
+                              >
+                                <Upload className="w-4 h-4" />
+                                {uploading ? "A carregar..." : "Carregar novo logo"}
+                              </Button>
+                              <p className="text-xs text-muted-foreground">
+                                PNG, JPG, SVG ou WebP. Máx 50MB
+                              </p>
+                            </div>
                           </div>
                         </TabsContent>
 
-                        {/* VISITAS FILTERS */}
-                        <TabsContent value="visitas-filter" className="space-y-4 mt-4">
-                          <div className="space-y-4">
-                            <FormField
-                              control={form.control}
-                              name="uiSettings.visitas.enableFilterDateQuick"
-                              render={({ field }) => (
-                                <FormItem className="flex items-start gap-3">
-                                  <FormControl>
-                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-date-quick" />
-                                  </FormControl>
-                                  <div>
-                                    <FormLabel>Filtro Datas (Hoje / Semana / 30 dias)</FormLabel>
-                                  </div>
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="uiSettings.visitas.enableFilterUser"
-                              render={({ field }) => (
-                                <FormItem className="flex items-start gap-3">
-                                  <FormControl>
-                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-user-visitas" />
-                                  </FormControl>
-                                  <div>
-                                    <FormLabel>Filtro por Utilizador</FormLabel>
-                                  </div>
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="uiSettings.visitas.enableFilterMarca"
-                              render={({ field }) => (
-                                <FormItem className="flex items-start gap-3">
-                                  <FormControl>
-                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-marca-visitas" />
-                                  </FormControl>
-                                  <div>
-                                    <FormLabel>Filtro por Marca</FormLabel>
-                                  </div>
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="uiSettings.visitas.enableFilterEntidade"
-                              render={({ field }) => (
-                                <FormItem className="flex items-start gap-3">
-                                  <FormControl>
-                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-entidade-visitas" />
-                                  </FormControl>
-                                  <div>
-                                    <FormLabel>Filtro por Entidade</FormLabel>
-                                  </div>
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="uiSettings.visitas.enableFilterContacto"
-                              render={({ field }) => (
-                                <FormItem className="flex items-start gap-3">
-                                  <FormControl>
-                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-contacto-visitas" />
-                                  </FormControl>
-                                  <div>
-                                    <FormLabel>Filtro por Contacto</FormLabel>
-                                  </div>
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="uiSettings.visitas.enableFilterHasAudio"
-                              render={({ field }) => (
-                                <FormItem className="flex items-start gap-3">
-                                  <FormControl>
-                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-audio-visitas" />
-                                  </FormControl>
-                                  <div>
-                                    <FormLabel>Filtro por Áudio (Com áudio por transcrever)</FormLabel>
-                                  </div>
-                                </FormItem>
-                              )}
-                            />
+                        {/* Marcas & Entidades */}
+                        <TabsContent value="marcas-entidades" className="space-y-6 mt-6">
+                          <div className="space-y-6">
+                            <div>
+                              <h4 className="font-semibold mb-4">Gestão de Marcas</h4>
+                              <AdminMarcas />
+                            </div>
+                            
+                            <div className="pt-6 border-t">
+                              <h4 className="font-semibold mb-4">Tipos de Entidade</h4>
+                              <AdminEntidadeTipos />
+                            </div>
                           </div>
                         </TabsContent>
 
-                        {/* TAREFAS FILTERS */}
-                        <TabsContent value="tarefas-filter" className="space-y-4 mt-4">
+                        {/* Utilizadores */}
+                        <TabsContent value="utilizadores" className="mt-6">
+                          <AdminUsers />
+                        </TabsContent>
+                      </Tabs>
+                    </div>
+                  </div>
+                )}
+
+                {/* Section: VISITAS & TAREFAS */}
+                {currentSection === "visitas" && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Visitas & Tarefas</h3>
+                      
+                      <Tabs defaultValue="comportamento" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                          <TabsTrigger value="comportamento" data-testid="tab-visitas-comportamento">Comportamento</TabsTrigger>
+                          <TabsTrigger value="filtros" data-testid="tab-visitas-filtros">Filtros & Listas</TabsTrigger>
+                        </TabsList>
+
+                        {/* Comportamento */}
+                        <TabsContent value="comportamento" className="space-y-6 mt-6">
                           <div className="space-y-4">
                             <FormField
                               control={form.control}
-                              name="uiSettings.tarefas.enableFilterStatus"
+                              name="mostrarMarcasEmVisitas"
                               render={({ field }) => (
-                                <FormItem className="flex items-start gap-3">
+                                <FormItem className="flex flex-row items-center space-x-3 space-y-0">
                                   <FormControl>
-                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-status-tarefas" />
+                                    <Checkbox
+                                      checked={field.value}
+                                      onCheckedChange={field.onChange}
+                                      data-testid="checkbox-mostrar-marcas"
+                                    />
                                   </FormControl>
-                                  <div>
-                                    <FormLabel>Filtro por Status</FormLabel>
+                                  <div className="space-y-1">
+                                    <FormLabel className="font-normal cursor-pointer">
+                                      Mostrar seleção de marcas nas visitas
+                                    </FormLabel>
+                                    <p className="text-sm text-muted-foreground">
+                                      Permite aos agentes selecionar e rastrear marcas entregues
+                                    </p>
                                   </div>
                                 </FormItem>
                               )}
                             />
-                            <FormField
-                              control={form.control}
-                              name="uiSettings.tarefas.enableFilterOverdue"
-                              render={({ field }) => (
-                                <FormItem className="flex items-start gap-3">
-                                  <FormControl>
-                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-overdue" />
-                                  </FormControl>
-                                  <div>
-                                    <FormLabel>Filtro Tarefas em Atraso</FormLabel>
-                                  </div>
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="uiSettings.tarefas.enableFilterAssignedUser"
-                              render={({ field }) => (
-                                <FormItem className="flex items-start gap-3">
-                                  <FormControl>
-                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-assigned-user" />
-                                  </FormControl>
-                                  <div>
-                                    <FormLabel>Filtro por Utilizador Atribuído</FormLabel>
-                                  </div>
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="uiSettings.tarefas.enableFilterEntidade"
-                              render={({ field }) => (
-                                <FormItem className="flex items-start gap-3">
-                                  <FormControl>
-                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-entidade-tarefas" />
-                                  </FormControl>
-                                  <div>
-                                    <FormLabel>Filtro por Entidade</FormLabel>
-                                  </div>
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="uiSettings.tarefas.enableFilterVisita"
-                              render={({ field }) => (
-                                <FormItem className="flex items-start gap-3">
-                                  <FormControl>
-                                    <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-visita-tarefas" />
-                                  </FormControl>
-                                  <div>
-                                    <FormLabel>Filtro por Visita</FormLabel>
-                                  </div>
-                                </FormItem>
-                              )}
-                            />
+
+                            <div className="pt-4 border-t space-y-4">
+                              <div>
+                                <FormLabel>Follow-ups e Histórico de Visitas</FormLabel>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  Permite criar visitas de acompanhamento e rastrear a cadeia de visitas
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">Cadeia de follow-ups:</span>
+                                <Badge variant="secondary">Ativado</Badge>
+                              </div>
+                            </div>
+                          </div>
+                        </TabsContent>
+
+                        {/* Filtros */}
+                        <TabsContent value="filtros" className="space-y-6 mt-6">
+                          <div className="space-y-4">
+                            <p className="text-sm text-muted-foreground">
+                              Configure quais filtros estão disponíveis em cada módulo
+                            </p>
+
+                            <Tabs defaultValue="visitas-filter" className="w-full">
+                              <TabsList className="grid w-full grid-cols-4">
+                                <TabsTrigger value="entidades-filter" data-testid="tab-filter-entidades">Entidades</TabsTrigger>
+                                <TabsTrigger value="contactos-filter" data-testid="tab-filter-contactos">Contactos</TabsTrigger>
+                                <TabsTrigger value="visitas-filter" data-testid="tab-filter-visitas">Visitas</TabsTrigger>
+                                <TabsTrigger value="tarefas-filter" data-testid="tab-filter-tarefas">Tarefas</TabsTrigger>
+                              </TabsList>
+
+                              {/* Entidades Filters */}
+                              <TabsContent value="entidades-filter" className="space-y-4 mt-4">
+                                <div className="space-y-4">
+                                  <FormField
+                                    control={form.control}
+                                    name="uiSettings.entidades.enableFilterTipoEntidade"
+                                    render={({ field }) => (
+                                      <FormItem className="flex items-start gap-3">
+                                        <FormControl>
+                                          <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-tipo-entidade" />
+                                        </FormControl>
+                                        <div>
+                                          <FormLabel>Filtro por Tipo de Entidade</FormLabel>
+                                          <p className="text-xs text-muted-foreground">Permite filtrar por tipos configurados</p>
+                                        </div>
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
+                                    name="uiSettings.entidades.enableFilterSearch"
+                                    render={({ field }) => (
+                                      <FormItem className="flex items-start gap-3">
+                                        <FormControl>
+                                          <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-search-entidades" />
+                                        </FormControl>
+                                        <div>
+                                          <FormLabel>Pesquisa por Nome</FormLabel>
+                                          <p className="text-xs text-muted-foreground">Filtro de pesquisa rápida</p>
+                                        </div>
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+                              </TabsContent>
+
+                              {/* Contactos Filters */}
+                              <TabsContent value="contactos-filter" className="space-y-4 mt-4">
+                                <div className="space-y-4">
+                                  <FormField
+                                    control={form.control}
+                                    name="uiSettings.contactos.enableFilterEntidade"
+                                    render={({ field }) => (
+                                      <FormItem className="flex items-start gap-3">
+                                        <FormControl>
+                                          <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-entidade-contacto" />
+                                        </FormControl>
+                                        <div>
+                                          <FormLabel>Filtro por Entidade</FormLabel>
+                                          <p className="text-xs text-muted-foreground">Filtrar contactos por entidade associada</p>
+                                        </div>
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
+                                    name="uiSettings.contactos.enableFilterCargo"
+                                    render={({ field }) => (
+                                      <FormItem className="flex items-start gap-3">
+                                        <FormControl>
+                                          <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-cargo" />
+                                        </FormControl>
+                                        <div>
+                                          <FormLabel>Filtro por Cargo</FormLabel>
+                                          <p className="text-xs text-muted-foreground">Filtrar por função/cargo</p>
+                                        </div>
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
+                                    name="uiSettings.contactos.enableFilterSearch"
+                                    render={({ field }) => (
+                                      <FormItem className="flex items-start gap-3">
+                                        <FormControl>
+                                          <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-search-contactos" />
+                                        </FormControl>
+                                        <div>
+                                          <FormLabel>Pesquisa por Nome</FormLabel>
+                                          <p className="text-xs text-muted-foreground">Filtro de pesquisa rápida</p>
+                                        </div>
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+                              </TabsContent>
+
+                              {/* Visitas Filters */}
+                              <TabsContent value="visitas-filter" className="space-y-4 mt-4">
+                                <div className="space-y-4">
+                                  <FormField
+                                    control={form.control}
+                                    name="uiSettings.visitas.enableFilterDateQuick"
+                                    render={({ field }) => (
+                                      <FormItem className="flex items-start gap-3">
+                                        <FormControl>
+                                          <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-date-quick" />
+                                        </FormControl>
+                                        <div>
+                                          <FormLabel>Filtro Datas (Hoje / Semana / 30 dias)</FormLabel>
+                                        </div>
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
+                                    name="uiSettings.visitas.enableFilterUser"
+                                    render={({ field }) => (
+                                      <FormItem className="flex items-start gap-3">
+                                        <FormControl>
+                                          <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-user-visitas" />
+                                        </FormControl>
+                                        <div>
+                                          <FormLabel>Filtro por Utilizador</FormLabel>
+                                        </div>
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
+                                    name="uiSettings.visitas.enableFilterMarca"
+                                    render={({ field }) => (
+                                      <FormItem className="flex items-start gap-3">
+                                        <FormControl>
+                                          <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-marca-visitas" />
+                                        </FormControl>
+                                        <div>
+                                          <FormLabel>Filtro por Marca</FormLabel>
+                                        </div>
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
+                                    name="uiSettings.visitas.enableFilterEntidade"
+                                    render={({ field }) => (
+                                      <FormItem className="flex items-start gap-3">
+                                        <FormControl>
+                                          <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-entidade-visitas" />
+                                        </FormControl>
+                                        <div>
+                                          <FormLabel>Filtro por Entidade</FormLabel>
+                                        </div>
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
+                                    name="uiSettings.visitas.enableFilterContacto"
+                                    render={({ field }) => (
+                                      <FormItem className="flex items-start gap-3">
+                                        <FormControl>
+                                          <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-contacto-visitas" />
+                                        </FormControl>
+                                        <div>
+                                          <FormLabel>Filtro por Contacto</FormLabel>
+                                        </div>
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
+                                    name="uiSettings.visitas.enableFilterHasAudio"
+                                    render={({ field }) => (
+                                      <FormItem className="flex items-start gap-3">
+                                        <FormControl>
+                                          <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-audio-visitas" />
+                                        </FormControl>
+                                        <div>
+                                          <FormLabel>Filtro por Áudio (Com áudio por transcrever)</FormLabel>
+                                        </div>
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+                              </TabsContent>
+
+                              {/* Tarefas Filters */}
+                              <TabsContent value="tarefas-filter" className="space-y-4 mt-4">
+                                <div className="space-y-4">
+                                  <FormField
+                                    control={form.control}
+                                    name="uiSettings.tarefas.enableFilterStatus"
+                                    render={({ field }) => (
+                                      <FormItem className="flex items-start gap-3">
+                                        <FormControl>
+                                          <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-status-tarefas" />
+                                        </FormControl>
+                                        <div>
+                                          <FormLabel>Filtro por Status</FormLabel>
+                                        </div>
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
+                                    name="uiSettings.tarefas.enableFilterOverdue"
+                                    render={({ field }) => (
+                                      <FormItem className="flex items-start gap-3">
+                                        <FormControl>
+                                          <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-overdue" />
+                                        </FormControl>
+                                        <div>
+                                          <FormLabel>Filtro Tarefas em Atraso</FormLabel>
+                                        </div>
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
+                                    name="uiSettings.tarefas.enableFilterAssignedUser"
+                                    render={({ field }) => (
+                                      <FormItem className="flex items-start gap-3">
+                                        <FormControl>
+                                          <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-assigned-user" />
+                                        </FormControl>
+                                        <div>
+                                          <FormLabel>Filtro por Utilizador Atribuído</FormLabel>
+                                        </div>
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
+                                    name="uiSettings.tarefas.enableFilterEntidade"
+                                    render={({ field }) => (
+                                      <FormItem className="flex items-start gap-3">
+                                        <FormControl>
+                                          <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-entidade-tarefas" />
+                                        </FormControl>
+                                        <div>
+                                          <FormLabel>Filtro por Entidade</FormLabel>
+                                        </div>
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
+                                    name="uiSettings.tarefas.enableFilterVisita"
+                                    render={({ field }) => (
+                                      <FormItem className="flex items-start gap-3">
+                                        <FormControl>
+                                          <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid="checkbox-filter-visita-tarefas" />
+                                        </FormControl>
+                                        <div>
+                                          <FormLabel>Filtro por Visita</FormLabel>
+                                        </div>
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+                              </TabsContent>
+                            </Tabs>
                           </div>
                         </TabsContent>
                       </Tabs>
                     </div>
-                  </TabsContent>
-                </Tabs>
+                  </div>
+                )}
 
+                {/* Section: IA & PRODUTIVIDADE */}
+                {currentSection === "ia" && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">IA & Produtividade</h3>
+                      
+                      <Tabs defaultValue="ia-visitas" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                          <TabsTrigger value="ia-visitas" data-testid="tab-ia-visitas">IA de Visitas</TabsTrigger>
+                          <TabsTrigger value="audio" data-testid="tab-ia-audio">Áudio & Transcrição</TabsTrigger>
+                        </TabsList>
+
+                        {/* IA de Visitas */}
+                        <TabsContent value="ia-visitas" className="space-y-6 mt-6">
+                          <FormField
+                            control={form.control}
+                            name="uiSettings"
+                            render={({ field }) => {
+                              const uiSettings = field.value || {};
+                              const isEnabled = uiSettings.enableIA !== false;
+                              return (
+                                <FormItem className="space-y-4">
+                                  <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-200 dark:border-amber-900/30">
+                                    <div className="flex-1 space-y-2">
+                                      <div className="flex items-center gap-2">
+                                        <Lightbulb className="w-5 h-5 text-amber-600" />
+                                        <FormLabel className="text-base font-semibold cursor-pointer">
+                                          Insights IA no Dashboard
+                                        </FormLabel>
+                                      </div>
+                                      <p className="text-sm text-muted-foreground">
+                                        Ativa ou desativa a geração de insights e recomendações automáticas baseadas em IA no dashboard
+                                      </p>
+                                      <p className="text-xs text-muted-foreground mt-3">
+                                        {isEnabled
+                                          ? "✓ Os dashboards mostram análises personalizadas por utilizador (agentes) ou agregadas por empresa (admin)"
+                                          : "✗ Os cards de insights mostram uma mensagem informativa sem chamar a IA"}
+                                      </p>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        field.onChange({ ...uiSettings, enableIA: !isEnabled });
+                                      }}
+                                      className={`px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                                        isEnabled
+                                          ? "bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-100"
+                                          : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                                      }`}
+                                      data-testid="button-toggle-ia-insights"
+                                    >
+                                      {isEnabled ? "Ativado" : "Desativado"}
+                                    </button>
+                                  </div>
+                                </FormItem>
+                              );
+                            }}
+                          />
+
+                          <div className="space-y-4 pt-6 border-t">
+                            <div>
+                              <FormLabel className="text-base font-semibold">IA - Resumos e Sugestões</FormLabel>
+                              <p className="text-sm text-muted-foreground mt-2">
+                                Controle a utilização de inteligência artificial nas suas visitas
+                              </p>
+                            </div>
+
+                            <div className="space-y-3">
+                              <div className="flex items-start gap-2">
+                                <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-ia-resumo" />
+                                <div>
+                                  <p className="font-medium text-sm">Geração de resumo da visita por IA</p>
+                                  <p className="text-xs text-muted-foreground">Gera automaticamente resumos das visitas</p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-start gap-2">
+                                <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-ia-sugestoes" />
+                                <div>
+                                  <p className="font-medium text-sm">Sugestões de tarefas por IA</p>
+                                  <p className="text-xs text-muted-foreground">Sugere tarefas de acompanhamento</p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-start gap-2">
+                                <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-ia-criar-tarefas" />
+                                <div>
+                                  <p className="font-medium text-sm">Criar tarefas diretamente das sugestões</p>
+                                  <p className="text-xs text-muted-foreground">Permite criar tarefas com um clique</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </TabsContent>
+
+                        {/* Áudio & Transcrição */}
+                        <TabsContent value="audio" className="space-y-6 mt-6">
+                          <div className="space-y-4">
+                            <div>
+                              <FormLabel className="text-base font-semibold">Áudio & Transcrição</FormLabel>
+                              <p className="text-sm text-muted-foreground mt-2">
+                                Configure a gravação e transcrição de áudio
+                              </p>
+                            </div>
+
+                            <div className="space-y-3">
+                              <div className="flex items-start gap-2">
+                                <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-audio-gravacao" />
+                                <div>
+                                  <p className="font-medium text-sm">Permitir gravação de áudio nas visitas</p>
+                                  <p className="text-xs text-muted-foreground">Os agentes podem gravar notas de áudio</p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-start gap-2">
+                                <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-audio-transcracao" />
+                                <div>
+                                  <p className="font-medium text-sm">Transcrição automática de áudio</p>
+                                  <p className="text-xs text-muted-foreground">Transcreve automaticamente para texto</p>
+                                </div>
+                              </div>
+
+                              <div>
+                                <FormLabel className="text-sm">Idioma preferencial da transcrição</FormLabel>
+                                <Select defaultValue="pt-PT">
+                                  <SelectTrigger className="mt-2" data-testid="select-audio-language">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="pt-PT">Português (Portugal)</SelectItem>
+                                    <SelectItem value="pt-BR">Português (Brasil)</SelectItem>
+                                    <SelectItem value="en-GB">English (UK)</SelectItem>
+                                    <SelectItem value="es-ES">Español</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          </div>
+                        </TabsContent>
+                      </Tabs>
+                    </div>
+                  </div>
+                )}
+
+                {/* Section: ALERTAS & RELATÓRIOS */}
+                {currentSection === "alertas" && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Alertas & Relatórios</h3>
+                      
+                      <Tabs defaultValue="alertas-ux" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                          <TabsTrigger value="alertas-ux" data-testid="tab-alertas-ux">Alertas & UX</TabsTrigger>
+                          <TabsTrigger value="gps" data-testid="tab-alertas-gps">Localização</TabsTrigger>
+                        </TabsList>
+
+                        {/* Alertas */}
+                        <TabsContent value="alertas-ux" className="space-y-6 mt-6">
+                          <div className="space-y-4">
+                            <div>
+                              <FormLabel className="text-base font-semibold">Alertas & Notificações</FormLabel>
+                              <p className="text-sm text-muted-foreground mt-2">
+                                Configure como os alertas são mostrados
+                              </p>
+                            </div>
+
+                            <div className="space-y-3">
+                              <div className="flex items-start gap-2">
+                                <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-alert-ribbon" />
+                                <div>
+                                  <p className="font-medium text-sm">Mostrar barra de alertas nos dashboards</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Exibe tarefas em atraso e visitas de hoje em destaque
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-start gap-2">
+                                <input type="checkbox" defaultChecked className="mt-1" data-testid="checkbox-badges-nav" />
+                                <div>
+                                  <p className="font-medium text-sm">Mostrar badges na navegação</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Exibe contagens de tarefas pendentes e visitas de hoje
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="pt-4 border-t space-y-4">
+                              <div>
+                                <FormLabel>Intervalo de atualização dos indicadores</FormLabel>
+                                <p className="text-sm text-muted-foreground mt-2">
+                                  Com que frequência os números são atualizados
+                                </p>
+                              </div>
+                              <Select defaultValue="60">
+                                <SelectTrigger data-testid="select-refresh-interval">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="60">1 minuto</SelectItem>
+                                  <SelectItem value="120">2 minutos</SelectItem>
+                                  <SelectItem value="300">5 minutos</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </TabsContent>
+
+                        {/* Localização */}
+                        <TabsContent value="gps" className="space-y-6 mt-6">
+                          <div className="space-y-4">
+                            <FormField
+                              control={form.control}
+                              name="mostrarGPS"
+                              render={({ field }) => (
+                                <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                                  <FormControl>
+                                    <Checkbox
+                                      checked={field.value}
+                                      onCheckedChange={field.onChange}
+                                      data-testid="checkbox-mostrar-gps"
+                                    />
+                                  </FormControl>
+                                  <div className="space-y-1">
+                                    <FormLabel className="font-normal cursor-pointer">
+                                      Ativar funcionalidades de GPS nesta empresa
+                                    </FormLabel>
+                                    <p className="text-sm text-muted-foreground">
+                                      Permite rastrear a localização das visitas
+                                    </p>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+
+                            <div className="pt-6 border-t bg-blue-50 dark:bg-blue-950 p-4 rounded-lg space-y-2">
+                              <p className="font-medium text-sm flex items-center gap-2">
+                                <MapPin className="w-4 h-4" />
+                                Informações sobre Localização
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                Se a localização estiver ativada, o sistema pode registar a posição aproximada ao marcar visitas como realizadas. Isto ajuda no acompanhamento e análise de padrões de visita. Os dados de localização são armazenados de forma privada e apenas acessíveis aos administradores da empresa.
+                              </p>
+                            </div>
+                          </div>
+                        </TabsContent>
+                      </Tabs>
+                    </div>
+                  </div>
+                )}
+
+                {/* Section: INTEGRAÇÕES */}
+                {currentSection === "integracoes" && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Integrações</h3>
+                      
+                      <Tabs defaultValue="microsoft" className="w-full">
+                        <TabsList className="grid w-full grid-cols-3">
+                          <TabsTrigger value="microsoft" data-testid="tab-integracoes-microsoft">Microsoft 365</TabsTrigger>
+                          <TabsTrigger value="google" data-testid="tab-integracoes-google">Google</TabsTrigger>
+                          <TabsTrigger value="outros" data-testid="tab-integracoes-outros">Outros</TabsTrigger>
+                        </TabsList>
+
+                        {/* Microsoft */}
+                        <TabsContent value="microsoft" className="space-y-6 mt-6">
+                          <div className="space-y-4">
+                            <div className="flex items-start justify-between p-4 border rounded-lg">
+                              <div className="space-y-1">
+                                <p className="font-medium">Microsoft Outlook / 365</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Sincronize o seu calendário e tarefas
+                                </p>
+                              </div>
+                              <Badge variant="outline">Desligado</Badge>
+                            </div>
+
+                            <div className="flex items-start justify-between p-4 border rounded-lg">
+                              <div className="space-y-1">
+                                <p className="font-medium">Microsoft Planner / To-Do</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Sincronize tarefas com o Planner
+                                </p>
+                              </div>
+                              <Badge variant="outline">Desligado</Badge>
+                            </div>
+                          </div>
+                        </TabsContent>
+
+                        {/* Google */}
+                        <TabsContent value="google" className="space-y-6 mt-6">
+                          <div className="space-y-4">
+                            <div className="flex items-start justify-between p-4 border rounded-lg">
+                              <div className="space-y-1">
+                                <p className="font-medium">Google Calendar</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Sincronize o seu calendário
+                                </p>
+                              </div>
+                              <Badge variant="outline">Desligado</Badge>
+                            </div>
+
+                            <div className="flex items-start justify-between p-4 border rounded-lg">
+                              <div className="space-y-1">
+                                <p className="font-medium">Google Contacts</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Sincronize contactos
+                                </p>
+                              </div>
+                              <Badge variant="outline">Desligado</Badge>
+                            </div>
+                          </div>
+                        </TabsContent>
+
+                        {/* Outros */}
+                        <TabsContent value="outros" className="space-y-6 mt-6">
+                          <div className="bg-amber-50 dark:bg-amber-950 p-4 rounded-lg">
+                            <p className="text-sm font-medium">Mais integrações em breve</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Novas integrações estão a ser desenvolvidas. Contacte o suporte para saber mais.
+                            </p>
+                          </div>
+                        </TabsContent>
+                      </Tabs>
+                    </div>
+                  </div>
+                )}
+
+                {/* Save Button */}
                 <Button
                   type="submit"
                   disabled={updateMutation.isPending}
@@ -922,6 +1044,3 @@ export default function AdminEmpresa() {
     </div>
   );
 }
-
-// FASE 29: Import AdminEntidadeTipos temporarily (will be extracted as component)
-// This will be moved to a separate component file in the future
