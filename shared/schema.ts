@@ -717,6 +717,8 @@ export type VisitaWithRelations = Visita & {
   user?: User;
   assignedUser?: User | null;
   createdByUser?: User | null;
+  visitaAnterior?: Visita | null;
+  visitasPosteriores?: Visita[];
 };
 
 export type TarefaWithRelations = Tarefa & {
