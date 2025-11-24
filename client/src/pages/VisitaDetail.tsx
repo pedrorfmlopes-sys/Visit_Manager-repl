@@ -450,21 +450,27 @@ export default function VisitaDetail() {
     mutationFn: async () => {
       if (!visitaId || !visita?.proximaVisita) throw new Error('No appointment data');
       
+      console.log("📋 Creating follow-up visit from appointment:", visita.proximaVisita);
+      
       // Prepare follow-up visit data
       const formData = new FormData();
       formData.append("entidadeId", visita?.entidadeId || visita?.gabineteId || "");
       formData.append("contactoId", visita?.contactoId || "");
       
-      // Convert proximaVisita to ISO string if it's not already
-      const proximaData = typeof visita.proximaVisita === 'string' 
-        ? visita.proximaVisita 
-        : new Date(visita.proximaVisita).toISOString();
-      formData.append("dataVisita", proximaData);
+      // Send proximaVisita directly - backend will convert it
+      formData.append("dataVisita", String(visita.proximaVisita));
       formData.append("visitaAnteriorId", visitaId);
       
       // Add pre-filled notes with reference to previous visit
       const previousSummary = visita?.resumoIa ? `<p>Referência à visita anterior: ${visita.resumoIa}</p><p></p><p></p>` : "<p></p><p></p><p></p>";
       formData.append("notas", previousSummary);
+      
+      console.log("📨 FormData content:", {
+        entidadeId: visita?.entidadeId || visita?.gabineteId,
+        contactoId: visita?.contactoId,
+        dataVisita: String(visita.proximaVisita),
+        visitaAnteriorId: visitaId,
+      });
       
       // Create the follow-up visit
       const response = await apiRequest("POST", "/api/visitas", formData);
