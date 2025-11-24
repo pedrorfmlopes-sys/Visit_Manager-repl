@@ -81,7 +81,7 @@ export default function VisitaDetail() {
   const deleteVisitaMutation = useMutation({
     mutationFn: async () => {
       if (!visitaId) throw new Error("Visita ID is required");
-      await apiRequest(`/api/visitas/${visitaId}`, { method: 'DELETE' });
+      await apiRequest('DELETE', `/api/visitas/${visitaId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });

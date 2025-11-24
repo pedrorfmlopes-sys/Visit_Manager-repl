@@ -22,7 +22,7 @@ export function TarefaCard({ tarefa, onClick }: TarefaCardProps) {
 
   const deleteTarefaMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest(`/api/tarefas/${tarefa.id}`, { method: 'DELETE' });
+      await apiRequest('DELETE', `/api/tarefas/${tarefa.id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tarefas"] });
@@ -61,7 +61,7 @@ export function TarefaCard({ tarefa, onClick }: TarefaCardProps) {
               <Circle className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" data-testid="icon-status-pending" />
             )}
             
-            <div className="flex-1 min-w-0" onClick={onClick} className="cursor-pointer">
+            <div className="flex-1 min-w-0 cursor-pointer" onClick={onClick}>
               <h3 className={`font-medium text-foreground mb-1 ${tarefa.status === 'done' ? 'line-through text-muted-foreground' : ''}`} data-testid="text-titulo">
                 {tarefa.titulo}
               </h3>
