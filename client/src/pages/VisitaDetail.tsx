@@ -60,6 +60,9 @@ export default function VisitaDetail() {
   const [createdTaskId, setCreatedTaskId] = useState<string | null>(null);
   const [createdAppointmentId, setCreatedAppointmentId] = useState<string | null>(null);
   const [localProximaVisita, setLocalProximaVisita] = useState<Date | null>(null);
+  const [newVisitDialogOpen, setNewVisitDialogOpen] = useState(false);
+  const [newVisitTitle, setNewVisitTitle] = useState("");
+  const [newVisitNotes, setNewVisitNotes] = useState("");
   const [createdSuggestedMap, setCreatedSuggestedMap] = useState<Map<string, { type: 'tarefa' | 'agendamento', status?: string, date?: Date }>>(new Map());
   const [pdfProOptions, setPdfProOptions] = useState({
     includePhotos: true,
@@ -423,18 +426,9 @@ export default function VisitaDetail() {
   };
 
   const createNextVisitMutation = useMutation({
-    mutationFn: async () => {
-      if (!visita?.proximaVisita) throw new Error('No scheduled visit');
-      
-      const newVisitData: InsertVisita = {
-        dataVisita: new Date(visita.proximaVisita),
-        tipoVisita: "presencial",
-        entidadeId: visita?.entidadeId || visita?.gabineteId || undefined,
-        contactoId: visita?.contactoId || undefined,
-        notas: `Seguimento de: ${visita.gabinete?.nome || visita.entidade?.nome || ""}`,
-      };
-      
-      const response = await apiRequest("POST", "/api/visitas", newVisitData);
+    mutationFn: async (newVisitData: InsertVisita & { visitaAnteriorId?: string }) => {
+      const { visitaAnteriorId, ...data } = newVisitData;
+      const response = await apiRequest("POST", "/api/visitas", data);
       return response;
     },
     onSuccess: (response: any) => {
@@ -446,6 +440,11 @@ export default function VisitaDetail() {
         title: "Sucesso",
         description: "Nova visita criada a partir do agendamento!",
       });
+      
+      // Close dialog and reset form
+      setNewVisitDialogOpen(false);
+      setNewVisitTitle("");
+      setNewVisitNotes("");
       
       // Navigate to the new visit
       if (newVisitId) {
@@ -1187,7 +1186,12 @@ export default function VisitaDetail() {
                 <Button
                   variant="default"
                   size="sm"
-                  onClick={() => createNextVisitMutation.mutate()}
+                  onClick={() => {
+                    // Pre-fill form for new visit
+                    setNewVisitTitle(`Seguimento — ${visita?.gabinete?.nome || visita?.entidade?.nome || ""}`);
+                    setNewVisitNotes("");
+                    setNewVisitDialogOpen(true);
+                  }}
                   disabled={createNextVisitMutation.isPending}
                   data-testid="button-mark-scheduled-visit-done"
                 >
@@ -1650,6 +1654,122 @@ export default function VisitaDetail() {
               Exportar
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={newVisitDialogOpen} onOpenChange={setNewVisitDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Criar Nova Visita de Seguimento</DialogTitle>
+          </DialogHeader>
+          
+          {visita && (
+            <div className="space-y-4">
+              {/* Resumo da visita anterior */}
+              <div className="p-4 bg-muted/50 rounded-lg border border-border space-y-3">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <ArrowRight className="h-4 w-4 text-primary" />
+                  Resumo da Visita Anterior
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Entidade:</span>
+                    <p className="font-medium">{visita.gabinete?.nome || visita.entidade?.nome || "—"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Contacto:</span>
+                    <p className="font-medium">{visita.contacto?.nome || "—"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Data:</span>
+                    <p className="font-medium">{format(new Date(visita.dataVisita), "PPP", { locale: pt })}</p>
+                  </div>
+                  {visita.tarefasSugeridasIA && (
+                    <div>
+                      <span className="text-muted-foreground">Resumo IA:</span>
+                      <p className="font-medium line-clamp-2 mt-1">
+                        {typeof visita.tarefasSugeridasIA === 'string' 
+                          ? JSON.parse(visita.tarefasSugeridasIA)?.find((t: any) => t.tipo === 'resumo')?.descricao || 'Sem resumo'
+                          : visita.tarefasSugeridasIA?.find((t: any) => t.tipo === 'resumo')?.descricao || 'Sem resumo'
+                        }
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Formulário para nova visita */}
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="new-visit-title">Título da Nova Visita</Label>
+                  <Input
+                    id="new-visit-title"
+                    value={newVisitTitle}
+                    onChange={(e) => setNewVisitTitle(e.target.value)}
+                    placeholder="Título da visita"
+                    data-testid="input-new-visit-title"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="new-visit-notes">Notas Iniciais (opcional)</Label>
+                  <Textarea
+                    id="new-visit-notes"
+                    value={newVisitNotes}
+                    onChange={(e) => setNewVisitNotes(e.target.value)}
+                    placeholder="Notas iniciais para esta visita..."
+                    className="min-h-20"
+                    data-testid="textarea-new-visit-notes"
+                  />
+                </div>
+              </div>
+
+              {/* Botões de ação */}
+              <div className="flex justify-end gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setNewVisitDialogOpen(false);
+                    setNewVisitTitle("");
+                    setNewVisitNotes("");
+                  }}
+                  data-testid="button-cancel-new-visit"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (newVisitTitle.trim()) {
+                      const newVisitData: InsertVisita & { visitaAnteriorId?: string } = {
+                        dataVisita: localProximaVisita || (visita?.proximaVisita ? new Date(visita.proximaVisita) : new Date()),
+                        tipoVisita: "presencial",
+                        entidadeId: visita?.entidadeId || visita?.gabineteId || undefined,
+                        contactoId: visita?.contactoId || undefined,
+                        notas: newVisitNotes || "",
+                        visitaAnteriorId: visitaId,
+                      };
+                      createNextVisitMutation.mutate(newVisitData);
+                    }
+                  }}
+                  disabled={createNextVisitMutation.isPending || !newVisitTitle.trim()}
+                  data-testid="button-create-new-visit"
+                >
+                  {createNextVisitMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      A criar...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Criar Visita
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
