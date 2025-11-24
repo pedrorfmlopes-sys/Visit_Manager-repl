@@ -365,7 +365,7 @@ export default function VisitaDetail() {
       });
       return response;
     },
-    onSuccess: (response: any) => {
+    onSuccess: async (response: any) => {
       console.log("🎯 Appointment mutation success! Response:", response);
       
       // Update local state immediately to show card
@@ -374,12 +374,17 @@ export default function VisitaDetail() {
       }
       
       if (visitaId) setCreatedAppointmentId(visitaId);
-      queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
+      
+      // Invalidate and refetch all visits
+      await queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
+      
       if (visitaId) {
-        queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
-        // Force refetch to get updated proximaVisita
+        // Force complete refetch to ensure proximaVisita is updated
         console.log("🔄 Refetching visit with ID:", visitaId);
-        queryClient.refetchQueries({ queryKey: ["/api/visitas", visitaId] });
+        await queryClient.refetchQueries({ 
+          queryKey: ["/api/visitas", visitaId],
+          type: "active"
+        });
       }
       
       // Register in created suggestions map
