@@ -18,15 +18,15 @@ export function useTodaySummary(): TodaySummary {
 
   // Fetch all pending tasks
   const { data: tarefas = [], isLoading: tarefasLoading } = useQuery<Tarefa[]>({
-    queryKey: ["/api/tarefas", { status: "pending" }],
+    queryKey: ["/api/tarefas"],
     refetchInterval: 120000, // 2 minutes
   });
 
-  // Fetch visits for today
+  // Fetch all visits
   const { data: visitasData = [], isLoading: visitasLoading } = useQuery<
     Visita[]
   >({
-    queryKey: ["/api/visitas", { from: todayStart, to: todayEnd }],
+    queryKey: ["/api/visitas"],
     refetchInterval: 120000, // 2 minutes
   });
 
