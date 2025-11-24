@@ -928,58 +928,6 @@ export default function VisitaDetail() {
           </Card>
         ) : null}
 
-        {/* FASE 15: Próxima Visita - Moved to top for visibility */}
-        {visita.proximaVisita && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-primary" />
-                Próxima Visita Agendada
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm font-medium">
-                  {format(new Date(visita.proximaVisita), "PPP 'às' HH:mm", { locale: pt })}
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Agendada a partir de sugestão IA
-                </p>
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleExportNextVisit}
-                  data-testid="button-export-proxima"
-                >
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Adicionar ao Calendário
-                </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => createNextVisitMutation.mutate()}
-                  disabled={createNextVisitMutation.isPending}
-                  data-testid="button-mark-scheduled-visit-done"
-                >
-                  {createNextVisitMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-                      A criar...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      Marcar como Realizado
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* FASE 14: AI Summary, Key Points and Suggested Tasks */}
         <Card>
           <CardHeader>
@@ -1190,6 +1138,58 @@ export default function VisitaDetail() {
             )}
           </CardContent>
         </Card>
+
+        {/* FASE 15: Próxima Visita Agendada - After AI Analysis */}
+        {visita.proximaVisita && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-primary" />
+                Próxima Visita Agendada
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm font-medium">
+                  {format(new Date(visita.proximaVisita), "PPP 'às' HH:mm", { locale: pt })}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Agendada a partir de sugestão IA
+                </p>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportNextVisit}
+                  data-testid="button-export-proxima"
+                >
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Adicionar ao Calendário
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => createNextVisitMutation.mutate()}
+                  disabled={createNextVisitMutation.isPending}
+                  data-testid="button-mark-scheduled-visit-done"
+                >
+                  {createNextVisitMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                      A criar...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Marcar como Realizado
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* FASE 15: GPS Location - Hidden by default, can be enabled in admin settings */}
         {false && gpsLocation && (
