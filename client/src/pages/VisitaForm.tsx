@@ -167,10 +167,13 @@ export default function VisitaForm() {
       queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
       
       // FASE 15: Refetch previous visit query and its posteriores if this is a follow-up visit
+      // IMPORTANT: Must await these refetches before navigating so the component can render updated data
       const visitaAnteriorId = new URLSearchParams(window.location.search).get('visitaAnteriorId');
       if (visitaAnteriorId) {
-        queryClient.refetchQueries({ queryKey: ["/api/visitas", visitaAnteriorId] });
-        queryClient.refetchQueries({ queryKey: ["/api/visitas", visitaAnteriorId, "posteriores"] });
+        await Promise.all([
+          queryClient.refetchQueries({ queryKey: ["/api/visitas", visitaAnteriorId] }),
+          queryClient.refetchQueries({ queryKey: ["/api/visitas", visitaAnteriorId, "posteriores"] }),
+        ]);
       }
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/entidades"] });
