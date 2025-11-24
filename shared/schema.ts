@@ -373,6 +373,7 @@ export const visitas = pgTable("visitas", {
   audioUrl: varchar("audio_url", { length: 500 }),
   mediaUrls: text("media_urls").array(),
   proximaVisita: timestamp("proxima_visita"),
+  visitaAnteriorId: varchar("visita_anterior_id").references(() => visitas.id, { onDelete: 'set null' }), // FASE 15: Link to previous visit for relationship tracking
   linkVisita: varchar("link_visita", { length: 100 }).unique(),
   resumoIa: text("resumo_ia"),
   pontosChaveIA: text("pontos_chave_ia"), // FASE 14: JSON array of key points
@@ -423,6 +424,14 @@ export const visitasRelations = relations(visitas, ({ one, many }) => ({
     fields: [visitas.createdByUserId],
     references: [users.id],
   }),
+  visitaAnterior: one(visitas, {
+    fields: [visitas.visitaAnteriorId],
+    references: [visitas.id],
+    relationName: "previousVisit",
+  }),
+  visitasPosteriores: many(visitas, {
+    relationName: "previousVisit",
+  }),
   marcas: many(visitasMarcas),
   audio: many(visitasAudio),
 }));
@@ -433,6 +442,7 @@ export const insertVisitaSchema = createInsertSchema(visitas).omit({
   userId: true, // Legacy field, use createdByUserId (backend sets)
   createdByUserId: true, // Set by backend from getUserContext
   assignedUserId: true, // Optional, set by backend
+  visitaAnteriorId: true, // Set by frontend when creating from scheduled visit
   createdAt: true,
   updatedAt: true,
   linkVisita: true,

@@ -13,7 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import type { VisitaWithRelations, Tarefa, InsertTarefa, Lembrete, VisitasAudio } from "@shared/schema";
+import type { VisitaWithRelations, Tarefa, InsertTarefa, InsertVisita, Lembrete, VisitasAudio } from "@shared/schema";
 import { downloadNextVisitICS } from "@/lib/calendarExport";
 import { LocationPreview } from "@/components/LocationPreview";
 import { TarefaCard } from "@/components/TarefaCard";
@@ -326,7 +326,7 @@ export default function VisitaDetail() {
     const proposedTitle = `${suggestedItem.titulo} — ${entityName}`;
     const suggestedDate = addDays(new Date(), suggestedItem.prazo_sugerido_dias);
     setAppointmentTitle(proposedTitle);
-    setAppointmentDate(suggestedDate);
+    setAppointmentDate(suggestedDate as Date);
     setSuggestedTaskToCreate(suggestedItem);
     setAppointmentDialogOpen(true);
   };
@@ -342,9 +342,9 @@ export default function VisitaDetail() {
       return response;
     },
     onSuccess: (response: any) => {
-      setCreatedAppointmentId(visitaId);
+      if (visitaId) setCreatedAppointmentId(visitaId);
       queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
+      if (visitaId) queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
       
       // Register in created suggestions map
       if (suggestedTaskToCreate && appointmentDate) {
@@ -385,6 +385,47 @@ export default function VisitaDetail() {
       });
     }
   };
+
+  const createNextVisitMutation = useMutation({
+    mutationFn: async () => {
+      if (!visita?.proximaVisita) throw new Error('No scheduled visit');
+      
+      const newVisitData: InsertVisita = {
+        dataVisita: new Date(visita.proximaVisita),
+        tipoVisita: "presencial",
+        entidadeId: visita?.entidadeId || visita?.gabineteId || undefined,
+        contactoId: visita?.contactoId || undefined,
+        notas: `Seguimento de: ${visita.gabinete?.nome || visita.entidade?.nome || ""}`,
+      };
+      
+      const response = await apiRequest("POST", "/api/visitas", newVisitData);
+      return response;
+    },
+    onSuccess: (response: any) => {
+      const newVisitId = response?.id || "";
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
+      
+      toast({
+        title: "Sucesso",
+        description: "Nova visita criada a partir do agendamento!",
+      });
+      
+      // Navigate to the new visit
+      if (newVisitId) {
+        setTimeout(() => {
+          setLocation(`/visitas/${newVisitId}`);
+        }, 500);
+      }
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Falha ao criar nova visita",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleExportPDF = async () => {
     if (!visita) return;
@@ -747,14 +788,14 @@ export default function VisitaDetail() {
         )}
 
         {/* FASE 5: Marcas Faladas */}
-        {visita.marcas && visita.marcas.length > 0 && (
+        {(visita as any).marcas && (visita as any).marcas.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Marcas Faladas Nesta Visita</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
-                {visita.marcas.map((visitaMarca) => (
+                {(visita as any).marcas.map((visitaMarca: any) => (
                   <Badge key={visitaMarca.id} variant="default">
                     {visitaMarca.marca.nome}
                   </Badge>
@@ -847,7 +888,7 @@ export default function VisitaDetail() {
                       </div>
                     )}
                     <p className="text-xs text-muted-foreground mt-2">
-                      {new Date(clip.createdAt).toLocaleDateString('pt-PT')}
+                      {clip.createdAt && new Date(clip.createdAt).toLocaleDateString('pt-PT')}
                     </p>
                   </div>
                 ))}
@@ -1099,20 +1140,45 @@ export default function VisitaDetail() {
                 Próxima Visita
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm font-medium">
-                {format(new Date(visita.proximaVisita), "PPP 'às' HH:mm", { locale: pt })}
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportNextVisit}
-                className="mt-3"
-                data-testid="button-export-proxima"
-              >
-                <Calendar className="h-4 w-4 mr-2" />
-                Adicionar ao Calendário
-              </Button>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm font-medium">
+                  {format(new Date(visita.proximaVisita), "PPP 'às' HH:mm", { locale: pt })}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Agendada a partir de sugestão IA
+                </p>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportNextVisit}
+                  data-testid="button-export-proxima"
+                >
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Adicionar ao Calendário
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => createNextVisitMutation.mutate()}
+                  disabled={createNextVisitMutation.isPending}
+                  data-testid="button-mark-scheduled-visit-done"
+                >
+                  {createNextVisitMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                      A criar...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Marcar como Realizado
+                    </>
+                  )}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}
