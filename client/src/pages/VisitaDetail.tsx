@@ -61,6 +61,7 @@ export default function VisitaDetail() {
   const [createdAppointmentId, setCreatedAppointmentId] = useState<string | null>(null);
   const [localProximaVisita, setLocalProximaVisita] = useState<Date | null>(null);
   const [createdSuggestedMap, setCreatedSuggestedMap] = useState<Map<string, { type: 'tarefa' | 'agendamento', status?: string, date?: Date }>>(new Map());
+  const [deleteConfirmDialogOpen, setDeleteConfirmDialogOpen] = useState(false);
   const [pdfProOptions, setPdfProOptions] = useState({
     includePhotos: true,
     includeTasks: true,
@@ -1156,7 +1157,7 @@ export default function VisitaDetail() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => deleteScheduledAppointmentMutation.mutate()}
+                onClick={() => setDeleteConfirmDialogOpen(true)}
                 disabled={deleteScheduledAppointmentMutation.isPending}
                 data-testid="button-delete-scheduled-appointment"
                 className="h-8 w-8"
@@ -1711,6 +1712,40 @@ export default function VisitaDetail() {
               <Download className="h-4 w-4 mr-2" />
               Exportar
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* FASE 15: Delete Scheduled Appointment Confirmation Dialog */}
+      <Dialog open={deleteConfirmDialogOpen} onOpenChange={setDeleteConfirmDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar Agendamento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Tem a certeza que deseja eliminar este agendamento? Esta ação não pode ser desfeita.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setDeleteConfirmDialogOpen(false)}
+                data-testid="button-delete-confirm-cancel"
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  deleteScheduledAppointmentMutation.mutate();
+                  setDeleteConfirmDialogOpen(false);
+                }}
+                disabled={deleteScheduledAppointmentMutation.isPending}
+                data-testid="button-delete-confirm"
+              >
+                {deleteScheduledAppointmentMutation.isPending ? "A eliminar..." : "Eliminar"}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
