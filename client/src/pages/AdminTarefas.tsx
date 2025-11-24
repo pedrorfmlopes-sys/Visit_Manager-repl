@@ -14,15 +14,17 @@ export default function AdminTarefas() {
   const [filters, setFilters] = useState<TarefasFilters>({});
   const [users, setUsers] = useState<{ id: string; email: string }[]>([]);
   const [entidades, setEntidades] = useState<{ id: string; nome: string }[]>([]);
+  const [visitas, setVisitas] = useState<{ id: string; titulo: string }[]>([]);
   const { empresa } = useAuth();
 
-  // Fetch users and entidades for filters
+  // Fetch users, entidades, and visitas for filters
   useEffect(() => {
     const fetchAdminData = async () => {
       try {
-        const [usersRes, entidadesRes] = await Promise.all([
+        const [usersRes, entidadesRes, visitasRes] = await Promise.all([
           fetch("/api/admin/utilizadores"),
           fetch("/api/entidades"),
+          fetch("/api/visitas"),
         ]);
         
         if (usersRes.ok) {
@@ -33,6 +35,11 @@ export default function AdminTarefas() {
         if (entidadesRes.ok) {
           const entidadesData = await entidadesRes.json();
           setEntidades(entidadesData);
+        }
+
+        if (visitasRes.ok) {
+          const visitasData = await visitasRes.json();
+          setVisitas(visitasData.map((v: any) => ({ id: v.id, titulo: v.titulo })));
         }
       } catch (error) {
         console.error("Error fetching admin data:", error);
@@ -49,6 +56,7 @@ export default function AdminTarefas() {
   if (filters.overdue) queryParams.set("overdue", "true");
   if (filters.assignedUserId) queryParams.set("assignedUserId", filters.assignedUserId);
   if (filters.entidadeId) queryParams.set("entidadeId", filters.entidadeId);
+  if (filters.visitaId) queryParams.set("visitaId", filters.visitaId);
 
   const { data: tarefas, isLoading } = useQuery<TarefaWithRelations[]>({
     queryKey: ["/api/tarefas", filters],
@@ -70,6 +78,7 @@ export default function AdminTarefas() {
             showAdminFilters={true}
             users={users}
             entidades={entidades}
+            visitas={visitas}
             tarefasSettings={empresa?.uiSettings?.tarefas}
           />
         </div>

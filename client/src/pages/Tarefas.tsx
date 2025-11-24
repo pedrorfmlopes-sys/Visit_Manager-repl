@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2 } from "lucide-react";
 import { TarefaCard } from "@/components/TarefaCard";
@@ -12,7 +12,25 @@ import { useAuth } from "@/hooks/useAuth";
 export default function Tarefas() {
   const [, setLocation] = useLocation();
   const [filters, setFilters] = useState<TarefasFilters>({});
+  const [visitas, setVisitas] = useState<{ id: string; titulo: string }[]>([]);
   const { empresa } = useAuth();
+
+  // Fetch visitas for filter
+  useEffect(() => {
+    const fetchVisitas = async () => {
+      try {
+        const response = await fetch("/api/visitas");
+        if (response.ok) {
+          const visitasData = await response.json();
+          setVisitas(visitasData.map((v: any) => ({ id: v.id, titulo: v.titulo })));
+        }
+      } catch (error) {
+        console.error("Error fetching visitas:", error);
+      }
+    };
+
+    fetchVisitas();
+  }, []);
 
   // Build query string from filters
   const queryParams = new URLSearchParams();
@@ -21,6 +39,7 @@ export default function Tarefas() {
   if (filters.overdue) queryParams.set("overdue", "true");
   if (filters.assignedUserId) queryParams.set("assignedUserId", filters.assignedUserId);
   if (filters.entidadeId) queryParams.set("entidadeId", filters.entidadeId);
+  if (filters.visitaId) queryParams.set("visitaId", filters.visitaId);
 
   const { data: tarefas, isLoading } = useQuery<TarefaWithRelations[]>({
     queryKey: ["/api/tarefas", filters],
@@ -39,6 +58,7 @@ export default function Tarefas() {
           <TarefasFilterBar 
             filters={filters}
             onFilterChange={setFilters}
+            visitas={visitas}
             tarefasSettings={empresa?.uiSettings?.tarefas}
           />
         </div>

@@ -11,6 +11,7 @@ export interface TarefasFilters {
   overdue?: boolean;
   assignedUserId?: string;
   entidadeId?: string;
+  visitaId?: string;
 }
 
 interface TarefasFilterBarProps {
@@ -19,6 +20,7 @@ interface TarefasFilterBarProps {
   showAdminFilters?: boolean;
   users?: { id: string; email: string }[];
   entidades?: { id: string; nome: string }[];
+  visitas?: { id: string; titulo: string }[];
   tarefasSettings?: {
     enableFilterStatus?: boolean;
     enableFilterOverdue?: boolean;
@@ -34,6 +36,7 @@ export function TarefasFilterBar({
   showAdminFilters = false,
   users = [],
   entidades = [],
+  visitas = [],
   tarefasSettings,
 }: TarefasFilterBarProps) {
   const handleClear = () => {
@@ -125,6 +128,27 @@ export function TarefasFilterBar({
           <label htmlFor="overdue-filter" className="text-sm cursor-pointer">
             Apenas em atraso
           </label>
+        </div>
+      )}
+
+      {/* Visit filter */}
+      {showVisita && visitas.length > 0 && (
+        <div>
+          <select
+            value={filters.visitaId || ""}
+            onChange={(e) =>
+              onFilterChange({ ...filters, visitaId: e.target.value || undefined })
+            }
+            className="text-sm p-2 rounded border border-input bg-background w-full"
+            data-testid="select-visita-filter"
+          >
+            <option value="">Todas as visitas</option>
+            {visitas.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.titulo}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 

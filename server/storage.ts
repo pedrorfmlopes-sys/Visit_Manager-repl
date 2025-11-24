@@ -73,7 +73,7 @@ export interface IStorage {
   deleteVisita(id: string, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void>;
   
   // Tarefas - FASE 2: all filtered by empresaId
-  getTarefas(empresaId: string, userId: string, userRole: 'admin' | 'agent', filters?: { status?: string; assignedUserId?: string; entidadeId?: string; overdue?: boolean }): Promise<TarefaWithRelations[]>;
+  getTarefas(empresaId: string, userId: string, userRole: 'admin' | 'agent', filters?: { status?: string; assignedUserId?: string; entidadeId?: string; visitaId?: string; overdue?: boolean }): Promise<TarefaWithRelations[]>;
   getTarefa(id: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<TarefaWithRelations | undefined>;
   createTarefa(tarefa: InsertTarefa, empresaId: string): Promise<Tarefa>;
   updateTarefa(id: string, tarefa: Partial<InsertTarefa>, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<Tarefa | undefined>;
@@ -707,7 +707,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Tarefas (Tasks) - FASE 2: filtered by empresaId
-  async getTarefas(empresaId: string, userId: string, userRole: 'admin' | 'agent', filters?: { status?: string; assignedUserId?: string; entidadeId?: string; overdue?: boolean }): Promise<TarefaWithRelations[]> {
+  async getTarefas(empresaId: string, userId: string, userRole: 'admin' | 'agent', filters?: { status?: string; assignedUserId?: string; entidadeId?: string; visitaId?: string; overdue?: boolean }): Promise<TarefaWithRelations[]> {
     // Build where clauses for role-based filtering - FASE 2: always include empresaId
     const conditions: any[] = [eq(tarefas.empresaId, empresaId)];
     
@@ -730,6 +730,9 @@ export class DatabaseStorage implements IStorage {
     }
     if (filters?.entidadeId) {
       conditions.push(eq(tarefas.entidadeId, filters.entidadeId));
+    }
+    if (filters?.visitaId) {
+      conditions.push(eq(tarefas.visitaId, filters.visitaId));
     }
     if (filters?.overdue) {
       conditions.push(

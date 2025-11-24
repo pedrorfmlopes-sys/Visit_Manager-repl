@@ -1768,6 +1768,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: req.query.status as string | undefined,
         assignedUserId: req.query.assignedUserId as string | undefined,
         entidadeId: req.query.entidadeId as string | undefined,
+        visitaId: req.query.visitaId as string | undefined,
         overdue: req.query.overdue === 'true',
       };
       let tarefas = await storage.getTarefas(empresaId, userId, userRole, filters);
