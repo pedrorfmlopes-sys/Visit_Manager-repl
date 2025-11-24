@@ -253,6 +253,8 @@ export default function VisitaForm() {
       // FASE 15: If this is a follow-up visit, navigate back to anterior visit, otherwise to list
       const visitaAnteriorIdNav = new URLSearchParams(window.location.search).get('visitaAnteriorId');
       if (visitaAnteriorIdNav) {
+        // Wait a bit to ensure queries are refetched before navigating
+        await new Promise(resolve => setTimeout(resolve, 500));
         setLocation(`/visitas/${visitaAnteriorIdNav}`);
       } else {
         setLocation("/visitas");
@@ -316,6 +318,7 @@ export default function VisitaForm() {
         locationAccuracy: gpsLocation?.accuracy || null,
         createdByUserId: createdByUserId || null,
         assignedUserId: assignedUserId || null,
+        visitaAnteriorId: prefillData.visitaAnteriorId || null,
       };
 
       await syncManager.queueVisitaCreation(visitaData);
@@ -339,6 +342,11 @@ export default function VisitaForm() {
     if (data.proximaVisita) formData.append("proximaVisita", data.proximaVisita.toISOString());
     if (data.marcasEntregues) formData.append("marcasEntregues", JSON.stringify(data.marcasEntregues));
     if (data.marcasIds && data.marcasIds.length > 0) formData.append("marcasIds", JSON.stringify(data.marcasIds));
+    
+    // FASE 15: Add visitaAnteriorId if this is a follow-up visit
+    if (prefillData.visitaAnteriorId) {
+      formData.append("visitaAnteriorId", prefillData.visitaAnteriorId);
+    }
     
     // Add ownership fields
     if (createdByUserId) formData.append("createdByUserId", createdByUserId);
