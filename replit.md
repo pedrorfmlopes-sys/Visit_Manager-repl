@@ -54,10 +54,18 @@ PostgreSQL with Drizzle ORM is used for type-safe schema management. Core entiti
 -   **date-fns**: For date manipulation and timezone-aware comparisons.
 -   **chartjs-node-canvas**: For server-side chart rendering in PDF exports.
 -   **DOMPurify**: For XSS prevention in rich text content.
-### FASE X: Arrumar "Tipo de Entidade" - Dropdown, Filtros e Label (✅ Completo)
-- **Endpoint**: `GET /api/entidade-tipos` filtra por `empresaId` + retorna apenas `ativo = true`
-- **EntidadeForm**: Campo renomeado para "Entidade" (sem "Configurada" / "Legado")
-- **Filtros dinâmicos**: Entidades.tsx usa lista do backend (sem enum hardcoded)
-- **UI consistente**: ContactoForm, VisitaForm, AdminEntidades mostram `entidade.entidadeTipo.nome`
-- **Status**: ✅ Tipos dinâmicos do backend, 1 único campo visível, 5 ficheiros atualizados
+### FASE 30: Ícones Configuráveis por Tipo de Entidade (✅ Completo)
+- **Schema**: Campo `icon` varchar(50) default "Building2" adicionado a `entidade_tipos`
+- **Zod Validation**: Enum com 8 ícones suportados (Building2, Store, Factory, Briefcase, Users, Home, Handshake, Package)
+- **AdminEntidadeTipos**: Select dropdown para escolher ícone, visual preview na lista
+- **EntidadeCard**: Usa `entidade.entidadeTipo.icon` para renderizar ícone dinamicamente
+- **EntidadeDetail**: Badge mostra ícone + nome do tipo
+- **Status**: ✅ Sistema completo, 77 linhas adicionadas, testes OK
+
+### FASE 30.1: Corrigir Erro 400 ao Criar Tipo com Ícone (✅ Completo)
+- **Erro Root Cause**: Coluna `icon` não estava sincronizada com BD PostgreSQL
+- **Solução**: Execução de `npm run db:push` para migrar schema Drizzle
+- **Verificação**: Schema Zod + routes + storage estavam corretos desde o início
+- **Resultado**: Criação de tipos com ícone 100% funcional, 6 testes passados
+- **Status**: ✅ Migração executada, app restarted, sistema operacional
 

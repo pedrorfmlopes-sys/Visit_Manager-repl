@@ -1,0 +1,186 @@
+🔧 FASE 30.1 – Corrigir criação de Tipo de Entidade com Ícone (erro 400)
+
+Sintoma no UI:
+
+Em Definições → Empresa → Entidades → “Novo Tipo de Entidade”:
+
+preencho Nome, Cor e Ícone,
+
+clico em “Criar”,
+
+recebo um toast vermelho:
+Erro ao criar 400: {"message":"Failed to create entidade tipo"}
+
+Ou seja: o POST /api/admin/entidade-tipos está a falhar.
+
+🎯 Objetivo:
+
+Garantir que criar novo tipo de entidade funciona mesmo com o campo de ícone.
+
+Alinhar:
+
+tabela entidade_tipos,
+
+insertEntidadeTipoSchema,
+
+rota POST /api/admin/entidade-tipos,
+
+e o payload que o frontend envia.
+
+1. Verificar logs do backend para este POST
+
+Abre os logs do servidor e volta a tentar criar um tipo, para ver o erro real.
+
+Quero que verifiques especificamente:
+
+se o erro vem de:
+
+Zod (insertEntidadeTipoSchema) a rejeitar o body (ex: chave icon não esperada),
+
+DB (drizzle) a falhar no insert (ex: coluna icon em falta / NOT NULL, etc.),
+
+ou qualquer outra validação na rota.
+
+No relatório, escreve qual a stack/erro concreto que aparece nos logs quando o POST falha.
+
+2. Alinhar o schema entidadeTipos + Zod com o campo icon
+
+Em shared/schema.ts, na tabela entidadeTipos, confirma:
+
+que tens o campo icon definido, por exemplo:
+
+icon: varchar("icon").default("Building2"),
+
+
+Em seguida, garante que o Zod schema de inserção inclui o icon:
+
+export const insertEntidadeTipoSchema = createInsertSchema(entidadeTipos)
+  .omit({
+    id: true,
+    empresaId: true,
+    createdAt: true,
+    updatedAt: true,
+  });
+
+
+Se estiveres a sobrescrever este schema noutro lado, certifica-te que não removes o icon.
+
+Se usares .strict(), lembra-te que o campo icon TEM de existir no schema, senão o body com icon vai dar erro 400.
+
+Garante que o tipo InsertEntidadeTipo inclui icon (como string, opcional, com default).
+
+3. Confirmar que o POST /api/admin/entidade-tipos passa o icon para o storage
+
+Na rota POST /api/admin/entidade-tipos em server/routes.ts:
+
+confirma que estás a fazer algo do género:
+
+const parsed = insertEntidadeTipoSchema.parse(req.body);
+const tipo = await storage.createEntidadeTipo(
+  { ...parsed },
+  ctx.empresaId
+);
+
+
+Não faças destructuring que perca o campo icon.
+
+Em server/storage.ts, no método createEntidadeTipo:
+
+certifica-te que o insert inclui icon:
+
+async createEntidadeTipo(data: InsertEntidadeTipo, empresaId: string) {
+  const [tipo] = await db.insert(entidadeTipos)
+    .values({
+      ...data,
+      empresaId,
+    })
+    .returning();
+  return tipo;
+}
+
+
+Garante que não há nenhuma validação manual a rejeitar icon.
+
+4. Sincronizar a base de dados (se precisa)
+
+Verifica se a coluna icon existe mesmo na tabela entidade_tipos da BD.
+
+Se ainda não existir, cria a migração / atualiza o schema e corre:
+
+npm run db:push
+
+
+Depois da migração, volta a testar o POST.
+
+5. Validar o payload do frontend
+
+No componente do dialog “Novo Tipo de Entidade” (admin):
+
+confirma que o valor que envias em icon é uma string simples que bate certo com o que o backend espera (ex.: "Handshake", "Building2", etc.), e não o label em português (“Parceria”).
+
+Se for preciso, faz um map:
+
+// ex.
+const ICON_OPTIONS = [
+  { value: "Handshake", label: "Parceria", Icon: Handshake },
+  { value: "Building2", label: "Gabinete", Icon: Building2 },
+  // ...
+];
+
+
+Adiciona um console.log("[DEBUG create tipo entidade] payload:", payload) antes da mutation, para veres o que está a ser enviado.
+
+Garante que a mutation está a fazer o POST para /api/admin/entidade-tipos com body:
+
+{
+  "nome": "Gabinete de Arquitetura",
+  "cor": "#3b82f6",
+  "icon": "Handshake",
+  "ativo": true
+}
+
+6. Testes que quero que faças
+
+Criar 3 tipos de entidade diferentes em /admin/empresa → Entidades:
+
+“Gabinete de Arquitetura” com ícone Building2
+
+“Distribuidor” com ícone Store
+
+“Construtor” com ícone Factory
+
+Verificar:
+
+✅ Nenhum erro 400 no toast
+
+✅ Tipos aparecem na lista de tipos
+
+✅ Tipos aparecem no dropdown de Entidade em EntidadeForm
+
+✅ Ícones aparecem nos cards de Entidades (se já está implementado)
+
+Recarregar a página e confirmar que tudo persiste sem erros.
+
+7. Relatório desta fase
+
+No relatório, por favor inclui:
+
+Qual era o erro concreto nos logs do backend (stack / mensagem).
+
+Que alterações fizeste em:
+
+shared/schema.ts (campo icon + insertEntidadeTipoSchema),
+
+server/routes.ts (POST /api/admin/entidade-tipos),
+
+server/storage.ts (createEntidadeTipo),
+
+componente de frontend do “Novo Tipo de Entidade” (payload de icon).
+
+Resultado final dos testes (itens do ponto 6).
+
+⚠️ Importante:
+
+Não alterar a lógica já existente de associação das entidades aos tipos – isso já está a funcionar.
+
+Esta fase serve APENAS para garantir que criar novos tipos com ícone deixa de dar 400.
