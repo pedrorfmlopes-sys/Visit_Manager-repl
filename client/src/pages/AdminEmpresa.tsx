@@ -1011,7 +1011,7 @@ export default function AdminEmpresa() {
       <div className="max-w-6xl mx-auto px-4">
         <Card>
           <CardHeader>
-            <CardTitle data-testid="text-admin-settings-title">Centro de Configurações</CardTitle>
+            <CardTitle data-testid="text-admin-settings-title">Definições</CardTitle>
             <CardDescription>Gerencie as definições da sua empresa</CardDescription>
           </CardHeader>
           <CardContent>

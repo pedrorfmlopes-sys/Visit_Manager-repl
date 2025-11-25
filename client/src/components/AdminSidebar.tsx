@@ -126,7 +126,7 @@ export function AdminSidebar() {
             data-testid="button-settings"
           >
             <Settings className="h-4 w-4 mr-2" />
-            Centro de configurações
+            Definições
           </Button>
         )}
         
