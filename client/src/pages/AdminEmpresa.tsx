@@ -168,17 +168,12 @@ export default function AdminEmpresa() {
 
   const currentLogo = logoPreview || empresa?.logoUrl;
 
-  // DEBUG: Log when section changes
-  console.log("🔍 AdminEmpresa currentSection:", currentSection, "location:", location);
-
   const handleSectionClick = (sectionId: SectionId) => {
-    console.log("🖱️ handleSectionClick called with:", sectionId, "setting location to:", `/admin/empresa?section=${sectionId}`);
     setLocation(`/admin/empresa?section=${sectionId}`);
   };
 
   // ✅ RENDERIZAÇÃO CONDICIONAL - SWITCH STATEMENT
   const renderCurrentSection = () => {
-    console.log("📱 renderCurrentSection called, returning section for:", currentSection);
     switch (currentSection) {
       case "empresa":
         return renderEmpresaSection();

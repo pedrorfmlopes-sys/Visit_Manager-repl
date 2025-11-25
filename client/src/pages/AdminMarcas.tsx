@@ -91,8 +91,8 @@ export default function AdminMarcas() {
   }
 
   return (
-    <div className="min-h-screen pb-32 pt-4">
-      <div className="max-w-4xl mx-auto px-4 space-y-6">
+    <div className="space-y-6">
+      <div className="space-y-6">
         {/* Create Marca Form */}
         {!isFormOpen ? (
           <Button
