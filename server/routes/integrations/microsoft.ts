@@ -13,9 +13,9 @@ export function setupMicrosoftRoutes(app: any): void {
     try {
       const { userId } = await getUserContext(req);
 
-      const tenantId = process.env.MS_TENANT_ID;
-      const clientId = process.env.MS_CLIENT_ID;
-      const redirectUri = process.env.MS_REDIRECT_URI;
+      const tenantId = process.env.MS_TENANT_ID!;
+      const clientId = process.env.MS_CLIENT_ID!;
+      const redirectUri = process.env.MS_REDIRECT_URI!;
 
       if (!tenantId || !clientId || !redirectUri) {
         return res.status(500).json({ message: "Microsoft OAuth configuration incomplete" });
@@ -32,16 +32,17 @@ export function setupMicrosoftRoutes(app: any): void {
         maxAge: 10 * 60 * 1000, // 10 minutes
       });
 
-      // Constrói a URL de autorização
-      const authUrl = new URL(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`);
-      authUrl.searchParams.append("client_id", clientId);
-      authUrl.searchParams.append("response_type", "code");
-      authUrl.searchParams.append("redirect_uri", redirectUri);
-      authUrl.searchParams.append("response_mode", "query");
-      authUrl.searchParams.append("scope", "openid profile offline_access User.Read Calendars.ReadWrite");
-      authUrl.searchParams.append("state", state);
+      // Constrói a URL de autorização com tenantId (NÃO clientId)
+      const authorizeUrl =
+        `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize` +
+        `?client_id=${encodeURIComponent(clientId)}` +
+        `&response_type=code` +
+        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+        `&response_mode=query` +
+        `&scope=${encodeURIComponent("openid profile offline_access User.Read Calendars.ReadWrite")}` +
+        `&state=${encodeURIComponent(state)}`;
 
-      res.redirect(302, authUrl.toString());
+      res.redirect(302, authorizeUrl);
     } catch (error) {
       console.error("Error in Microsoft login:", error);
       res.status(500).json({ message: "Failed to start Microsoft login" });
