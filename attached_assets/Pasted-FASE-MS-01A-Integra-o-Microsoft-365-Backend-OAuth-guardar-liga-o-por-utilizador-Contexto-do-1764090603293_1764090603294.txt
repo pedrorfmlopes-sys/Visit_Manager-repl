@@ -1,0 +1,302 @@
+FASE MS-01A – Integração Microsoft 365 (Backend OAuth + guardar ligação por utilizador)
+
+Contexto do projeto
+
+Backend: Node + Express + TypeScript, Drizzle ORM (Postgres), auth própria com getUserContext() que devolve userId, empresaId, userRole.
+
+A app corre em Replit com URL público (BASE_URL) já definido.
+
+No Azure (Entra ID) já existe uma App Registration com Microsoft Graph:
+
+Delegated permissions: User.Read, offline_access, openid, profile, Calendars.ReadWrite.
+
+No ambiente do backend já existem variáveis de ambiente definidas (NÃO criar valores, só usar):
+
+MS_TENANT_ID
+
+MS_CLIENT_ID
+
+MS_CLIENT_SECRET
+
+MS_REDIRECT_URI
+
+Nesta fase quero apenas o backend:
+
+Tabela para guardar a ligação Microsoft por utilizador.
+
+Endpoints:
+
+GET /api/integrations/microsoft/login – inicia o login na Microsoft.
+
+GET /api/integrations/microsoft/callback – recebe o code, troca por tokens, guarda na BD.
+
+GET /api/integrations/microsoft/status – devolve se o utilizador tem conta Microsoft ligada.
+
+Sem ainda criar eventos de calendário; isso fica para uma fase seguinte.
+
+1. Nova tabela Drizzle: microsoft_connections
+
+No shared/schema.ts (ou ficheiro equivalente onde estão as tabelas), cria uma tabela para guardar a ligação Microsoft por utilizador:
+
+export const microsoftConnections = pgTable("microsoft_connections", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  msAccountId: text("ms_account_id").notNull(), // id do utilizador na Microsoft (me.id)
+  email: text("email"),                        // mail ou userPrincipalName
+  displayName: text("display_name"),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+
+Adiciona a tabela às exports e ao sistema de migrations, de forma consistente com o resto do projeto.
+
+Garante que os índices/chaves seguem o padrão do resto do schema (se houver convenções).
+
+2. Funções de acesso (storage/service)
+
+Cria um módulo de storage/serviço (ex.: server/storage/microsoftConnections.ts ou semelhante) com:
+
+async function getMicrosoftConnectionByUserId(userId: string) { ... }
+
+async function upsertMicrosoftConnection(input: {
+  userId: string;
+  msAccountId: string;
+  email?: string | null;
+  displayName?: string | null;
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: Date;
+}) { ... }
+
+
+Comportamento:
+
+getMicrosoftConnectionByUserId:
+
+Faz SELECT microsoft_connections WHERE user_id = userId LIMIT 1.
+
+upsertMicrosoftConnection:
+
+Se já existir registo para esse userId, faz UPDATE.
+
+Caso contrário, faz INSERT.
+
+Usa Drizzle e o mesmo padrão de erro/logging já usado noutros storages.
+
+3. Router Express para Microsoft
+
+Cria um router dedicado, por ex.: server/routes/integrations/microsoft.ts, e regista-o em registerRoutes com o prefixo:
+
+app.use("/api/integrations/microsoft", microsoftRouter);
+
+
+Usa sempre o middleware de auth existente para garantir que temos contexto do utilizador onde for necessário.
+
+4. Estado de OAuth (state anti-CSRF)
+
+Para o parâmetro state do OAuth:
+
+Gera um string aleatório (ex.: 32+ chars).
+
+Guarda esse valor numa cookie HTTP-only, por ex. ms_oauth_state, com curta duração (ex.: 10 minutos).
+
+No callback, lê essa cookie e compara com o state recebido.
+
+Se já existir no projeto alguma forma padrão de guardar estado de OAuth/sessões, reutiliza; caso contrário, usa cookie assinado de forma simples.
+
+5. Endpoint: GET /api/integrations/microsoft/login
+
+Objetivo: redirecionar o utilizador autenticado para o login da Microsoft.
+
+Implementação:
+
+Endpoint autenticado (usa o middleware de auth standard do projeto).
+
+Usa getUserContext() para garantir que há userId; caso não haja, responde 401.
+
+Lê as env vars:
+
+const tenantId = process.env.MS_TENANT_ID!;
+const clientId = process.env.MS_CLIENT_ID!;
+const redirectUri = process.env.MS_REDIRECT_URI!;
+
+
+Gera o state aleatório, guarda na cookie ms_oauth_state.
+
+Constrói a URL:
+
+https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize
+
+Query params:
+
+client_id = clientId
+
+response_type = code
+
+redirect_uri = redirectUri
+
+response_mode = query
+
+scope = openid profile offline_access User.Read Calendars.ReadWrite
+
+state = valor gerado
+
+Responde com 302 redirect para essa URL.
+
+6. Endpoint: GET /api/integrations/microsoft/callback
+
+Objetivo: receber code da Microsoft, trocar por tokens, obter dados do utilizador e guardar na BD.
+
+Implementação:
+
+Endpoint público (sem auth de header), mas:
+
+Usa a cookie/sessão já existente da aplicação para identificar o userId (ex.: se o auth atual usa cookie JWT ou sessão server-side, reaproveita essa info).
+
+Valida que o utilizador está autenticado; se não estiver, pode redirecionar para a página de login da app.
+
+Lê code e state de req.query.
+
+Valida state:
+
+Lê a cookie ms_oauth_state.
+
+Compara com o state recebido.
+
+Se não coincidir ou estiver vazio → responde com erro simples ou redireciona com ms=error.
+
+Lê de env:
+
+const tenantId = process.env.MS_TENANT_ID!;
+const clientId = process.env.MS_CLIENT_ID!;
+const clientSecret = process.env.MS_CLIENT_SECRET!;
+const redirectUri = process.env.MS_REDIRECT_URI!;
+
+
+Faz POST para:
+
+https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token
+
+Content-Type: application/x-www-form-urlencoded
+
+Body (usar URLSearchParams):
+
+client_id
+
+client_secret
+
+grant_type=authorization_code
+
+code (da query)
+
+redirect_uri (tem de ser exatamente o mesmo das env/Authentication)
+
+scope = openid profile offline_access User.Read Calendars.ReadWrite
+
+Faz await response.json() e extrai:
+
+access_token
+
+refresh_token
+
+expires_in (segundos)
+
+Com o access_token, chama o Graph:
+
+GET https://graph.microsoft.com/v1.0/me
+
+Header Authorization: Bearer <access_token>
+
+Extrai:
+
+id → msAccountId
+
+mail ou userPrincipalName → email
+
+displayName
+
+Calcula expiresAt = new Date(Date.now() + expires_in * 1000).
+
+Chama upsertMicrosoftConnection com:
+
+userId (do contexto da app)
+
+msAccountId, email, displayName
+
+accessToken, refreshToken, expiresAt
+
+Limpa a cookie ms_oauth_state (opcional mas recomendado).
+
+Faz redirect para o frontend, por exemplo:
+
+302 → /admin/empresa?tab=apis-keys&ms=connected
+
+Em caso de erro em qualquer passo:
+
+Log claro no servidor (console/error logger).
+
+Redirect para /admin/empresa?tab=apis-keys&ms=error.
+
+7. Endpoint: GET /api/integrations/microsoft/status
+
+Objetivo: permitir ao frontend saber se o utilizador corrente tem conta Microsoft ligada.
+
+Implementação:
+
+Endpoint autenticado (usa o middleware usual).
+
+Usa getUserContext() para obter userId.
+
+Chama getMicrosoftConnectionByUserId(userId).
+
+Responde:
+
+Se não existir ligação:
+
+{ "connected": false }
+
+
+Se existir:
+
+{
+  "connected": true,
+  "displayName": "...",
+  "email": "...",
+  "msAccountId": "..."
+}
+
+8. Critérios de aceitação MS-01A
+
+Existe tabela microsoft_connections em Drizzle e na BD, com userId, msAccountId, tokens e expiresAt.
+
+GET /api/integrations/microsoft/login:
+
+Só funciona se o utilizador estiver autenticado.
+
+Redireciona para o login da Microsoft com os scopes indicados.
+
+GET /api/integrations/microsoft/callback:
+
+Recebe code e state, valida state.
+
+Troca code por access_token+refresh_token.
+
+Chama https://graph.microsoft.com/v1.0/me e guarda/actualiza a ligação em microsoft_connections.
+
+Faz redirect para /admin/empresa?tab=apis-keys&ms=connected em caso de sucesso.
+
+GET /api/integrations/microsoft/status:
+
+Para um utilizador sem ligação → { connected: false }.
+
+Para um utilizador com ligação → { connected: true, displayName, email, msAccountId }.
+
+Nenhuma funcionalidade existente é quebrada.
+
+Nesta fase não é necessário criar eventos de calendário – apenas preparar a ligação Microsoft por utilizador e o endpoint de status.

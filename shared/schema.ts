@@ -866,6 +866,37 @@ export const insertMicrosoftTokenSchema = createInsertSchema(microsoftTokens).om
 export type InsertMicrosoftToken = z.infer<typeof insertMicrosoftTokenSchema>;
 export type MicrosoftToken = typeof microsoftTokens.$inferSelect;
 
+// Microsoft Connections table (per-user OAuth connections with user data)
+// FASE MS-01A: Backend OAuth + guardar ligação por utilizador
+export const microsoftConnections = pgTable("microsoft_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 255 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  msAccountId: text("ms_account_id").notNull(),
+  email: text("email"),
+  displayName: text("display_name"),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const microsoftConnectionsRelations = relations(microsoftConnections, ({ one }) => ({
+  user: one(users, {
+    fields: [microsoftConnections.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertMicrosoftConnectionSchema = createInsertSchema(microsoftConnections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMicrosoftConnection = z.infer<typeof insertMicrosoftConnectionSchema>;
+export type MicrosoftConnection = typeof microsoftConnections.$inferSelect;
+
 // Extended types for relations
 export type EmpresaWithRelations = Empresa & {
   users?: User[];
