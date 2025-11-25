@@ -11,7 +11,6 @@ import {
   visitasAudio,
   visitasContactos,
   lembretes,
-  microsoftConnections,
   type Empresa,
   type InsertEmpresa,
   type User,
@@ -34,8 +33,6 @@ import {
   type TarefaWithRelations,
   type VisitasAudio,
   type InsertVisitasAudio,
-  type MicrosoftConnection,
-  type InsertMicrosoftConnection,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, gte, sql, or, and } from "drizzle-orm";
@@ -178,10 +175,6 @@ export interface IStorage {
       brand_frequency: { marca: string; count: number }[];
     };
   }>;
-
-  // FASE MS-01A: Microsoft Connections
-  getMicrosoftConnectionByUserId(userId: string): Promise<MicrosoftConnection | undefined>;
-  upsertMicrosoftConnection(input: InsertMicrosoftConnection): Promise<MicrosoftConnection>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1785,39 +1778,6 @@ export class DatabaseStorage implements IStorage {
         brand_frequency,
       },
     };
-  }
-
-  // FASE MS-01A: Microsoft Connections
-  async getMicrosoftConnectionByUserId(userId: string): Promise<MicrosoftConnection | undefined> {
-    const [connection] = await db
-      .select()
-      .from(microsoftConnections)
-      .where(eq(microsoftConnections.userId, userId));
-    return connection;
-  }
-
-  async upsertMicrosoftConnection(input: InsertMicrosoftConnection): Promise<MicrosoftConnection> {
-    const existing = await this.getMicrosoftConnectionByUserId(input.userId);
-
-    if (existing) {
-      // UPDATE
-      const [updated] = await db
-        .update(microsoftConnections)
-        .set({
-          ...input,
-          updatedAt: new Date(),
-        })
-        .where(eq(microsoftConnections.userId, input.userId))
-        .returning();
-      return updated;
-    } else {
-      // INSERT
-      const [inserted] = await db
-        .insert(microsoftConnections)
-        .values(input)
-        .returning();
-      return inserted;
-    }
   }
 }
 

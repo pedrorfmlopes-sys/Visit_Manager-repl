@@ -18,7 +18,6 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import express from "express";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subDays } from "date-fns";
 import { pt } from "date-fns/locale";
-import microsoftRouter from "./routes/integrations/microsoft";
 
 // Ensure upload directory exists
 const uploadsDir = path.join(process.cwd(), "uploads");
@@ -3819,9 +3818,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(404).json({ message: "File not found" });
     }
   });
-
-  // FASE MS-01A: Register Microsoft integrations router
-  app.use("/api/integrations/microsoft", microsoftRouter);
 
   const httpServer = createServer(app);
   return httpServer;
