@@ -65,14 +65,22 @@ export default function ContactoDetail() {
         from: dateRange.from.toISOString(),
         to: dateRange.to.toISOString(),
       });
-      const response = await fetch(`/api/visitas?${params.toString()}`, {
+      console.log("[DEBUG ContactoDetail] Query params:", { contactoId, from: dateRange.from, to: dateRange.to });
+      const url = `/api/visitas?${params.toString()}`;
+      console.log("[DEBUG ContactoDetail] Full URL:", url);
+      const response = await fetch(url, {
         credentials: "include",
       });
       if (!response.ok) throw new Error("Failed to fetch visitas");
-      return response.json();
+      const data = await response.json();
+      console.log("[DEBUG ContactoDetail] Response data:", { visitasCount: data.length, visitas: data });
+      return data;
     },
     enabled: !!contactoId,
   });
+  
+  // DEBUG: Log whenever visitasDoContacto changes
+  console.log("[DEBUG ContactoDetail] visitasDoContacto state updated:", { visitasDoContacto, contactoId, periodFilter, dateRange });
 
   // Delete contacto mutation
   const deleteContactoMutation = useMutation({

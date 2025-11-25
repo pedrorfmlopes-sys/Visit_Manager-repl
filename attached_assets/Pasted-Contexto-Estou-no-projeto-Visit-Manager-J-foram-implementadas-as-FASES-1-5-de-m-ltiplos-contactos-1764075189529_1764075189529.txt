@@ -1,0 +1,145 @@
+Contexto:
+Estou no projeto Visit Manager. Já foram implementadas as FASES 1–5 de múltiplos contactos por visita (tabela visitas_contactos, filtro contactoId em /api/visitas, secção “Visitas em que participou” no detalhe do contacto).
+
+No detalhe de Contacto, aparece o card “Visitas em que participou” com o seletor de período (Últimos 30/90 dias, etc.), mas a lista vem sempre vazia, mesmo sabendo que esse contacto já está associado a visitas.
+
+Preciso que faças um debug completo desta funcionalidade e a deixes a funcionar.
+
+O que quero que verifiques, por ordem:
+
+ContactDetail – Query React Query
+
+Abre o ficheiro do componente de detalhe do contacto (ex.: ContactoDetail.tsx ou similar).
+
+Encontra a secção “Visitas em que participou” e o useQuery que chama /api/visitas com contactoId, from e to.
+
+Garante que:
+
+O contactoId passado ao query é o ID correcto do contacto (string) e não undefined / null.
+
+A query está a construir os parâmetros da URL exatamente assim (ou equivalente):
+
+const params = new URLSearchParams({
+  contactoId,
+  from: dateRange.from.toISOString(),
+  to: dateRange.to.toISOString(),
+});
+
+
+O enabled do useQuery está correcto (enabled: !!contactoId ou semelhante) e não está a impedir a query.
+
+Adiciona (temporariamente) um console.log com { contactoId, dateRange, visitasDoContacto } para facilitar debug.
+
+Rota /api/visitas – processamento do contactoId
+
+Abre o ficheiro de rotas onde está o GET /api/visitas.
+
+Garante que:
+
+Lê contactoId da query string (req.query.contactoId).
+
+Passa esse contactoId para a função de storage getVisitas ou equivalente.
+
+Adiciona (temporariamente) logs na rota:
+
+console.log("[DEBUG visitas] contactoId:", contactoId, "from:", from, "to:", to);
+console.log("[DEBUG visitas] total visitas antes de filtrar:", visitas.length);
+
+
+(coloca isto logo antes e depois da chamada ao storage/filtro).
+
+Storage getVisitas – filtro por contacto e carregamento de contactos
+
+Abre o ficheiro de storage (ex.: server/storage.ts ou similar) onde está getVisitas.
+
+Confirma duas coisas ESSENCIAIS:
+
+A query Drizzle está a carregar os contactos:
+
+db.query.visitas.findMany({
+  where: whereClause,
+  with: {
+    // ...
+    contactos: {
+      with: {
+        contacto: true,
+      },
+    },
+  },
+});
+
+
+O filtro por contactoId está a ser aplicado sobre esses dados:
+
+if (contactoId) {
+  visitas = visitas.filter((v) => {
+    const contactos = v.contactos ?? [];
+    return contactos.some((vc) => vc.contactoId === contactoId);
+  });
+}
+
+
+Se em vez disto estiveres a comparar vc.contacto.id com contactoId, ajusta para o que fizer mais sentido de acordo com a estrutura real (vc.contactoId ou vc.contacto.id), mas garante que estás a comparar o mesmo tipo (string com string).
+
+Adiciona logs temporários para ver pelo menos uma visita com contactos:
+
+console.log("[DEBUG visitas] exemplo v.contactos:", visitas[0]?.contactos);
+
+
+Filtros de datas (from/to)
+
+Ainda em getVisitas, confirma que:
+
+O filtro de datas está a ser aplicado sobre o campo certo (ex.: dataVisita).
+
+A comparação está correcta (>= from e <= to).
+
+Se from/to não forem fornecidos, não estás sem querer a excluir tudo.
+
+Garante que quando o frontend escolhe a opção “Todas”:
+
+O from vem como uma data suficientemente antiga (ex.: 2000-01-01) para não excluir visitas antigas.
+
+Testar manualmente a rota
+
+Depois das correcções e logs:
+
+Escolhe um contacto que TENHA visitas associadas.
+
+Copia o contactoId.
+
+Faz uma chamada manual no browser/postman:
+
+GET /api/visitas?contactoId=<ID>&from=2000-01-01T00:00:00.000Z&to=2100-01-01T00:00:00.000Z
+
+Verifica:
+
+Se a resposta tem visitas (JSON com array).
+
+Se os logs que adicionaste mostram que o filtro está a encontrar contactos.
+
+Limpar logs e garantir UX
+
+Quando estiver tudo a funcionar:
+
+Remove os console.log/logs temporários do backend e frontend.
+
+Garante que:
+
+Em contactos com visitas → a lista aparece com os dados.
+
+Em contactos sem visitas → mostra a mensagem “Este contacto ainda não está associado a nenhuma visita neste período”.
+
+Critério de aceitação
+
+No detalhe de um contacto que já participou em visitas:
+
+O card “Visitas em que participou” mostra efectivamente a lista de visitas.
+
+O seletor de período altera a lista (por ex. “Últimos 30 dias” vs “Todas”).
+
+Ao clicar numa visita, sou redirecionado para o detalhe dessa visita.
+
+No detalhe de um contacto sem visitas:
+
+A secção mostra a mensagem de empty state, sem erros.
