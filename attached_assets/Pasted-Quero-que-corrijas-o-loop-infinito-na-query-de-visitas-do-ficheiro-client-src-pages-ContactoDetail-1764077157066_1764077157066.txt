@@ -1,0 +1,77 @@
+Quero que corrijas o loop infinito na query de visitas do ficheiro
+`client/src/pages/ContactoDetail.tsx`.
+
+Contexto:
+- O componente tem um `getDateRange()` que usa `new Date()`.
+- Depois faz `const dateRange = getDateRange();` fora da query.
+- O `dateRange` é usado dentro do `queryKey` da React Query:
+  `queryKey: ["/api/visitas", { contactoId, from: dateRange.from.toISOString(), to: dateRange.to.toISOString() }]`.
+- Isto está a provocar pedidos a `/api/visitas` em loop, porque o `queryKey` muda em cada render.
+
+Objectivo:
+- Tornar o `queryKey` estável enquanto o `contactoId` e o `periodFilter` não mudarem.
+- Continuar a usar o filtro de datas na query, mas sem causar refetch infinito.
+- Manter o tipo `VisitaWithRelations[]` e o comportamento actual da UI.
+
+Passos concretos:
+
+1. No topo do ficheiro `ContactoDetail.tsx` deixa os imports como estão (não é preciso alterar nada aí).
+
+2. Mantém a função `getDateRange()` tal como está, porque ela é útil para calcular o intervalo com base no `periodFilter`.
+
+3. **Remove** a linha onde o intervalo é calculado fora da query:
+   ```ts
+   const dateRange = getDateRange();
+Substitui a definição da query de visitas por esta versão:
+
+ts
+Copiar código
+const {
+  data: visitasDoContacto = [],
+  isLoading: isLoadingVisitas,
+} = useQuery<VisitaWithRelations[]>({
+  // key estável: depende apenas do contacto e do período selecionado
+  queryKey: ["/api/visitas", "contacto-visitas", contactoId, periodFilter],
+  enabled: !!contactoId,
+  queryFn: async () => {
+    const { from, to } = getDateRange();
+
+    const params = new URLSearchParams({
+      contactoId: contactoId || "",
+      from: from.toISOString(),
+      to: to.toISOString(),
+    });
+
+    const response = await fetch(`/api/visitas?${params.toString()}`, {
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch visitas");
+    }
+
+    const data = await response.json();
+
+    // DEBUG opcional (podes deixar)
+    console.debug("[DEBUG ContactoDetail] /api/visitas response:", data);
+
+    // A API devolve directamente `VisitaWithRelations[]`, por isso devolve o data tal como vem
+    return data;
+  },
+});
+Garante que não há mais nenhuma utilização de dateRange fora da queryFn. O cálculo do intervalo deve acontecer apenas dentro da queryFn.
+
+Não alteres o JSX que renderiza a lista de visitas — deve continuar a usar visitasDoContacto tal como já está.
+
+No fim, verifica:
+
+A consola deixa de mostrar dezenas de [DEBUG ContactoDetail] /api/visitas response em loop.
+
+O skeleton de “A carregar visitas” desaparece ao fim de 1 pedido.
+
+As visitas em que o contacto participou aparecem normalmente no card, com os filtros de período a funcionar.
+
+Aplica estas alterações apenas no client/src/pages/ContactoDetail.tsx.
+
+css
+Copiar código

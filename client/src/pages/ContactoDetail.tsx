@@ -61,25 +61,31 @@ export default function ContactoDetail() {
     }
   };
 
-  const dateRange = getDateRange();
-
   const { data: visitasResponse, isLoading: isLoadingVisitas } = useQuery<VisitasResponse>({
-    queryKey: ["/api/visitas", { contactoId, from: dateRange.from.toISOString(), to: dateRange.to.toISOString() }],
+    queryKey: ["/api/visitas", "contacto-visitas", contactoId, periodFilter],
+    enabled: !!contactoId,
     queryFn: async () => {
+      const { from, to } = getDateRange();
+
       const params = new URLSearchParams({
         contactoId: contactoId || "",
-        from: dateRange.from.toISOString(),
-        to: dateRange.to.toISOString(),
+        from: from.toISOString(),
+        to: to.toISOString(),
       });
+
       const response = await fetch(`/api/visitas?${params.toString()}`, {
         credentials: "include",
       });
-      if (!response.ok) throw new Error("Failed to fetch visitas");
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch visitas");
+      }
+
       const data = await response.json();
-      console.log("[DEBUG ContactoDetail] /api/visitas response:", data);
+      console.debug("[DEBUG ContactoDetail] /api/visitas response:", data);
+
       return data;
     },
-    enabled: !!contactoId,
   });
 
   // Normalize response to array format
