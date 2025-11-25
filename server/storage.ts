@@ -557,6 +557,12 @@ export class DatabaseStorage implements IStorage {
             marca: true,
           },
         },
+        // FASE 5: Load contactos from junction table for filtering
+        contactos: {
+          with: {
+            contacto: true,
+          },
+        },
       },
     });
   }
@@ -592,6 +598,12 @@ export class DatabaseStorage implements IStorage {
         marcas: {
           with: {
             marca: true,
+          },
+        },
+        // FASE 5: Load contactos from junction table for filtering
+        contactos: {
+          with: {
+            contacto: true,
           },
         },
       },
