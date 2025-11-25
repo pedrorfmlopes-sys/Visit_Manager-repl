@@ -1256,7 +1256,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       
       let visitas = await storage.getVisitas(empresaId, userId, userRole);
-      console.log("[DEBUG GET /api/visitas] Total visitas after getVisitas():", visitas.length);
       
       // Apply query filters (FASE 11, FASE 29: Added entidadeId and contactoId)
       const search = req.query.search as string | undefined;
@@ -1267,16 +1266,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hasAudioToTranscribe = req.query.hasAudioToTranscribe === 'true';
       const entidadeId = req.query.entidadeId as string | undefined;
       const contactoId = req.query.contactoId as string | undefined;
-      
-      console.log("[DEBUG GET /api/visitas] Query filters:", { contactoId, from, to, search, entidadeId });
-      if (visitas.length > 0) {
-        console.log("[DEBUG GET /api/visitas] Sample visita contactos:", { 
-          visitaId: visitas[0].id, 
-          contactosLoaded: !!visitas[0].contactos,
-          contactosCount: visitas[0].contactos?.length || 0,
-          firstContacto: visitas[0].contactos?.[0]
-        });
-      }
       
       visitas = visitas.filter(v => {
         // Search filter
@@ -1316,12 +1305,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // FASE 1: Filter using visitasContactos junction table
         if (contactoId) {
           const hasContacto = v.contactos && v.contactos.some((vc: any) => vc.contactoId === contactoId);
-          if (!hasContacto) {
-            console.log(`[DEBUG contactoId filter] Visita ${v.id} does NOT have contactoId ${contactoId}. v.contactos:`, v.contactos?.map(vc => ({ contactoId: vc.contactoId, contactoNome: vc.contacto?.nome })));
-            return false;
-          } else {
-            console.log(`[DEBUG contactoId filter] Visita ${v.id} HAS contactoId ${contactoId}! Including in results.`);
-          }
+          if (!hasContacto) return false;
         }
         
         // Audio to transcribe filter
@@ -1333,8 +1317,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         return true;
       });
-      
-      console.log("[DEBUG GET /api/visitas] Visitas after filtering:", visitas.length);
       
       res.json(visitas);
     } catch (error) {

@@ -57,7 +57,7 @@ export default function ContactoDetail() {
 
   const dateRange = getDateRange();
 
-  const { data: visitasDoContacto = [] } = useQuery<VisitaWithRelations[]>({
+  const { data: visitasDoContacto = [], isLoading: isLoadingVisitas } = useQuery<VisitaWithRelations[]>({
     queryKey: ["/api/visitas", { contactoId, from: dateRange.from.toISOString(), to: dateRange.to.toISOString() }],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -65,22 +65,14 @@ export default function ContactoDetail() {
         from: dateRange.from.toISOString(),
         to: dateRange.to.toISOString(),
       });
-      console.log("[DEBUG ContactoDetail] Query params:", { contactoId, from: dateRange.from, to: dateRange.to });
-      const url = `/api/visitas?${params.toString()}`;
-      console.log("[DEBUG ContactoDetail] Full URL:", url);
-      const response = await fetch(url, {
+      const response = await fetch(`/api/visitas?${params.toString()}`, {
         credentials: "include",
       });
       if (!response.ok) throw new Error("Failed to fetch visitas");
-      const data = await response.json();
-      console.log("[DEBUG ContactoDetail] Response data:", { visitasCount: data.length, visitas: data });
-      return data;
+      return response.json();
     },
     enabled: !!contactoId,
   });
-  
-  // DEBUG: Log whenever visitasDoContacto changes
-  console.log("[DEBUG ContactoDetail] visitasDoContacto state updated:", { visitasDoContacto, contactoId, periodFilter, dateRange });
 
   // Delete contacto mutation
   const deleteContactoMutation = useMutation({
@@ -480,7 +472,13 @@ export default function ContactoDetail() {
             </div>
           </CardHeader>
           <CardContent>
-            {visitasDoContacto.length > 0 ? (
+            {isLoadingVisitas ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-20 bg-muted rounded-md animate-pulse" />
+                ))}
+              </div>
+            ) : visitasDoContacto.length > 0 ? (
               <div className="space-y-2">
                 {visitasDoContacto.map((visita) => (
                   <div
@@ -512,7 +510,7 @@ export default function ContactoDetail() {
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Este contacto ainda não está associado a nenhuma visita neste período
+                Este contacto não tem visitas neste período
               </p>
             )}
           </CardContent>

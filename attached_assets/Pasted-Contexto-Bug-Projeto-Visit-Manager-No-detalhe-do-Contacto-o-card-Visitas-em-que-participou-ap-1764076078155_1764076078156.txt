@@ -1,0 +1,122 @@
+Contexto / Bug:
+Projeto Visit Manager.
+No detalhe do Contacto, o card “Visitas em que participou” aparece, o filtro de datas também, mas a lista está sempre vazia.
+
+Já coloquei logs e vejo isto no console:
+
+Response data: { visitasCount: 4, visitas: Array(4) } → o response.json() traz um array com 4 visitas.
+
+A seguir aparece: visitasDoContacto state updated: { visitasDoContacto: Array(0), ... } → o state está a ficar a [].
+
+Ou seja: o backend está a devolver visitas, mas o React está a guardar/renderizar mal (provavelmente a usar data.visitas em vez de data).
+
+Objetivo:
+Corrigir o componente de detalhe do contacto para que o card “Visitas em que participou” mostre realmente as visitas que o backend já está a devolver.
+
+Tarefas a executar
+
+Abrir o componente do detalhe do contacto
+
+Procura o ficheiro onde está o componente do detalhe do contacto e a secção “Visitas em que participou” (ex.: ContactoDetail.tsx, ContactDetailVisits.tsx ou semelhante, dentro de client/src/...).
+
+Aí vais encontrar:
+
+Um useQuery que faz fetch('/api/visitas?...contactoId=...').
+
+Algum useState tipo const [visitasDoContacto, setVisitasDoContacto] = useState(...).
+
+Um useEffect a fazer setVisitasDoContacto(data.visitas ?? []) ou algo semelhante.
+
+Corrigir o useQuery para devolver directamente o array
+
+Garante que o queryFn faz algo neste estilo:
+
+const { data: visitasDoContacto = [], isLoading: isLoadingVisitas } = useQuery({
+  queryKey: ["contacto-visitas", contactoId, periodFilter, dateRange],
+  enabled: !!contactoId,
+  queryFn: async () => {
+    const params = new URLSearchParams({
+      contactoId: contactoId!,
+      from: dateRange.from.toISOString(),
+      to: dateRange.to.toISOString(),
+    });
+    const url = `/api/visitas?${params.toString()}`;
+
+    const response = await fetch(url, { credentials: "include" });
+    if (!response.ok) throw new Error("Failed to fetch visitas");
+
+    const data = await response.json(); // data é um ARRAY de visitas
+
+    console.log("[DEBUG ContactoDetail] Response data:", {
+      visitasCount: data.length,
+      visitas: data,
+    });
+
+    return data; // ← devolve o ARRAY directamente
+  },
+});
+
+
+Ou seja: não devolver { visitas: data }, apenas data (o array).
+
+Eliminar o estado extra que está a estragar os dados
+
+Remove o useState e o useEffect que fazem algo como:
+
+const [visitasDoContacto, setVisitasDoContacto] = useState<VisitaDTO[]>([]);
+
+useEffect(() => {
+  if (data) {
+    setVisitasDoContacto(data.visitas ?? []); // BUG: data já é array
+    console.log("[DEBUG ContactoDetail] visitasDoContacto state updated:", { visitasDoContacto, contactoId, periodFilter, dateRange });
+  }
+}, [data, contactoId, periodFilter, dateRange]);
+
+
+Depois da refactorização, não uses mais setVisitasDoContacto; usa apenas o data do React Query já renomeado para visitasDoContacto.
+
+Actualizar o JSX para usar o array correcto
+
+No render da secção “Visitas em que participou”, usa o visitasDoContacto que vem directamente do useQuery:
+
+if (isLoadingVisitas) {
+  return <Skeleton /* ... */ />;
+}
+
+if (!visitasDoContacto || visitasDoContacto.length === 0) {
+  return (
+    <p className="text-sm text-muted-foreground">
+      Este contacto não tem visitas neste período.
+    </p>
+  );
+}
+
+return (
+  <ul className="space-y-2">
+    {visitasDoContacto.map((visita) => (
+      <li key={visita.id}>
+        {/* aqui mostrar data, entidade, etc., conforme já estava */}
+      </li>
+    ))}
+  </ul>
+);
+
+
+Garante que não fazes mais nada tipo visitasDoContacto.visitas.map(...).
+visitasDoContacto já é Array de visitas, não um objecto com .visitas.
+
+Limpar logs temporários excessivos
+
+Podes manter um único console.log de debug no queryFn se quiseres, mas remove os logs do useEffect que foi apagado.
+
+Critério de aceitação
+
+No detalhe de um contacto que tem visitas associadas:
+
+O card “Visitas em que participou” mostra a lista de visitas (por exemplo, 4 visitas), sem ficar vazio.
+
+O seletor de período (datas) continua a funcionar: trocar o filtro altera a lista conforme o backend.
+
+No detalhe de um contacto sem visitas:
+
+É mostrada a mensagem de empty state (“Este contacto não tem visitas neste período”) sem erros na consola.
