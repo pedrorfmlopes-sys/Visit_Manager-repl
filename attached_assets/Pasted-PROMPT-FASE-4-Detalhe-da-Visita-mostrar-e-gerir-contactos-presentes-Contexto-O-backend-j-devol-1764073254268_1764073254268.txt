@@ -1,0 +1,62 @@
+PROMPT FASE 4 – Detalhe da Visita: mostrar e gerir contactos presentes
+
+Contexto:
+O backend já devolve contactosPresentes no detalhe da visita e o formulário já envia contactosIds na criação/edição. Agora vamos melhorar o detalhe da visita para mostrar e gerir os contactos presentes.
+
+Objetivo desta fase:
+
+Mostrar claramente, no detalhe da visita, a lista de contactos presentes.
+
+Permitir editar os contactos presentes a partir do próprio detalhe (opcional, se fizer sentido com os componentes que já existem).
+
+Tarefas
+
+Localizar a página de detalhe da visita
+
+Encontra o componente responsável pelo detalhe da visita (ex.: VisitDetailPage em client/src/features/visitas/...).
+
+Identifica a zona onde já são mostrados dados como entidade, data, notas, marcas, etc.
+
+Mostrar a lista de contactos presentes
+
+Usa o campo contactosPresentes que vem do endpoint de detalhe.
+
+Adiciona uma secção, por exemplo com título: “Contactos presentes”.
+
+Renderiza uma lista de chips/cards com:
+
+Nome do contacto.
+
+(Opcional) cargo/função, email, telefone se estiverem disponíveis.
+
+Ações rápidas já usadas noutros sítios (email, telefonar), se fizer sentido reutilizar.
+
+Se não houver contactos na visita, mostra uma mensagem discreta (“Nenhum contacto associado a esta visita”).
+
+Botão de edição de contactos (opcional mas desejável)
+
+Adiciona um botão “Editar contactos” ou similar que:
+
+Abre um dialog/sheet com o mesmo componente de multi-select usado no formulário de visita.
+
+Carrega a lista de contactos da entidade da visita.
+
+Pré-selecciona os contactos que já estão em contactosPresentes.
+
+Ao confirmar:
+
+Envia um PUT /api/visitas/:id com o campo contactosIds actualizado.
+
+Depois de guardar, actualiza o estado do detalhe para reflectir os novos contactos.
+
+Critérios de aceitação
+
+No detalhe da visita:
+
+Vejo uma secção “Contactos presentes” com os contactos associados.
+
+Visitas antigas que tinham contactoId migrado mostram pelo menos esse contacto.
+
+Se existir o botão de edição:
+
+Consigo adicionar/remover contactos presentes e ao guardar vejo as alterações reflectidas sem erros.

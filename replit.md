@@ -150,3 +150,25 @@ PostgreSQL with Drizzle ORM is used for type-safe schema management. Core entiti
 - **Stats**: +100 linhas frontend, 6 campos atualizados, build ✅ passing
 - **Status**: ✅ FASE 1-3 Completa (Backend + Frontend + API)
 
+### FASE 4: Detalhe da Visita - Mostrar e Gerir Contactos Presentes (✅ Completo)
+- **Secção Contactos Presentes** em VisitaDetail.tsx:
+  - Mostra lista de contactos já associados
+  - Cada contacto: nome, funcao, email, telefone
+  - "Nenhum contacto" mensagem se vazio
+- **Botão Editar (Admin Only)**:
+  - Abre Dialog com lista de contactos da entidade
+  - Multi-select com search por nome
+  - Checkboxes para selecionar/desselecionar contactos
+  - Badges mostrando seleção atual
+- **Mutation editContactosMutation**:
+  - PATCH /api/visitas/:id com contactosIds[]
+  - Invalida cache, mostra toast
+  - Dialog fecha automaticamente
+- **UX**:
+  - Mostra nome da entidade em topo do diálogo
+  - Search em tempo real por nome do contacto
+  - Contador de selecionados
+  - Contactos filtrados por entidadeId
+- **Stats**: +160 linhas VisitaDetail.tsx, 1 mutation, 1 dialog, imports adicionais (Users icon, Popover, Checkbox)
+- **Status**: ✅ FASE 4 Completa (Detalhe + Edição inline)
+

@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import DOMPurify from 'dompurify';
-import { ArrowLeft, ArrowRight, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles, Bell, Volume2, Trash2, Loader2, Mic, Plus, X, Edit, AlertTriangle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles, Bell, Volume2, Trash2, Loader2, Mic, Plus, X, Edit, AlertTriangle, Users } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { pt } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { Contacto } from "@shared/schema";
 
 interface SuggestedItem {
   titulo: string;
@@ -71,6 +74,10 @@ export default function VisitaDetail() {
     type: 'interno' as 'interno' | 'cliente'
   });
   const [updateStatusDialogOpen, setUpdateStatusDialogOpen] = useState(false);
+  // FASE 4: Edit contactos presentes
+  const [editContactosDialogOpen, setEditContactosDialogOpen] = useState(false);
+  const [editContactosSearch, setEditContactosSearch] = useState("");
+  const [selectedContactosEdit, setSelectedContactosEdit] = useState<string[]>([]);
   const { data: currentUser } = useCurrentUser();
   const isAdmin = useIsAdmin();
   
@@ -136,6 +143,29 @@ export default function VisitaDetail() {
     },
   });
 
+  // FASE 4: Edit contactos presentes mutation
+  const editContactosMutation = useMutation({
+    mutationFn: async (contactosIds: string[]) => {
+      if (!visitaId) throw new Error("Visita ID is required");
+      await apiRequest('PATCH', `/api/visitas/${visitaId}`, { contactosIds });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
+      setEditContactosDialogOpen(false);
+      toast({
+        title: "Sucesso",
+        description: "Contactos atualizados com sucesso",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Falha ao atualizar contactos",
+        variant: "destructive",
+      });
+    },
+  });
+
   const { data: tarefas = [] } = useQuery<Tarefa[]>({
     queryKey: ["/api/tarefas"],
     select: (data) => data.filter((t) => t.visitaId === visitaId),
@@ -149,6 +179,11 @@ export default function VisitaDetail() {
   const { data: audioClips = [] } = useQuery<VisitasAudio[]>({
     queryKey: ["/api/visitas", visitaId, "audio"],
     enabled: !!visitaId,
+  });
+
+  // FASE 4: Fetch all contactos
+  const { data: allContactos = [] } = useQuery<Contacto[]>({
+    queryKey: ["/api/contactos"],
   });
 
   const visitReminders = allLembretes?.filter(l => 
@@ -917,6 +952,127 @@ export default function VisitaDetail() {
             </CardContent>
           </Card>
         )}
+
+        {/* FASE 4: Contactos Presentes */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Contactos Presentes
+              </CardTitle>
+              {isAdmin && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedContactosEdit(visita?.contactosPresentes?.map((c: any) => c.id) || []);
+                    setEditContactosSearch("");
+                    setEditContactosDialogOpen(true);
+                  }}
+                  data-testid="button-edit-contactos"
+                >
+                  <Edit className="h-3 w-3 mr-1" />
+                  Editar
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {visita?.contactosPresentes && visita.contactosPresentes.length > 0 ? (
+              <div className="space-y-3">
+                {visita.contactosPresentes.map((contacto: any) => (
+                  <div key={contacto.id} className="p-3 border rounded-md bg-muted/30">
+                    <div className="font-medium text-sm">{contacto.nome}</div>
+                    {contacto.funcao && <div className="text-xs text-muted-foreground">{contacto.funcao}</div>}
+                    {contacto.email && <div className="text-xs text-muted-foreground">{contacto.email}</div>}
+                    {contacto.telefone && <div className="text-xs text-muted-foreground">{contacto.telefone}</div>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Nenhum contacto associado a esta visita</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Dialog para editar contactos presentes */}
+        <Dialog open={editContactosDialogOpen} onOpenChange={setEditContactosDialogOpen}>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Contactos Presentes</DialogTitle>
+            </DialogHeader>
+            
+            {visita && (
+              <div className="space-y-4">
+                <div className="p-3 border rounded-md bg-muted/30">
+                  <p className="text-sm font-medium">Entidade: {visita.gabinete?.nome || visita.entidade?.nome}</p>
+                </div>
+
+                <div className="space-y-3">
+                  <Label htmlFor="search-contactos">Pesquisar Contactos</Label>
+                  <Input
+                    id="search-contactos"
+                    placeholder="Pesquisar por nome..."
+                    value={editContactosSearch}
+                    onChange={(e) => setEditContactosSearch(e.target.value)}
+                    data-testid="input-edit-contactos-search"
+                  />
+                </div>
+
+                <div className="space-y-2 max-h-64 overflow-y-auto border rounded-md p-3">
+                  {allContactos
+                    .filter(c => c.entidadeId === visita.entidadeId)
+                    .filter(c => c.nome.toLowerCase().includes(editContactosSearch.toLowerCase()))
+                    .map((contacto) => (
+                      <div key={contacto.id} className="flex items-center gap-2 p-2 hover:bg-muted rounded">
+                        <Checkbox
+                          id={`contacto-${contacto.id}`}
+                          checked={selectedContactosEdit.includes(contacto.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedContactosEdit([...selectedContactosEdit, contacto.id]);
+                            } else {
+                              setSelectedContactosEdit(selectedContactosEdit.filter(id => id !== contacto.id));
+                            }
+                          }}
+                          data-testid={`checkbox-contacto-${contacto.id}`}
+                        />
+                        <Label htmlFor={`contacto-${contacto.id}`} className="flex-1 cursor-pointer">
+                          <div className="font-medium text-sm">{contacto.nome}</div>
+                          {contacto.funcao && <div className="text-xs text-muted-foreground">{contacto.funcao}</div>}
+                        </Label>
+                      </div>
+                    ))}
+                </div>
+
+                {selectedContactosEdit.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-xs">Selecionados ({selectedContactosEdit.length}):</Label>
+                    <div className="flex flex-wrap gap-1">
+                      {allContactos
+                        .filter(c => selectedContactosEdit.includes(c.id))
+                        .map((c) => (
+                          <Badge key={c.id} variant="secondary" className="text-xs">
+                            {c.nome}
+                          </Badge>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-2 justify-end pt-4">
+                  <Button variant="outline" onClick={() => setEditContactosDialogOpen(false)} data-testid="button-cancel-edit-contactos">
+                    Cancelar
+                  </Button>
+                  <Button onClick={() => editContactosMutation.mutate(selectedContactosEdit)} disabled={editContactosMutation.isPending} data-testid="button-save-edit-contactos">
+                    {editContactosMutation.isPending ? "A guardar..." : "Guardar"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* FASE 6: Áudio da Visita */}
         {audioClips.length > 0 || supportsRecording ? (
