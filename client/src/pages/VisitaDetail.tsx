@@ -21,7 +21,7 @@ import { ShareDialog, useShareActions } from "@/components/ShareDialog";
 import { EmailAIDialog } from "@/components/EmailAIDialog";
 import { UpdateVisitStatusDialog } from "@/components/UpdateVisitStatusDialog";
 import { formatVisitForSharing } from "@/lib/shareFormatters";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useCurrentUser, useAllUsers } from "@/hooks/use-user-context";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
@@ -54,6 +54,7 @@ export default function VisitaDetail() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const visitaId = params?.id;
+  const { data: allUsers = [] } = useAllUsers();
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
@@ -1989,7 +1990,15 @@ export default function VisitaDetail() {
               <div className="flex gap-2">
                 <div className="text-muted-foreground">•</div>
                 <div>
-                  <p className="text-foreground">Criada por <span className="font-medium">{visita.createdByUserId}</span></p>
+                  {(() => {
+                    const creator = allUsers.find(u => u.id === visita.createdByUserId);
+                    const displayName = creator 
+                      ? (creator.firstName && creator.lastName ? `${creator.firstName} ${creator.lastName}` : creator.email)
+                      : "Utilizador desconhecido";
+                    return (
+                      <p className="text-foreground">Criada por <span className="font-medium">{displayName}</span></p>
+                    );
+                  })()}
                   <p className="text-xs text-muted-foreground">{visita.dataVisita ? format(new Date(visita.dataVisita), "PPp", { locale: pt }) : "Data desconhecida"}</p>
                 </div>
               </div>

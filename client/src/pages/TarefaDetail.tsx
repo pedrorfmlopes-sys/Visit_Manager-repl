@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { ArrowLeft, Calendar, Trash2, Edit, Download, CheckCircle2, Circle, Building2, FileText, Send, CheckCheck, Cloud } from "lucide-react";
+import { useAllUsers } from "@/hooks/use-user-context";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +38,7 @@ export default function TarefaDetail() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showPlannerDialog, setShowPlannerDialog] = useState(false);
+  const { data: allUsers = [] } = useAllUsers();
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
   const [selectedPlanId, setSelectedPlanId] = useState<string>("");
   const [selectedBucketId, setSelectedBucketId] = useState<string>("");
@@ -500,7 +502,15 @@ export default function TarefaDetail() {
                 <div className="flex gap-2">
                   <div className="text-muted-foreground">•</div>
                   <div>
-                    <p className="text-foreground">Criada por <span className="font-medium">{tarefa.createdByUserId}</span></p>
+                    {(() => {
+                      const creator = allUsers.find(u => u.id === tarefa.createdByUserId);
+                      const displayName = creator 
+                        ? (creator.firstName && creator.lastName ? `${creator.firstName} ${creator.lastName}` : creator.email)
+                        : "Utilizador desconhecido";
+                      return (
+                        <p className="text-foreground">Criada por <span className="font-medium">{displayName}</span></p>
+                      );
+                    })()}
                   </div>
                 </div>
               )}

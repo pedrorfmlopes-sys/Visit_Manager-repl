@@ -114,7 +114,16 @@ export function AdminSidebar() {
 
       {/* Footer */}
       <div className="p-4 border-t border-card-border space-y-2">
-        <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+        <div className="flex flex-col gap-1">
+          {user?.firstName && user?.lastName ? (
+            <>
+              <p className="text-xs font-medium text-foreground truncate">{user.firstName} {user.lastName}</p>
+              <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+          )}
+        </div>
         
         {/* Settings Button - only for admins */}
         {isAdmin && (

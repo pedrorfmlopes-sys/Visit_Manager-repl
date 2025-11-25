@@ -1,0 +1,169 @@
+1) “Criada por 49812204” → mostrar o nome do utilizador
+
+Provavelmente, no detalhe da visita estás a receber algo tipo:
+
+createdByUserId: "49812204"
+
+
+ou no activity log:
+
+{ type: "created", userId: "49812204", ... }
+
+
+e o frontend está a fazer Criada por ${userId}.
+
+Prompt para o agent (Histórico da Visita)
+
+Copia este bloco para o agent:
+
+Contexto:
+No detalhe da visita, na secção “Histórico desta Visita”, aparece texto do género:
+Criada por 49812204.
+
+Ou seja, está a ser mostrado o ID interno do utilizador em vez do nome (e idealmente email como fallback).
+
+Objetivo:
+No histórico da visita (activity log) e em qualquer texto “Criada por …”, quero que apareça:
+
+Primeiro o nome do utilizador (ex.: Pedro Lopes)
+
+Se não houver nome, mostrar o email
+
+Nunca mostrar o ID “feio” ao utilizador final.
+
+Tarefas
+
+Backend – enriquecer activity log com dados do utilizador
+
+Localiza o código que constrói o detalhe da visita, incluindo o activity log / “Histórico desta Visita”.
+
+Ex.: storage getVisitaDetalhe ou getVisitaById e o tipo VisitDetailDTO.
+
+Garante que, para cada evento de histórico que tenha userId, é obtido também:
+
+userName (ou nome)
+
+userEmail
+a partir da tabela users da app (não do Supabase directo).
+
+No DTO enviado ao frontend, para cada item do histórico, incluir campos:
+
+{
+  ...,
+  userId: string | null;
+  userName?: string | null;
+  userEmail?: string | null;
+}
+
+
+Para o evento inicial de criação (“Criada por …”), se ainda não existir um item no histórico com esta info, cria um item com estes campos preenchidos.
+
+Frontend – usar userName/userEmail em vez de userId
+
+No componente do detalhe da visita (VisitaDetail ou similar), localiza o mapeamento que renderiza a secção “Histórico desta Visita”.
+
+Em vez de usar evento.userId na string “Criada por …”, passa a usar:
+
+const displayName =
+  evento.userName ||
+  evento.userEmail ||
+  "Utilizador desconhecido";
+
+
+E depois:
+
+<span>Criada por {displayName}</span>
+
+
+Garante que nenhuma parte do histórico mostra IDs de utilizador em texto para o ecrã.
+
+Critérios de aceitação
+
+Na secção “Histórico desta Visita”:
+
+Em vez de “Criada por 49812204”, passa a aparecer “Criada por [Nome do utilizador]”.
+
+Se o utilizador não tiver nome, aparece “Criada por [email]”.
+
+Nunca é mostrado o ID interno ao utilizador final.
+
+O restante conteúdo do histórico mantém-se igual (datas, tipos de ação, etc.).
+
+2) Sidebar / menu de conta – mostrar nome em vez de só email
+
+Na tua sidebar, debaixo do avatar/ícone, está só:
+
+pedrorfmlopes@gmail.com
+
+O ideal é:
+
+Linha 1: Nome do utilizador
+
+Linha 2: Email (opcional / mais pequeno)
+
+Prompt para o agent (User menu)
+
+Copia este também:
+
+Contexto:
+No menu de utilizador (sidebar / canto inferior esquerdo), actualmente aparece apenas o email (pedrorfmlopes@gmail.com).
+Quero que apareça o nome do utilizador (quando existir), e opcionalmente o email por baixo.
+
+Objetivo:
+
+Mostrar Nome Apelido como texto principal.
+
+Mostrar email apenas como secundário ou, se não houver nome, usá-lo como principal.
+
+Tarefas
+
+Backend/Auth – garantir que a API devolve nome do utilizador
+
+Localizar o endpoint que devolve o utilizador autenticado (ex.: /api/auth/user ou similar).
+
+Certificar que esse endpoint já inclui:
+
+name / fullName / displayName (o campo que já existir na tabela users da app para o nome).
+
+email.
+
+Se ainda não devolver o nome, junta-o a partir da tabela users (não apenas dos metadados do Supabase).
+
+Frontend – componente do menu de utilizador
+
+Localizar o componente que desenha a área com o email e as opções “Definições / Sair” (ex.: UserMenu, SidebarUserSection, AccountMenu, etc.).
+
+Ver como está a obter o utilizador:
+
+provavelmente via hook tipo useAuthUser() ou useCurrentUser().
+
+No JSX, altera para algo do género:
+
+const displayName = user.name || user.fullName || null;
+const displayEmail = user.email;
+
+return (
+  <div className="flex flex-col">
+    <span className="text-sm font-medium">
+      {displayName ?? displayEmail}
+    </span>
+    {displayName && displayEmail && (
+      <span className="text-xs text-muted-foreground">
+        {displayEmail}
+      </span>
+    )}
+  </div>
+);
+
+
+Mantém o resto (links “Definições”, “Sair”, etc.) tal como está.
+
+Critérios de aceitação
+
+No menu de utilizador:
+
+Se o utilizador tiver nome guardado → aparece “Nome Apelido” em primeiro plano, e o email numa linha abaixo (texto mais pequeno / secundário).
+
+Se não tiver nome → aparece só o email, como antes.
+
+Nenhum ID interno é mostrado ao utilizador.
