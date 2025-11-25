@@ -1764,7 +1764,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updates.tarefasSugeridasIA = req.body.tarefasSugeridasIA;
       }
       
-      if (Object.keys(updates).length === 0) {
+      // FASE 5: Allow update if only contactosIds is provided
+      if (Object.keys(updates).length === 0 && !req.body.contactosIds) {
         return res.status(400).json({ message: "No valid fields to update" });
       }
       
