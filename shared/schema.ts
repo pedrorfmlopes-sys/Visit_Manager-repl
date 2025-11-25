@@ -114,7 +114,8 @@ export const empresas = pgTable("empresas", {
       "enableFilterMarca": true,
       "enableFilterEntidade": true,
       "enableFilterContacto": true,
-      "enableFilterHasAudio": true
+      "enableFilterHasAudio": true,
+      "multiContactosEnabled": false
     },
     "tarefas": {
       "enableFilterStatus": true,

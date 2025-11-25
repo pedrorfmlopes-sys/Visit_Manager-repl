@@ -387,6 +387,30 @@ export default function AdminEmpresa() {
                 )}
               />
 
+              <FormField
+                control={form.control}
+                name="uiSettings.visitas.multiContactosEnabled"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value as boolean}
+                        onCheckedChange={field.onChange}
+                        data-testid="checkbox-multi-contactos"
+                      />
+                    </FormControl>
+                    <div className="space-y-1">
+                      <FormLabel className="font-normal cursor-pointer">
+                        Permitir vários contactos por visita
+                      </FormLabel>
+                      <p className="text-sm text-muted-foreground">
+                        Se ligado, cada visita pode ter vários contactos associados. Se desligado, cada visita terá apenas um contacto.
+                      </p>
+                    </div>
+                  </FormItem>
+                )}
+              />
+
               <div className="pt-4 border-t space-y-4">
                 <div>
                   <FormLabel>Follow-ups e Histórico de Visitas</FormLabel>

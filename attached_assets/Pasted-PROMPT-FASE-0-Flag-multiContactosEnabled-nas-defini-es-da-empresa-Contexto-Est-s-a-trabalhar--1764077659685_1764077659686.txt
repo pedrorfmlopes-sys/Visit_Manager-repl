@@ -1,0 +1,119 @@
+PROMPT – FASE 0 (Flag multiContactosEnabled nas definições da empresa)
+
+Contexto:
+Estás a trabalhar no projeto Visit Manager (Node + Express + TypeScript, Drizzle ORM + Postgres, React + Vite).
+Já existe um Centro de Definições da Empresa (/admin/empresa), com secção “Visitas & Tarefas”, onde são guardadas várias flags em settings/uiSettings da empresa.
+
+Nas fases anteriores, a app passou a suportar múltiplos contactos por visita. Agora quero transformar isso numa opção configurável por empresa:
+
+Modo simples: uma visita → um contacto
+
+Modo avançado: uma visita → vários contactos
+
+Esta Fase 0 é só para criar a flag e o toggle nas definições. Não alteres ainda o comportamento das visitas.
+
+OBJETIVO
+
+Adicionar uma flag booleana multiContactosEnabled às definições da empresa, exposta na página /admin/empresa na secção “Visitas & Tarefas”.
+
+TAREFAS
+1. Backend – adicionar flag nas settings da empresa
+
+Localiza onde estão definidas as settings/uiSettings da empresa no backend:
+
+Normalmente será na definição da tabela empresas (shared/schema.ts ou similar) e/ou num tipo TypeScript do género EmpresaSettings, EmpresaUiSettings, etc.
+
+Adiciona uma flag booleana:
+
+Nome: multiContactosEnabled
+
+Default: false (modo simples por omissão)
+
+Coloca-a na parte das configurações de Visitas/Tarefas (por exemplo dentro de um objecto visitas ou ui.visitas, mantém o padrão já existente).
+Exemplos ilustrativos (ajusta à estrutura real):
+
+type VisitasSettings = {
+  // ...
+  multiContactosEnabled?: boolean; // novo campo
+};
+
+
+Garante que:
+
+O tipo TypeScript usado na API (EmpresaSettings / UiSettings) inclui o novo campo.
+
+Se houver valores por defeito para settings, multiContactosEnabled vem como false quando não existir ainda.
+
+Se for preciso migração para defaults, cria-a (pode ser uma migração simples a meter false nas empresas existentes).
+
+2. Backend – expor e aceitar a flag na API /api/admin/empresa
+
+Abre o handler/route do endpoint /api/admin/empresa:
+
+GET que devolve os dados da empresa.
+
+PUT ou PATCH que actualiza dados e settings.
+
+Garante que:
+
+GET inclui multiContactosEnabled no JSON de resposta dentro do objecto de settings (mesmo que seja false).
+
+PUT/PATCH aceita multiContactosEnabled no body e guarda correctamente nas settings da empresa.
+
+Mantém o formato actual da resposta; só adiciona o novo campo, sem remover nada.
+
+3. Frontend – toggle em /admin/empresa → “Visitas & Tarefas”
+
+Abre o componente da página de definições da empresa (/admin/empresa), provavelmente algo como AdminEmpresaPage, EmpresaSettingsPage ou similar.
+
+Dentro da tab/secção “Visitas & Tarefas”:
+
+Adiciona um Switch/toggle (usando os componentes já existentes – shadcn/ui ou equivalente) para esta flag.
+
+Propriedades sugeridas:
+
+Label: Permitir vários contactos por visita
+
+Descrição: Se ligado, cada visita pode ter vários contactos associados. Se desligado, cada visita terá apenas um contacto.
+
+Liga o toggle ao estado de settings da empresa:
+
+Quando a página carrega, o valor do switch deve vir do multiContactosEnabled devolvido pela API.
+
+Quando o utilizador altera o switch e clica em “Guardar”/“Salvar” nas definições:
+
+O valor actualizado de multiContactosEnabled deve ser enviado no PUT /api/admin/empresa.
+
+Garante que:
+
+Se o campo não existir (empresa antiga), o toggle aparece desligado por defeito (false).
+
+4. NÃO alterar comportamento das visitas nesta fase
+
+Muito importante:
+Nesta Fase 0 não mudes nenhum comportamento nas visitas/tarefas.
+Apenas:
+
+Cria a flag no backend.
+
+Exibe o toggle no frontend.
+
+Garante que ler/escrever funciona.
+
+CRITÉRIOS DE ACEITAÇÃO
+
+GET /api/admin/empresa devolve multiContactosEnabled nas settings (por exemplo dentro de visitas ou uiSettings, conforme a estrutura actual).
+
+PUT /api/admin/empresa aceita multiContactosEnabled e actualiza a BD correctamente.
+
+Na página /admin/empresa → tab “Visitas & Tarefas”:
+
+Existe um toggle “Permitir vários contactos por visita”.
+
+Abrir as definições mostra o estado actual (false por defeito).
+
+Alterar o toggle e gravar persiste o valor; ao recarregar a página, o estado mantém-se.
+
+Nada no comportamento actual de criação/edição de visitas é alterado ainda.
+
+Aplica estas alterações de forma mínima e coesa, seguindo o estilo e padrões já usados no projecto.

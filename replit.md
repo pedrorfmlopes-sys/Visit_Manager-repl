@@ -56,11 +56,18 @@ PostgreSQL with Drizzle ORM provides type-safe schema management. Core entities 
 -   **date-fns**: For date manipulation and timezone-aware comparisons.
 -   **chartjs-node-canvas**: For server-side chart rendering in PDF exports.
 -   **DOMPurify**: For XSS prevention in rich text content.
-## Última Actualização - FASES 1-5 (25 Novembro 2025)
+## Última Actualização - FASE 0 (25 Novembro 2025, 15h45)
 
-### Implementação: Sistema N:N para Múltiplos Contactos por Visita
+### Implementação: Flag de Configuração para Múltiplos Contactos
 
-**Ficheiro de Relatório Completo**: `RELATORIO_FASES_1_5.md`
+**Ficheiro de Relatório Completo**: `RELATORIO_FASES_1_5_ATUALIZADO.md`
+
+**Fase 0: Flag multiContactosEnabled nas definições da empresa**
+- ✅ Backend: Adicionada flag `uiSettings.visitas.multiContactosEnabled` (default: false)
+- ✅ Frontend: Toggle adicionado em /admin/empresa → "Visitas & Tarefas" → "Comportamento"
+- ✅ API: GET/PATCH já suportam `uiSettings` (sem alterações necessárias)
+- ✅ Build: ✅ Passing
+- ⏳ Comportamento das visitas: Alterações serão feitas em Fase 1 (próxima)
 
 **Fase 1-3: Backend + Junction Table**
 - ✅ Tabela `visitasContactos` criada
