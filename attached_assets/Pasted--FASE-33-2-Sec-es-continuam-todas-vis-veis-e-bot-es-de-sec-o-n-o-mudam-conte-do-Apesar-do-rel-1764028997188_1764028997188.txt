@@ -1,0 +1,137 @@
+🔧 FASE 33.2 – Secções continuam todas visíveis e botões de secção não mudam conteúdo
+
+Apesar do relatório da FASE 33.1 dizer que só uma secção é renderizada de cada vez com renderCurrentSection() e currentSection, na prática o comportamento ainda é este:
+
+Na página /admin/empresa:
+
+Clicar em “Visitas & Tarefas”, “IA & Produtividade”, “Alertas & Relatórios” ou “Integrações” não altera o conteúdo que estou a ver.
+
+Se fizer scroll, continuo a ver todo o conteúdo das várias secções seguido, como antes (Empresa + Visitas + IA + Alertas + Integrações).
+
+Ou seja, nenhum botão de secção está a alterar a secção activa, e todas as secções continuam presentes no DOM.
+
+O teu relatório diz que:
+
+foi criada uma função renderCurrentSection() com um switch (currentSection) e que apenas uma secção é devolvida,
+
+e que currentSection é lido do query param section e actualizado com handleSectionClick.
+
+👉 Na prática, algo disto não está a acontecer no código que está a correr:
+
+ou renderCurrentSection() não está a ser usado no return,
+
+ou ainda existem blocos JSX das secções fora dessa função,
+
+ou currentSection não está a ser calculado de forma consistente com a URL.
+
+1. Verificar o return principal de AdminEmpresa
+
+Quero que:
+
+No ficheiro client/src/pages/AdminEmpresa.tsx, confirmes que o return principal da página NÃO tem nenhum JSX das secções fora de renderCurrentSection().
+
+Ou seja, o return deve ter apenas algo neste formato:
+
+return (
+  <Form {...form}>
+    {/* barra de secções */}
+    <SectionNavigation
+      currentSection={currentSection}
+      onSectionClick={handleSectionClick}
+    />
+
+    {/* ✅ só 1 secção */}
+    {renderCurrentSection()}
+  </Form>
+);
+
+
+E não deve existir nada como:
+
+{currentSection === "empresa" && ...}
+{currentSection === "visitas" && ...}
+// ou blocos tipo <EmpresaSection /> fora de renderCurrentSection
+
+
+Se ainda houver código antigo a renderizar as secções directamente no return, remove-o e garante que tudo passa por renderCurrentSection().
+
+2. Garantir que currentSection muda mesmo ao clicar
+
+Garante que estás a ler o section da URL apenas num sítio, de forma consistente.
+Por exemplo (conceito, ajusta ao router real):
+
+const [location, navigate] = useLocation();
+const urlParams = new URLSearchParams(location.split("?")[1] || "");
+const sectionFromUrl = (urlParams.get("section") || "empresa") as SectionId;
+const currentSection = sectionFromUrl;
+
+
+Ou, se usares useState, certifica-te de que o estado e a URL estão sempre sincronizados.
+
+Garante que TODOS os botões que mudam de secção chamam handleSectionClick com o id correcto:
+
+barra de secções no topo de /admin/empresa;
+
+menu ⚙️ “Definições” no rodapé (Empresa & Equipa, Visitas & Tarefas, etc.).
+
+Adiciona um console.log("currentSection", currentSection) em AdminEmpresa:
+
+Quando clicas em “Visitas & Tarefas”, o log deve passar de "empresa" para "visitas".
+
+Se o log nunca muda, então currentSection não está a ser calculado a partir da nova URL ou não está a ser actualizado.
+
+3. Confirmar que só uma secção é renderizada
+
+Depois de corrigires, valida o seguinte (por favor, faz mesmo estes testes no browser, não só mentalmente):
+
+Ir a /admin/empresa (sem query):
+
+Ver:
+
+Botão “Empresa & Equipa” activo.
+
+Tabs internas “Geral / Marcas & Entidades / Utilizadores”.
+
+Não conseguir ver nada de Visitas/IA/Alertas/Integrações mesmo que faça scroll até ao fim.
+
+Clicar em “Visitas & Tarefas”:
+
+O botão “Visitas & Tarefas” fica activo.
+
+Tabs internas mudam para “Comportamento / Filtros & Listas”.
+
+O conteúdo de “Empresa & Equipa” desaparece completamente.
+
+A URL passa a ser /admin/empresa?section=visitas.
+
+Clicar em “IA & Produtividade”, “Alertas & Relatórios”, “Integrações”:
+
+Cada um activa apenas a sua secção, sem acumular conteúdo.
+
+Fazer refresh em /admin/empresa?section=alertas:
+
+Abrir directamente em “Alertas & Relatórios”, com apenas essa secção visível.
+
+4. Relatório FASE 33.2
+
+No relatório desta fase, por favor:
+
+Indica exactamente:
+
+como está o return do componente (se só usa {renderCurrentSection()} para as secções),
+
+como estás a calcular currentSection,
+
+e se verificaste via console.log que currentSection muda quando clicas em cada secção.
+
+Confirma explicitamente:
+
+“Testado no browser: já não vejo várias secções ao fazer scroll; apenas a secção activa é renderizada.”
+
+🎯 Objetivo final:
+
+Os botões de secção deixam de ser apenas visuais.
+
+currentSection muda de facto quando clico nas secções ou uso o menu ⚙️.
+
+Só uma secção do Centro de Configurações existe no DOM de cada vez.
