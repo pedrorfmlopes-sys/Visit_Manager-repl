@@ -1764,14 +1764,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updates.tarefasSugeridasIA = req.body.tarefasSugeridasIA;
       }
       
-      // FASE 5: Allow update if only contactosIds is provided
-      if (Object.keys(updates).length === 0 && !req.body.contactosIds) {
-        return res.status(400).json({ message: "No valid fields to update" });
-      }
-      
-      const updated = await storage.updateVisita(req.params.id, updates, empresaId, userId, userRole);
-      if (!updated) {
-        return res.status(404).json({ message: "Visita not found" });
+      // FASE 5: If only contactosIds provided and no other fields, skip updateVisita
+      let updated: any = null;
+      if (Object.keys(updates).length > 0) {
+        updated = await storage.updateVisita(req.params.id, updates, empresaId, userId, userRole);
+        if (!updated) {
+          return res.status(404).json({ message: "Visita not found" });
+        }
+      } else {
+        // If no fields to update, fetch current visita to return
+        updated = await storage.getVisita(req.params.id, empresaId, userId, userRole);
+        if (!updated) {
+          return res.status(404).json({ message: "Visita not found" });
+        }
       }
       
       // FASE 1: Sync contactos if provided in update
