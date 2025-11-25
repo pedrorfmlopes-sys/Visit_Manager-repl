@@ -18,6 +18,12 @@ import { subDays, subMonths, startOfYear, endOfYear, format } from "date-fns";
 import { pt } from "date-fns/locale";
 import type { ContactoWithRelations, VisitaWithRelations } from "@shared/schema";
 
+// Type to normalize different response formats from /api/visitas
+type VisitasResponse =
+  | VisitaWithRelations[]
+  | { visitas: VisitaWithRelations[]; total?: number }
+  | { items: VisitaWithRelations[]; total?: number };
+
 export default function ContactoDetail() {
   const [, params] = useRoute("/contactos/:id/detalhes");
   const [, setLocation] = useLocation();
@@ -57,7 +63,7 @@ export default function ContactoDetail() {
 
   const dateRange = getDateRange();
 
-  const { data: visitasDoContacto = [], isLoading: isLoadingVisitas } = useQuery<VisitaWithRelations[]>({
+  const { data: visitasResponse, isLoading: isLoadingVisitas } = useQuery<VisitasResponse>({
     queryKey: ["/api/visitas", { contactoId, from: dateRange.from.toISOString(), to: dateRange.to.toISOString() }],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -69,10 +75,19 @@ export default function ContactoDetail() {
         credentials: "include",
       });
       if (!response.ok) throw new Error("Failed to fetch visitas");
-      return response.json();
+      const data = await response.json();
+      console.log("[DEBUG ContactoDetail] /api/visitas response:", data);
+      return data;
     },
     enabled: !!contactoId,
   });
+
+  // Normalize response to array format
+  const visitasDoContacto: VisitaWithRelations[] = Array.isArray(visitasResponse)
+    ? visitasResponse
+    : (visitasResponse?.visitas ??
+       (visitasResponse as any)?.items ??
+       []);
 
   // Delete contacto mutation
   const deleteContactoMutation = useMutation({

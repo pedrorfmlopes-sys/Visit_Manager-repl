@@ -1,0 +1,132 @@
+Contexto / Bug:
+Projeto Visit Manager.
+No componente ContactoDetail.tsx, o card “Visitas em que participou” aparece mas a lista está sempre vazia, apesar de o endpoint /api/visitas devolver visitas para esse contactoId.
+
+O ficheiro actual ContactoDetail.tsx tem este useQuery:
+
+const { data: visitasDoContacto = [], isLoading: isLoadingVisitas } = useQuery<VisitaWithRelations[]>({
+  queryKey: ["/api/visitas", { contactoId, from: dateRange.from.toISOString(), to: dateRange.to.toISOString() }],
+  queryFn: async () => {
+    const params = new URLSearchParams({
+      contactoId: contactoId || "",
+      from: dateRange.from.toISOString(),
+      to: dateRange.to.toISOString(),
+    });
+    const response = await fetch(`/api/visitas?${params.toString()}`, {
+      credentials: "include",
+    });
+    if (!response.ok) throw new Error("Failed to fetch visitas");
+    return response.json();
+  },
+  enabled: !!contactoId,
+});
+
+
+Isto assume que a resposta é um array directo de visitas. Mas o endpoint /api/visitas pode estar a devolver um objecto (por ex. { visitas: [...], total: ... }). Nesse caso:
+
+visitasDoContacto fica a ser um objecto, não um array.
+
+visitasDoContacto.length é undefined → a condição visitasDoContacto.length > 0 é sempre falsa.
+
+A UI cai sempre no “Este contacto não tem visitas neste período”.
+
+Objetivo:
+Adaptar o ContactoDetail.tsx para tratar correctamente a resposta do endpoint, quer seja um array, quer seja um objecto com propriedade visitas (ou items). Mostrar efectivamente as visitas no card.
+
+Tarefas
+
+Abrir ContactoDetail.tsx
+
+Localiza o ficheiro ContactoDetail.tsx no cliente (já está anexado neste contexto).
+
+Foca-te na parte do useQuery para /api/visitas e no render da secção “Visitas em que participou”.
+
+Criar tipo de resposta e normalizar dados
+
+Cria um tipo local para a resposta, por exemplo:
+
+type VisitasResponse =
+  | VisitaWithRelations[] // resposta directa em array
+  | { visitas: VisitaWithRelations[]; total?: number } // resposta em objecto
+  | { items: VisitaWithRelations[]; total?: number };  // alternativa
+
+
+Altera o useQuery para usar este tipo:
+
+const { data: visitasResponse, isLoading: isLoadingVisitas } = useQuery<VisitasResponse>({
+  // ...
+  queryFn: async () => {
+    const params = new URLSearchParams({
+      contactoId: contactoId || "",
+      from: dateRange.from.toISOString(),
+      to: dateRange.to.toISOString(),
+    });
+    const response = await fetch(`/api/visitas?${params.toString()}`, {
+      credentials: "include",
+    });
+    if (!response.ok) throw new Error("Failed to fetch visitas");
+    const data = await response.json();
+
+    console.log("[DEBUG ContactoDetail] /api/visitas response:", data);
+    return data;
+  },
+  enabled: !!contactoId,
+});
+
+
+Logo abaixo do useQuery, normaliza para um array:
+
+const visitasDoContacto: VisitaWithRelations[] = Array.isArray(visitasResponse)
+  ? visitasResponse
+  : (visitasResponse?.visitas ??
+     (visitasResponse as any)?.items ??
+     []);
+
+
+Actualizar o JSX para usar o array normalizado
+
+No CardContent da secção “Visitas em que participou”, garante que a lógica é:
+
+{isLoadingVisitas ? (
+  // skeletons
+) : visitasDoContacto.length > 0 ? (
+  <div className="space-y-2">
+    {visitasDoContacto.map((visita) => (
+      <div
+        key={visita.id}
+        className="p-3 border rounded-md bg-muted/30 hover-elevate cursor-pointer"
+        onClick={() => setLocation(`/visitas/${visita.id}`)}
+        data-testid={`row-visita-${visita.id}`}
+      >
+        {/* resto do conteúdo (entidade/gabinete, dataVisita, notas, etc.) */}
+      </div>
+    ))}
+  </div>
+) : (
+  <p className="text-sm text-muted-foreground">
+    Este contacto não tem visitas neste período
+  </p>
+)}
+
+
+Garante que não há nenhum uso de visitasDoContacto.visitas ou visitasDoContacto.items no JSX; o JSX deve usar sempre o array já normalizado.
+
+Limpar e confirmar
+
+Mantém por agora o console.log("[DEBUG ContactoDetail] /api/visitas response:", data); para confirmar o formato real da resposta.
+
+Após confirmar que tudo funciona, podes comentar ou remover esse log se quiseres.
+
+Critério de aceitação
+
+Ao abrir o detalhe de um contacto que tem visitas:
+
+O card “Visitas em que participou” mostra efectivamente a lista de visitas (com data, entidade/gabinete e excerto de notas).
+
+O seletor de período altera a lista conforme esperado.
+
+Ao abrir um contacto sem visitas no período:
+
+É apresentada a mensagem “Este contacto não tem visitas neste período”.
+
+Nenhum erro aparece na consola do browser relacionado com visitasDoContacto.map ou length.
