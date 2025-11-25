@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Empresa, User, Marca } from "@shared/schema";
-import { Upload, Building2, Bell, Zap, Lightbulb, MapPin, Calendar, PlugZap } from "lucide-react";
+import { Upload, Building2, Bell, Zap, Lightbulb, MapPin, Calendar, PlugZap, Code, Mail, Map, Cloud, Webhook } from "lucide-react";
 import { useRef, useState } from "react";
 import AdminEntidadeTipos from "@/pages/AdminEntidadeTipos";
 import AdminUsers from "@/pages/AdminUsers";
@@ -41,7 +41,7 @@ const SECTIONS = [
   { id: "visitas", label: "Visitas & Tarefas", icon: Calendar },
   { id: "ia", label: "IA & Produtividade", icon: Lightbulb },
   { id: "alertas", label: "Alertas & Relatórios", icon: Bell },
-  { id: "integracoes", label: "Integrações", icon: PlugZap },
+  { id: "apis-keys", label: "APIs & Keys", icon: Code },
 ] as const;
 
 type SectionId = typeof SECTIONS[number]["id"];
@@ -191,8 +191,8 @@ export default function AdminEmpresa() {
         return renderIaSection();
       case "alertas":
         return renderAlertasSection();
-      case "integracoes":
-        return renderIntegracoesSection();
+      case "apis-keys":
+        return renderApisKeysSection();
       default:
         return renderEmpresaSection();
     }
@@ -1149,82 +1149,176 @@ export default function AdminEmpresa() {
     </div>
   );
 
-  // SECÇÃO: INTEGRAÇÕES
-  const renderIntegracoesSection = () => (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold mb-4">Integrações</h3>
-        
-        <Tabs defaultValue="microsoft" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="microsoft" data-testid="tab-integracoes-microsoft">Microsoft 365</TabsTrigger>
-            <TabsTrigger value="google" data-testid="tab-integracoes-google">Google</TabsTrigger>
-            <TabsTrigger value="outros" data-testid="tab-integracoes-outros">Outros</TabsTrigger>
-          </TabsList>
+  // SECÇÃO: APIs & KEYS - INTEG-01
+  // Resumo de configurações de IA e placeholders para outras integrações
+  const renderApisKeysSection = () => {
+    const iaSettings = empresa?.uiSettings?.ia || { aiEnabled: true, aiKeyMode: "global" };
+    const hasOwnKey = iaSettings.hasOwnOpenAIApiKey ?? false;
+    
+    const getIaStatus = () => {
+      if (!iaSettings.aiEnabled) return "IA desativada para esta empresa";
+      return "IA ativa para esta empresa";
+    };
+    
+    const getIaKeyMode = () => {
+      if (iaSettings.aiKeyMode === "own") {
+        return hasOwnKey 
+          ? "Modo: Chave própria da empresa (chave configurada)"
+          : "Modo: Chave própria da empresa (nenhuma chave configurada)";
+      }
+      return "Modo: Chave global do Visit Manager";
+    };
+    
+    return (
+      <div className="space-y-6">
+        <div>
+          <h3 className="text-lg font-semibold mb-4">APIs & Integrações Externas</h3>
+          <p className="text-sm text-muted-foreground mb-6">
+            Gerencie todas as integrações externas e configurações de API da sua empresa. Aqui pode centralizar as chaves de acesso e os modos de funcionamento de cada serviço.
+          </p>
+        </div>
 
-          {/* Microsoft */}
-          <TabsContent value="microsoft" className="space-y-6 mt-6">
-            <div className="space-y-4">
-              <div className="flex items-start justify-between p-4 border rounded-lg">
-                <div className="space-y-1">
-                  <p className="font-medium">Microsoft Outlook / 365</p>
-                  <p className="text-sm text-muted-foreground">
-                    Sincronize o seu calendário e tarefas
-                  </p>
-                </div>
-                <Badge variant="outline">Desligado</Badge>
+        {/* IA Summary Card */}
+        <Card className="bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 border-blue-200 dark:border-blue-900/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-blue-600" />
+              Inteligência Artificial (IA)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-medium">Estado da IA</p>
+                <p className="text-sm text-muted-foreground mt-1">{getIaStatus()}</p>
+              </div>
+              
+              <div>
+                <p className="text-sm font-medium">Configuração de Chave</p>
+                <p className="text-sm text-muted-foreground mt-1">{getIaKeyMode()}</p>
               </div>
 
-              <div className="flex items-start justify-between p-4 border rounded-lg">
-                <div className="space-y-1">
-                  <p className="font-medium">Microsoft Planner / To-Do</p>
-                  <p className="text-sm text-muted-foreground">
-                    Sincronize tarefas com o Planner
-                  </p>
-                </div>
-                <Badge variant="outline">Desligado</Badge>
-              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setActiveSection("ia")}
+                data-testid="button-manage-ia-audio"
+                className="mt-2"
+              >
+                Gerir IA & Áudio
+              </Button>
             </div>
-          </TabsContent>
+          </CardContent>
+        </Card>
 
-          {/* Google */}
-          <TabsContent value="google" className="space-y-6 mt-6">
-            <div className="space-y-4">
-              <div className="flex items-start justify-between p-4 border rounded-lg">
-                <div className="space-y-1">
-                  <p className="font-medium">Google Calendar</p>
-                  <p className="text-sm text-muted-foreground">
-                    Sincronize o seu calendário
-                  </p>
-                </div>
-                <Badge variant="outline">Desligado</Badge>
-              </div>
-
-              <div className="flex items-start justify-between p-4 border rounded-lg">
-                <div className="space-y-1">
-                  <p className="font-medium">Google Contacts</p>
-                  <p className="text-sm text-muted-foreground">
-                    Sincronize contactos
-                  </p>
-                </div>
-                <Badge variant="outline">Desligado</Badge>
-              </div>
-            </div>
-          </TabsContent>
-
-          {/* Outros */}
-          <TabsContent value="outros" className="space-y-6 mt-6">
-            <div className="bg-amber-50 dark:bg-amber-950 p-4 rounded-lg">
-              <p className="text-sm font-medium">Mais integrações em breve</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Novas integrações estão a ser desenvolvidas. Contacte o suporte para saber mais.
+        {/* Placeholder Integrations */}
+        <div className="space-y-4">
+          <h4 className="font-semibold text-base">Integrações Planeadas</h4>
+          
+          {/* Microsoft 365 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <PlugZap className="w-5 h-5 text-blue-700" />
+                Microsoft 365
+              </CardTitle>
+              <CardDescription>Planner, Calendar, Contacts via Microsoft Graph</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Futuras integrações com Outlook Calendar, Planner e Contactos para sincronização bidireccional de dados.
               </p>
-            </div>
-          </TabsContent>
-        </Tabs>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium">Estado</span>
+                <Badge variant="secondary">Planeado</Badge>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Google Workspace */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <PlugZap className="w-5 h-5 text-orange-600" />
+                Google Workspace
+              </CardTitle>
+              <CardDescription>Calendar, Contacts, Drive</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Suporte planeado para Google Calendar, Contactos e Drive, com sincronização automática de dados de empresa.
+              </p>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium">Estado</span>
+                <Badge variant="secondary">Planeado</Badge>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Email & Notifications */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="w-5 h-5 text-red-600" />
+                Email & Notificações
+              </CardTitle>
+              <CardDescription>SMTP, SendGrid, Mailgun, SMS e WhatsApp</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Futura integração com provedores de email (SendGrid, Mailgun, Postmark) e SMS/WhatsApp para comunicações em tempo real.
+              </p>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium">Estado</span>
+                <Badge variant="secondary">Planeado</Badge>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Maps & Location */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Map className="w-5 h-5 text-green-600" />
+                Mapas & Localização
+              </CardTitle>
+              <CardDescription>Google Maps, Mapbox, OpenStreetMap</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Suporte planeado para diferentes provedores de mapas e serviços de geocoding avançado.
+              </p>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium">Estado</span>
+                <Badge variant="secondary">Planeado</Badge>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Storage & Webhooks */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Cloud className="w-5 h-5 text-purple-600" />
+                Storage & Webhooks
+              </CardTitle>
+              <CardDescription>S3, Azure, Google Cloud, Webhooks</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Futuro suporte para storage externo (AWS S3, Azure Blob, Google Cloud) e webhooks para integração com sistemas internos da empresa.
+              </p>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium">Estado</span>
+                <Badge variant="secondary">Planeado</Badge>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="min-h-screen pb-32 pt-4">

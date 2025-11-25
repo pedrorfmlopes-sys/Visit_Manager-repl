@@ -1,0 +1,161 @@
+Contexto:
+Projeto Visit Manager, multi-empresa, com página /admin/empresa para definições.
+Já existe uma tab “IA & Áudio” onde vivem as flags funcionais de IA (ativar resumos, sugestões, etc.) e vamos passar a ter também configuração de chave da OpenAI por empresa (IA-01).
+
+Quero preparar uma página/tab central chamada “APIs & Keys” (ou “Integrações & APIs”) para concentrar, no futuro, todas as integrações externas (IA, Microsoft, Google, Email, Mapas, etc.).
+
+Nesta fase INTEG-01 quero apenas:
+
+Criar a tab/estrutura de UI.
+
+Mostrar um resumo da configuração de IA por empresa (lido das settings).
+
+Ter placeholders bonitos para Microsoft, Google, Email, Mapas.
+
+Sem implementar ainda lógica de OAuth ou chamadas às APIs externas (além de ler settings).
+
+Tarefas
+1. Adicionar tab “APIs & Keys” em /admin/empresa
+
+Abre o componente da página de definições da empresa (ex.: AdminEmpresaPage, EmpresaSettingsPage ou semelhante).
+
+Na estrutura de tabs (onde já existe “Empresa & Equipa”, “Visitas & Tarefas”, “IA & Áudio”, etc.):
+
+Adiciona uma nova tab:
+
+ID: "apis-keys" (ou "integrations", mas usa um só nome de forma consistente).
+
+Label visível: “APIs & Keys” (ou “Integrações & APIs”, mantém o estilo do resto da UI).
+
+Cria o conteúdo desta tab num componente específico (ex.: EmpresaApisKeysTab), para manter o código organizado.
+
+2. Ler settings de IA para resumo
+
+Usa o mesmo hook/forma que já é utilizada para obter os dados da empresa e as settings (provavelmente já tens algo como useEmpresa / useEmpresaSettings).
+
+Garante que tens acesso ao bloco ia das settings, com campos:
+
+aiEnabled?: boolean
+
+aiKeyMode?: "global" | "own"
+
+hasOwnOpenAIApiKey?: boolean
+
+Dentro da tab “APIs & Keys”, secção “Inteligência Artificial (IA)”:
+
+Mostra um pequeno card/resumo com:
+
+Estado:
+
+Se aiEnabled === true: “IA ativa para esta empresa”.
+
+Se aiEnabled === false ou undefined: “IA desativada para esta empresa”.
+
+Modo de chave:
+
+Se aiKeyMode === "own" e hasOwnOpenAIApiKey === true:
+“Modo: Chave própria da empresa (chave configurada)”.
+
+Se aiKeyMode === "own" e hasOwnOpenAIApiKey === false:
+“Modo: Chave própria da empresa (nenhuma chave configurada)”.
+
+Qualquer outro caso:
+“Modo: Chave global do Visit Manager”.
+
+Um botão/link:
+
+Texto: “Gerir IA & Áudio”
+
+Ação: navegar para a tab “IA & Áudio” da própria página (/admin/empresa), reutilizando o sistema interno de tabs (por ex., setActiveTab("ia-audio") ou o ID que estiver em uso).
+
+3. Secções placeholder para outras integrações
+
+Ainda dentro da tab “APIs & Keys”, cria cards simples (usando o mesmo design dos outros cards de definições) para:
+
+Microsoft 365
+
+Título: “Microsoft 365 (Planner, Calendar, Contacts)”
+
+Conteúdo:
+
+Texto descritivo curto, por exemplo:
+
+“Integrações previstas com Outlook Calendar, Planner e Contactos via Microsoft Graph.”
+
+“Nesta fase a integração ainda não está configurada.”
+
+Um badge/label de estado: “Planeado”.
+
+(Opcional) Um botão desativado ou marcado como “Em breve”.
+
+Google Workspace
+
+Título: “Google (Calendar, Contacts, Drive)”
+
+Texto semelhante: integração planeada com Google Calendar, Contacts, Drive.
+
+Estado: “Planeado”.
+
+Email & Notificações
+
+Título: “Email & Notificações”
+
+Texto: futuro suporte a SMTP próprio, provedores de email (SendGrid/Mailgun/Postmark) e possivelmente SMS/WhatsApp.
+
+Estado: “Planeado”.
+
+Mapas & Localização
+
+Título: “Mapas & Localização”
+
+Texto: futuro suporte a configuração de provider de mapas/geocoding (Google Maps, Mapbox, etc.).
+
+Estado: “Planeado”.
+
+(Opcional) Storage & Webhooks
+
+Título: “Storage & Webhooks”
+
+Texto: “Planeado: configuração de storage externo (S3/Azure/etc.) e webhooks para integração com sistemas internos da empresa.”
+
+Cada card pode ser um Card shadcn/ui ou equivalente, com título, pequena descrição, e um Badge ou span com o estado (“Ativo”, “Desativado”, “Planeado”).
+
+4. Escopo e segurança
+
+Não expor nenhuma chave real nesta tab nesta fase.
+
+Apenas ler as settings de IA (ia) para mostrar o resumo.
+
+Não alterar ainda nenhum comportamento das integrações existentes (IA continua a ser gerida funcionalmente na tab “IA & Áudio”, e a lógica de escolha de key só será alterada em IA-02).
+
+Critérios de aceitação
+
+/admin/empresa tem uma nova tab “APIs & Keys” (ou “Integrações & APIs”), acessível e consistente com o resto da navegação.
+
+Nesta tab:
+
+Existe um card de resumo da configuração de IA por empresa, mostrando:
+
+Se a IA está ativa ou desativada.
+
+Qual o modo de chave (global vs própria) e se existe chave própria configurada.
+
+Um botão “Gerir IA & Áudio” que leva corretamente à tab de “IA & Áudio”.
+
+Existem cards placeholders para:
+
+Microsoft 365
+
+Google
+
+Email & Notificações
+
+Mapas & Localização
+
+(Opcional) Storage & Webhooks
+
+Esses cards mostram claramente que as integrações estão “Planeadas” e ainda não configuradas.
+
+Não há exposição de valores de API keys em texto claro no frontend.
+
+Nenhuma funcionalidade existente é quebrada por esta alteração.
