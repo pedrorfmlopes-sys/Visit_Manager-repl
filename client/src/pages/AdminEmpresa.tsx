@@ -14,8 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Empresa, User, Marca } from "@shared/schema";
 import { Upload, Building2, Bell, Zap, Lightbulb, MapPin, Calendar, PlugZap } from "lucide-react";
-import { useRef, useState, useMemo, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useRef, useState } from "react";
 import AdminEntidadeTipos from "@/pages/AdminEntidadeTipos";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminMarcas from "@/pages/AdminMarcas";
@@ -50,24 +49,7 @@ export default function AdminEmpresa() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [location, setLocation] = useLocation();
-
-  // ✅ USAR URL COMO FONTE ÚNICA DE VERDADE COM useMemo
-  const currentSection = useMemo(() => {
-    const urlParams = new URLSearchParams(location.split("?")[1] || "");
-    const sectionFromQuery = urlParams.get("section");
-    
-    // Validar que é uma secção válida
-    if (sectionFromQuery && SECTIONS.some(s => s.id === sectionFromQuery)) {
-      return sectionFromQuery as SectionId;
-    }
-    return "empresa" as SectionId;
-  }, [location]);
-
-  // Debug
-  useEffect(() => {
-    console.log("🔍 AdminEmpresa DEBUG - currentSection:", currentSection, "location:", location);
-  }, [currentSection, location]);
+  const [activeSection, setActiveSection] = useState<SectionId>("empresa");
 
   const { data: empresa, isLoading, error } = useQuery<Empresa>({
     queryKey: ["/api/admin/empresa"],
@@ -182,12 +164,12 @@ export default function AdminEmpresa() {
   const currentLogo = logoPreview || empresa?.logoUrl;
 
   const handleSectionClick = (sectionId: SectionId) => {
-    setLocation(`/admin/empresa?section=${sectionId}`);
+    setActiveSection(sectionId);
   };
 
-  // ✅ RENDERIZAÇÃO CONDICIONAL - SWITCH STATEMENT
-  const renderCurrentSection = () => {
-    switch (currentSection) {
+  // ✅ RENDERIZAÇÃO CONDICIONAL - APENAS UMA SECÇÃO ATIVA
+  const renderActiveSection = () => {
+    switch (activeSection) {
       case "empresa":
         return renderEmpresaSection();
       case "visitas":
@@ -1040,7 +1022,7 @@ export default function AdminEmpresa() {
                 <div className="flex gap-2 pb-4 border-b overflow-x-auto">
                   {SECTIONS.map((section) => {
                     const Icon = section.icon;
-                    const isActive = currentSection === section.id;
+                    const isActive = activeSection === section.id;
                     return (
                       <button
                         key={section.id}
@@ -1061,7 +1043,7 @@ export default function AdminEmpresa() {
                 </div>
 
                 {/* ✅ RENDER ONLY ACTIVE SECTION (SWITCH STATEMENT) */}
-                {renderCurrentSection()}
+                {renderActiveSection()}
 
                 {/* Save Button */}
                 <Button

@@ -1,0 +1,184 @@
+🔧 FASE 33.RESET – Reimplementar as secções do Centro de Configurações de forma simples (useState + render condicional)
+
+Situação actual (do lado do utilizador):
+
+Em /admin/empresa:
+
+A barra de secções no topo mostra:
+
+“Empresa & Equipa”, “Visitas & Tarefas”, “IA & Produtividade”, “Alertas & Relatórios”, “Integrações”.
+
+A URL chega a mudar (?section=visitas, etc.).
+
+MAS:
+
+O conteúdo visível é sempre o de “Empresa & Equipa”.
+
+As outras secções nunca chegam a aparecer.
+
+Ou seja, a lógica de currentSection / URL ficou demasiado complexa e não está a funcionar.
+
+🎯 Objectivo desta fase:
+
+Ignorar completamente o query param section (por agora).
+
+Implementar um sistema de secções simples, local, usando apenas useState:
+
+clicar numa secção → altera activeSection → muda o conteúdo renderizado.
+
+apenas uma secção visível de cada vez.
+
+1. Limpar qualquer dependência de URL para as secções
+
+No componente AdminEmpresa.tsx:
+
+Remove toda a lógica relacionada com:
+
+leitura de section da URL,
+
+useLocation, navigate usados apenas para secções,
+
+useMemo/useEffect que sincronizam currentSection com a localização.
+
+Remove também qualquer chamada a navigate("/admin/empresa?section=...") que seja apenas para mudar secção.
+
+O Centro de Configurações deve passar a funcionar mesmo que a URL seja sempre /admin/empresa.
+
+2. Criar um estado local simples activeSection
+
+No topo de AdminEmpresa.tsx, define:
+
+type SectionId = "empresa" | "visitas" | "ia" | "alertas" | "integracoes";
+
+const SECTIONS: { id: SectionId; label: string }[] = [
+  { id: "empresa", label: "Empresa & Equipa" },
+  { id: "visitas", label: "Visitas & Tarefas" },
+  { id: "ia", label: "IA & Produtividade" },
+  { id: "alertas", label: "Alertas & Relatórios" },
+  { id: "integracoes", label: "Integrações" },
+];
+
+
+Dentro do componente:
+
+const [activeSection, setActiveSection] = useState<SectionId>("empresa");
+
+
+A barra de secções no topo deve usar apenas este estado:
+
+<div className="flex gap-2 pb-4 border-b overflow-x-auto">
+  {SECTIONS.map((section) => {
+    const isActive = activeSection === section.id;
+    return (
+      <button
+        key={section.id}
+        type="button"
+        onClick={() => setActiveSection(section.id)}
+        className={isActive ? "classes-activo" : "classes-normal"}
+      >
+        {section.label}
+      </button>
+    );
+  })}
+</div>
+
+
+Importante: type="button" para NÃO fazer submit do form.
+
+3. Renderizar apenas a secção activa
+
+Cria uma função para decidir o conteúdo com base em activeSection:
+
+function renderActiveSection() {
+  switch (activeSection) {
+    case "empresa":
+      return <EmpresaSectionTabs /* Geral / Marcas & Entidades / Utilizadores */ />;
+    case "visitas":
+      return <VisitasSectionTabs /* Comportamento / Filtros & Listas */ />;
+    case "ia":
+      return <IaSectionTabs /* IA / Áudio */ />;
+    case "alertas":
+      return <AlertasSectionTabs /* AlertRibbon / Badges / Relatórios */ />;
+    case "integracoes":
+      return <IntegracoesSectionTabs /* Microsoft / Google / Outros */ />;
+    default:
+      return <EmpresaSectionTabs />;
+  }
+}
+
+
+No return do componente, garante que:
+
+NÃO existe nenhuma outra renderização directa das secções.
+
+O conteúdo das secções é apenas:
+
+<Form {...form}>
+  <form onSubmit={form.handleSubmit(onSubmit)}>
+    {renderActiveSection()}
+    <Button type="submit">Guardar Configurações</Button>
+  </form>
+</Form>
+
+4. Ajustar o menu ⚙️ Definições (rodapé)
+
+No menu que abre quando clico em ⚙️ Definições:
+
+Mantém a navegação para /admin/empresa sem query:
+
+“Configurações da Empresa & Equipa” → /admin/empresa
+
+“Visitas & Tarefas” → /admin/empresa mas, para já, não precisas de mudar secção automaticamente.
+
+Se quiseres ir mais longe:
+
+podes passar um estado via navigate("/admin/empresa", { state: { initialSection: "visitas" } })
+e usá-lo para inicializar activeSection, MAS isto é opcional nesta fase.
+
+Nesta FASE 33.RESET, o requisito mínimo é:
+
+entrar em /admin/empresa → ver “Empresa & Equipa” activo,
+
+clicar nas outras secções → activeSection muda e o conteúdo muda.
+
+5. Testes obrigatórios
+
+Ir a /admin/empresa:
+
+Ver secção “Empresa & Equipa”.
+
+Não ver conteúdo de Visitas/IA/Alertas/Integrações (mesmo fazendo scroll até ao fundo).
+
+Clicar em:
+
+“Visitas & Tarefas” → o conteúdo muda para essa secção.
+
+“IA & Produtividade” → muda para IA.
+
+“Alertas & Relatórios” → muda para alertas.
+
+“Integrações” → muda para integrações.
+
+Confirmar:
+
+Não aparece “Configuração guardada com sucesso” quando clico nas secções.
+
+O botão “Guardar Configurações” continua a funcionar normalmente (submit).
+
+6. Relatório desta fase
+
+No relatório, descreve:
+
+Que removeste a dependência da URL para as secções.
+
+Como ficou o estado activeSection e o switch de renderActiveSection().
+
+Resultado dos testes do ponto 5 (em especial: agora só uma secção é visível de cada vez, e as tabs trocam correctamente).
+
+🎯 Objetivo final:
+
+Secções do Centro de Configurações simples e estáveis, com useState local.
+
+Clicar em cada secção muda realmente o conteúdo.
+
+Nada de multi-secção em simultâneo nem submits indesejados.
