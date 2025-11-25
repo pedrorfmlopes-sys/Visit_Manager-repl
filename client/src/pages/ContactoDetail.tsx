@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, User, Phone, Mail, Building2, Edit, Share2, MessageCircle, Link as LinkIcon, Copy, FileText, Globe, MapPin, Linkedin, Instagram, Facebook, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, User, Phone, Mail, Building2, Edit, Share2, MessageCircle, Link as LinkIcon, Copy, FileText, Globe, MapPin, Linkedin, Instagram, Facebook, Sparkles, Trash2, Calendar } from "lucide-react";
 import { SiX } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +13,10 @@ import { QuickActionButton } from "@/components/QuickActionButton";
 import { formatContactForSharing } from "@/lib/shareFormatters";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { ContactoWithRelations } from "@shared/schema";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { subDays, subMonths, startOfYear, endOfYear, format } from "date-fns";
+import { pt } from "date-fns/locale";
+import type { ContactoWithRelations, VisitaWithRelations } from "@shared/schema";
 
 export default function ContactoDetail() {
   const [, params] = useRoute("/contactos/:id/detalhes");
@@ -23,11 +26,51 @@ export default function ContactoDetail() {
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  // FASE 5: Filter period for visitas
+  const [periodFilter, setPeriodFilter] = useState<"30" | "90" | "180" | "365" | "all">("90");
   
   const { isOnline, shareViaWhatsApp, shareViaEmail, copyToClipboard, copyLink } = useShareActions();
 
   const { data: contacto, isLoading } = useQuery<ContactoWithRelations>({
     queryKey: ["/api/contactos", contactoId],
+    enabled: !!contactoId,
+  });
+
+  // FASE 5: Get all visitas filtered by this contacto and date range
+  const getDateRange = () => {
+    const now = new Date();
+    switch (periodFilter) {
+      case "30":
+        return { from: subDays(now, 30), to: now };
+      case "90":
+        return { from: subDays(now, 90), to: now };
+      case "180":
+        return { from: subDays(now, 180), to: now };
+      case "365":
+        return { from: subDays(now, 365), to: now };
+      case "all":
+        return { from: new Date(2000, 0, 1), to: now };
+      default:
+        return { from: subDays(now, 90), to: now };
+    }
+  };
+
+  const dateRange = getDateRange();
+
+  const { data: visitasDoContacto = [] } = useQuery<VisitaWithRelations[]>({
+    queryKey: ["/api/visitas", { contactoId, from: dateRange.from.toISOString(), to: dateRange.to.toISOString() }],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        contactoId: contactoId || "",
+        from: dateRange.from.toISOString(),
+        to: dateRange.to.toISOString(),
+      });
+      const response = await fetch(`/api/visitas?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to fetch visitas");
+      return response.json();
+    },
     enabled: !!contactoId,
   });
 
@@ -403,6 +446,67 @@ export default function ContactoDetail() {
                 testId="button-quick-generate-email"
               />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* FASE 5: Visitas em que participou */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Visitas em que participou
+              </CardTitle>
+              <Select value={periodFilter} onValueChange={(v: any) => setPeriodFilter(v)} data-testid="select-period-filter">
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="30">Últimos 30 dias</SelectItem>
+                  <SelectItem value="90">Últimos 90 dias</SelectItem>
+                  <SelectItem value="180">Últimos 6 meses</SelectItem>
+                  <SelectItem value="365">Último ano</SelectItem>
+                  <SelectItem value="all">Todas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {visitasDoContacto.length > 0 ? (
+              <div className="space-y-2">
+                {visitasDoContacto.map((visita) => (
+                  <div
+                    key={visita.id}
+                    className="p-3 border rounded-md bg-muted/30 hover-elevate cursor-pointer"
+                    onClick={() => setLocation(`/visitas/${visita.id}`)}
+                    data-testid={`row-visita-${visita.id}`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm">
+                          {visita.gabinete?.nome || visita.entidade?.nome}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {format(new Date(visita.dataVisita), "dd MMM yyyy 'às' HH:mm", { locale: pt })}
+                        </div>
+                        {visita.notas && (
+                          <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                            {visita.notas.replace(/<[^>]*>/g, '')}
+                          </div>
+                        )}
+                      </div>
+                      <Badge variant="outline" className="text-xs ml-2 flex-shrink-0">
+                        Ver
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Este contacto ainda não está associado a nenhuma visita neste período
+              </p>
+            )}
           </CardContent>
         </Card>
       </main>
