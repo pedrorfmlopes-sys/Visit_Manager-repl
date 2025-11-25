@@ -578,6 +578,7 @@ export const visitasRelations = relations(visitas, ({ one, many }) => ({
   }),
   marcas: many(visitasMarcas),
   audio: many(visitasAudio),
+  contactos: many(visitasContactos), // FASE 1: Multiple contacts per visit
 }));
 
 export const insertVisitaSchema = createInsertSchema(visitas).omit({
@@ -663,6 +664,40 @@ export const insertVisitasAudioSchema = createInsertSchema(visitasAudio).omit({
 
 export type InsertVisitasAudio = z.infer<typeof insertVisitasAudioSchema>;
 export type VisitasAudio = typeof visitasAudio.$inferSelect;
+
+// FASE 1: Visitas Contactos (relationship table for multiple contacts per visit)
+export const visitasContactos = pgTable("visitas_contactos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: 'cascade' }),
+  visitaId: varchar("visita_id").notNull().references(() => visitas.id, { onDelete: 'cascade' }),
+  contactoId: varchar("contacto_id").notNull().references(() => contactos.id, { onDelete: 'cascade' }),
+  role: text("role"), // Optional: "Decisor", "Técnico", etc.
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const visitasContactosRelations = relations(visitasContactos, ({ one }) => ({
+  empresa: one(empresas, {
+    fields: [visitasContactos.empresaId],
+    references: [empresas.id],
+  }),
+  visita: one(visitas, {
+    fields: [visitasContactos.visitaId],
+    references: [visitas.id],
+  }),
+  contacto: one(contactos, {
+    fields: [visitasContactos.contactoId],
+    references: [contactos.id],
+  }),
+}));
+
+export const insertVisitasContactosSchema = createInsertSchema(visitasContactos).omit({
+  id: true,
+  empresaId: true,
+  createdAt: true,
+});
+
+export type InsertVisitasContactos = z.infer<typeof insertVisitasContactosSchema>;
+export type VisitasContactos = typeof visitasContactos.$inferSelect;
 
 // Tarefas (Tasks) table
 export const tarefas = pgTable("tarefas", {

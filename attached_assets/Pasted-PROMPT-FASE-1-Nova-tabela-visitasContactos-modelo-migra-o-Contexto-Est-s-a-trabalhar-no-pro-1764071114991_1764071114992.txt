@@ -1,0 +1,79 @@
+PROMPT FASE 1 – Nova tabela visitasContactos (modelo + migração)
+
+Contexto:
+Estás a trabalhar no projeto Visit Manager (Node + Express + TypeScript, Drizzle ORM + Postgres, React no frontend). A app é multi-empresa (todas as tabelas principais têm empresaId) e usa Drizzle em /shared/schema.ts.
+
+Objetivo desta fase:
+Preparar o modelo de dados para que uma visita possa ter vários contactos através de uma tabela de junção visitasContactos, sem partir nada do que já existe. Nesta fase é apenas modelo + migração; a API e o frontend vêm em fases seguintes.
+
+Tarefas
+
+Criar tabela visitasContactos no schema Drizzle
+
+Edita o ficheiro de schema partilhado (por ex. shared/schema.ts ou equivalente) e adiciona uma tabela nova chamada algo como visitasContactos (nome SQL: visitas_contactos).
+
+Campos mínimos:
+
+id – serial("id").primaryKey()
+
+empresaId – uuid("empresa_id").notNull().references(() => empresas.id)
+
+visitaId – uuid("visita_id").notNull().references(() => visitas.id, { onDelete: "cascade" })
+
+contactoId – uuid("contacto_id").notNull().references(() => contactos.id, { onDelete: "cascade" })
+
+role – text("role") (opcional, para no futuro indicar “Decisor”, “Técnico”, etc. – por agora pode ser ignorado pelo resto do código)
+
+createdAt – timestamp("created_at").defaultNow().notNull()
+
+Garante que:
+
+A tabela respeita o padrão multi-empresa (empresaId ligado à empresa da visita).
+
+Exportas os tipos TypeScript habituais (ex.: VisitasContactos ou similar) seguindo o padrão das outras tabelas.
+
+Criar migração para a nova tabela
+
+Cria uma migração Drizzle que:
+
+Cria a nova tabela visitas_contactos com a estrutura acima.
+
+Copia os dados existentes de visitas.contactoId para a nova tabela:
+
+Para cada visita com contactoId não nulo:
+
+Inserir uma linha em visitas_contactos com:
+
+empresa_id = visitas.empresa_id
+
+visita_id = visitas.id
+
+contacto_id = visitas.contacto_id
+
+created_at = visitas.created_at (ou now(), o que for mais simples)
+
+Nesta fase NÃO apagues ainda a coluna antiga visitas.contacto_id. Vamos usá-la como compatibilidade temporária até o código ser todo migrado.
+
+Garantir que nada mais é alterado nesta fase
+
+Não alteres ainda:
+
+Endpoints de API.
+
+Código de storage.
+
+Frontend.
+
+Apenas modelo e migração.
+
+Critérios de aceitação
+
+O projeto compila sem erros de TypeScript.
+
+As migrações executam com sucesso numa base de dados existente:
+
+A tabela visitas_contactos é criada.
+
+Para visitas que tinham contactoId, passam a existir linhas correspondentes em visitas_contactos.
+
+Nenhuma rota ou teste actual deixa de funcionar por causa desta alteração (comportamento da API deve ficar igual).
