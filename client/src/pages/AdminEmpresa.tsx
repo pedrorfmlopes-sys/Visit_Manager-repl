@@ -10,11 +10,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Empresa, User, Marca } from "@shared/schema";
-import { Upload, Building2, Bell, Zap, Lightbulb, MapPin, Calendar, PlugZap, Code, Mail, Map, Cloud, Webhook } from "lucide-react";
-import { useRef, useState } from "react";
+import { Upload, Building2, Bell, Zap, Lightbulb, MapPin, Calendar, PlugZap, Code, Mail, Map, Cloud, Webhook, ExternalLink, Loader2 } from "lucide-react";
+import { useRef, useState, useEffect } from "react";
 import AdminEntidadeTipos from "@/pages/AdminEntidadeTipos";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminMarcas from "@/pages/AdminMarcas";
@@ -55,10 +56,57 @@ export default function AdminEmpresa() {
   // FASE 31-IA-01: Manage OpenAI API Key UI state
   const [showOpenAIKeyInput, setShowOpenAIKeyInput] = useState(false);
   const [openAIKeyValue, setOpenAIKeyValue] = useState("");
+  // FASE MS-01B: Microsoft OAuth UI state
+  const [showMicrosoftDialog, setShowMicrosoftDialog] = useState(false);
+  const [microsoftConnecting, setMicrosoftConnecting] = useState(false);
+  const [microsoftStatus, setMicrosoftStatus] = useState<{ connected: boolean; email?: string } | null>(null);
 
   const { data: empresa, isLoading, error } = useQuery<Empresa>({
     queryKey: ["/api/admin/empresa"],
   });
+
+  // FASE MS-01B: Load Microsoft connection status on mount
+  useEffect(() => {
+    const loadMicrosoftStatus = async () => {
+      try {
+        const response = await fetch("/api/integrations/microsoft/status");
+        if (response.ok) {
+          const data = await response.json();
+          setMicrosoftStatus(data);
+        }
+      } catch (error) {
+        console.error("Error loading Microsoft status:", error);
+      }
+    };
+    loadMicrosoftStatus();
+  }, []);
+
+  // FASE MS-01B: Handle Microsoft login flow
+  const handleMicrosoftLogin = async () => {
+    try {
+      setMicrosoftConnecting(true);
+      const response = await fetch("/api/integrations/microsoft/login", { method: "POST" });
+      if (response.ok) {
+        const { loginUrl } = await response.json();
+        // Redirect to Microsoft login
+        window.location.href = loginUrl;
+      } else {
+        toast({
+          title: "Erro ao conectar com Microsoft",
+          description: "Falha ao iniciar o fluxo de login",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro ao conectar com Microsoft",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setMicrosoftConnecting(false);
+    }
+  };
 
   const form = useForm<UpdateEmpresaForm>({
     resolver: zodResolver(updateEmpresaSchema),
@@ -1227,12 +1275,47 @@ export default function AdminEmpresa() {
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                Futuras integrações com Outlook Calendar, Planner e Contactos para sincronização bidireccional de dados.
+                Integração com Outlook Calendar, Planner e Contactos para sincronização bidireccional de dados.
               </p>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium">Estado</span>
-                <Badge variant="secondary">Planeado</Badge>
+                <Badge variant={microsoftStatus?.connected ? "default" : "secondary"}>
+                  {microsoftStatus?.connected ? "Conectado" : "Desconectado"}
+                </Badge>
               </div>
+              {microsoftStatus?.connected && microsoftStatus?.email && (
+                <div className="bg-green-50 dark:bg-green-950/20 p-3 rounded border border-green-200 dark:border-green-900/30">
+                  <p className="text-xs text-muted-foreground">
+                    Conectado como: <span className="font-medium text-foreground">{microsoftStatus.email}</span>
+                  </p>
+                </div>
+              )}
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setShowMicrosoftDialog(true)}
+                disabled={microsoftConnecting}
+                variant={microsoftStatus?.connected ? "outline" : "default"}
+                className="gap-2"
+                data-testid="button-microsoft-connect"
+              >
+                {microsoftConnecting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    A conectar...
+                  </>
+                ) : microsoftStatus?.connected ? (
+                  <>
+                    <ExternalLink className="w-4 h-4" />
+                    Gerir Conexão
+                  </>
+                ) : (
+                  <>
+                    <ExternalLink className="w-4 h-4" />
+                    Conectar Microsoft
+                  </>
+                )}
+              </Button>
             </CardContent>
           </Card>
 
@@ -1373,6 +1456,78 @@ export default function AdminEmpresa() {
           </CardContent>
         </Card>
       </div>
+
+      {/* FASE MS-01B: Microsoft Login Dialog */}
+      <Dialog open={showMicrosoftDialog} onOpenChange={setShowMicrosoftDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Conectar Microsoft 365</DialogTitle>
+            <DialogDescription>
+              Conecte a sua conta Microsoft para integração com Outlook Calendar, Planner e Contactos
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900/30 space-y-3">
+              <p className="text-sm font-medium text-foreground">O que vai acontecer:</p>
+              <ul className="text-xs text-muted-foreground space-y-2">
+                <li className="flex gap-2">
+                  <span className="font-semibold">1.</span>
+                  <span>Clique no botão abaixo para iniciar o login seguro da Microsoft</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="font-semibold">2.</span>
+                  <span>Será redirecionado para a página de login da Microsoft</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="font-semibold">3.</span>
+                  <span>Autorize a aplicação a aceder aos seus dados</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="font-semibold">4.</span>
+                  <span>Será redirecionado de volta para completar a configuração</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="space-y-3 pt-4">
+              <Button
+                onClick={handleMicrosoftLogin}
+                disabled={microsoftConnecting}
+                className="w-full gap-2"
+                size="lg"
+                data-testid="button-microsoft-login"
+              >
+                {microsoftConnecting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    A conectar...
+                  </>
+                ) : (
+                  <>
+                    <PlugZap className="w-4 h-4" />
+                    Iniciar Login Microsoft
+                  </>
+                )}
+              </Button>
+
+              <Button
+                onClick={() => setShowMicrosoftDialog(false)}
+                variant="outline"
+                className="w-full"
+                disabled={microsoftConnecting}
+                data-testid="button-microsoft-cancel"
+              >
+                Cancelar
+              </Button>
+            </div>
+
+            <p className="text-xs text-muted-foreground text-center">
+              A sua segurança é importante. Usamos OAuth 2.0 para conexões seguras.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
