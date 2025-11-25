@@ -31,6 +31,7 @@ PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities in
 -   **Configurable Entity Types**: Company-specific entity type management with color coding and filtering.
 -   **Multi-Contact Support for Visits**: Allows associating multiple contacts per visit, with a company-level toggle for single vs. multi-contact mode.
 -   **Company-level AI Configuration**: Supports global OpenAI API key usage or "Bring Your Own Key" (BYOK) mode for advanced companies, with secure storage of API keys.
+-   **Microsoft 365 OAuth Integration**: OAuth 2.0 integration for secure Microsoft account connection with state-based CSRF protection, token storage, and connection status tracking.
 
 ## External Dependencies
 
