@@ -35,6 +35,7 @@ const visitaFormSchema = insertVisitaSchema.extend({
   entidadeId: z.string().min(1, "Selecione uma entidade"),
   dataVisita: z.date(),
   marcasIds: z.array(z.string()).optional(),
+  contactosIds: z.array(z.string()).optional(), // FASE 3: Multiple contacts per visit
 });
 
 type VisitaFormData = z.infer<typeof visitaFormSchema>;
@@ -88,6 +89,9 @@ export default function VisitaForm() {
   
   // Marcas search state (FASE 5 UI update)
   const [marcasSearch, setMarcasSearch] = useState("");
+  
+  // FASE 3: Contactos search state
+  const [contactosSearch, setContactosSearch] = useState("");
   
   // User context for multi-agent system
   const { data: currentUser } = useCurrentUser();
@@ -147,34 +151,37 @@ export default function VisitaForm() {
     resolver: zodResolver(visitaFormSchema),
     defaultValues: isEdit && existingVisita ? {
       entidadeId: existingVisita.entidadeId || "",
-      contactoId: existingVisita.contactoId || "",
       dataVisita: new Date(existingVisita.dataVisita),
       notas: existingVisita.notas || "",
       marcasEntregues: existingVisita.marcasEntregues || [],
       marcasIds: existingVisita.visitasMarcas?.map((vm: any) => vm.marca.id) || [],
+      // FASE 3: Load contactosPresentes from API response
+      contactosIds: existingVisita.contactosPresentes?.map((c: any) => c.id) || [],
       proximaVisita: existingVisita.proximaVisita ? new Date(existingVisita.proximaVisita) : undefined,
     } : {
       entidadeId: prefillData.entidadeId || "",
-      contactoId: prefillData.contactoId || "",
       dataVisita: prefillData.dataVisita || new Date(),
       notas: notasComResumo,
       marcasEntregues: [],
       marcasIds: [],
+      contactosIds: [],
       proximaVisita: undefined,
     },
     values: isEdit && existingVisita ? {
       entidadeId: existingVisita.entidadeId || "",
-      contactoId: existingVisita.contactoId || "",
       dataVisita: new Date(existingVisita.dataVisita),
       notas: existingVisita.notas || "",
       marcasEntregues: existingVisita.marcasEntregues || [],
       marcasIds: existingVisita.visitasMarcas?.map((vm: any) => vm.marca.id) || [],
+      // FASE 3: Load contactosPresentes from API response
+      contactosIds: existingVisita.contactosPresentes?.map((c: any) => c.id) || [],
       proximaVisita: existingVisita.proximaVisita ? new Date(existingVisita.proximaVisita) : undefined,
     } : undefined,
   });
 
   const selectedEntidadeId = form.watch("entidadeId");
   const selectedMarcasIds = form.watch("marcasIds") || [];
+  const selectedContactosIds = form.watch("contactosIds") || [];
   const filteredContactos = contactos?.filter(c => c.entidadeId === selectedEntidadeId);
 
   const updateMutation = useMutation({
@@ -182,11 +189,15 @@ export default function VisitaForm() {
       // Convert FormData to JSON for PATCH (unlike POST which uses FormData for file uploads)
       const jsonData: any = {
         entidadeId: formData.get("entidadeId"),
-        contactoId: formData.get("contactoId") || null,
         dataVisita: formData.get("dataVisita"),
         notas: formData.get("notas") || null,
         marcasEntregues: formData.get("marcasEntregues") ? JSON.parse(formData.get("marcasEntregues") as string) : [],
       };
+      
+      // FASE 3: Add contactosIds if provided
+      if (formData.get("contactosIds")) {
+        jsonData.contactosIds = JSON.parse(formData.get("contactosIds") as string);
+      }
       
       const response = await fetch(`/api/visitas/${visitaId}`, {
         method: "PATCH",
@@ -394,7 +405,6 @@ export default function VisitaForm() {
 
       const visitaData = {
         entidadeId: data.entidadeId,
-        contactoId: data.contactoId || null,
         dataVisita: data.dataVisita.toISOString(),
         notas: data.notas || null,
         proximaVisita: data.proximaVisita?.toISOString() || null,
@@ -405,6 +415,7 @@ export default function VisitaForm() {
         createdByUserId: createdByUserId || null,
         assignedUserId: assignedUserId || null,
         visitaAnteriorId: prefillData.visitaAnteriorId || null,
+        contactosIds: data.contactosIds || [],
       };
 
       await syncManager.queueVisitaCreation(visitaData);
@@ -422,12 +433,13 @@ export default function VisitaForm() {
     const formData = new FormData();
     
     formData.append("entidadeId", data.entidadeId);
-    if (data.contactoId) formData.append("contactoId", data.contactoId);
     formData.append("dataVisita", data.dataVisita.toISOString());
     if (data.notas) formData.append("notas", data.notas);
     if (data.proximaVisita) formData.append("proximaVisita", data.proximaVisita.toISOString());
     if (data.marcasEntregues) formData.append("marcasEntregues", JSON.stringify(data.marcasEntregues));
     if (data.marcasIds && data.marcasIds.length > 0) formData.append("marcasIds", JSON.stringify(data.marcasIds));
+    // FASE 3: Send contactosIds array instead of single contactoId
+    if (data.contactosIds && data.contactosIds.length > 0) formData.append("contactosIds", JSON.stringify(data.contactosIds));
     
     // FASE 15: Add visitaAnteriorId if this is a follow-up visit
     if (prefillData.visitaAnteriorId) {
@@ -634,30 +646,105 @@ export default function VisitaForm() {
               )}
             />
 
+            {/* FASE 3: Multiple contacts selector replacing single contactoId */}
             <FormField
               control={form.control}
-              name="contactoId"
+              name="contactosIds"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Contacto</FormLabel>
-                  <Select 
-                    onValueChange={field.onChange} 
-                    value={field.value || ""}
-                    disabled={!selectedEntidadeId}
-                  >
-                    <FormControl>
-                      <SelectTrigger className="h-12" data-testid="select-contacto">
-                        <SelectValue placeholder={selectedEntidadeId ? "Selecione o contacto" : "Selecione primeiro a entidade"} />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {filteredContactos?.map((contacto) => (
-                        <SelectItem key={contacto.id} value={contacto.id}>
-                          {contacto.nome} {contacto.funcao && `- ${contacto.funcao}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>Contactos presentes na visita</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between"
+                        disabled={!selectedEntidadeId}
+                        data-testid="button-contactos-dropdown"
+                      >
+                        {field.value?.length
+                          ? `${field.value.length} contacto${field.value.length === 1 ? "" : "s"} selecionado${field.value.length === 1 ? "" : "s"}`
+                          : selectedEntidadeId ? "Seleciona um ou mais contactos" : "Selecione primeiro a entidade"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0" side="bottom" align="start">
+                      {selectedEntidadeId && (
+                        <>
+                          <div className="p-3 border-b">
+                            <Input
+                              placeholder="Pesquisar contactos..."
+                              value={contactosSearch}
+                              onChange={(e) => setContactosSearch(e.target.value)}
+                              className="h-8"
+                              data-testid="input-contactos-search"
+                            />
+                          </div>
+                          <div className="max-h-64 overflow-y-auto">
+                            {filteredContactos && filteredContactos.length === 0 ? (
+                              <div className="px-3 py-2 text-sm text-muted-foreground">
+                                Nenhum contacto disponível para esta entidade
+                              </div>
+                            ) : (
+                              filteredContactos
+                                ?.filter((contacto) =>
+                                  contacto.nome.toLowerCase().includes(contactosSearch.toLowerCase())
+                                )
+                                .map((contacto) => {
+                                  const isSelected = field.value?.includes(contacto.id);
+                                  return (
+                                    <div
+                                      key={contacto.id}
+                                      className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted"
+                                      onClick={() => {
+                                        const newIds = isSelected
+                                          ? (field.value || []).filter((id) => id !== contacto.id)
+                                          : [...(field.value || []), contacto.id];
+                                        field.onChange(newIds);
+                                      }}
+                                      data-testid={`button-contacto-${contacto.id}`}
+                                    >
+                                      <Checkbox
+                                        checked={isSelected}
+                                        onCheckedChange={() => {}}
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                      <div className="flex-1 min-w-0">
+                                        <div className="text-sm font-medium">{contacto.nome}</div>
+                                        {contacto.funcao && <div className="text-xs text-muted-foreground">{contacto.funcao}</div>}
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+
+                  {/* Show selected contactos as small badges below */}
+                  {field.value && field.value.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {filteredContactos
+                        ?.filter((c) => field.value?.includes(c.id))
+                        .map((c) => (
+                          <Badge
+                            key={c.id}
+                            variant="secondary"
+                            className="text-xs"
+                            data-testid={`badge-contacto-selected-${c.id}`}
+                          >
+                            {c.nome}
+                          </Badge>
+                        ))}
+                    </div>
+                  )}
+
+                  <FormDescription className="text-xs">
+                    {selectedEntidadeId 
+                      ? "Escolhe um ou mais contactos que estiveram presentes nesta visita"
+                      : "Seleciona uma entidade primeiro para ver os contactos disponíveis"}
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

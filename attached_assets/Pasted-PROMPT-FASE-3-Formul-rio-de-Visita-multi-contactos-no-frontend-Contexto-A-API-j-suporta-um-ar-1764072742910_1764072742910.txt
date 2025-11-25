@@ -1,0 +1,109 @@
+PROMPT FASE 3 – Formulário de Visita (multi-contactos no frontend)
+
+Contexto:
+A API já suporta um array contactosIds e o detalhe da visita devolve contactosPresentes. Agora vamos adaptar o formulário de criação/edição de visitas no frontend (React + Vite, React Hook Form + Zod, shadcn/ui).
+
+Objetivo desta fase:
+
+Substituir o campo único de contacto (contactoId) por um campo de multi-selecção de contactos (contactosIds), dependente da entidade escolhida.
+
+Garantir que, ao editar uma visita, os contactos já associados aparecem pré-seleccionados.
+
+Tarefas
+
+Localizar o formulário de visitas
+
+Procura o componente usado para:
+
+Criar nova visita (/visitas/nova).
+
+Editar visita (/visitas/:id/editar ou equivalente).
+
+Ex.: ficheiros em client/src/features/visitas/VisitForm.tsx ou semelhante.
+
+Modelos e tipos do formulário
+
+No schema Zod / tipos do formulário de visita, adiciona:
+
+contactosIds: string[] (pode ser opcional ou default para []).
+
+Se ainda existir contactoId no formulário, vamos deixá-lo de usar na UI e focar-nos em contactosIds.
+
+Criar componente de multi-select de contactos
+
+Adiciona um campo visual para “Contactos presentes”:
+
+Multi-select (lista de contactos da entidade seleccionada), usando componentes que já existam (por ex. command + checkbox, badgets/tags, etc.).
+
+A lista deve ser filtrada pela entidade escolhida:
+
+Quando entidadeId mudar, volta a carregar os contactos dessa entidade.
+
+Lógica sugerida:
+
+Usa watch("entidadeId") do React Hook Form para saber qual entidade está seleccionada.
+
+Faz fetch dos contactos dessa entidade com um hook / query já existente (podes reutilizar qualquer endpoint que liste contactos por entidade).
+
+Renderiza uma lista onde o utilizador pode seleccionar vários contactos.
+
+Liga este componente ao form:
+
+<Controller
+  name="contactosIds"
+  control={control}
+  render={({ field }) => (
+    <MultiContactSelect
+      value={field.value ?? []}
+      onChange={field.onChange}
+      entidadeId={watch("entidadeId")}
+    />
+  )}
+/>
+
+
+A implementação concreta de MultiContactSelect deve seguir o padrão visual da app (shadcn/ui + Tailwind).
+
+Pré-preenchimento em modo edição
+
+Quando estás a editar uma visita:
+
+Usa os dados do detalhe (GET /api/visitas/:id) para preencher:
+
+entidadeId
+
+contactosIds = lista dos id em contactosPresentes.
+
+Garante que, depois de carregar a lista de contactos da entidade, os contactos cujos IDs vêm em contactosIds aparecem marcados como seleccionados.
+
+Envio para a API
+
+No submit do formulário:
+
+Inclui contactosIds no payload enviado para POST /api/visitas e PUT /api/visitas/:id.
+
+Garante que:
+
+Se o utilizador não escolher contactos, contactosIds é um array vazio (ou omitido), e a API lida bem com isso.
+
+UX
+
+Mostra um label claro, por ex.: “Contactos presentes na visita”.
+
+Se não houver entidade seleccionada, desactiva o campo ou mostra uma mensagem do tipo “Seleccione primeiro uma entidade”.
+
+Critérios de aceitação
+
+Criar nova visita:
+
+É possível escolher uma entidade e seleccionar 0, 1 ou vários contactos dessa entidade.
+
+A visita é criada sem erro, e as associações são guardadas em visitas_contactos.
+
+Editar visita:
+
+Os contactos que já estavam associados aparecem pré-seleccionados.
+
+Alterar a selecção actualiza correctamente as associações na base de dados.
+
+O formulário continua a funcionar mesmo que o utilizador não escolha qualquer contacto.
