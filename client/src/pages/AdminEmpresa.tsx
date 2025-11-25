@@ -14,8 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Empresa, User, Marca } from "@shared/schema";
 import { Upload, Building2, Bell, Zap, Lightbulb, MapPin, Calendar, PlugZap } from "lucide-react";
-import { useRef, useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useRef, useState } from "react";
 import AdminEntidadeTipos from "@/pages/AdminEntidadeTipos";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminMarcas from "@/pages/AdminMarcas";
@@ -44,7 +43,6 @@ const SECTIONS = [
 ] as const;
 
 type SectionId = typeof SECTIONS[number]["id"];
-const SECTION_IDS: SectionId[] = ["empresa", "visitas", "ia", "alertas", "integracoes"];
 
 export default function AdminEmpresa() {
   const { toast } = useToast();
@@ -52,20 +50,6 @@ export default function AdminEmpresa() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [activeSection, setActiveSection] = useState<SectionId>("empresa");
-  const [location, navigate] = useLocation();
-
-  // ✅ Sincronizar activeSection com o URL (location)
-  useEffect(() => {
-    const search = location.split("?")[1] ?? "";
-    const params = new URLSearchParams(search);
-    const fromQuery = params.get("section") as SectionId | null;
-
-    if (fromQuery && SECTION_IDS.includes(fromQuery)) {
-      setActiveSection(fromQuery);
-    } else {
-      setActiveSection("empresa");
-    }
-  }, [location]);
 
   const { data: empresa, isLoading, error } = useQuery<Empresa>({
     queryKey: ["/api/admin/empresa"],
@@ -180,11 +164,11 @@ export default function AdminEmpresa() {
   const currentLogo = logoPreview || empresa?.logoUrl;
 
   const handleSectionClick = (sectionId: SectionId) => {
-    navigate(`/admin/empresa?section=${sectionId}`);
+    setActiveSection(sectionId);
   };
 
   // ✅ RENDERIZAÇÃO CONDICIONAL - APENAS UMA SECÇÃO ATIVA
-  const renderActiveSection = () => {
+  const renderCurrentSection = () => {
     switch (activeSection) {
       case "empresa":
         return renderEmpresaSection();
@@ -1059,7 +1043,7 @@ export default function AdminEmpresa() {
                 </div>
 
                 {/* ✅ RENDER ONLY ACTIVE SECTION (SWITCH STATEMENT) */}
-                {renderActiveSection()}
+                {renderCurrentSection()}
 
                 {/* Save Button */}
                 <Button

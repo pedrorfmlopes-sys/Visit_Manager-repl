@@ -32,8 +32,8 @@ export function AdminSidebar() {
     window.location.href = "/api/logout";
   };
 
-  const handleNavigateToSection = (section: string) => {
-    setLocation(`/admin/empresa?section=${section}`);
+  const handleOpenSettings = () => {
+    setLocation("/admin/empresa");
   };
 
   return (
@@ -116,89 +116,18 @@ export function AdminSidebar() {
       <div className="p-4 border-t border-card-border space-y-2">
         <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
         
-        {/* Settings Dropdown Menu - only for admins */}
+        {/* Settings Button - only for admins */}
         {isAdmin && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start text-xs hover-elevate"
-                data-testid="button-settings-dropdown"
-              >
-                <Settings className="h-4 w-4 mr-2" />
-                Definições
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="start" className="w-64">
-              <DropdownMenuLabel className="py-2">Configurações</DropdownMenuLabel>
-              
-              <DropdownMenuSeparator />
-              
-              {/* Empresa */}
-              <DropdownMenuItem
-                onClick={() => handleNavigateToSection("empresa")}
-                data-testid="menu-item-empresa"
-                className="cursor-pointer"
-              >
-                <Building2 className="h-4 w-4 mr-2" />
-                <span>Empresa &amp; Equipa</span>
-              </DropdownMenuItem>
-              
-              {/* Visitas */}
-              <DropdownMenuItem
-                onClick={() => handleNavigateToSection("visitas")}
-                data-testid="menu-item-visitas"
-                className="cursor-pointer"
-              >
-                <Calendar className="h-4 w-4 mr-2" />
-                <span>Visitas &amp; Tarefas</span>
-              </DropdownMenuItem>
-              
-              {/* IA */}
-              <DropdownMenuItem
-                onClick={() => handleNavigateToSection("ia")}
-                data-testid="menu-item-ia"
-                className="cursor-pointer"
-              >
-                <Lightbulb className="h-4 w-4 mr-2" />
-                <span>IA &amp; Produtividade</span>
-              </DropdownMenuItem>
-              
-              {/* Alertas */}
-              <DropdownMenuItem
-                onClick={() => handleNavigateToSection("alertas")}
-                data-testid="menu-item-alertas"
-                className="cursor-pointer"
-              >
-                <Bell className="h-4 w-4 mr-2" />
-                <span>Alertas &amp; Relatórios</span>
-              </DropdownMenuItem>
-              
-              {/* Integrações */}
-              <DropdownMenuItem
-                onClick={() => handleNavigateToSection("integracoes")}
-                data-testid="menu-item-integracoes"
-                className="cursor-pointer"
-              >
-                <Zap className="h-4 w-4 mr-2" />
-                <span>Integrações</span>
-              </DropdownMenuItem>
-              
-              <DropdownMenuSeparator />
-              
-              {/* Perfil */}
-              <DropdownMenuItem disabled data-testid="menu-item-my-settings">
-                <User className="h-4 w-4 mr-2" />
-                <span>As minhas definições</span>
-              </DropdownMenuItem>
-              
-              <DropdownMenuItem disabled data-testid="menu-item-help">
-                <HelpCircle className="h-4 w-4 mr-2" />
-                <span>Ajuda &amp; Feedback</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start text-xs hover-elevate"
+            onClick={handleOpenSettings}
+            data-testid="button-settings"
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Centro de configurações
+          </Button>
         )}
         
         <Button

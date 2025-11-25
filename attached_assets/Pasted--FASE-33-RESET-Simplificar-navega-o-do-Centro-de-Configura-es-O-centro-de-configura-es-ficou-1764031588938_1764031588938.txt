@@ -1,0 +1,206 @@
+🔧 FASE 33.RESET – Simplificar navegação do Centro de Configurações
+
+O centro de configurações ficou instável:
+
+Já tivemos várias tentativas com query params (?section=...).
+
+Neste momento, as tabs não mudam de secção e o menu lateral ⚙️ também não.
+
+Quero voltar a algo simples e robusto, mesmo que perca a “navegação bonita” por URL.
+
+🎯 Objetivo desta fase
+
+Remover completamente a lógica de query params para as secções de /admin/empresa.
+
+Ter apenas um botão de Definições na sidebar que abre sempre /admin/empresa.
+
+Dentro de /admin/empresa, mudar de secção usando apenas useState (tabs normais).
+
+Não quero mais sincronização com URL nesta página.
+Foco total: estabilidade e simplicidade.
+
+1) AdminEmpresa.tsx – voltar a state interno
+
+No AdminEmpresa.tsx:
+
+Remove toda a lógica relacionada com useLocation, location, navigate, setLocation, URLSearchParams, currentSection baseado no URL, etc.
+
+Define um tipo simples:
+
+type SectionId = "empresa" | "visitas" | "ia" | "alertas" | "integracoes";
+
+
+Usa apenas state interno:
+
+const [activeSection, setActiveSection] = useState<SectionId>("empresa");
+
+
+Cria uma função para mudar de secção:
+
+function handleSectionClick(sectionId: SectionId) {
+  setActiveSection(sectionId);
+}
+
+
+A barra de secções no topo tem de usar sempre handleSectionClick e o activeSection:
+
+{SECTIONS.map((section) => {
+  const isActive = activeSection === section.id;
+  return (
+    <button
+      key={section.id}
+      type="button"
+      onClick={() => handleSectionClick(section.id)}
+      className={isActive ? "..." : "..."} // mantém as classes que já tens
+    >
+      {section.icon && <section.icon className="mr-2 h-4 w-4" />}
+      {section.label}
+    </button>
+  );
+})}
+
+
+Garante que toda a lógica de renderização das secções passa por uma função tipo:
+
+function renderCurrentSection() {
+  switch (activeSection) {
+    case "empresa":
+      return renderEmpresaSection();
+    case "visitas":
+      return renderVisitasSection();
+    case "ia":
+      return renderIaSection();
+    case "alertas":
+      return renderAlertasSection();
+    case "integracoes":
+      return renderIntegracoesSection();
+    default:
+      return renderEmpresaSection();
+  }
+}
+
+
+No return principal de AdminEmpresa, deve haver apenas:
+
+<Form {...form}>
+  <form onSubmit={form.handleSubmit((data) => updateMutation.mutate(data))}>
+    {/* Barra de secções */}
+    <SectionNavigation
+      activeSection={activeSection}
+      onSectionClick={handleSectionClick}
+    />
+
+    {/* Conteúdo da secção ativa */}
+    {renderCurrentSection()}
+
+    {/* Botão Guardar */}
+    <Button type="submit">Guardar configurações</Button>
+  </form>
+</Form>
+
+
+⚠️ Importante:
+
+Confirma que não ficou nenhuma referência a location, setLocation, useLocation em AdminEmpresa.tsx.
+
+O valor visível no UI tem de depender apenas de activeSection.
+
+2) AdminSidebar / menu ⚙️ – apenas um botão Definições
+
+No AdminSidebar.tsx e no AdminDrawer.tsx:
+
+Quero ter apenas um item de Definições (ou “Centro de configurações da empresa”), que:
+
+Navega sempre para /admin/empresa
+
+Não passa section na query string.
+
+Remove toda a lógica de:
+
+handleNavigateToSection(sectionId)
+
+?section=empresa, ?section=visitas, etc.
+
+Vários items de Definições que apontam para secções diferentes.
+
+Fica algo como:
+
+const [location, navigate] = useLocation();
+
+function handleOpenSettings() {
+  navigate("/admin/empresa");
+}
+
+
+E no menu:
+
+<DropdownMenuItem onClick={handleOpenSettings}>
+  <Settings className="mr-2 h-4 w-4" />
+  <span>Centro de configurações da empresa</span>
+</DropdownMenuItem>
+
+
+No mobile drawer (se tiver opção de Definições), faz o mesmo:
+navegar para /admin/empresa sem query params.
+
+3) O que não alterar
+
+NÃO mexer em:
+
+Estrutura das secções internas (Empresa & Equipa, Visitas & Tarefas, etc.)
+
+Conteúdo dos formulários e tabs dentro de cada secção.
+
+Lógica de guardar configurações (updateMutation / PATCH /api/admin/empresa).
+
+Só queremos:
+
+Simplificar a navegação
+
+Tirar fora os query params
+
+Deixar o centro de configurações estável e previsível.
+
+4) Testes obrigatórios
+
+Depois das alterações, confirma:
+
+Sidebar:
+
+Clicar no botão de Definições → abre /admin/empresa.
+
+Dentro de /admin/empresa:
+
+Clicar em “Empresa & Equipa” → mostra só a secção Empresa & Equipa.
+
+Clicar em “Visitas & Tarefas” → muda o conteúdo para essa secção.
+
+Repetir para IA, Alertas & Relatórios, Integrações.
+
+O URL não muda quando troco de secção (sem ?section=).
+
+Nenhuma secção deve ficar todas visíveis ao mesmo tempo:
+só o conteúdo da secção activa.
+
+5) Relatório desta fase
+
+No relatório desta FASE 33.RESET, por favor:
+
+Lista exactamente onde removeste useLocation/query params.
+
+Mostra como ficou activeSection + handleSectionClick.
+
+Confirma que:
+
+Sidebar abre /admin/empresa.
+
+Tabs mudam de secção mesmo após refresh.
+
+Não há mais mensagens a dizer que a config foi guardada quando só mudo de tab.
+
+Objetivo final:
+👉 Um centro de configurações simples, em que:
+
+clico em Definições → entro em /admin/empresa
+
+uso as tabs/secções lá dentro → tudo funciona sem partir.
