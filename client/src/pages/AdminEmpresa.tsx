@@ -1031,6 +1031,7 @@ export default function AdminEmpresa() {
                     return (
                       <button
                         key={section.id}
+                        type="button"
                         onClick={() => handleSectionClick(section.id)}
                         data-testid={`button-section-${section.id}`}
                         className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${

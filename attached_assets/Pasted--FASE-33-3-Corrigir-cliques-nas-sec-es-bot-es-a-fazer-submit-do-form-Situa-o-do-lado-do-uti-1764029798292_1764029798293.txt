@@ -1,0 +1,151 @@
+🔧 FASE 33.3 – Corrigir cliques nas secções (botões a fazer submit do form)
+
+Situação do lado do utilizador:
+
+Em /admin/empresa, o topo tem as secções:
+
+“Empresa & Equipa”, “Visitas & Tarefas”, “IA & Produtividade”, “Alertas & Relatórios”, “Integrações”.
+
+Visualmente está ok, mas:
+
+Só consigo ver “Empresa & Equipa”.
+
+Ao clicar em QUALQUER outra secção:
+
+não muda o conteúdo,
+
+aparece imediatamente a mensagem “Configuração guardada com sucesso”,
+
+o que significa que o botão está a disparar o submit do formulário.
+
+Também não vejo a URL a mudar para ?section=visitas, ?section=ia, etc.
+
+No relatório 33.2 mostraste que:
+
+o return do AdminEmpresa está assim: <Form><form onSubmit={...}> ... SectionNavigation ... {renderCurrentSection()} ...</form></Form>
+
+e os botões da SectionNavigation estão dentro desse <form>.
+
+👉 Em HTML, <button> dentro de <form> sem type tem type="submit" por defeito.
+Por isso, cada clique numa secção está a fazer submit e não a navegar.
+
+1. Garantir que os botões de secção NÃO fazem submit
+
+No componente onde renderizas a barra de secções (dentro de AdminEmpresa.tsx):
+
+Localiza este bloco (ou equivalente):
+
+<div className="flex gap-2 pb-4 border-b overflow-x-auto">
+  {SECTIONS.map((section) => {
+    const isActive = currentSection === section.id;
+    return (
+      <button
+        onClick={() => handleSectionClick(section.id)}
+        className={isActive ? "..." : "..."}
+      >
+        {section.label}
+      </button>
+    );
+  })}
+</div>
+
+
+Muda para um botão que não submete o form. Tens duas opções (escolhe uma e aplica em todos os botões de secção):
+
+Opção A – <button type="button">
+
+<button
+  type="button"
+  onClick={() => handleSectionClick(section.id)}
+  className={...}
+>
+  {section.label}
+</button>
+
+
+Opção B – shadcn Button com asChild ou type="button"
+
+<Button
+  type="button"
+  variant={isActive ? "default" : "outline"}
+  onClick={() => handleSectionClick(section.id)}
+>
+  {section.label}
+</Button>
+
+
+Confirma que nenhum botão da barra de secções tem type="submit" (explícito ou implícito).
+
+2. Opcional – Mover a barra de secções para fora do <form>
+
+Para evitar este tipo de problema no futuro, é ainda melhor:
+
+No AdminEmpresa.tsx, altera a estrutura para:
+
+return (
+  <div className="min-h-screen pb-32 pt-4">
+    {/* Barra de secções FORA do form */}
+    <SectionNavigation
+      currentSection={currentSection}
+      onSectionClick={handleSectionClick}
+    />
+
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit((data) => updateMutation.mutate(data))}>
+        {renderCurrentSection()}
+        <Button type="submit">Guardar Configurações</Button>
+      </form>
+    </Form>
+  </div>
+);
+
+
+Assim, os botões de secção ficam fora do form e nunca vão “acertar” no submit por acidente.
+
+3. Testes obrigatórios
+
+Abrir /admin/empresa:
+
+Ver “Empresa & Equipa” activa.
+
+Clicar em “Visitas & Tarefas”:
+
+NÃO deve aparecer a mensagem “Configuração guardada com sucesso”.
+
+A URL deve mudar para /admin/empresa?section=visitas.
+
+O conteúdo deve mudar para a secção “Visitas & Tarefas”.
+
+Repetir para:
+
+“IA & Produtividade” → /admin/empresa?section=ia
+
+“Alertas & Relatórios” → /admin/empresa?section=alertas
+
+“Integrações” → /admin/empresa?section=integracoes
+
+Fazer refresh em /admin/empresa?section=ia:
+
+Deve abrir directamente na secção “IA & Produtividade”.
+
+Confirmar que o botão “Guardar Configurações” continua a funcionar normalmente (submit).
+
+4. Relatório FASE 33.3
+
+No relatório desta fase, por favor indica:
+
+Se mantiveste os botões dentro do <form> com type="button" ou se os moveste para fora do form.
+
+Como ficou o JSX final da barra de secções (apenas a parte dos botões).
+
+Resultado dos testes (ponto 3), confirmando que:
+
+já não aparece “Configuração guardada com sucesso” ao clicar nas secções,
+
+e que o conteúdo/URL muda correctamente.
+
+🎯 Objetivo final:
+
+Cada clique numa secção muda de secção, não faz submit.
+
+A mensagem de “Configuração guardada com sucesso” só aparece quando carregas no botão “Guardar Configurações”.
