@@ -8,6 +8,7 @@ import { transcribeAudio, generateVisitSummary, extractBusinessCardData, generat
 import { sendVisitEmail } from "./email";
 import { enrichEntity, type EnrichmentInput, extractDomainFromEmail, isPersonalEmailDomain } from "./enrichment";
 import { ptIntelligentSearch, type PTEnrichmentInput } from "./enrichmentPT";
+import { setupMicrosoftRoutes } from "./routes/integrations/microsoft";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -290,6 +291,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Auth middleware
   await setupAuth(app);
+
+  // Microsoft Integration routes
+  setupMicrosoftRoutes(app);
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
