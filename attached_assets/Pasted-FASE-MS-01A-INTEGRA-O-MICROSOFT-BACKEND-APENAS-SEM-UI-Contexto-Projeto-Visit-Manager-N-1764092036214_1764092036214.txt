@@ -1,0 +1,99 @@
+FASE MS-01A – INTEGRAÇÃO MICROSOFT (BACKEND APENAS, SEM UI)
+
+Contexto:
+- Projeto Visit Manager (Node + Express + TypeScript, Drizzle ORM).
+- Já existem as env vars:
+  - MS_TENANT_ID
+  - MS_CLIENT_ID
+  - MS_CLIENT_SECRET
+  - MS_REDIRECT_URI
+- Não alteres NENHUM ficheiro do frontend nesta fase. Nesta fase só pode haver mudanças no backend (server + shared/schema).
+
+Objetivo da MS-01A:
+- Criar a tabela microsoft_connections.
+- Criar endpoints backend:
+  - GET /api/integrations/microsoft/login   (inicia login na Microsoft)
+  - GET /api/integrations/microsoft/callback (recebe o code e guarda tokens)
+  - GET /api/integrations/microsoft/status  (diz se o user tem conta MS ligada)
+- Não criar nem alterar componentes React. Nenhuma mudança em ficheiros dentro de /client nesta fase.
+
+Detalhes a implementar:
+
+1) Tabela microsoft_connections em shared/schema.ts
+- Cria uma tabela Drizzle com:
+  - id: uuid, defaultRandom, primary key
+  - userId: uuid, notNull, FK para users.id (onDelete: "cascade")
+  - msAccountId: text, notNull
+  - email: text, opcional
+  - displayName: text, opcional
+  - accessToken: text, notNull
+  - refreshToken: text, notNull
+  - expiresAt: timestamptz, notNull
+  - createdAt: timestamptz, defaultNow, notNull
+  - updatedAt: timestamptz, defaultNow, notNull
+- Adiciona microsoft_connections às exports do schema e às migrations, seguindo o padrão das outras tabelas.
+
+2) Funções de storage
+- Cria um módulo no backend (por exemplo server/storage/microsoftConnections.ts) com:
+  - getMicrosoftConnectionByUserId(userId: string)
+  - upsertMicrosoftConnection(input: { userId, msAccountId, email?, displayName?, accessToken, refreshToken, expiresAt })
+- Implementa com Drizzle:
+  - getMicrosoftConnectionByUserId → SELECT * FROM microsoft_connections WHERE user_id = userId LIMIT 1
+  - upsertMicrosoftConnection → se existir registo para esse userId faz UPDATE, caso contrário faz INSERT.
+
+3) Router Express /api/integrations/microsoft
+- Cria um router (ex: server/routes/integrations/microsoft.ts) e regista-o em registerRoutes com prefixo /api/integrations/microsoft.
+- Usa o middleware de auth existente para ter acesso ao userId (via getUserContext).
+
+3.1) GET /api/integrations/microsoft/login
+- Endpoint autenticado.
+- Lê MS_TENANT_ID, MS_CLIENT_ID, MS_REDIRECT_URI do process.env.
+- Gera um state aleatório (string) e guarda-o numa cookie HTTP-only ms_oauth_state (podes usar res.cookie, prazo ~10min).
+- Constrói a URL:
+  - https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize
+  - Query:
+    - client_id = clientId
+    - response_type = code
+    - redirect_uri = MS_REDIRECT_URI
+    - response_mode = query
+    - scope = "openid profile offline_access User.Read Calendars.ReadWrite"
+    - state = valor gerado
+- Responde com res.redirect(302, authUrl).
+
+3.2) GET /api/integrations/microsoft/callback
+- Endpoint público.
+- Lê code e state de req.query.
+- Lê ms_oauth_state da cookie e verifica se coincide com o state recebido. Se não coincidir, devolve erro simples e termina.
+- Usa MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET, MS_REDIRECT_URI.
+- Faz POST para:
+  - https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token
+  - Content-Type: application/x-www-form-urlencoded
+  - Body:
+    - client_id
+    - client_secret
+    - grant_type=authorization_code
+    - code
+    - redirect_uri = MS_REDIRECT_URI
+    - scope = "openid profile offline_access User.Read Calendars.ReadWrite"
+- Lê access_token, refresh_token, expires_in da resposta.
+- Com access_token faz GET https://graph.microsoft.com/v1.0/me
+  - Authorization: Bearer <access_token>
+  - Extrai id, mail ou userPrincipalName, displayName.
+- Calcula expiresAt = new Date(Date.now() + expires_in * 1000).
+- Usa getUserContext (ou o mecanismo de sessão já existente) para obter userId autenticado.
+- Chama upsertMicrosoftConnection com:
+  - userId, msAccountId = me.id, email, displayName, accessToken, refreshToken, expiresAt.
+- Limpa a cookie ms_oauth_state.
+- Faz redirect para /admin/empresa?tab=apis-keys&ms=connected (podes ajustar a query param se a app usar outro nome de tab).
+
+3.3) GET /api/integrations/microsoft/status
+- Endpoint autenticado.
+- Obtém userId via getUserContext().
+- Chama getMicrosoftConnectionByUserId(userId).
+- Se não existir ligação, responde com { connected: false }.
+- Se existir, responde com { connected: true, email, displayName, msAccountId }.
+
+IMPORTANTE:
+- NÃO criar nem alterar componentes React nesta fase.
+- NÃO mexer na tab “APIs & Keys” no frontend nesta fase.
+- Garante que o backend arranca sem erros de TypeScript e que os novos endpoints respondem corretamente.
