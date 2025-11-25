@@ -1,0 +1,110 @@
+FASE MS-01B – UI Microsoft 365 na tab “APIs & Keys” (sem mexer no backend)
+
+Contexto:
+- Projeto Visit Manager (React + Vite + TypeScript, React Query, shadcn/ui).
+- Já existe a tab “APIs & Keys” / “Integrações & APIs” na página de definições da empresa (/admin/empresa), criada na INTEG-01.
+- No backend já existem endpoints (criados na MS-01A):
+  - GET /api/integrations/microsoft/status
+  - GET /api/integrations/microsoft/login
+  - GET /api/integrations/microsoft/callback (usado apenas pelo fluxo OAuth)
+- IMPORTANTE:
+  - Nesta fase **NÃO** alterar NENHUM ficheiro do backend (server/*).
+  - Nesta fase **NÃO** alterar nem reutilizar o componente MicrosoftIntegration.tsx (usa outros endpoints legacy /api/microsoft/auth/* – deixa-o quieto por agora).
+
+Objetivo da MS-01B:
+- Na tab “APIs & Keys”, no card “Microsoft 365”, mostrar:
+  - Estado da ligação Microsoft para o utilizador atual (ligado/desligado), usando /api/integrations/microsoft/status.
+  - Botão “Ligar conta Microsoft” que inicia o fluxo OAuth, usando /api/integrations/microsoft/login.
+  - Quando já estiver ligado, mostrar “Ligado como Nome (email)” e permitir “Religar / trocar conta” chamando o mesmo /login.
+- Mostrar mensagens simples de sucesso/erro, em PT-PT, usando o sistema de toast existente.
+
+Tarefas detalhadas:
+
+1) Encontrar o card “Microsoft 365” na tab “APIs & Keys”
+- Abre o componente da página de definições da empresa (por exemplo AdminEmpresaPage / EmpresaSettingsPage / EmpresaApisKeysTab – procura pela string de título que criaste na INTEG-01, algo como:
+  - "Microsoft 365", "Planner, Calendar, Contacts", etc.
+- Garante que este card fica todo encapsulado num pequeno componente interno (por ex.: MicrosoftIntegrationCard) dentro da própria tab, para manter o código organizado.
+
+2) Hook para obter o status ao montar
+- Usa React Query para fazer GET a /api/integrations/microsoft/status.
+  - queryKey: ['/api/integrations/microsoft/status']
+  - fetch:
+    - method: GET
+    - credentials: 'include'
+- Estrutura expectável da resposta:
+  - Se não houver ligação:
+    { connected: false }
+  - Se houver ligação:
+    { connected: true, email: string, displayName?: string, msAccountId?: string }
+- No estado de loading:
+  - Mostrar um pequeno spinner (Loader2 da lucide-react) e texto tipo "A verificar estado da ligação...".
+- Em erro:
+  - Mostrar um texto simples “Não foi possível obter o estado da ligação Microsoft.” e um botão “Tentar novamente” que faz refetch da query.
+
+3) UI do card “Microsoft 365”
+Dentro do card existente para “Microsoft 365”, implementar a seguinte lógica:
+
+3.1) Cabeçalho
+- Título (CardTitle): “Microsoft 365”
+- Descrição (CardDescription): algo como:
+  - “Ligue a sua conta Microsoft 365 para sincronizar visitas com o Outlook Calendar (no futuro também Planner e Contactos).”
+
+3.2) Corpo – estado e ações
+- Se a query estiver em loading:
+  - Mostrar linha com ícone Loader2 a rodar e texto “A verificar ligação...”.
+- Se `data?.connected === false`:
+  - Mostrar texto:
+    - “Nenhuma conta Microsoft ligada para este utilizador.”
+  - Botão principal:
+    - Texto: “Ligar conta Microsoft”
+    - onClick: `window.location.href = "/api/integrations/microsoft/login"`
+    - Enquanto se está a clicar, podes opcionalmente mostrar um spinner no botão (estado local isConnecting).
+- Se `data?.connected === true`:
+  - Mostrar algo como:
+    - “Ligado como: {displayName || email}”
+    - Em pequeno: `{email}` (se existir)
+  - Mostrar um badge verde “Ligado”.
+  - Botão secundário:
+    - Texto: “Religar / trocar conta”
+    - onClick: `window.location.href = "/api/integrations/microsoft/login"`
+    - (Por agora não precisamos de botão de desligar; isso fica para uma fase futura.)
+- Em qualquer caso, usar componentes shadcn/ui (Card, Button, Badge se já existir, etc.) e seguir o estilo visual já usado na tab.
+
+4) Feedback via querystring (?ms=connected ou ?ms=error)
+- Na MS-01A, o backend redireciona o utilizador de volta para `/admin/empresa?tab=apis-keys&ms=connected` (ou `ms=error`) depois do callback OAuth.
+- Nesta fase:
+  - Na tab “APIs & Keys”, lê os query params (por ex. usando useSearchParams / hook utilitário equivalente).
+  - Se encontrar `ms=connected`, mostra um toast de sucesso:
+    - Título: “Conta Microsoft ligada”
+    - Descrição: “A conta Microsoft 365 foi ligada com sucesso.”
+  - Se encontrar `ms=error`, mostra um toast de erro:
+    - Título: “Erro na ligação”
+    - Descrição: “Ocorreu um erro ao ligar a conta Microsoft. Tente novamente.”
+  - Depois de mostrar o toast, limpa o parâmetro da URL (por ex. atualizando o search params sem o `ms`, usando navigate / history.replaceState, conforme o router usado no projeto).
+
+5) Não usar os endpoints legacy
+- Existe um componente MicrosoftIntegration.tsx que fala com endpoints como:
+  - /api/microsoft/auth/start-device-flow
+  - /api/microsoft/auth/poll-device-flow
+  - /api/microsoft/auth/disconnect
+  - /api/microsoft/auth/status
+- Nesta fase, NÃO reutilizar nem alterar esse componente.
+- A integração desta fase deve usar apenas:
+  - GET /api/integrations/microsoft/status
+  - GET /api/integrations/microsoft/login
+- O componente antigo pode ficar como código não utilizado (legacy) para uma fase futura em que decidiremos se aproveitamos partes ou removemos.
+
+Critérios de aceitação:
+- A tab “APIs & Keys” continua a abrir normalmente.
+- O card “Microsoft 365” mostra:
+  - Enquanto carrega → texto “A verificar ligação...” com spinner.
+  - Com backend sem ligação → “Nenhuma conta Microsoft ligada...” e botão “Ligar conta Microsoft”.
+  - Com ligação existente → “Ligado como Nome (email)” + badge “Ligado” + botão “Religar / trocar conta”.
+- Ao clicar em “Ligar conta Microsoft”:
+  - O browser é redirecionado para a página de login/consentimento da Microsoft.
+- Depois do login/consentimento:
+  - O backend redireciona para `/admin/empresa?tab=apis-keys&ms=connected`.
+  - Ao abrir esta tab, aparece um toast de sucesso.
+  - A query de status passa a devolver `{ connected: true, ... }` e a UI reflete esse estado.
+- Nenhum ficheiro do backend é alterado nesta fase.
+- O ficheiro MicrosoftIntegration.tsx permanece existente mas não é modificado nem usado por esta implementação.

@@ -18,6 +18,7 @@ import { useRef, useState } from "react";
 import AdminEntidadeTipos from "@/pages/AdminEntidadeTipos";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminMarcas from "@/pages/AdminMarcas";
+import { MicrosoftIntegrationCard } from "@/components/integrations/MicrosoftIntegrationCard";
 
 const updateEmpresaSchema = z.object({
   nome: z.string().min(1, "Nome obrigatório"),
@@ -1214,27 +1215,10 @@ export default function AdminEmpresa() {
 
         {/* Placeholder Integrations */}
         <div className="space-y-4">
-          <h4 className="font-semibold text-base">Integrações Planeadas</h4>
+          <h4 className="font-semibold text-base">Integrações</h4>
           
-          {/* Microsoft 365 */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <PlugZap className="w-5 h-5 text-blue-700" />
-                Microsoft 365
-              </CardTitle>
-              <CardDescription>Planner, Calendar, Contacts via Microsoft Graph</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Futuras integrações com Outlook Calendar, Planner e Contactos para sincronização bidireccional de dados.
-              </p>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium">Estado</span>
-                <Badge variant="secondary">Planeado</Badge>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Microsoft 365 - Active Integration */}
+          <MicrosoftIntegrationCard />
 
           {/* Google Workspace */}
           <Card>
