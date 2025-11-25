@@ -1,0 +1,104 @@
+2️⃣ PROMPT – Frontend VisitForm obedecer à flag (single vs multi)
+
+Depois do backend estar a respeitar a flag, mandas este:
+
+Contexto:
+Já existe a flag multiContactosEnabled nas definições da empresa, e o backend já limita o número de contactos por visita quando a flag está false.
+
+O formulário de visitas (criar/editar) actualmente permite sempre seleccionar vários contactos (multi-select), independentemente da flag.
+
+Objetivo:
+Adaptar o frontend para que:
+
+Quando multiContactosEnabled === false → a UI só permita um contacto por visita (modo simples).
+
+Quando multiContactosEnabled === true → mantém o multi-select (modo avançado).
+
+Tarefas
+
+Obter multiContactosEnabled no formulário de visita
+
+Localiza o componente que representa o formulário de visita (criação/edição) – o mesmo que já tem o campo de contactos multi-select.
+
+Garante que este componente recebe ou consegue ler (via hook/context) o objecto de settings da empresa que inclui multiContactosEnabled.
+
+Se ainda não estiver disponível, reutiliza o mesmo hook/context que é usado na página de /admin/empresa para carregar as settings, ou o hook global de empresa.
+
+Lógica de selecção de contactos
+
+Encontra o componente/parte do código onde é gerida a selecção de contactos (o multi-select):
+
+Normalmente terás algo como:
+
+const contactosIds = watch("contactosIds");
+const handleToggleContacto = (id: string) => { ... };
+
+
+Adapta o handleToggleContacto (ou função equivalente) para:
+
+Se multiContactosEnabled === true:
+
+Comportamento actual (adiciona/remover id num array).
+
+Se multiContactosEnabled === false:
+
+Comportamento single:
+
+Se o contacto clicado já está seleccionado → desselecciona (fica sem nenhum contacto).
+
+Se o contacto clicado não está seleccionado → substitui o array inteiro por [id].
+
+Exemplo:
+
+if (!multiContactosEnabled) {
+  if (contactosIds.includes(id)) {
+    onChange([]); // desseleccionar
+  } else {
+    onChange([id]); // apenas este
+  }
+  return;
+}
+// modo multi: lógica actual
+
+
+Aspecto visual (opcional mas recomendado)
+
+Se for simples, melhora subtilemente a UI em modo simples:
+
+Por exemplo, no label do campo mostrar:
+
+Modo multi: “Contactos presentes (pode seleccionar vários)”.
+
+Modo simples: “Contacto da visita”.
+
+Não é obrigatório mudar o componente inteiro; o mais importante é que a lógica de selecção respeite a flag.
+
+Submit do formulário
+
+Garante que o payload enviado no onSubmit continua a usar contactosIds (array), mesmo em modo simples:
+
+Em modo simples:
+
+contactosIds terá sempre [] ou [unicoId].
+
+Em modo multi:
+
+contactosIds pode ter 0, 1 ou vários IDs.
+
+Critérios de aceitação
+
+Com multiContactosEnabled = false:
+
+No formulário de visita:
+
+Só consigo ter no máximo 1 contacto seleccionado de cada vez.
+
+Se clicar num segundo contacto, o primeiro é desseleccionado (ou substituído).
+
+O payload enviado tem contactosIds com tamanho 0 ou 1.
+
+Com multiContactosEnabled = true:
+
+O formulário mantém o comportamento actual de multi-select; consigo seleccionar vários contactos.
+
+Em ambos os modos, o backend continua a aceitar o payload e guardar correctamente.

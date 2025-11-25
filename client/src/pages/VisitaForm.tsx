@@ -646,108 +646,131 @@ export default function VisitaForm() {
               )}
             />
 
-            {/* FASE 3: Multiple contacts selector replacing single contactoId */}
+            {/* FASE 1 (Fase 0+): Multiple/Single contacts selector based on multiContactosEnabled flag */}
             <FormField
               control={form.control}
               name="contactosIds"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Contactos presentes na visita</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        className="w-full justify-between"
-                        disabled={!selectedEntidadeId}
-                        data-testid="button-contactos-dropdown"
-                      >
-                        {field.value?.length
-                          ? `${field.value.length} contacto${field.value.length === 1 ? "" : "s"} selecionado${field.value.length === 1 ? "" : "s"}`
-                          : selectedEntidadeId ? "Seleciona um ou mais contactos" : "Selecione primeiro a entidade"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0" side="bottom" align="start">
-                      {selectedEntidadeId && (
-                        <>
-                          <div className="p-3 border-b">
-                            <Input
-                              placeholder="Pesquisar contactos..."
-                              value={contactosSearch}
-                              onChange={(e) => setContactosSearch(e.target.value)}
-                              className="h-8"
-                              data-testid="input-contactos-search"
-                            />
-                          </div>
-                          <div className="max-h-64 overflow-y-auto">
-                            {filteredContactos && filteredContactos.length === 0 ? (
-                              <div className="px-3 py-2 text-sm text-muted-foreground">
-                                Nenhum contacto disponível para esta entidade
-                              </div>
-                            ) : (
-                              filteredContactos
-                                ?.filter((contacto) =>
-                                  contacto.nome.toLowerCase().includes(contactosSearch.toLowerCase())
-                                )
-                                .map((contacto) => {
-                                  const isSelected = field.value?.includes(contacto.id);
-                                  return (
-                                    <div
-                                      key={contacto.id}
-                                      className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted"
-                                      onClick={() => {
-                                        const newIds = isSelected
-                                          ? (field.value || []).filter((id) => id !== contacto.id)
-                                          : [...(field.value || []), contacto.id];
-                                        field.onChange(newIds);
-                                      }}
-                                      data-testid={`button-contacto-${contacto.id}`}
-                                    >
-                                      <Checkbox
-                                        checked={isSelected}
-                                        onCheckedChange={() => {}}
-                                        onClick={(e) => e.stopPropagation()}
-                                      />
-                                      <div className="flex-1 min-w-0">
-                                        <div className="text-sm font-medium">{contacto.nome}</div>
-                                        {contacto.funcao && <div className="text-xs text-muted-foreground">{contacto.funcao}</div>}
+              render={({ field }) => {
+                const multiContactosEnabled = empresa?.uiSettings?.visitas?.multiContactosEnabled ?? false;
+                
+                return (
+                  <FormItem>
+                    <FormLabel>
+                      {multiContactosEnabled ? "Contactos presentes na visita" : "Contacto da visita"}
+                    </FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className="w-full justify-between"
+                          disabled={!selectedEntidadeId}
+                          data-testid="button-contactos-dropdown"
+                        >
+                          {field.value?.length
+                            ? multiContactosEnabled
+                              ? `${field.value.length} contacto${field.value.length === 1 ? "" : "s"} selecionado${field.value.length === 1 ? "" : "s"}`
+                              : field.value[0] ? (contactos?.find(c => c.id === field.value[0])?.nome || "Contacto selecionado") : "Selecione um contacto"
+                            : selectedEntidadeId 
+                              ? (multiContactosEnabled ? "Seleciona um ou mais contactos" : "Selecione um contacto")
+                              : "Selecione primeiro a entidade"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" side="bottom" align="start">
+                        {selectedEntidadeId && (
+                          <>
+                            <div className="p-3 border-b">
+                              <Input
+                                placeholder="Pesquisar contactos..."
+                                value={contactosSearch}
+                                onChange={(e) => setContactosSearch(e.target.value)}
+                                className="h-8"
+                                data-testid="input-contactos-search"
+                              />
+                            </div>
+                            <div className="max-h-64 overflow-y-auto">
+                              {filteredContactos && filteredContactos.length === 0 ? (
+                                <div className="px-3 py-2 text-sm text-muted-foreground">
+                                  Nenhum contacto disponível para esta entidade
+                                </div>
+                              ) : (
+                                filteredContactos
+                                  ?.filter((contacto) =>
+                                    contacto.nome.toLowerCase().includes(contactosSearch.toLowerCase())
+                                  )
+                                  .map((contacto) => {
+                                    const isSelected = field.value?.includes(contacto.id);
+                                    return (
+                                      <div
+                                        key={contacto.id}
+                                        className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted"
+                                        onClick={() => {
+                                          // FASE 1: Respect multiContactosEnabled flag
+                                          if (!multiContactosEnabled) {
+                                            // Single mode: toggle or replace
+                                            if (isSelected) {
+                                              field.onChange([]); // Deselect
+                                            } else {
+                                              field.onChange([contacto.id]); // Replace with this one
+                                            }
+                                          } else {
+                                            // Multi mode: original behavior
+                                            const newIds = isSelected
+                                              ? (field.value || []).filter((id) => id !== contacto.id)
+                                              : [...(field.value || []), contacto.id];
+                                            field.onChange(newIds);
+                                          }
+                                        }}
+                                        data-testid={`button-contacto-${contacto.id}`}
+                                      >
+                                        <Checkbox
+                                          checked={isSelected}
+                                          onCheckedChange={() => {}}
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                          <div className="text-sm font-medium">{contacto.nome}</div>
+                                          {contacto.funcao && <div className="text-xs text-muted-foreground">{contacto.funcao}</div>}
+                                        </div>
                                       </div>
-                                    </div>
-                                  );
-                                })
-                            )}
-                          </div>
-                        </>
-                      )}
-                    </PopoverContent>
-                  </Popover>
+                                    );
+                                  })
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </PopoverContent>
+                    </Popover>
 
-                  {/* Show selected contactos as small badges below */}
-                  {field.value && field.value.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {filteredContactos
-                        ?.filter((c) => field.value?.includes(c.id))
-                        .map((c) => (
-                          <Badge
-                            key={c.id}
-                            variant="secondary"
-                            className="text-xs"
-                            data-testid={`badge-contacto-selected-${c.id}`}
-                          >
-                            {c.nome}
-                          </Badge>
-                        ))}
-                    </div>
-                  )}
+                    {/* Show selected contactos as small badges below */}
+                    {field.value && field.value.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {filteredContactos
+                          ?.filter((c) => field.value?.includes(c.id))
+                          .map((c) => (
+                            <Badge
+                              key={c.id}
+                              variant="secondary"
+                              className="text-xs"
+                              data-testid={`badge-contacto-selected-${c.id}`}
+                            >
+                              {c.nome}
+                            </Badge>
+                          ))}
+                      </div>
+                    )}
 
-                  <FormDescription className="text-xs">
-                    {selectedEntidadeId 
-                      ? "Escolhe um ou mais contactos que estiveram presentes nesta visita"
-                      : "Seleciona uma entidade primeiro para ver os contactos disponíveis"}
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
+                    <FormDescription className="text-xs">
+                      {selectedEntidadeId 
+                        ? (multiContactosEnabled
+                          ? "Escolhe um ou mais contactos que estiveram presentes nesta visita"
+                          : "Seleciona um contacto que esteve presente nesta visita. Clica noutro para substituir.")
+                        : "Seleciona uma entidade primeiro para ver os contactos disponíveis"}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
 
             {/* Assigned User Field - Admin Only */}
