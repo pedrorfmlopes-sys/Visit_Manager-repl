@@ -10,6 +10,7 @@ import {
   integer,
   boolean,
   pgEnum,
+  uuid,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -895,6 +896,37 @@ export const insertMicrosoftConnectionSchema = createInsertSchema(microsoftConne
 
 export type InsertMicrosoftConnection = z.infer<typeof insertMicrosoftConnectionSchema>;
 export type MicrosoftConnection = typeof microsoftConnections.$inferSelect;
+
+// Google Connections table (user-connected Google accounts)
+export const googleConnections = pgTable("google_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 255 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  googleUserId: text("google_user_id").notNull(),
+  email: text("email"),
+  name: text("name"),
+  picture: text("picture"),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const googleConnectionsRelations = relations(googleConnections, ({ one }) => ({
+  user: one(users, {
+    fields: [googleConnections.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertGoogleConnectionSchema = createInsertSchema(googleConnections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertGoogleConnection = z.infer<typeof insertGoogleConnectionSchema>;
+export type GoogleConnection = typeof googleConnections.$inferSelect;
 
 // Extended types for relations
 export type EmpresaWithRelations = Empresa & {

@@ -9,6 +9,7 @@ import { sendVisitEmail } from "./email";
 import { enrichEntity, type EnrichmentInput, extractDomainFromEmail, isPersonalEmailDomain } from "./enrichment";
 import { ptIntelligentSearch, type PTEnrichmentInput } from "./enrichmentPT";
 import { setupMicrosoftRoutes } from "./routes/integrations/microsoft";
+import { setupGoogleRoutes } from "./routes/integrations/google";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -294,6 +295,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Microsoft Integration routes
   setupMicrosoftRoutes(app);
+
+  // Google Integration routes
+  setupGoogleRoutes(app);
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {

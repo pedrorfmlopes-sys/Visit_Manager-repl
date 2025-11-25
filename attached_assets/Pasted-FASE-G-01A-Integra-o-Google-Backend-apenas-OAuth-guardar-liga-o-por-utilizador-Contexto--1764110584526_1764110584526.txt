@@ -1,0 +1,279 @@
+FASE G-01A – Integração Google (Backend apenas: OAuth + guardar ligação por utilizador)
+
+Contexto:
+- Projeto Visit Manager (Node + Express + TypeScript, Drizzle ORM, Postgres).
+- Já existem vars de ambiente no Replit:
+  - GOOGLE_CLIENT_ID
+  - GOOGLE_CLIENT_SECRET
+  - GOOGLE_REDIRECT_URI
+- No Google Cloud:
+  - Já está criado um OAuth 2.0 Client ID do tipo "Web application".
+  - O redirect URI autorizado é o mesmo que GOOGLE_REDIRECT_URI.
+- Nesta fase:
+  - NÃO mexer em nada do frontend (/client).
+  - NÃO criar ainda chamadas ao Google Calendar; apenas login, callback, guardar tokens e endpoint de status.
+
+Objetivo da FASE G-01A:
+- Criar uma tabela `google_connections` para guardar a ligação Google por utilizador.
+- Criar endpoints backend:
+  - GET /api/integrations/google/login    → inicia login Google
+  - GET /api/integrations/google/callback → recebe o code, troca por tokens, guarda na BD
+  - GET /api/integrations/google/status   → diz se o user tem conta Google ligada
+- Fluxo feito com OAuth 2.0 “standard” (sem SDK externo), usando:
+  - Authorization endpoint: https://accounts.google.com/o/oauth2/v2/auth
+  - Token endpoint: https://oauth2.googleapis.com/token
+  - UserInfo endpoint: https://openidconnect.googleapis.com/v1/userinfo
+
+Scopes para esta fase:
+- "openid profile email https://www.googleapis.com/auth/calendar"
+
+---
+
+1) Tabela google_connections (Drizzle + Postgres)
+
+No ficheiro onde estão as tabelas (ex.: shared/schema.ts), criar a tabela:
+
+- Padrão deve ser consistente com microsoft_connections:
+  - PK uuid
+  - FK para users.id com onDelete: "cascade"
+  - timestamps com timestamptz e defaultNow()
+
+Estrutura sugerida:
+
+  export const googleConnections = pgTable("google_connections", {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    googleUserId: text("google_user_id").notNull(),      // sub do userinfo
+    email: text("email"),
+    name: text("name"),
+    picture: text("picture"),                           // URL da foto do perfil (se existir)
+    accessToken: text("access_token").notNull(),
+    refreshToken: text("refresh_token").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  });
+
+- Adicionar googleConnections às exports do schema e ao drizzle config/migrations, seguindo o mesmo padrão que usaste para microsoft_connections.
+
+---
+
+2) Storage: funções para ler e gravar ligações Google
+
+Criar um módulo no backend, por exemplo:
+- server/storage/googleConnections.ts
+
+Com duas funções:
+
+  export async function getGoogleConnectionByUserId(userId: string) { ... }
+
+  export async function upsertGoogleConnection(input: {
+    userId: string;
+    googleUserId: string;
+    email?: string | null;
+    name?: string | null;
+    picture?: string | null;
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: Date;
+  }) { ... }
+
+Implementação:
+
+- getGoogleConnectionByUserId:
+  - SELECT * FROM google_connections WHERE user_id = userId LIMIT 1
+- upsertGoogleConnection:
+  - Se existir registo com user_id = input.userId:
+    - UPDATE com os novos valores (googleUserId, email, name, picture, tokens, expiresAt, updatedAt).
+  - Caso contrário:
+    - INSERT.
+
+---
+
+3) Router Express /api/integrations/google
+
+Criar um router novo, por exemplo:
+- server/routes/integrations/google.ts
+
+E registá-lo em registerRoutes, tal como fizeste com Microsoft:
+- app.use("/api/integrations/google", googleRouter);
+
+Usar o mesmo middleware de auth e getUserContext() que já existe para obter userId.
+
+---
+
+4) Gestão do state (anti-CSRF)
+
+Tal como na integração Microsoft:
+
+- No endpoint /login:
+  - Gerar um state aleatório (string).
+  - Guardar numa cookie HTTP-only, ex.: "google_oauth_state", com expiração curta (ex.: 10 min).
+- No /callback:
+  - Ler a cookie "google_oauth_state".
+  - Comparar com o state que vem em req.query.state.
+  - Se forem diferentes ou se estiver em falta → erro e não prosseguir.
+
+---
+
+5) Endpoint: GET /api/integrations/google/login
+
+Objetivo: redirecionar o utilizador autenticado para o ecrã de login/consentimento Google.
+
+Passos:
+
+1. Endpoint autenticado (usa o mesmo middleware que outras rotas protegidas).
+2. Obter userId via getUserContext(). Se não houver userId → 401.
+3. Ler env vars:
+
+   const clientId = process.env.GOOGLE_CLIENT_ID!;
+   const redirectUri = process.env.GOOGLE_REDIRECT_URI!;
+
+4. Gerar state, guardar em cookie HTTP-only "google_oauth_state".
+5. Construir URL de autorização:
+
+   const scope = "openid profile email https://www.googleapis.com/auth/calendar";
+
+   const authorizeUrl =
+     "https://accounts.google.com/o/oauth2/v2/auth" +
+     `?client_id=${encodeURIComponent(clientId)}` +
+     `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+     `&response_type=code` +
+     `&scope=${encodeURIComponent(scope)}` +
+     `&access_type=offline` +
+     `&prompt=consent` +   // para garantir refresh_token na primeira vez
+     `&state=${encodeURIComponent(state)}`;
+
+6. Fazer res.redirect(302, authorizeUrl).
+
+---
+
+6) Endpoint: GET /api/integrations/google/callback
+
+Objetivo: receber o code, trocar por tokens, obter dados do utilizador e guardar na BD.
+
+Passos:
+
+1. Endpoint público (sem header Authorization), mas:
+
+   - Usar o mecanismo de sessão/cookie já existente para mapear a request ao utilizador logado e obter userId.
+   - Se o user da app não estiver autenticado, redirecionar para a página de login da app (ou devolver erro).
+
+2. Ler code e state de req.query.
+
+3. Validar state:
+   - Ler cookie "google_oauth_state".
+   - Comparar com o state recebido.
+   - Se não coincidir, devolver erro simples (ou redirect com ?google=error) e terminar.
+
+4. Ler env vars:
+
+   const clientId = process.env.GOOGLE_CLIENT_ID!;
+   const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
+   const redirectUri = process.env.GOOGLE_REDIRECT_URI!;
+
+5. Fazer POST para o token endpoint:
+
+   URL: https://oauth2.googleapis.com/token
+   Content-Type: application/x-www-form-urlencoded
+
+   Body (usar URLSearchParams):
+   - code: code recebido
+   - client_id: clientId
+   - client_secret: clientSecret
+   - redirect_uri: redirectUri
+   - grant_type: "authorization_code"
+
+6. Ler resposta JSON e extrair:
+   - access_token
+   - refresh_token
+   - expires_in (segundos)
+   - id_token (não obrigatório para já, só se quiseres validar openid)
+
+7. Com o access_token, chamar o endpoint UserInfo:
+
+   GET https://openidconnect.googleapis.com/v1/userinfo
+   Header: Authorization: Bearer <access_token>
+
+   Resposta típica:
+   {
+     "sub": "google-user-id",
+     "email": "user@example.com",
+     "email_verified": true,
+     "name": "Nome Apresentado",
+     "picture": "https://.../photo.jpg",
+     ...
+   }
+
+8. Calcular expiresAt:
+
+   const expiresAt = new Date(Date.now() + expires_in * 1000);
+
+9. Obter userId da app (mesmo método de auth que usaste na MS-01A).
+
+10. Chamar upsertGoogleConnection com:
+
+    {
+      userId,
+      googleUserId: userinfo.sub,
+      email: userinfo.email,
+      name: userinfo.name,
+      picture: userinfo.picture,
+      accessToken,
+      refreshToken,
+      expiresAt,
+    }
+
+11. Limpar cookie "google_oauth_state".
+
+12. Redirecionar para o frontend, por exemplo:
+
+    res.redirect("/admin/empresa?tab=apis-keys&google=connected");
+
+Em caso de erro (token inválido, falha no fetch, etc.):
+
+- Logar o erro no servidor com mensagem clara.
+- Redirecionar para "/admin/empresa?tab=apis-keys&google=error".
+
+---
+
+7) Endpoint: GET /api/integrations/google/status
+
+Objetivo: dizer ao frontend se o utilizador atual tem conta Google ligada.
+
+Passos:
+
+1. Endpoint autenticado.
+2. Obter userId via getUserContext().
+3. Chamar getGoogleConnectionByUserId(userId).
+4. Responder:
+   - Se não existir ligação:
+     { "connected": false }
+   - Se existir:
+     {
+       "connected": true,
+       "email": "...",
+       "name": "...",
+       "googleUserId": "...",
+       "picture": "..." // se existir
+     }
+
+---
+
+8) Critérios de aceitação G-01A
+
+- A tabela google_connections existe na BD (via Drizzle) com os campos definidos.
+- Com o servidor a correr:
+  - GET /api/integrations/google/status, para um user sem ligação, devolve { connected: false }.
+- Ao chamar GET /api/integrations/google/login:
+  - O utilizador autenticado é redirecionado para o login/consentimento Google (no projeto configurado em Google Cloud).
+- Depois de aceitar as permissões e voltar ao callback:
+  - O backend troca o code por tokens.
+  - Chama o endpoint userinfo.
+  - Guarda/actualiza o registo em google_connections para aquele userId.
+  - Redireciona para /admin/empresa?tab=apis-keys&google=connected.
+- Após isto:
+  - GET /api/integrations/google/status devolve { connected: true, ... } com email, name e googleUserId do user Google associado.
+- Nenhum ficheiro do frontend (/client) é modificado nesta fase.
