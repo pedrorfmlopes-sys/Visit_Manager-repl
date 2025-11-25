@@ -88,6 +88,8 @@ export const empresas = pgTable("empresas", {
   mostrarMarcasEmVisitas: boolean("mostrar_marcas_em_visitas").default(false).notNull(),
   mostrarGPS: boolean("mostrar_gps").default(false).notNull(), // FASE 15: Toggle GPS visibility
   theme: varchar("theme", { length: 50 }).default("light-business").notNull(),
+  // FASE 31-IA-01: OpenAI API Key for company (stored securely, never exposed to frontend)
+  openai_api_key: text("openai_api_key"),
   // FASE 22: UI Settings as JSON for future extensibility
   uiSettings: jsonb("ui_settings").default(sql`'{
     "mostrarGPS": false,
@@ -99,6 +101,10 @@ export const empresas = pgTable("empresas", {
     "enableAlertRibbon": true,
     "enableBadges": true,
     "refreshInterval": 60,
+    "ia": {
+      "aiEnabled": true,
+      "aiKeyMode": "global"
+    },
     "entidades": {
       "enableFilterTipoEntidade": true,
       "enableFilterSearch": true

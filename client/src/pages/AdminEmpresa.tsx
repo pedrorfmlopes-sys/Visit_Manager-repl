@@ -29,6 +29,8 @@ const updateEmpresaSchema = z.object({
   mostrarGPS: z.boolean().default(false),
   theme: z.enum(["light-business", "dark-pro"]).default("light-business"),
   uiSettings: z.record(z.any()).optional(),
+  // FASE 31-IA-01: OpenAI API Key management
+  iaOpenAIApiKey: z.string().optional().nullable(),
 });
 
 type UpdateEmpresaForm = z.infer<typeof updateEmpresaSchema>;
@@ -50,6 +52,9 @@ export default function AdminEmpresa() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [activeSection, setActiveSection] = useState<SectionId>("empresa");
+  // FASE 31-IA-01: Manage OpenAI API Key UI state
+  const [showOpenAIKeyInput, setShowOpenAIKeyInput] = useState(false);
+  const [openAIKeyValue, setOpenAIKeyValue] = useState("");
 
   const { data: empresa, isLoading, error } = useQuery<Empresa>({
     queryKey: ["/api/admin/empresa"],
@@ -71,10 +76,18 @@ export default function AdminEmpresa() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: UpdateEmpresaForm) =>
-      apiRequest("PATCH", "/api/admin/empresa", data),
+    mutationFn: (data: UpdateEmpresaForm) => {
+      // FASE 31-IA-01: Include OpenAI API Key if provided
+      const payload = { ...data };
+      if (openAIKeyValue) {
+        payload.iaOpenAIApiKey = openAIKeyValue;
+      }
+      return apiRequest("PATCH", "/api/admin/empresa", payload);
+    },
     onSuccess: () => {
       toast({ title: "Configuração guardada com sucesso" });
+      setOpenAIKeyValue(""); // Clear the input after successful save
+      setShowOpenAIKeyInput(false);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/empresa"] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     },
@@ -715,6 +728,189 @@ export default function AdminEmpresa() {
 
           {/* IA de Visitas */}
           <TabsContent value="ia-visitas" className="space-y-6 mt-6">
+            {/* FASE 31-IA-01: IA Configuration - Enable/Disable and Key Management */}
+            <FormField
+              control={form.control}
+              name="uiSettings"
+              render={({ field }) => {
+                const uiSettings = field.value || {};
+                const iaSettings = uiSettings.ia || { aiEnabled: true, aiKeyMode: "global" };
+                const hasOwnKey = (empresa?.uiSettings as any)?.ia?.hasOwnOpenAIApiKey ?? false;
+                return (
+                  <Card className="bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 border-blue-200 dark:border-blue-900/50">
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-blue-600" />
+                        Configuração de IA
+                      </CardTitle>
+                      <CardDescription>Gerencie as definições de inteligência artificial para a sua empresa</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {/* Toggle IA Enable/Disable */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <FormLabel className="text-sm font-semibold">Ativar IA para esta empresa</FormLabel>
+                            <p className="text-xs text-muted-foreground mt-1">Quando desativado, nenhuma chamada de IA será feita</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              field.onChange({
+                                ...uiSettings,
+                                ia: { ...iaSettings, aiEnabled: !iaSettings.aiEnabled }
+                              });
+                            }}
+                            className={`px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                              iaSettings.aiEnabled
+                                ? "bg-blue-200 dark:bg-blue-900 text-blue-900 dark:text-blue-100"
+                                : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                            }`}
+                            data-testid="button-toggle-ia-enabled"
+                          >
+                            {iaSettings.aiEnabled ? "Ativado" : "Desativado"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* AI Key Mode Selection */}
+                      {iaSettings.aiEnabled && (
+                        <div className="space-y-3 pt-4 border-t">
+                          <div>
+                            <FormLabel className="text-sm font-semibold">Modo de chave de IA</FormLabel>
+                            <p className="text-xs text-muted-foreground mt-1">Escolha onde vem a chave de API da OpenAI</p>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors" 
+                              style={{
+                                borderColor: iaSettings.aiKeyMode === "global" ? "rgb(59, 130, 246)" : "rgb(209, 213, 219)",
+                                backgroundColor: iaSettings.aiKeyMode === "global" ? "rgba(59, 130, 246, 0.05)" : "transparent"
+                              }}>
+                              <input
+                                type="radio"
+                                name="aiKeyMode"
+                                value="global"
+                                checked={iaSettings.aiKeyMode === "global"}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    field.onChange({
+                                      ...uiSettings,
+                                      ia: { ...iaSettings, aiKeyMode: "global" }
+                                    });
+                                  }
+                                }}
+                                className="mt-1"
+                                data-testid="radio-key-mode-global"
+                              />
+                              <div>
+                                <p className="font-medium text-sm">Usar chave global do Visit Manager</p>
+                                <p className="text-xs text-muted-foreground">Usa a chave de API partilhada da aplicação</p>
+                              </div>
+                            </label>
+                            <label className="flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors"
+                              style={{
+                                borderColor: iaSettings.aiKeyMode === "own" ? "rgb(59, 130, 246)" : "rgb(209, 213, 219)",
+                                backgroundColor: iaSettings.aiKeyMode === "own" ? "rgba(59, 130, 246, 0.05)" : "transparent"
+                              }}>
+                              <input
+                                type="radio"
+                                name="aiKeyMode"
+                                value="own"
+                                checked={iaSettings.aiKeyMode === "own"}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    field.onChange({
+                                      ...uiSettings,
+                                      ia: { ...iaSettings, aiKeyMode: "own" }
+                                    });
+                                  }
+                                }}
+                                className="mt-1"
+                                data-testid="radio-key-mode-own"
+                              />
+                              <div>
+                                <p className="font-medium text-sm">Usar chave própria desta empresa</p>
+                                <p className="text-xs text-muted-foreground">Introduza a chave de API da OpenAI da sua empresa</p>
+                              </div>
+                            </label>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* OpenAI API Key Management */}
+                      {iaSettings.aiEnabled && iaSettings.aiKeyMode === "own" && (
+                        <div className="space-y-3 pt-4 border-t">
+                          <div>
+                            <FormLabel className="text-sm font-semibold">OpenAI API Key</FormLabel>
+                            <p className="text-xs text-muted-foreground mt-1">Esta chave será usada apenas para esta empresa</p>
+                          </div>
+                          
+                          {hasOwnKey && !showOpenAIKeyInput ? (
+                            <div className="space-y-2">
+                              <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900/50 rounded-lg p-3">
+                                <p className="text-sm font-medium text-green-700 dark:text-green-300">✓ Chave própria configurada</p>
+                                <p className="text-xs text-green-600 dark:text-green-400 mt-1">A chave está armazenada com segurança</p>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setShowOpenAIKeyInput(true)}
+                                data-testid="button-replace-openai-key"
+                              >
+                                Substituir chave
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setOpenAIKeyValue(""); // Empty string signals to remove the key
+                                  form.handleSubmit((data) => {
+                                    updateMutation.mutate(data);
+                                  })();
+                                }}
+                                className="text-red-600 hover:text-red-700 dark:text-red-400 hover:dark:text-red-300"
+                                data-testid="button-remove-openai-key"
+                              >
+                                Remover chave
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <Input
+                                type="password"
+                                placeholder={hasOwnKey ? "Deixe em branco para manter a chave atual" : "Cole a sua chave sk-..."}
+                                value={openAIKeyValue}
+                                onChange={(e) => setOpenAIKeyValue(e.target.value)}
+                                data-testid="input-openai-api-key"
+                                className="font-mono text-sm"
+                              />
+                              <p className="text-xs text-muted-foreground">Chaves começam com sk-</p>
+                              {showOpenAIKeyInput && hasOwnKey && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setShowOpenAIKeyInput(false);
+                                    setOpenAIKeyValue("");
+                                  }}
+                                  data-testid="button-cancel-replace-key"
+                                >
+                                  Cancelar
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              }}
+            />
+
             <FormField
               control={form.control}
               name="uiSettings"

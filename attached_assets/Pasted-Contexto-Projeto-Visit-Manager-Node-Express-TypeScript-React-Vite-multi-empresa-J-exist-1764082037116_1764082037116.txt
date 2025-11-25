@@ -1,0 +1,194 @@
+Contexto:
+Projeto Visit Manager (Node + Express + TypeScript, React + Vite, multi-empresa).
+Já existe uma secção “IA & Áudio” nas Definições da Empresa (/admin/empresa), com algumas flags para ativar/desativar funcionalidades de IA e transcrição.
+
+Objetivo desta FASE IA-01:
+Preparar a configuração de IA a nível de empresa, suportando um modelo “mix”:
+
+Uma chave global de IA (do próprio Visit Manager), usada por defeito.
+
+Opcionalmente, uma chave própria por empresa (“Bring Your Own Key”), que a empresa pode introduzir e alterar facilmente.
+
+Nesta fase, vamos apenas criar/guardar a configuração e expô-la na UI.
+Não vamos ainda alterar os endpoints que chamam a OpenAI; isso ficará para uma Fase IA-02.
+
+Tarefas
+1. Backend – novos campos nas settings da empresa
+
+Localiza a estrutura de settings/uiSettings da empresa (ex.: tipo EmpresaSettings / EmpresaUiSettings e a coluna JSON correspondente na tabela empresas em shared/schema.ts ou equivalente).
+
+Adiciona um sub-bloco específico para IA, se ainda não existir, por exemplo:
+
+type EmpresaIaSettings = {
+  aiEnabled?: boolean;          // ativa/desativa funcionalidades de IA para esta empresa
+  aiKeyMode?: "global" | "own"; // "global" = usa a chave da app; "own" = usa chave própria
+  hasOwnOpenAIApiKey?: boolean; // apenas indicador booleano para a UI
+  // NÃO expor aqui a key em si; a key real será armazenada em campo separado/seguro
+};
+
+
+e integra-o nas settings principais:
+
+type EmpresaSettings = {
+  // ...
+  ia?: EmpresaIaSettings;
+  // ...
+};
+
+
+Cria (se necessário) um campo próprio na tabela empresas (ou tabela relacionada) para armazenar a OpenAI API Key própria da empresa, por exemplo:
+
+Coluna: openai_api_key (text ou similar), ou um JSON com segredos.
+
+Esta coluna não deve ser exposta directamente pela API; será usada apenas no backend.
+
+Se já tiveres uma estrutura para segredos da empresa, reutiliza-a.
+
+2. Backend – API /api/admin/empresa
+
+No GET /api/admin/empresa:
+
+Inclui nas settings um bloco ia com:
+
+aiEnabled
+
+aiKeyMode
+
+hasOwnOpenAIApiKey (boolean calculado no backend: true se a empresa tiver uma key própria guardada, false caso contrário).
+
+Nunca devolver a chave real (openai_api_key) para o frontend.
+
+No PUT/PATCH /api/admin/empresa:
+
+Aceitar alterações ao bloco ia:
+
+aiEnabled (boolean)
+
+aiKeyMode ("global" | "own")
+
+Para a key em si, aceita um campo específico no body, por exemplo:
+
+{
+  "ia": { ... },
+  "iaOpenAIApiKey": "sk-..."   // opcional; se vier preenchido, substituir key
+}
+
+
+Comportamento:
+
+Se iaOpenAIApiKey vier com string não vazia:
+
+Guardar/actualizar a key no campo seguro (openai_api_key).
+
+Actualizar hasOwnOpenAIApiKey = true nas settings.
+
+Se iaOpenAIApiKey vier como string vazia ou campo explícito tipo null:
+
+Remover/limpar a key da empresa.
+
+Definir hasOwnOpenAIApiKey = false.
+
+A resposta após o PUT deve apenas devolver o bloco ia com o boolean hasOwnOpenAIApiKey; nunca a key em texto claro.
+
+3. Frontend – UI em /admin/empresa → tab “IA & Áudio”
+
+Na página de Definições da Empresa (/admin/empresa), tab “IA & Áudio”, ler do endpoint /api/admin/empresa o bloco ia e o boolean hasOwnOpenAIApiKey.
+
+Adicionar/ajustar os controlos:
+
+Toggle “Ativar IA para esta empresa”:
+
+liga/desliga ia.aiEnabled.
+
+Select ou radio “Modo de chave de IA”:
+
+Opções:
+
+Usar chave global do Visit Manager → aiKeyMode = "global"
+
+Usar chave própria desta empresa → aiKeyMode = "own"
+
+Só deve estar ativo/visível se aiEnabled === true.
+
+Campo para introduzir/alterar a OpenAI API Key da empresa:
+
+Input de tipo password/text com label, por exemplo:
+
+Label: OpenAI API Key da empresa
+
+Descrição: Esta chave será usada apenas para esta empresa quando o modo estiver em "Chave própria".
+
+UX recomendada:
+
+Se hasOwnOpenAIApiKey === true:
+
+Mostrar algo como “Chave própria configurada” (sem mostrar o valor).
+
+Input inicialmente vazio, com botão Substituir chave (quando o admin quiser colar uma nova).
+
+Se hasOwnOpenAIApiKey === false:
+
+Mostrar mensagem “Nenhuma chave própria configurada”.
+
+Input para colar uma nova key.
+
+Ao gravar:
+
+Se o admin colar uma chave nova → enviar iaOpenAIApiKey com esse valor no PUT.
+
+Se o admin quiser limpar/remover a chave:
+
+Por exemplo, botão “Remover chave própria” que envia iaOpenAIApiKey como string vazia ou null.
+
+Botão de “Guardar”:
+
+Continua a usar o mesmo fluxo de guardar definições da empresa.
+
+Certificar que envia:
+
+ia.aiEnabled
+
+ia.aiKeyMode
+
+iaOpenAIApiKey quando for para criar/substituir/limpar.
+
+4. Escopo desta fase (importante)
+
+NÃO alterar ainda a forma como os endpoints de IA escolhem a API key:
+
+Nesta Fase IA-01 estamos apenas a criar a configuração e guardá-la com segurança.
+
+A lógica do tipo:
+
+“se aiKeyMode === 'own' usar a key da empresa, senão usar a global”
+será implementada numa futura Fase IA-02.
+
+Critérios de aceitação
+
+GET /api/admin/empresa devolve um bloco ia com:
+
+aiEnabled
+
+aiKeyMode
+
+hasOwnOpenAIApiKey (true/false), mas nunca a chave real.
+
+PUT /api/admin/empresa:
+
+Permite activar/desactivar IA por empresa.
+
+Permite mudar o modo de chave (global/own).
+
+Permite definir ou substituir a key própria (iaOpenAIApiKey), actualizando hasOwnOpenAIApiKey.
+
+Permite limpar/remover a key própria.
+
+Na UI (/admin/empresa → “IA & Áudio”):
+
+Consigo ligar/desligar IA para a empresa.
+
+Consigo escolher entre “Usar chave global do Visit Manager” e “Usar chave própria desta empresa”.
+
+Consigo colar/alterar/remover uma OpenAI API Key própria para a empresa, com feedback claro se há ou não chave configurada.
+
+Nenhum valor de API key é exposto em texto claro no frontend após guardar.

@@ -3105,6 +3105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================
 
   // GET /api/admin/empresa - Get current company config
+  // FASE 31-IA-01: Include IA settings with hasOwnOpenAIApiKey boolean (never expose actual key)
   app.get('/api/admin/empresa', requireAdmin, async (req: any, res) => {
     try {
       const { empresaId } = await getUserContext(req);
@@ -3114,7 +3115,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!empresa) {
         return res.status(404).json({ message: "Empresa not found" });
       }
-      res.json(empresa);
+      
+      // FASE 31-IA-01: Add calculated hasOwnOpenAIApiKey to response, never expose the actual key
+      const responseData = {
+        ...empresa,
+        uiSettings: {
+          ...(empresa.uiSettings || {}),
+          ia: {
+            ...(empresa.uiSettings?.ia || { aiEnabled: true, aiKeyMode: "global" }),
+            hasOwnOpenAIApiKey: !!(empresa as any).openai_api_key, // Calculate from backend field
+          },
+        },
+      };
+      
+      // Remove the actual openai_api_key from response
+      const { openai_api_key, ...safeResponse } = responseData;
+      res.json(safeResponse);
     } catch (error) {
       console.error("Error fetching empresa:", error);
       res.status(500).json({ message: "Failed to fetch empresa" });
@@ -3158,12 +3174,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // PATCH /api/admin/empresa - Update company config
   // FASE 22: Added support for uiSettings
+  // FASE 31-IA-01: Added support for IA configuration and custom OpenAI API Key management
   app.patch('/api/admin/empresa', requireAdmin, async (req: any, res) => {
     try {
       const { empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       
-      const { nome, nif, email, telefone, logoUrl, mostrarMarcasEmVisitas, mostrarGPS, theme, uiSettings } = req.body;
+      const { nome, nif, email, telefone, logoUrl, mostrarMarcasEmVisitas, mostrarGPS, theme, uiSettings, iaOpenAIApiKey } = req.body;
       
       // Validate theme if provided
       if (theme !== undefined && !["light-business", "dark-pro"].includes(theme)) {
@@ -3181,11 +3198,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (theme !== undefined) updateData.theme = theme;
       if (uiSettings !== undefined) updateData.uiSettings = uiSettings; // FASE 22
       
+      // FASE 31-IA-01: Handle custom OpenAI API Key management
+      if (iaOpenAIApiKey !== undefined) {
+        if (iaOpenAIApiKey && iaOpenAIApiKey.trim()) {
+          // If key is provided and non-empty, store it
+          (updateData as any).openai_api_key = iaOpenAIApiKey.trim();
+          // Ensure uiSettings.ia is updated to reflect the key is set
+          if (!updateData.uiSettings) {
+            const empresa = await storage.getEmpresa(empresaId);
+            updateData.uiSettings = empresa?.uiSettings || {};
+          }
+          if (!updateData.uiSettings.ia) {
+            updateData.uiSettings.ia = { aiEnabled: true, aiKeyMode: "own" };
+          }
+        } else {
+          // If key is empty/null, clear it
+          (updateData as any).openai_api_key = null;
+          // Ensure uiSettings.ia reflects no custom key
+          if (!updateData.uiSettings) {
+            const empresa = await storage.getEmpresa(empresaId);
+            updateData.uiSettings = empresa?.uiSettings || {};
+          }
+          if (!updateData.uiSettings.ia) {
+            updateData.uiSettings.ia = { aiEnabled: true, aiKeyMode: "global" };
+          }
+        }
+      }
+      
       const updated = await storage.updateEmpresa(empresaId, updateData);
       if (!updated) {
         return res.status(404).json({ message: "Empresa not found" });
       }
-      res.json(updated);
+      
+      // Return response WITHOUT the actual openai_api_key
+      const responseData = {
+        ...updated,
+        uiSettings: {
+          ...(updated.uiSettings || {}),
+          ia: {
+            ...(updated.uiSettings?.ia || { aiEnabled: true, aiKeyMode: "global" }),
+            hasOwnOpenAIApiKey: !!(updated as any).openai_api_key,
+          },
+        },
+      };
+      const { openai_api_key, ...safeResponse } = responseData;
+      res.json(safeResponse);
     } catch (error) {
       console.error("Error updating empresa:", error);
       res.status(500).json({ message: "Failed to update empresa" });
