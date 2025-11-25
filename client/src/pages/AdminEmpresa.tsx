@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Empresa, User, Marca } from "@shared/schema";
 import { Upload, Building2, Bell, Zap, Lightbulb, MapPin, Calendar, PlugZap } from "lucide-react";
-import { useRef, useState } from "react";
+import { useRef, useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import AdminEntidadeTipos from "@/pages/AdminEntidadeTipos";
 import AdminUsers from "@/pages/AdminUsers";
@@ -52,9 +52,22 @@ export default function AdminEmpresa() {
   const [uploading, setUploading] = useState(false);
   const [location, setLocation] = useLocation();
 
-  // Read section from query param
-  const urlParams = new URLSearchParams(location.split("?")[1] || "");
-  const currentSection = (urlParams.get("section") || "empresa") as SectionId;
+  // ✅ USAR URL COMO FONTE ÚNICA DE VERDADE COM useMemo
+  const currentSection = useMemo(() => {
+    const urlParams = new URLSearchParams(location.split("?")[1] || "");
+    const sectionFromQuery = urlParams.get("section");
+    
+    // Validar que é uma secção válida
+    if (sectionFromQuery && SECTIONS.some(s => s.id === sectionFromQuery)) {
+      return sectionFromQuery as SectionId;
+    }
+    return "empresa" as SectionId;
+  }, [location]);
+
+  // Debug
+  useEffect(() => {
+    console.log("🔍 AdminEmpresa DEBUG - currentSection:", currentSection, "location:", location);
+  }, [currentSection, location]);
 
   const { data: empresa, isLoading, error } = useQuery<Empresa>({
     queryKey: ["/api/admin/empresa"],

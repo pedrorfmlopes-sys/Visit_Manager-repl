@@ -1,0 +1,163 @@
+🔧 FASE 33.4 – URL actualiza, mas currentSection não muda (fica sempre Empresa & Equipa)
+
+Situação actual:
+
+Em /admin/empresa:
+
+Clicar em “Visitas & Tarefas”, “IA & Produtividade”, etc. já não faz submit (OK).
+
+A URL passa correctamente para ?section=visitas, ?section=ia, etc. (OK).
+
+MAS:
+
+O conteúdo continua sempre na secção “Empresa & Equipa”.
+
+O botão visualmente activo continua a ser “Empresa & Equipa”.
+
+Ou seja: a navegação do router funciona, mas o estado/UI da página não acompanham.
+
+Isto significa que:
+
+ou currentSection não está a ser actualizado quando a URL muda,
+
+ou o switch (currentSection) está a cair sempre no caso "empresa" ou no default.
+
+1. Ligar currentSection à localização ACTUAL (router)
+
+Quero que a página use sempre o valor de section da URL como fonte de verdade.
+
+No topo de AdminEmpresa.tsx, faz algo assim (ajusta ao router real, p.ex. wouter):
+
+type SectionId = "empresa" | "visitas" | "ia" | "alertas" | "integracoes";
+
+const SECTIONS: { id: SectionId; label: string; /* ... */ }[] = [ ... ];
+
+const [location, navigate] = useLocation();
+
+const currentSection: SectionId = useMemo(() => {
+  const search = location.split("?")[1] ?? "";
+  const params = new URLSearchParams(search);
+  const fromQuery = params.get("section") as SectionId | null;
+  if (fromQuery && SECTIONS.some(s => s.id === fromQuery)) {
+    return fromQuery;
+  }
+  return "empresa";
+}, [location]);
+
+
+Ponto importante: não uses um useState separado para currentSection que possa ficar desincronizado. Usa sempre a localização (location) como fonte única de verdade, com useMemo ou lógica equivalente.
+
+Garante que o handleSectionClick apenas navega:
+
+function handleSectionClick(sectionId: SectionId) {
+  const base = "/admin/empresa";
+  navigate(`${base}?section=${sectionId}`);
+}
+
+
+Ou seja: não precisas de setCurrentSection se o currentSection vem sempre da URL.
+
+Na SectionNavigation:
+
+o botão activo deve ser decidido com section.id === currentSection.
+
+2. Garantir que apenas a secção activa é renderizada
+
+Confirma que tens UMA função clara:
+
+function renderCurrentSection() {
+  switch (currentSection) {
+    case "empresa":
+      return <EmpresaSectionTabs /* ... */ />;
+    case "visitas":
+      return <VisitasSectionTabs /* ... */ />;
+    case "ia":
+      return <IaSectionTabs /* ... */ />;
+    case "alertas":
+      return <AlertasSectionTabs /* ... */ />;
+    case "integracoes":
+      return <IntegracoesSectionTabs /* ... */ />;
+    default:
+      return <EmpresaSectionTabs /* ... */ />;
+  }
+}
+
+
+E no return principal não pode haver mais nenhum bloco a renderizar secções directamente.
+Exemplo desejado:
+
+return (
+  <div className="...">
+    <SectionNavigation
+      currentSection={currentSection}
+      onSectionClick={handleSectionClick}
+    />
+
+    <Form {...form}>
+      <form onSubmit={...}>
+        {renderCurrentSection()}
+        <Button type="submit">Guardar Configurações</Button>
+      </form>
+    </Form>
+  </div>
+);
+
+
+Se ainda existir algo como:
+
+<EmpresaSectionTabs ... />
+<VisitasSectionTabs ... />
+
+
+fora de renderCurrentSection(), remove – isso faz com que tudo apareça ao mesmo tempo.
+
+3. Debug rápido obrigatório
+
+Antes de dizer que está resolvido, por favor:
+
+Adiciona:
+
+console.log("DEBUG currentSection", currentSection, location);
+
+
+no corpo do componente.
+
+No browser:
+
+Vai a /admin/empresa → deve logar empresa.
+
+Clica em “Visitas & Tarefas”:
+
+a URL muda para ?section=visitas,
+
+o log deve mostrar DEBUG currentSection visitas ....
+
+Clica em “IA & Produtividade”:
+
+deve logar ia, etc.
+
+Confirma também que:
+
+ao clicar em cada secção, o conteúdo muda realmente (tabs internas + campos),
+
+se fizeres scroll, já não encontras o conteúdo das outras secções.
+
+4. Relatório FASE 33.4
+
+No relatório, indica:
+
+Como passou a ser calculado currentSection (mostra a lógica de leitura da URL).
+
+Confirmação dos logs (ex.: “ao clicar em Visitas & Tarefas, currentSection = 'visitas'”).
+
+Que o return principal usa apenas {renderCurrentSection()} para mostrar secções.
+
+Resultado dos testes de navegação (cliques em todas as secções + refresh em ?section=ia).
+
+🎯 Objetivo final:
+
+currentSection fica 100% sincronizado com section na URL.
+
+Cada clique numa secção muda realmente o conteúdo.
+
+Em qualquer momento, só uma secção do Centro de Configurações está visível.
