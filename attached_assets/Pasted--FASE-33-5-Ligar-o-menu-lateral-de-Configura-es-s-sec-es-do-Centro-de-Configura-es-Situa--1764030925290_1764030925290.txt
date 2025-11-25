@@ -1,0 +1,145 @@
+🔧 FASE 33.5 – Ligar o menu lateral de “Configurações” às secções do Centro de Configurações
+
+Situação actual:
+
+Dentro de /admin/empresa, as tabs de secção no topo (Empresa & Equipa / Visitas & Tarefas / IA & Produtividade / Alertas & Relatórios / Integrações) já funcionam bem com activeSection em useState ✅
+
+O menu que abre a partir do botão ⚙️ “Definições” no rodapé mostra:
+
+Empresa & Equipa
+
+Visitas & Tarefas
+
+IA & Produtividade
+
+Alertas & Relatórios
+
+Integrações
+
+Porém, clicar nessas opções não muda a secção:
+
+O menu fecha, mas fico sempre na mesma secção.
+
+🎯 Objectivo:
+
+Ao clicar numa opção do menu ⚙️, quero ir para /admin/empresa já com a secção correcta activa.
+
+Exemplo:
+
+“Visitas & Tarefas” → abre /admin/empresa com a secção “visitas” activa.
+
+Vamos usar uma solução simples:
+
+O menu ⚙️ navega para /admin/empresa?section=...
+
+O componente AdminEmpresa lê esse query param uma vez ao montar e inicializa o activeSection.
+
+1. Ajustar o menu ⚙️ “Definições”
+
+No componente onde renderizas o menu de “Configurações” (o dropdown/sheet que aparece quando clico no botão ⚙️ no rodapé):
+
+Garante que cada item faz navigate com um section diferente:
+
+// pseudo-código, ajusta ao router que estás a usar
+const [_, navigate] = useLocation();
+
+function goToSection(sectionId: SectionId) {
+  navigate(`/admin/empresa?section=${sectionId}`);
+}
+
+<DropdownMenuItem onClick={() => goToSection("empresa")}>
+  Empresa & Equipa
+</DropdownMenuItem>
+<DropdownMenuItem onClick={() => goToSection("visitas")}>
+  Visitas & Tarefas
+</DropdownMenuItem>
+<DropdownMenuItem onClick={() => goToSection("ia")}>
+  IA & Produtividade
+</DropdownMenuItem>
+<DropdownMenuItem onClick={() => goToSection("alertas")}>
+  Alertas & Relatórios
+</DropdownMenuItem>
+<DropdownMenuItem onClick={() => goToSection("integracoes")}>
+  Integrações
+</DropdownMenuItem>
+
+
+Não é preciso fazer mais nada aqui: só navegar para a URL com ?section=....
+
+2. Ler section da URL para inicializar o activeSection
+
+No AdminEmpresa.tsx, onde já tens:
+
+const [activeSection, setActiveSection] = useState<SectionId>("empresa");
+
+
+adiciona um useEffect simples que corre ao montar e olha para o query param:
+
+useEffect(() => {
+  // lê search da localização actual (ajusta ao teu router)
+  const search = window.location.search;
+  const params = new URLSearchParams(search);
+  const fromQuery = params.get("section") as SectionId | null;
+  const validIds: SectionId[] = ["empresa", "visitas", "ia", "alertas", "integracoes"];
+
+  if (fromQuery && validIds.includes(fromQuery)) {
+    setActiveSection(fromQuery);
+  }
+}, []);
+
+
+Requisitos:
+
+Este efeito só precisa de correr uma vez (array de deps [] é suficiente).
+
+As tabs de topo continuam a mudar activeSection com setActiveSection(...) como já fazem agora.
+
+Não voltes a complicar com sincronização contínua da URL – basta usar o query param apenas para o valor inicial.
+
+3. Testes a fazer
+
+Em qualquer página, clicar em ⚙️ → “Empresa & Equipa”:
+
+Deve navegar para /admin/empresa?section=empresa.
+
+O Centro de Configurações abre na secção Empresa & Equipa.
+
+Clicar em ⚙️ → “Visitas & Tarefas”:
+
+Navega para /admin/empresa?section=visitas.
+
+O Centro abre com Visitas & Tarefas activa (conteúdo muda).
+
+Repetir para:
+
+IA & Produtividade → section=ia
+
+Alertas & Relatórios → section=alertas
+
+Integrações → section=integracoes
+
+Abrir directamente a URL no browser, por exemplo:
+
+/admin/empresa?section=ia
+
+/admin/empresa?section=integracoes
+
+Em cada caso, a secção correcta deve aparecer activa à primeira.
+
+4. Relatório rápido
+
+No relatório desta fase, por favor descreve:
+
+Como ficou o onClick dos items do menu ⚙️ (que section usa cada um).
+
+O useEffect que inicializa activeSection a partir do query param.
+
+Resultado dos testes do ponto 3.
+
+🎯 Objetivo final:
+
+As tabs internas já funcionam (OK).
+
+Agora, o menu ⚙️ “Configurações” também passa a servir de atalho directo para cada secção do Centro de Configurações.
+
+Em qualquer navegação, menu lateral + tabs topo apontam para a mesma secção activa.

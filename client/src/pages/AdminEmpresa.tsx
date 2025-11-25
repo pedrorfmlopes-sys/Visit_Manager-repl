@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Empresa, User, Marca } from "@shared/schema";
 import { Upload, Building2, Bell, Zap, Lightbulb, MapPin, Calendar, PlugZap } from "lucide-react";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import AdminEntidadeTipos from "@/pages/AdminEntidadeTipos";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminMarcas from "@/pages/AdminMarcas";
@@ -50,6 +50,18 @@ export default function AdminEmpresa() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [activeSection, setActiveSection] = useState<SectionId>("empresa");
+
+  // ✅ Ler section do query param na inicialização
+  useEffect(() => {
+    const search = window.location.search;
+    const params = new URLSearchParams(search);
+    const fromQuery = params.get("section") as SectionId | null;
+    const validIds: SectionId[] = ["empresa", "visitas", "ia", "alertas", "integracoes"];
+
+    if (fromQuery && validIds.includes(fromQuery)) {
+      setActiveSection(fromQuery);
+    }
+  }, []);
 
   const { data: empresa, isLoading, error } = useQuery<Empresa>({
     queryKey: ["/api/admin/empresa"],
