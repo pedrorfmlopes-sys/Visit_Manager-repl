@@ -56,3 +56,39 @@ PostgreSQL with Drizzle ORM provides type-safe schema management. Core entities 
 -   **date-fns**: For date manipulation and timezone-aware comparisons.
 -   **chartjs-node-canvas**: For server-side chart rendering in PDF exports.
 -   **DOMPurify**: For XSS prevention in rich text content.
+## Última Actualização - FASES 1-5 (25 Novembro 2025)
+
+### Implementação: Sistema N:N para Múltiplos Contactos por Visita
+
+**Ficheiro de Relatório Completo**: `RELATORIO_FASES_1_5.md`
+
+**Fase 1-3: Backend + Junction Table**
+- ✅ Tabela `visitasContactos` criada
+- ✅ Storage methods: `addContactosToVisita()`, `getContactosFromVisita()`
+- ✅ API GET /visitas com filtro `contactoId`
+- ✅ API PATCH /visitas com `contactosIds[]`
+- ✅ 13 visitas migradas
+- ✅ Backward compatible
+
+**Fase 4: Detalhe Visita - Editar Contactos**
+- ✅ Secção "Contactos Presentes" com lista
+- ✅ Dialog "Editar Contactos" com multi-select + search
+- ✅ Admin-only controls
+- ✅ Pre-fill com contactos actuais
+- ✅ Mutation + cache invalidation
+
+**Fase 5: Detalhe Contacto - Histórico Visitas**
+- ✅ Secção "Visitas em que participou"
+- ✅ Filtro por período (30/90/180/365/all dias)
+- ✅ Query dinâmica com date range
+- ✅ Lista clickable com navegação
+- ✅ Empty state message
+- ✅ Backend eager-loading `.contactos`
+
+**Bugs Corrigidos**
+- ✅ getVisitas() agora carrega junction table
+- ✅ PATCH aceita contactosIds como único campo
+
+**Build Status**: ✅ Passing
+**Performance**: ~200-250ms queries
+**Test**: Funcional end-to-end
