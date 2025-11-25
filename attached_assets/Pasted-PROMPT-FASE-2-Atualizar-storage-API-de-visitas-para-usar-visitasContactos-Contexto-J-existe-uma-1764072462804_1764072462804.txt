@@ -1,0 +1,129 @@
+PROMPT FASE 2 – Atualizar storage/API de visitas para usar visitasContactos
+
+Contexto:
+Já existe uma tabela de junção visitas_contactos criada na fase anterior. Agora vamos começar a expô-la na API, mas sem ainda mexer no frontend.
+
+Objetivo desta fase:
+
+Fazer com que o detalhe da visita devolva a lista de contactos presentes.
+
+Fazer com que o endpoint de listagem de visitas consiga filtrar por contactoId usando a nova tabela.
+
+Preparar a API para aceitar um array contactosIds na criação/edição de visitas (ainda sem obrigar o frontend a enviar isso).
+
+Tarefas
+
+Detetar onde está o storage e as rotas de visitas
+
+Procura o módulo de storage das visitas (por ex.: server/storage/visitas.ts ou similar).
+
+Procura as rotas associadas (server/routes/visitas.ts ou equivalente) com endpoints tipo:
+
+GET /api/visitas/:id
+
+GET /api/visitas
+
+POST /api/visitas
+
+PUT /api/visitas/:id
+
+Adicionar contactos presentes ao detalhe da visita
+
+No método de storage que devolve o detalhe da visita (ex.: getVisitaById / getVisitaDetalhe):
+
+Junta à query a tabela visitas_contactos e contactos para obter uma lista de contactos dessa visita.
+
+Garante filtragem por empresaId como já é feito para outras entidades.
+
+Estrutura de retorno:
+
+Mantém tudo o que já existe (para não quebrar o frontend actual).
+
+Adiciona um campo novo, por ex.:
+
+contactosPresentes: Array<{
+  id: string;
+  nome: string;
+  email?: string | null;
+  telefone?: string | null;
+  role?: string | null;
+}>
+
+
+Atualiza os tipos DTO usados na rota de detalhe de visita, se existirem, para incluir este array.
+
+Filtro contactoId em GET /api/visitas
+
+No endpoint de listagem de visitas (GET /api/visitas):
+
+Se já existir um filtro contactoId, adapta-o para usar a tabela visitas_contactos.
+
+Se ainda não existir, adiciona um filtro opcional contactoId à query string.
+
+Implementação no storage:
+
+Quando contactoId é fornecido:
+
+Faz join com visitas_contactos e filtra por visitas_contactos.contacto_id = contactoId.
+
+Mantém todos os outros filtros já existentes (from, to, search, status, userId, etc.).
+
+Continua a respeitar empresaId e qualquer regra de RBAC actual (ex.: agentes só vêem as suas visitas).
+
+Aceitar contactosIds na criação/edição de visita
+
+Nos schemas de validação (Zod) para criação/edição de visita:
+
+Adiciona um campo opcional contactosIds?: string[].
+
+No POST /api/visitas:
+
+Continua a criar a visita como hoje.
+
+Após criar a visita, se contactosIds vier preenchido:
+
+Insere linhas em visitas_contactos para cada contactoId:
+
+empresaId = empresaId do contexto.
+
+visitaId = id da visita recém-criada.
+
+contactoId = cada elemento de contactosIds.
+
+No PUT /api/visitas/:id:
+
+Se contactosIds não vier no body, não mexas nas associações.
+
+Se contactosIds vier no body:
+
+Sincroniza a tabela visitas_contactos para essa visita:
+
+Apaga associações que deixaram de existir.
+
+Cria novas associações em falta.
+
+Garante que apenas mexes em registos dessa empresaId.
+
+Compatibilidade com o campo contactoId antigo
+
+Não apagues nem alteres o uso actual de visitas.contactoId nesta fase.
+
+Apenas adiciona suporte à nova estrutura (visitas_contactos) e filtros por contactoId.
+
+Critérios de aceitação
+
+GET /api/visitas/:id:
+
+Continua a funcionar como antes, mas agora inclui o campo contactosPresentes com a lista de contactos da visita (pode ser array vazio).
+
+GET /api/visitas?contactoId=...:
+
+Devolve apenas as visitas em que esse contacto está associado via visitas_contactos.
+
+Continua a respeitar os outros filtros que já existiam.
+
+POST /api/visitas e PUT /api/visitas/:id:
+
+Funcionam como antes se não for enviado contactosIds.
+
+Se for enviado contactosIds, criam/actualizam as linhas em visitas_contactos correctamente.

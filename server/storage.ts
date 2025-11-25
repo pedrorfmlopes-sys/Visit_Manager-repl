@@ -9,6 +9,7 @@ import {
   marcas,
   visitasMarcas,
   visitasAudio,
+  visitasContactos,
   lembretes,
   type Empresa,
   type InsertEmpresa,
@@ -105,6 +106,10 @@ export interface IStorage {
   // PASSO 7: Migration function
   migrateEntidadeTipos(): Promise<{ empresasProcessadas: number; entidadesMigradas: number; tiposCriados: number }>;
   
+  // FASE 1: Contactos management for visitas
+  addContactosToVisita(visitaId: string, contactosIds: string[], empresaId: string): Promise<void>;
+  getContactosFromVisita(visitaId: string, empresaId: string): Promise<Array<{ id: string; nome: string; email?: string | null; telefone?: string | null; role?: string | null }>>;
+
   // FASE 6: Audio management
   addAudioToVisita(visitaId: string, fileUrl: string, empresaId: string): Promise<VisitasAudio>;
   getVisitasAudio(visitaId: string, empresaId: string): Promise<VisitasAudio[]>;
@@ -618,6 +623,52 @@ export class DatabaseStorage implements IStorage {
       }));
       await db.insert(visitasMarcas).values(marcasData);
     }
+  }
+
+  // FASE 1: Add contactos to visita (multiple contacts per visit)
+  async addContactosToVisita(visitaId: string, contactosIds: string[], empresaId: string): Promise<void> {
+    if (!contactosIds || contactosIds.length === 0) return;
+    
+    // Delete existing contactos for this visita
+    await db.delete(visitasContactos).where(eq(visitasContactos.visitaId, visitaId));
+    
+    // Insert new contactos
+    if (contactosIds.length > 0) {
+      const contactosData = contactosIds.map(contactoId => ({
+        visitaId,
+        contactoId,
+        empresaId,
+      }));
+      await db.insert(visitasContactos).values(contactosData);
+    }
+  }
+
+  // FASE 1: Get contactos for a visita
+  async getContactosFromVisita(visitaId: string, empresaId: string): Promise<Array<{ id: string; nome: string; email?: string | null; telefone?: string | null; role?: string | null }>> {
+    const records = await db.query.visitasContactos.findMany({
+      where: and(
+        eq(visitasContactos.visitaId, visitaId),
+        eq(visitasContactos.empresaId, empresaId)
+      ),
+      with: {
+        contacto: {
+          columns: {
+            id: true,
+            nome: true,
+            email: true,
+            telemovel: true,
+          }
+        }
+      },
+    });
+    
+    return records.map(r => ({
+      id: r.contacto.id,
+      nome: r.contacto.nome,
+      email: r.contacto.email || null,
+      telefone: r.contacto.telemovel || null,
+      role: r.role,
+    }));
   }
 
   // FASE 6: Audio management

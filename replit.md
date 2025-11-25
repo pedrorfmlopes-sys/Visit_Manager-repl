@@ -110,3 +110,20 @@ PostgreSQL with Drizzle ORM is used for type-safe schema management. Core entiti
 - **Stats**: 5 funções render, 1 switch statement, 5 query params, 26 filtros consolidados
 - **Status**: ✅ Completo, renderização condicional funcional, navegação limpa, DOM otimizado
 
+### FASE 1: Suporte para Múltiplos Contactos por Visita (✅ Completo)
+- **Schema**: Tabela `visitasContactos` junction criada com (visitaId, contactoId, empresaId, role)
+- **Tipos TypeScript**: InsertVisita estendido com campo `contactosIds: string[]` (opcional)
+- **Storage Methods** (server/storage.ts):
+  - `addContactosToVisita()` - Gerencia inserção/atualização de contactos (delete + insert)
+  - `getContactosFromVisita()` - Retorna array de contactos com (id, nome, email, telefone, role)
+- **API Endpoints Atualizados**:
+  - **GET /api/visitas/:id** - Retorna visita + `contactosPresentes` array (13 contactos por visita em demo)
+  - **GET /api/visitas** - Filtra por `contactoId` usando junction table (não apenas legacy contactoId)
+  - **POST /api/visitas** - Aceita `contactosIds` array, cria junction records em paralelo com marcas
+  - **PATCH /api/visitas/:id** - Sincroniza `contactosIds` (delete + insert de junction table)
+- **Dados Existentes**: 13 recordes migrados automaticamente de `visitas.contactoId` para `visitasContactos`
+- **Multi-Tenant**: Todos os queries filtram por `empresaId` para isolamento de dados
+- **Stats**: 2 métodos storage + 1 método interface, 4 rotas atualizadas, build ✅ passing
+- **Status**: ✅ Fase 1 Backend Completo (API routes, storage, schema, tipo-seguro)
+- **Próximos Passos**: FASE 2 (Frontend UI para CRUD de contactos em visitas)
+

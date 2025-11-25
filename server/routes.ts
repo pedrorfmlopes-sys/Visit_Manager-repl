@@ -1301,8 +1301,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // FASE 29: Entidade filter
         if (entidadeId && v.entidadeId !== entidadeId) return false;
         
-        // FASE 29: Contacto filter
-        if (contactoId && v.contactoId !== contactoId) return false;
+        // FASE 29: Contacto filter (deprecated - use FASE 1 visitasContactos)
+        // FASE 1: Filter using visitasContactos junction table
+        if (contactoId) {
+          const hasContacto = v.contactos && v.contactos.some((vc: any) => vc.contactoId === contactoId);
+          if (!hasContacto) return false;
+        }
         
         // Audio to transcribe filter
         if (hasAudioToTranscribe) {
@@ -1329,7 +1333,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!visita) {
         return res.status(404).json({ message: "Visita not found" });
       }
-      res.json(visita);
+      
+      // FASE 1: Get contactos presentes from visitasContactos table
+      const contactosPresentes = await storage.getContactosFromVisita(req.params.id, empresaId);
+      
+      // Return visita with contactosPresentes array
+      res.json({
+        ...visita,
+        contactosPresentes,
+      });
     } catch (error) {
       console.error("Error fetching visita:", error);
       res.status(500).json({ message: "Failed to fetch visita" });
@@ -1608,6 +1620,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // FASE 1: Add contactos to visita if provided
+      if (req.body.contactosIds) {
+        try {
+          let contactosIds: string[] = [];
+          if (typeof req.body.contactosIds === 'string') {
+            contactosIds = JSON.parse(req.body.contactosIds);
+          } else if (Array.isArray(req.body.contactosIds)) {
+            contactosIds = req.body.contactosIds;
+          }
+          if (Array.isArray(contactosIds) && contactosIds.length > 0) {
+            await storage.addContactosToVisita(visita.id, contactosIds, empresaId);
+          }
+        } catch (error) {
+          console.error("Error adding contactos to visita:", error);
+        }
+      }
+
       // Generate AI summary asynchronously
       const visitaComplete = await storage.getVisita(visita.id, empresaId, userId, userRole);
       if (visitaComplete) {
@@ -1742,6 +1771,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updated = await storage.updateVisita(req.params.id, updates, empresaId, userId, userRole);
       if (!updated) {
         return res.status(404).json({ message: "Visita not found" });
+      }
+      
+      // FASE 1: Sync contactos if provided in update
+      if (req.body.contactosIds !== undefined) {
+        try {
+          let contactosIds: string[] = [];
+          if (typeof req.body.contactosIds === 'string') {
+            contactosIds = JSON.parse(req.body.contactosIds);
+          } else if (Array.isArray(req.body.contactosIds)) {
+            contactosIds = req.body.contactosIds;
+          }
+          if (Array.isArray(contactosIds) && contactosIds.length > 0) {
+            await storage.addContactosToVisita(req.params.id, contactosIds, empresaId);
+          } else {
+            // If empty array, delete all contactos for this visita
+            await storage.addContactosToVisita(req.params.id, [], empresaId);
+          }
+        } catch (error) {
+          console.error("Error updating contactos for visita:", error);
+        }
       }
       
       res.json(updated);

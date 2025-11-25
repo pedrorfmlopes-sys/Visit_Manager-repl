@@ -606,6 +606,9 @@ export const insertVisitaSchema = createInsertSchema(visitas).omit({
   lastCalendarSyncAt: true,
   proximaVisitaStatus: true, // FASE 20: Set by backend
   proximaVisitaStatusData: true, // FASE 20: Set by backend
+}).extend({
+  // FASE 1: Multiple contacts per visit (optional)
+  contactosIds: z.array(z.string().uuid()).optional(),
 });
 
 export type InsertVisita = z.infer<typeof insertVisitaSchema>;
