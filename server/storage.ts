@@ -221,24 +221,29 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(users).orderBy(users.email);
   }
 
+  // ============ ENTIDADES RBAC HELPER (STEP 1: Centralized Access Control) ============
+  private buildEntidadeAccessWhere(empresaId: string, userId: string, userRole: 'admin' | 'agent') {
+    if (userRole === 'admin') {
+      // Admin vê todas as entidades da empresa
+      return eq(entidades.empresaId, empresaId);
+    }
+
+    // Agent: só entidades da empresa em que é criador ou assigned
+    return and(
+      eq(entidades.empresaId, empresaId),
+      or(
+        eq(entidades.createdByUserId, userId),
+        eq(entidades.assignedUserId, userId)
+      )
+    );
+  }
+
   // Entidades (Universal Entities) - FASE 2: filtered by empresaId
   async getEntidades(empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<Entidade[]> {
-    // Always filter by empresaId; then apply RBAC
-    let whereClause;
-    if (userRole === 'agent') {
-      whereClause = and(
-        eq(entidades.empresaId, empresaId),
-        or(
-          eq(entidades.createdByUserId, userId),
-          eq(entidades.assignedUserId, userId)
-        )
-      );
-    } else {
-      whereClause = eq(entidades.empresaId, empresaId);
-    }
+    const baseWhere = this.buildEntidadeAccessWhere(empresaId, userId, userRole);
     
     return db.query.entidades.findMany({
-      where: whereClause,
+      where: baseWhere,
       orderBy: desc(entidades.createdAt),
       with: {
         assignedUser: true,
@@ -249,30 +254,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getEntidade(id: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<EntidadeWithRelations | undefined> {
-    // FASE 2: Always include empresaId in where clause
-    console.log("[storage.getEntidade] called with", {
-      id,
-      empresaId,
-      userId,
-      userRole,
-    });
-    
-    let whereClause;
-    if (userRole === 'admin') {
-      whereClause = and(
-        eq(entidades.id, id),
-        eq(entidades.empresaId, empresaId)
-      );
-    } else {
-      whereClause = and(
-        eq(entidades.id, id),
-        eq(entidades.empresaId, empresaId),
-        or(
-          eq(entidades.createdByUserId, userId),
-          eq(entidades.assignedUserId, userId)
-        )
-      );
-    }
+    const baseWhere = this.buildEntidadeAccessWhere(empresaId, userId, userRole);
+    const whereClause = and(eq(entidades.id, id), baseWhere);
+
+    console.log("[storage.getEntidade] called with", { id, empresaId, userId, userRole });
     
     const [entidade] = await db.query.entidades.findMany({
       where: whereClause,
@@ -286,11 +271,7 @@ export class DatabaseStorage implements IStorage {
       },
     });
     
-    console.log("[storage.getEntidade] DB result", {
-      id,
-      empresaId,
-      found: !!entidade,
-    });
+    console.log("[storage.getEntidade] DB result", { id, empresaId, found: !!entidade });
     
     return entidade;
   }

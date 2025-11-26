@@ -2837,7 +2837,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/pdf/agente/:id/relatorio-mensal', isAuthenticated, async (req, res) => {
     try {
       const { id: targetUserId } = req.params;
-      const { userId, userRole } = await getUserContext(req);
+      const { userId, userRole, empresaId } = await getUserContext(req);
       const { year, month, includePhotos, includeTasks, includeIA, includeCharts } = req.query;
       
       // RBAC: Agente só pode ver seus próprios relatórios, admin pode ver todos
@@ -2853,7 +2853,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const visitas = await storage.getVisitasInPeriod(periodStart, periodEnd, targetUserId, userRole);
       const tarefas = await storage.getTarefasInPeriod(periodStart, periodEnd, targetUserId, userRole);
-      const entidades = await storage.getAllEntidades(targetUserId, userRole);
+      const entidades = await storage.getAllEntidades(empresaId, targetUserId, userRole);
       
       const { generateMonthlyReportPDF } = await import('./pdfPro');
       const { getOpenAIClient } = await import('./openai');
@@ -2891,7 +2891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/pdf/agente/:id/relatorio-semanal', isAuthenticated, async (req, res) => {
     try {
       const { id: targetUserId } = req.params;
-      const { userId, userRole } = await getUserContext(req);
+      const { userId, userRole, empresaId } = await getUserContext(req);
       const { date, includePhotos, includeTasks, includeIA, includeCharts } = req.query;
       
       // RBAC: Agente só pode ver seus próprios relatórios, admin pode ver todos
@@ -2905,7 +2905,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const visitas = await storage.getVisitasInPeriod(periodStart, periodEnd, targetUserId, userRole);
       const tarefas = await storage.getTarefasInPeriod(periodStart, periodEnd, targetUserId, userRole);
-      const entidades = await storage.getAllEntidades(targetUserId, userRole);
+      const entidades = await storage.getAllEntidades(empresaId, targetUserId, userRole);
       
       const { generateMonthlyReportPDF } = await import('./pdfPro');
       const { getOpenAIClient } = await import('./openai');
@@ -2942,7 +2942,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/pdf/empresa/relatorio-mensal - Relatório mensal da empresa (Admin only)
   app.get('/api/pdf/empresa/relatorio-mensal', isAuthenticated, async (req, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
+      const { userId, userRole, empresaId } = await getUserContext(req);
       const { year, month, includePhotos, includeTasks, includeIA, includeCharts } = req.query;
       
       // RBAC: Admin only
@@ -2959,7 +2959,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Admin vê tudo
       const visitas = await storage.getVisitasInPeriod(periodStart, periodEnd, userId, userRole);
       const tarefas = await storage.getTarefasInPeriod(periodStart, periodEnd, userId, userRole);
-      const entidades = await storage.getAllEntidades(userId, userRole);
+      const entidades = await storage.getAllEntidades(empresaId, userId, userRole);
       
       const { generateMonthlyReportPDF } = await import('./pdfPro');
       const { getOpenAIClient } = await import('./openai');
@@ -2998,7 +2998,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/pdf/reports/monthly/agent - Relatório mensal do agente atual
   app.get('/api/pdf/reports/monthly/agent', isAuthenticated, async (req, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
+      const { userId, userRole, empresaId } = await getUserContext(req);
       const { year, month } = req.query;
       
       const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
@@ -3009,7 +3009,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const visitas = await storage.getVisitasInPeriod(periodStart, periodEnd, userId, userRole);
       const tarefas = await storage.getTarefasInPeriod(periodStart, periodEnd, userId, userRole);
-      const entidades = await storage.getAllEntidades(userId, userRole);
+      const entidades = await storage.getAllEntidades(empresaId, userId, userRole);
       
       const { generateMonthlyReportPDF } = await import('./pdfPro');
       const { getOpenAIClient } = await import('./openai');
@@ -3046,7 +3046,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/pdf/reports/weekly/agent - Relatório semanal do agente atual
   app.get('/api/pdf/reports/weekly/agent', isAuthenticated, async (req, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
+      const { userId, userRole, empresaId } = await getUserContext(req);
       const { date } = req.query;
       
       const referenceDate = date ? new Date(date as string) : new Date();
@@ -3055,7 +3055,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const visitas = await storage.getVisitasInPeriod(periodStart, periodEnd, userId, userRole);
       const tarefas = await storage.getTarefasInPeriod(periodStart, periodEnd, userId, userRole);
-      const entidades = await storage.getAllEntidades(userId, userRole);
+      const entidades = await storage.getAllEntidades(empresaId, userId, userRole);
       
       const { generateMonthlyReportPDF } = await import('./pdfPro');
       const { getOpenAIClient } = await import('./openai');
@@ -3092,7 +3092,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/pdf/reports/monthly/company - Relatório mensal da empresa (Admin only)
   app.get('/api/pdf/reports/monthly/company', isAuthenticated, async (req, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
+      const { userId, userRole, empresaId } = await getUserContext(req);
       const { year, month } = req.query;
       
       // RBAC: Admin only
@@ -3108,7 +3108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const visitas = await storage.getVisitasInPeriod(periodStart, periodEnd, userId, userRole);
       const tarefas = await storage.getTarefasInPeriod(periodStart, periodEnd, userId, userRole);
-      const entidades = await storage.getAllEntidades(userId, userRole);
+      const entidades = await storage.getAllEntidades(empresaId, userId, userRole);
       
       const { generateMonthlyReportPDF } = await import('./pdfPro');
       const { getOpenAIClient } = await import('./openai');
@@ -3145,7 +3145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/pdf/reports/weekly/company - Relatório semanal da empresa (Admin only)
   app.get('/api/pdf/reports/weekly/company', isAuthenticated, async (req, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
+      const { userId, userRole, empresaId } = await getUserContext(req);
       const { date } = req.query;
       
       // RBAC: Admin only
@@ -3159,7 +3159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const visitas = await storage.getVisitasInPeriod(periodStart, periodEnd, userId, userRole);
       const tarefas = await storage.getTarefasInPeriod(periodStart, periodEnd, userId, userRole);
-      const entidades = await storage.getAllEntidades(userId, userRole);
+      const entidades = await storage.getAllEntidades(empresaId, userId, userRole);
       
       const { generateMonthlyReportPDF } = await import('./pdfPro');
       const { getOpenAIClient } = await import('./openai');
