@@ -1,0 +1,228 @@
+PROMPT PARA O AGENT – ODOO-UI-CONTACTOS-STEP1 (Apenas leitura)
+
+Objetivo:
+Na página de detalhe de Contacto, criar um card “Odoo” idêntico ao das Entidades, mas por agora só com:
+
+visualização do estado da ligação (odooPartnerId),
+
+botão para ir buscar detalhes do parceiro (GET /api/integrations/odoo/partner/:id),
+
+renderização dos dados do parceiro / erros.
+
+⚠️ Neste step NÃO há pesquisa nem link/unlink. Só leitura.
+
+1) Localizar o componente de detalhe de Contacto
+
+Procura o componente React da página de detalhe de contacto, rota tipo:
+/backoffice/contactos/:id.
+
+Nomes prováveis:
+
+client/src/pages/Contactos/ContactoDetailPage.tsx
+
+ou algo como client/src/features/contactos/ContactoDetail.tsx.
+
+Garante que esse componente já recebe o objeto contacto da API (GET /api/contactos/:id), incluindo o campo opcional:
+
+odooPartnerId?: string | null.
+
+Não alteres ainda a forma de carregar o contacto. Só vamos acrescentar UI e chamadas à API Odoo.
+
+2) Adicionar estado para parceiro Odoo no detalhe de Contacto
+
+No componente de detalhe de Contacto, adiciona:
+
+type OdooPartner = {
+  id: number;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  mobile?: string | null;
+  vat?: string | null;
+  city?: string | null;
+  country?: string | null;
+  street?: string | null;
+};
+
+const [odooPartner, setOdooPartner] = useState<OdooPartner | null>(null);
+const [odooPartnerLoading, setOdooPartnerLoading] = useState(false);
+const [odooPartnerError, setOdooPartnerError] = useState<string | null>(null);
+const [odooNotConfigured, setOdooNotConfigured] = useState(false);
+
+
+Usa os mesmos imports (useState, etc.) e padrão que já tens em EntidadeDetail.tsx.
+
+3) Handler para ir buscar parceiro Odoo por ID
+
+Ainda no componente de Contacto, cria uma função parecida com a de Entidades:
+
+const handleFetchOdooPartner = async () => {
+  if (!contacto?.odooPartnerId) return;
+
+  const partnerIdNum = Number(contacto.odooPartnerId);
+  if (Number.isNaN(partnerIdNum)) {
+    setOdooPartnerError("ID de parceiro Odoo inválido.");
+    return;
+  }
+
+  setOdooPartnerLoading(true);
+  setOdooPartnerError(null);
+  setOdooNotConfigured(false);
+
+  try {
+    const response = await fetch(`/api/integrations/odoo/partner/${partnerIdNum}`, {
+      method: "GET",
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        setOdooPartner(null);
+        setOdooPartnerError("Parceiro não encontrado no Odoo.");
+        return;
+      }
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.notConfigured) {
+      setOdooNotConfigured(true);
+      setOdooPartner(null);
+      return;
+    }
+
+    setOdooPartner(data.partner ?? null);
+  } catch (error) {
+    console.error("[Odoo] Error fetching partner for contacto:", error);
+    setOdooPartnerError("Erro ao carregar parceiro do Odoo.");
+  } finally {
+    setOdooPartnerLoading(false);
+  }
+};
+
+4) Card “Odoo” no detalhe de Contacto
+
+No JSX do detalhe do Contacto, adiciona um card semelhante ao das Entidades (usa a mesma UI lib e classes já usadas para outros cards):
+
+Caso 1 – contacto NÃO ligado ao Odoo (!contacto.odooPartnerId):
+
+<Card>
+  <CardHeader>
+    <CardTitle>Odoo</CardTitle>
+    <CardDescription>
+      Integração com parceiros Odoo para este contacto.
+    </CardDescription>
+  </CardHeader>
+  <CardContent>
+    <p className="text-sm text-muted-foreground">
+      Este contacto ainda não está ligado a nenhum parceiro Odoo.
+    </p>
+    <p className="mt-1 text-xs text-muted-foreground">
+      A ligação manual será configurada numa próxima etapa.
+    </p>
+  </CardContent>
+</Card>
+
+
+Caso 2 – contacto LIGADO ao Odoo (contacto.odooPartnerId truthy):
+
+No mesmo card, troca o conteúdo para algo como:
+
+<Card>
+  <CardHeader>
+    <CardTitle>Odoo</CardTitle>
+    <CardDescription>
+      Detalhes do parceiro Odoo associado a este contacto.
+    </CardDescription>
+  </CardHeader>
+  <CardContent className="space-y-3">
+    <p className="text-sm">
+      Ligado ao parceiro Odoo #{contacto.odooPartnerId}
+    </p>
+
+    <div className="flex flex-wrap items-center gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={handleFetchOdooPartner}
+        disabled={odooPartnerLoading}
+      >
+        {odooPartnerLoading ? "A carregar..." : "Ver detalhes do parceiro"}
+      </Button>
+    </div>
+
+    {odooNotConfigured && (
+      <p className="text-xs text-amber-600">
+        Integração Odoo ainda não está configurada para esta empresa.
+      </p>
+    )}
+
+    {odooPartnerError && (
+      <p className="text-xs text-red-600">
+        {odooPartnerError}
+      </p>
+    )}
+
+    {odooPartner && (
+      <div className="mt-2 space-y-1 text-sm">
+        <div>
+          <span className="font-medium">Nome: </span>
+          {odooPartner.name}
+        </div>
+        {odooPartner.email && (
+          <div>
+            <span className="font-medium">Email: </span>
+            {odooPartner.email}
+          </div>
+        )}
+        {(odooPartner.phone || odooPartner.mobile) && (
+          <div>
+            <span className="font-medium">Telefone: </span>
+            {[odooPartner.phone, odooPartner.mobile].filter(Boolean).join(" / ")}
+          </div>
+        )}
+        {odooPartner.vat && (
+          <div>
+            <span className="font-medium">NIF: </span>
+            {odooPartner.vat}
+          </div>
+        )}
+        {(odooPartner.street || odooPartner.city || odooPartner.country) && (
+          <div>
+            <span className="font-medium">Localização: </span>
+            {[odooPartner.street, odooPartner.city, odooPartner.country]
+              .filter(Boolean)
+              .join(", ")}
+          </div>
+        )}
+      </div>
+    )}
+  </CardContent>
+</Card>
+
+
+Mantém o estilo visual o mais semelhante possível ao card Odoo das Entidades, para consistência.
+
+5) Comando e testes
+
+Correr:
+
+npm run dev
+
+
+No browser:
+
+Abrir detalhe de um Contacto sem odooPartnerId:
+
+Ver o card “Odoo” com a mensagem “ainda não está ligado…”.
+
+Abrir detalhe de um Contacto com odooPartnerId (podes forçar um ID válido via DB ou API para teste):
+
+Ver “Ligado ao parceiro Odoo #ID”.
+
+Clicar em “Ver detalhes do parceiro”:
+
+Ver pedido GET /api/integrations/odoo/partner/:id no Network.
+
+Confirmar que os dados são exibidos correctamente ou que aparecem as mensagens de erro / não configurado.

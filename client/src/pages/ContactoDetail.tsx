@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, User, Phone, Mail, Building2, Edit, Share2, MessageCircle, Link as LinkIcon, Copy, FileText, Globe, MapPin, Linkedin, Instagram, Facebook, Sparkles, Trash2, Calendar } from "lucide-react";
+import { ArrowLeft, User, Phone, Mail, Building2, Edit, Share2, MessageCircle, Link as LinkIcon, Copy, FileText, Globe, MapPin, Linkedin, Instagram, Facebook, Sparkles, Trash2, Calendar, Store, AlertCircle } from "lucide-react";
 import { SiX } from "react-icons/si";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ShareDialog, useShareActions } from "@/components/ShareDialog";
 import { EmailAIDialog } from "@/components/EmailAIDialog";
 import { QuickActionButton } from "@/components/QuickActionButton";
@@ -24,6 +25,18 @@ type VisitasResponse =
   | { visitas: VisitaWithRelations[]; total?: number }
   | { items: VisitaWithRelations[]; total?: number };
 
+type OdooPartner = {
+  id: number;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  mobile?: string | null;
+  vat?: string | null;
+  city?: string | null;
+  country?: string | null;
+  street?: string | null;
+};
+
 export default function ContactoDetail() {
   const [, params] = useRoute("/contactos/:id/detalhes");
   const [, setLocation] = useLocation();
@@ -34,6 +47,11 @@ export default function ContactoDetail() {
   const queryClient = useQueryClient();
   // FASE 5: Filter period for visitas
   const [periodFilter, setPeriodFilter] = useState<"30" | "90" | "180" | "365" | "all">("90");
+  
+  const [odooPartner, setOdooPartner] = useState<OdooPartner | null>(null);
+  const [odooPartnerLoading, setOdooPartnerLoading] = useState(false);
+  const [odooPartnerError, setOdooPartnerError] = useState<string | null>(null);
+  const [odooNotConfigured, setOdooNotConfigured] = useState(false);
   
   const { isOnline, shareViaWhatsApp, shareViaEmail, copyToClipboard, copyLink } = useShareActions();
 
@@ -226,6 +244,51 @@ export default function ContactoDetail() {
       return;
     }
     window.open(url, '_blank');
+  };
+
+  const handleFetchOdooPartner = async () => {
+    if (!contacto?.odooPartnerId) return;
+
+    const partnerIdNum = Number(contacto.odooPartnerId);
+    if (Number.isNaN(partnerIdNum)) {
+      setOdooPartnerError("ID de parceiro Odoo inválido.");
+      return;
+    }
+
+    setOdooPartnerLoading(true);
+    setOdooPartnerError(null);
+    setOdooNotConfigured(false);
+
+    try {
+      const response = await fetch(`/api/integrations/odoo/partner/${partnerIdNum}`, {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          setOdooPartner(null);
+          setOdooPartnerError("Parceiro não encontrado no Odoo.");
+          return;
+        }
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.notConfigured) {
+        setOdooNotConfigured(true);
+        setOdooPartner(null);
+        return;
+      }
+
+      setOdooPartner(data.partner ?? null);
+    } catch (error) {
+      console.error("[Odoo] Error fetching partner for contacto:", error);
+      setOdooPartnerError("Erro ao carregar parceiro do Odoo.");
+    } finally {
+      setOdooPartnerLoading(false);
+    }
   };
 
   const shareText = formatContactForSharing(contacto);
@@ -467,6 +530,121 @@ export default function ContactoDetail() {
                 testId="button-quick-generate-email"
               />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Odoo Integration Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Store className="h-5 w-5" />
+              Odoo
+            </CardTitle>
+            {contacto.odooPartnerId ? (
+              <CardDescription>Detalhes do parceiro Odoo associado a este contacto.</CardDescription>
+            ) : (
+              <CardDescription>Integração com parceiros Odoo para este contacto.</CardDescription>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!contacto.odooPartnerId ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Este contacto ainda não está ligado a nenhum parceiro Odoo.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  A ligação manual será configurada numa próxima etapa.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Ligado ao parceiro Odoo </span>
+                  <span className="font-medium" data-testid="text-odoo-partner-id">
+                    #{contacto.odooPartnerId}
+                  </span>
+                </p>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleFetchOdooPartner}
+                    disabled={odooPartnerLoading}
+                    data-testid="button-odoo-fetch-partner"
+                  >
+                    {odooPartnerLoading ? "A carregar..." : "Ver detalhes do parceiro"}
+                  </Button>
+                </div>
+
+                {odooNotConfigured && (
+                  <Alert data-testid="alert-odoo-not-configured">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Integração não configurada</AlertTitle>
+                    <AlertDescription>
+                      Integração Odoo ainda não está configurada para esta empresa.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {odooPartnerError && (
+                  <Alert variant="destructive" data-testid="alert-odoo-error">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Erro</AlertTitle>
+                    <AlertDescription>{odooPartnerError}</AlertDescription>
+                  </Alert>
+                )}
+
+                {odooPartner && (
+                  <div className="space-y-3 pt-2 border-t">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Nome</p>
+                      <p className="font-medium" data-testid="text-odoo-partner-name">
+                        {odooPartner.name}
+                      </p>
+                    </div>
+
+                    {odooPartner.email && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Email</p>
+                        <p className="text-sm" data-testid="text-odoo-partner-email">
+                          {odooPartner.email}
+                        </p>
+                      </div>
+                    )}
+
+                    {(odooPartner.phone || odooPartner.mobile) && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Telefone</p>
+                        <p className="text-sm" data-testid="text-odoo-partner-phone">
+                          {[odooPartner.phone, odooPartner.mobile].filter(Boolean).join(" / ")}
+                        </p>
+                      </div>
+                    )}
+
+                    {odooPartner.vat && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">NIF</p>
+                        <p className="text-sm" data-testid="text-odoo-partner-vat">
+                          {odooPartner.vat}
+                        </p>
+                      </div>
+                    )}
+
+                    {(odooPartner.street || odooPartner.city || odooPartner.country) && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Localização</p>
+                        <p className="text-sm" data-testid="text-odoo-partner-location">
+                          {[odooPartner.street, odooPartner.city, odooPartner.country]
+                            .filter(Boolean)
+                            .join(", ")}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
 
