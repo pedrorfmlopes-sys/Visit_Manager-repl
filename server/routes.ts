@@ -549,8 +549,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      console.log("[Entidades] GET /api/entidades/:id", {
+        paramId: req.params.id,
+        userId,
+        userRole,
+        empresaId,
+      });
+      
       const entidade = await storage.getEntidade(req.params.id, empresaId, userId, userRole);
+      
       if (!entidade) {
+        console.log("[Entidades] storage.getEntidade result is null", {
+          paramId: req.params.id,
+          userId,
+          userRole,
+          empresaId,
+        });
         return res.status(404).json({ message: "Entidade not found" });
       }
       res.json(entidade);

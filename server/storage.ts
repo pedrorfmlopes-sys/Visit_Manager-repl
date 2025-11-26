@@ -250,6 +250,13 @@ export class DatabaseStorage implements IStorage {
 
   async getEntidade(id: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<EntidadeWithRelations | undefined> {
     // FASE 2: Always include empresaId in where clause
+    console.log("[storage.getEntidade] called with", {
+      id,
+      empresaId,
+      userId,
+      userRole,
+    });
+    
     let whereClause;
     if (userRole === 'admin') {
       whereClause = and(
@@ -279,11 +286,10 @@ export class DatabaseStorage implements IStorage {
       },
     });
     
-    console.log("[DEBUG ENTIDADE GET] entidade retornada com JOIN:", {
-      id: entidade?.id,
-      nome: entidade?.nome,
-      entidadeTipoId: entidade?.entidadeTipoId,
-      entidadeTipo: entidade?.entidadeTipo,
+    console.log("[storage.getEntidade] DB result", {
+      id,
+      empresaId,
+      found: !!entidade,
     });
     
     return entidade;

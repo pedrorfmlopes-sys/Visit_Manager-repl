@@ -1,0 +1,107 @@
+PROMPT PARA O AGENT – DEBUG-ENTIDADES-STEP2 (Logs + Confirmação de empresa/id)
+
+Objetivo:
+Adicionar logs no backend para perceber por que razão storage.getEntidade(...) está a devolver null quando clicamos num card de Entidade.
+
+1) Adicionar logs na rota /api/entidades/:id
+
+Ficheiro a editar:
+server/routes.ts (onde está definida a rota app.get('/api/entidades/:id', ...))
+
+Tarefas:
+
+Na rota /api/entidades/:id, logo após o getUserContext(req) e antes de chamar storage.getEntidade, adiciona:
+
+console.log("[Entidades] GET /api/entidades/:id", {
+  paramId: req.params.id,
+  userId,
+  userRole,
+  empresaId,
+});
+
+
+Logo antes do bloco:
+
+if (!entidade) {
+  return res.status(404).json({ message: "Entidade not found" });
+}
+
+
+adiciona:
+
+console.log("[Entidades] storage.getEntidade result is null", {
+  paramId: req.params.id,
+  userId,
+  userRole,
+  empresaId,
+});
+
+
+Não alteres mais nada nesta rota por agora.
+
+2) Adicionar log dentro de storage.getEntidade
+
+Ficheiro a editar:
+server/storage.ts (ou o ficheiro onde está definida getEntidade(id, empresaId, userId, userRole) – usar o nome real que já existe).
+
+Tarefas:
+
+Dentro da função getEntidade(...), antes de fazer a query à BD (db.select().from(entidades)...), adiciona:
+
+console.log("[storage.getEntidade] called with", {
+  id,
+  empresaId,
+  userId,
+  userRole,
+});
+
+
+Depois de obter o resultado da query (logo antes do return entidade), adiciona algo como:
+
+console.log("[storage.getEntidade] DB result", {
+  id,
+  empresaId,
+  found: !!entidade,
+});
+
+
+Mantém os nomes dos parâmetros exatamente como estão hoje na função, ajusta apenas o objeto do console.log se os nomes forem ligeiramente diferentes.
+
+3) Comandos a correr
+
+Na shell do Replit:
+
+npm run dev
+
+4) O que testar (tu, Pedro)
+
+No browser:
+
+Abre a lista de Entidades.
+
+Abre DevTools → Network.
+
+Clica num card que esteja a dar “Entidade não encontrada”.
+
+Confirma no Network:
+
+Qual é o URL exato da request?
+→ /api/entidades/<ID> (vê qual é o <ID>).
+
+No console do servidor (Replit):
+
+Vê as linhas de log:
+
+[Entidades] GET /api/entidades/:id → mostra paramId, empresaId, userId, userRole.
+
+[storage.getEntidade] called with ...
+
+[storage.getEntidade] DB result ... (vai dizer found: false neste caso).
+
+Tira nota dos valores:
+
+paramId
+
+empresaId
+
+found
