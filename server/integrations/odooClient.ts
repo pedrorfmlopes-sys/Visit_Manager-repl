@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { odooConnections } from "@shared/schema";
+import { odooConnections, empresas } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 export type OdooConnection = typeof odooConnections.$inferSelect;
@@ -27,6 +27,25 @@ export type CreateOdooLeadInput = {
   phone?: string | null;
   description?: string | null;
 };
+
+/**
+ * Valida se Odoo CRM está ativo para a empresa
+ */
+export async function assertOdooEnabled(empresaId: string): Promise<void> {
+  const empresa = await db.query.empresas.findFirst({
+    where: eq(empresas.id, empresaId),
+    columns: {
+      id: true,
+      odooCrmEnabled: true,
+    },
+  });
+
+  if (!empresa?.odooCrmEnabled) {
+    const error: any = new Error("ODOO_NOT_ENABLED");
+    error.code = "ODOO_NOT_ENABLED";
+    throw error;
+  }
+}
 
 /**
  * Busca a configuração Odoo para uma empresa

@@ -3,7 +3,7 @@ import { isAuthenticated } from "../../replitAuth";
 import { getUserContext } from "../../authContext";
 import { odooConnectionsStorage } from "../../storage/odooConnections";
 import { insertOdooConnectionSchema } from "@shared/schema";
-import { testOdooConnection, searchOdooPartners, getOdooPartnerById, createOdooLead } from "../../integrations/odooClient";
+import { testOdooConnection, searchOdooPartners, getOdooPartnerById, createOdooLead, assertOdooEnabled } from "../../integrations/odooClient";
 import { createLeadForVisita } from "../../integrations/odooLeadsFromVisitas";
 import express from "express";
 
@@ -88,6 +88,8 @@ export function setupOdooRoutes(app: any): void {
       if (!empresaId) {
         return res.status(400).json({ error: "User has no company assigned" });
       }
+
+      await assertOdooEnabled(empresaId);
 
       const partners = await searchOdooPartners(empresaId, q);
 

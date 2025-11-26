@@ -132,6 +132,8 @@ export const empresas = pgTable("empresas", {
       "enableFilterVisita": true
     }
   }'`),
+  // Odoo CRM Integration flag
+  odooCrmEnabled: boolean("odoo_crm_enabled").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

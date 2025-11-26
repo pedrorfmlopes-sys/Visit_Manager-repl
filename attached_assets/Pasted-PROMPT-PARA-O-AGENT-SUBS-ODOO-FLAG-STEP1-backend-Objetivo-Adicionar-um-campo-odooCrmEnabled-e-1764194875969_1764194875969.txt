@@ -1,0 +1,142 @@
+PROMPT PARA O AGENT – SUBS-ODOO-FLAG-STEP1 (backend)
+
+Objetivo:
+
+Adicionar um campo odooCrmEnabled em empresas.
+
+Criar um helper para validar se Odoo está ativo para a empresa.
+
+Usar esse helper nas rotas Odoo (search-partner, link, create-lead, etc.) para não chamar o Odoo quando a integração estiver desligada.
+
+1) Adicionar flag odooCrmEnabled em empresas
+
+Ficheiro a editar:
+shared/schema.ts
+
+Na definição da tabela empresas, adicionar o campo:
+
+odooCrmEnabled: boolean("odoo_crm_enabled").notNull().default(true),
+
+
+default(true) para não partir nada nas empresas atuais (Odoo continua ativo por defeito).
+
+Garante que o tipo TS exportado de empresas inclui este campo (se tiveres type Empresa = typeof empresas.$inferSelect, o campo já entra automaticamente).
+
+2) Sincronizar a BD
+
+Na shell:
+
+npm run db:push
+
+
+Confirma que não há erros e que a coluna odoo_crm_enabled foi criada na tabela empresas.
+
+3) Criar helper assertOdooEnabled
+
+Ficheiro a editar:
+server/integrations/odooClient.ts
+(onde já temos getOdooConnectionForEmpresa, callOdooJsonRpc, etc.)
+
+Importar db e empresas se ainda não estiverem importados aqui:
+
+import { db } from "../../shared/db";
+import { empresas } from "../../shared/schema";
+import { eq } from "drizzle-orm";
+
+
+Criar o helper:
+
+export async function assertOdooEnabled(empresaId: string): Promise<void> {
+  const empresa = await db.query.empresas.findFirst({
+    where: eq(empresas.id, empresaId),
+    columns: {
+      id: true,
+      odooCrmEnabled: true,
+    },
+  });
+
+  if (!empresa?.odooCrmEnabled) {
+    const error: any = new Error("ODOO_NOT_ENABLED");
+    error.code = "ODOO_NOT_ENABLED";
+    throw error;
+  }
+}
+
+4) Usar o helper nas rotas Odoo que chamam o Odoo
+
+Ficheiro a editar:
+server/routes/integrations/odoo.ts
+
+Importar o helper no topo:
+
+import { assertOdooEnabled } from "../../integrations/odooClient";
+
+
+Em todas as rotas que efetivamente falam com o Odoo, adicionar a verificação logo depois de obter empresaId:
+
+Rotas a tocar (exemplos):
+
+GET /api/integrations/odoo/search-partner
+
+GET /api/integrations/odoo/partner/:id
+
+POST /api/integrations/odoo/visitas/:id/create-lead
+
+Qualquer outra rota que use getOdooConnectionForEmpresa / callOdooJsonRpc.
+
+Em cada uma, depois de:
+
+const { empresaId } = await getUserContext(req);
+
+
+adicionar:
+
+await assertOdooEnabled(empresaId);
+
+
+No catch de cada rota, tratar o erro ODOO_NOT_ENABLED de forma amigável:
+
+} catch (error: any) {
+  if (error?.message === "ODOO_NOT_ENABLED" || error?.code === "ODOO_NOT_ENABLED") {
+    return res.status(200).json({
+      success: false,
+      notEnabled: true,
+      message: "Integração Odoo não está ativa para esta empresa.",
+    });
+  }
+
+  // resto do tratamento de erro já existente...
+}
+
+
+Mantém o resto do catch como está (logs, status 500, etc.).
+
+Nota:
+Não é preciso mexer no /status por agora – esse só diz se há config guardada. Vamos usar notEnabled apenas nas rotas “funcionais”.
+
+5) Comandos e teste rápido
+
+Na shell:
+
+npm run dev
+
+
+No browser:
+
+Testar normalmente (com a flag default true):
+
+Pesquisar parceiro Odoo numa Entidade → deve continuar a funcionar.
+
+Ligar/Desligar parceiro.
+
+Criar lead a partir de Visita.
+
+(Opcional, só para validar a flag)
+Se tiveres forma de editar a empresa na BD (ou via endpoint interno), mete odoo_crm_enabled = false e:
+
+tenta pesquisar parceiro / criar lead → a resposta deve vir com:
+
+{ "success": false, "notEnabled": true, ... }
+
+
+e o frontend deve parar de tentar fazer chamadas “a sério”.
