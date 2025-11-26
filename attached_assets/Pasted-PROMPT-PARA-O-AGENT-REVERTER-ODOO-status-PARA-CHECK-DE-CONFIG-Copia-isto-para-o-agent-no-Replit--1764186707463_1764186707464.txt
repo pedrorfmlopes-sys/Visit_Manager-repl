@@ -1,0 +1,89 @@
+PROMPT PARA O AGENT – REVERTER ODOO /status PARA CHECK DE CONFIG
+
+Copia isto para o agent no Replit:
+
+Objetivo:
+Simplificar GET /api/integrations/odoo/status para não fazer chamadas ao Odoo.
+A rota deve apenas dizer se existe configuração para a empresa atual.
+
+1) Editar server/routes/integrations/odoo.ts
+
+Abre o ficheiro server/routes/integrations/odoo.ts.
+
+Substitui todo o handler da rota /status por este:
+
+import express from "express";
+import { isAuthenticated } from "../../replitAuth"; // ou o middleware já em uso
+import { getUserContext } from "../../auth/getUserContext"; // ou caminho equivalente
+import { odooConnectionsStorage } from "../../storage/odooConnections";
+
+export function setupOdooRoutes(app: any): void {
+  const odooIntegrationsRouter = express.Router();
+
+  // GET /api/integrations/odoo/status
+  // Apenas verifica se a integração está configurada para a empresa atual
+  odooIntegrationsRouter.get(
+    "/status",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { empresaId } = await getUserContext(req);
+        if (!empresaId) {
+          return res.status(400).json({
+            configured: false,
+            message: "User has no company assigned",
+          });
+        }
+
+        const connection =
+          await odooConnectionsStorage.getOdooConnectionByEmpresaId(
+            empresaId
+          );
+
+        if (!connection) {
+          return res.json({ configured: false });
+        }
+
+        return res.json({
+          configured: true,
+          baseUrl: connection.baseUrl,
+          dbName: connection.dbName,
+          username: connection.username,
+          environment: connection.environment,
+          isActive: connection.isActive,
+        });
+      } catch (error) {
+        console.error("Error fetching Odoo connection status:", error);
+        return res
+          .status(500)
+          .json({ configured: false, message: "Failed to fetch Odoo status" });
+      }
+    }
+  );
+
+  // (deixa as outras rotas Odoo como estão: save, search-partner, etc.)
+  // ...
+}
+
+
+Se já existir o odooIntegrationsRouter, só troca o conteúdo da rota .get("/status", ...) por este.
+Não mexer nas restantes rotas.
+
+2) Correr e testar
+
+Na shell:
+
+npm run dev
+
+
+Depois, no browser:
+
+Vai a APIs & Keys → Odoo.
+
+Carrega em “Tentar novamente”.
+
+Esperado:
+
+Se tens configuração gravada na BD → configured: true e o cartão deixa de mostrar “Erro ao obter estado da integração Odoo”.
+
+Se apagares a config → configured: false.

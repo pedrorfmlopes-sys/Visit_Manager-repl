@@ -11,45 +11,37 @@ export function setupOdooRoutes(app: any): void {
   const router = express.Router();
 
   // GET /api/integrations/odoo/status
-  // Testa a ligação com Odoo de forma simples e robusta
+  // Apenas verifica se a integração está configurada para a empresa atual
   router.get("/status", isAuthenticated, async (req: any, res) => {
     try {
       const { empresaId } = await getUserContext(req);
-
       if (!empresaId) {
         return res.status(400).json({
-          connected: false,
-          error: "Empresa não encontrada no contexto do utilizador",
+          configured: false,
+          message: "User has no company assigned",
         });
       }
 
-      // Testa a ligação com Odoo - se falhar, lança erro
-      const result = await testOdooConnection(empresaId);
+      const connection =
+        await odooConnectionsStorage.getOdooConnectionByEmpresaId(empresaId);
 
-      // Se chegámos aqui, a ligação está funcional.
+      if (!connection) {
+        return res.json({ configured: false });
+      }
+
       return res.json({
-        connected: true,
-        userId: result.userId,
+        configured: true,
+        baseUrl: connection.baseUrl,
+        dbName: connection.dbName,
+        username: connection.username,
+        environment: connection.environment,
+        isActive: connection.isActive,
       });
-    } catch (error: any) {
-      // Caso em que a integração ainda não está configurada para esta empresa
-      if (error?.message === "ODOO_NOT_CONFIGURED") {
-        return res.status(200).json({
-          connected: false,
-          notConfigured: true,
-        });
-      }
-
-      console.error("[Odoo] /status error:", {
-        message: error?.message,
-        stack: error?.stack,
-      });
-
-      return res.status(500).json({
-        connected: false,
-        error: "Odoo status error",
-        message: error?.message ?? "Unknown error",
-      });
+    } catch (error) {
+      console.error("Error fetching Odoo connection status:", error);
+      return res
+        .status(500)
+        .json({ configured: false, message: "Failed to fetch Odoo status" });
     }
   });
 
