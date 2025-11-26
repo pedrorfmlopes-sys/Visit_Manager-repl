@@ -79,6 +79,10 @@ export default function VisitaDetail() {
   const [editContactosDialogOpen, setEditContactosDialogOpen] = useState(false);
   const [editContactosSearch, setEditContactosSearch] = useState("");
   const [selectedContactosEdit, setSelectedContactosEdit] = useState<string[]>([]);
+  // Odoo Lead Integration
+  const [odooLeadCreating, setOdooLeadCreating] = useState(false);
+  const [odooLeadError, setOdooLeadError] = useState<string | null>(null);
+  const [odooLeadNotConfigured, setOdooLeadNotConfigured] = useState(false);
   const { data: currentUser } = useCurrentUser();
   const isAdmin = useIsAdmin();
   
@@ -226,6 +230,66 @@ export default function VisitaDetail() {
       toast({ title: "Erro", description: "Falha na transcrição.", variant: "destructive" });
     },
   });
+
+  // Odoo Lead: Create lead from visita
+  const handleCreateOdooLeadForVisita = async () => {
+    if (!visita?.id) return;
+
+    setOdooLeadCreating(true);
+    setOdooLeadError(null);
+    setOdooLeadNotConfigured(false);
+
+    try {
+      const response = await fetch(
+        `/api/integrations/odoo/visitas/${visita.id}/create-lead`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.message || `HTTP ${response.status}`);
+      }
+
+      if (data.notConfigured) {
+        setOdooLeadNotConfigured(true);
+        return;
+      }
+
+      if (!data.success) {
+        throw new Error(data?.error || "Falha ao criar lead no Odoo.");
+      }
+
+      // Atualizar visita localmente
+      if (visita) {
+        visita.odooLeadId = String(data.leadId);
+      }
+
+      // Invalidar React Query cache
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
+
+      toast({
+        title: "Lead criada no Odoo",
+        description: `Lead #${data.leadId} criada a partir desta visita.`,
+      });
+    } catch (error: any) {
+      console.error("[Odoo] Error creating lead from visita:", error);
+      setOdooLeadError("Erro ao criar lead no Odoo.");
+      toast({
+        title: "Erro ao criar lead",
+        description: "Não foi possível criar a lead no Odoo.",
+        variant: "destructive",
+      });
+    } finally {
+      setOdooLeadCreating(false);
+    }
+  };
 
   // FASE 14: AI Summary mutation
   const generateAISummaryMutation = useMutation({
@@ -1978,6 +2042,64 @@ export default function VisitaDetail() {
         visitaId={visitaId}
         defaultTemplate="followup_pos_visita"
       />
+
+      {/* Odoo Integration */}
+      {visita && (
+        <Card data-testid="card-odoo-lead" className="mt-6">
+          <CardHeader>
+            <CardTitle>Odoo</CardTitle>
+            <CardDescription>
+              Integração com leads do Odoo para esta visita.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {/* Caso ainda não exista lead no Odoo */}
+            {!visita.odooLeadId && (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Esta visita ainda não tem nenhuma lead criada no Odoo.
+                </p>
+
+                {odooLeadNotConfigured && (
+                  <p className="text-xs text-amber-600">
+                    Integração Odoo ainda não está configurada para esta empresa.
+                  </p>
+                )}
+
+                {odooLeadError && (
+                  <p className="text-xs text-red-600">
+                    {odooLeadError}
+                  </p>
+                )}
+
+                <Button
+                  size="sm"
+                  onClick={handleCreateOdooLeadForVisita}
+                  disabled={odooLeadCreating}
+                  data-testid="button-odoo-create-lead-from-visita"
+                >
+                  {odooLeadCreating ? "A criar..." : "Criar lead no Odoo"}
+                </Button>
+              </>
+            )}
+
+            {/* Caso já exista lead no Odoo */}
+            {visita.odooLeadId && (
+              <div className="space-y-2">
+                <p className="text-sm">
+                  Esta visita está ligada à lead Odoo <span className="font-medium">#{visita.odooLeadId}</span>.
+                </p>
+
+                {odooLeadError && (
+                  <p className="text-xs text-red-600">
+                    {odooLeadError}
+                  </p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Activity Log */}
       {visita && (
