@@ -1,11 +1,23 @@
-import type { Router } from "express";
-import { isAuthenticated } from "../../replitAuth";
-import { getUserContext } from "../../authContext";
-import { googleConnectionsStorage } from "../../storage/googleConnections";
-import express from "express";
+PROMPT PARA O AGENT – G-01A-FIX (Corrigir callback Google)
 
-export function setupGoogleRoutes(app: any): void {
-  const router = express.Router();
+Objetivo:
+Corrigir a rota GET /api/integrations/google/callback para que:
+
+use autenticação (isAuthenticated) ao entrar no callback;
+
+leia o google_oauth_state a partir do header Cookie (sem depender de req.cookies);
+
+consiga obter o userId com getUserContext(req) e gravar a ligação na tabela google_connections via googleConnectionsStorage.upsertGoogleConnection.
+
+1. Ficheiro a editar
+
+Editar o ficheiro:
+
+server/routes/integrations/google.ts
+
+2. Adicionar helper para ler cookies (sem cookie-parser)
+
+Logo após o início da função setupGoogleRoutes (por exemplo depois de const router = express.Router();), adicionar esta função helper:
 
   // Helper simples para ler cookies sem depender de cookie-parser
   function getCookieValue(req: any, name: string): string | undefined {
@@ -23,49 +35,40 @@ export function setupGoogleRoutes(app: any): void {
     return undefined;
   }
 
-  // GET /api/integrations/google/login
-  // Inicia login no Google
-  router.get("/login", isAuthenticated, async (req: any, res) => {
+
+Não alterar o resto do ficheiro aqui, apenas inserir esta função helper.
+
+3. Atualizar rota /callback para usar isAuthenticated + helper
+
+No mesmo ficheiro server/routes/integrations/google.ts, localizar a rota:
+
+  // GET /api/integrations/google/callback
+  // Recebe o code e guarda tokens
+  router.get("/callback", async (req: any, res) => {
     try {
-      const { userId } = await getUserContext(req);
+      const { code, state, error } = req.query;
 
-      const clientId = process.env.GOOGLE_CLIENT_ID!;
-      const redirectUri = process.env.GOOGLE_REDIRECT_URI!;
-
-      if (!clientId || !redirectUri) {
-        return res.status(500).json({ message: "Google OAuth configuration incomplete" });
+      if (error) {
+        return res.redirect("/admin/empresa?tab=apis-keys&google=error");
       }
 
-      // Gera um state aleatório
-      const state = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      if (!code) {
+        return res.redirect("/admin/empresa?tab=apis-keys&google=error");
+      }
 
-      // Guarda state numa cookie HTTP-only (~10 min)
-      res.cookie("google_oauth_state", state, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 10 * 60 * 1000, // 10 minutes
-      });
+      // Verifica state
+      const cookieState = req.cookies.google_oauth_state;
+      if (!state || !cookieState || state !== cookieState) {
+        return res.redirect("/admin/empresa?tab=apis-keys&google=error");
+      }
 
-      // Constrói a URL de autorização
-      const scope = "openid profile email https://www.googleapis.com/auth/calendar";
+      const clientId = process.env.GOOGLE_CLIENT_ID!;
+      const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
+      const redirectUri = process.env.GOOGLE_REDIRECT_URI!;
+      // ...
 
-      const authorizeUrl =
-        "https://accounts.google.com/o/oauth2/v2/auth" +
-        `?client_id=${encodeURIComponent(clientId)}` +
-        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-        `&response_type=code` +
-        `&scope=${encodeURIComponent(scope)}` +
-        `&access_type=offline` +
-        `&prompt=consent` +
-        `&state=${encodeURIComponent(state)}`;
 
-      res.redirect(302, authorizeUrl);
-    } catch (error) {
-      console.error("Error in Google login:", error);
-      res.status(500).json({ message: "Failed to start Google login" });
-    }
-  });
+Substituir inteiramente esta rota pelo seguinte código atualizado:
 
   // GET /api/integrations/google/callback
   // Recebe o code e guarda tokens
@@ -182,30 +185,35 @@ export function setupGoogleRoutes(app: any): void {
     }
   });
 
-  // GET /api/integrations/google/status
-  // Diz se o user tem conta Google ligada
-  router.get("/status", isAuthenticated, async (req: any, res) => {
-    try {
-      const { userId } = await getUserContext(req);
 
-      const connection = await googleConnectionsStorage.getGoogleConnectionByUserId(userId);
+Nota: não alterar as outras rotas (/login, /status) nem outros imports. isAuthenticated, getUserContext e googleConnectionsStorage já estão importados no topo do ficheiro.
 
-      if (!connection) {
-        return res.json({ connected: false });
-      }
+4. Verificações rápidas após a alteração (para ti / para o agent)
 
-      res.json({
-        connected: true,
-        email: connection.email,
-        name: connection.name,
-        googleUserId: connection.googleUserId,
-        picture: connection.picture,
-      });
-    } catch (error) {
-      console.error("Error fetching Google connection status:", error);
-      res.status(500).json({ message: "Failed to fetch Google connection status" });
-    }
-  });
+Garantir que o servidor compila e arranca sem erros:
 
-  app.use("/api/integrations/google", router);
+npm run dev
+
+No browser:
+
+Abrir a página da empresa → aba “APIs & Keys”.
+
+Clicar em “Ligar conta Google”.
+
+Fazer login e aceitar permissões.
+
+Confirmar que és redirecionado para /admin/empresa?tab=apis-keys&google=connected.
+
+No DevTools → Network:
+
+Ver a chamada a GET /api/integrations/google/status.
+
+A resposta deve ser algo do género:
+
+{
+  "connected": true,
+  "email": "o_teu_email_google",
+  "name": "...",
+  "googleUserId": "...",
+  "picture": "..."
 }
