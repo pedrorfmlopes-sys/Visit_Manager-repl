@@ -3,7 +3,7 @@ import { isAuthenticated } from "../../replitAuth";
 import { getUserContext } from "../../authContext";
 import { odooConnectionsStorage } from "../../storage/odooConnections";
 import { insertOdooConnectionSchema } from "@shared/schema";
-import { testOdooConnection } from "../../integrations/odooClient";
+import { testOdooConnection, searchOdooPartners } from "../../integrations/odooClient";
 import express from "express";
 
 export function setupOdooRoutes(app: any): void {
@@ -72,6 +72,41 @@ export function setupOdooRoutes(app: any): void {
     } catch (error) {
       console.error("Error saving Odoo connection:", error);
       return res.status(500).json({ message: "Failed to save Odoo connection" });
+    }
+  });
+
+  // GET /api/integrations/odoo/search-partner
+  // Pesquisa parceiros no Odoo
+  router.get("/search-partner", isAuthenticated, async (req: any, res) => {
+    try {
+      const q = String(req.query.q ?? "").trim();
+      if (!q) {
+        return res.status(400).json({ error: "Missing query parameter q" });
+      }
+
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) {
+        return res.status(400).json({ error: "User has no company assigned" });
+      }
+
+      const partners = await searchOdooPartners(empresaId, q);
+
+      res.json({
+        results: partners,
+      });
+    } catch (error: any) {
+      if (error.message === "ODOO_NOT_CONFIGURED") {
+        return res.status(200).json({
+          results: [],
+          notConfigured: true,
+        });
+      }
+
+      console.error("[Odoo] search-partner error:", error);
+      res.status(500).json({
+        error: "Odoo search error",
+        message: error.message ?? "Unknown error",
+      });
     }
   });
 

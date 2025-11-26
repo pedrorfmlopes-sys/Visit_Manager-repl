@@ -1,0 +1,223 @@
+PROMPT PARA O AGENT – ODOO-02A / STEP 2
+
+Objetivo: criar uma função no cliente Odoo para pesquisar res.partner e expor isso numa rota
+GET /api/integrations/odoo/search-partner?q=....
+
+⚠️ Nada de sincronizar ainda com Entidades/Contactos. Só “search & list”.
+
+1) Atualizar server/integrations/odooClient.ts
+
+Ficheiro a editar:
+
+server/integrations/odooClient.ts
+
+Tarefas:
+
+Adicionar um helper para chamada genérica JSON-RPC ao Odoo (sem mexer no que já existe):
+
+async function callOdooJsonRpc<T>(
+  conn: OdooConnection,
+  payload: any
+): Promise<T> {
+  const response = await fetch(`${conn.baseUrl}/jsonrpc`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: Date.now(),
+      ...payload,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`[Odoo] HTTP error ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  if (data.error) {
+    throw new Error(
+      `[Odoo] RPC error: ${data.error.message ?? "Unknown error"}`
+    );
+  }
+
+  return data.result as T;
+}
+
+
+Adicionar função pública para pesquisa de parceiros:
+
+export type OdooPartner = {
+  id: number;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  mobile?: string | null;
+  vat?: string | null;
+  city?: string | null;
+  country?: string | null;
+  street?: string | null;
+};
+
+export async function searchOdooPartners(
+  empresaId: string,
+  query: string
+): Promise<OdooPartner[]> {
+  const conn = await getOdooConnectionForEmpresa(empresaId);
+
+  // executar método object/execute_kw em JSON-RPC
+  const result = await callOdooJsonRpc<any[]>(conn, {
+    method: "call",
+    params: {
+      service: "object",
+      method: "execute_kw",
+      args: [
+        conn.dbName,
+        conn.username,
+        conn.apiKey,
+        "res.partner",
+        "search_read",
+        [
+          [
+            "|",
+            ["name", "ilike", query],
+            ["email", "ilike", query],
+          ],
+        ],
+        {
+          fields: [
+            "name",
+            "email",
+            "phone",
+            "mobile",
+            "vat",
+            "city",
+            "country_id",
+            "street",
+          ],
+          limit: 10,
+        },
+      ],
+    },
+  });
+
+  return result.map((p) => ({
+    id: p.id,
+    name: p.name,
+    email: p.email ?? null,
+    phone: p.phone ?? null,
+    mobile: p.mobile ?? null,
+    vat: p.vat ?? null,
+    city: p.city ?? null,
+    country: p.country_id?.[1] ?? null, // [id, name]
+    street: p.street ?? null,
+  }));
+}
+
+
+Mantém os nomes dos campos (dbName, username, apiKey, etc.) exatamente como estão na OdooConnection real. Ajusta se os nomes forem ligeiramente diferentes.
+
+2) Atualizar rota server/routes/integrations/odoo.ts
+
+Ficheiro a editar:
+
+server/routes/integrations/odoo.ts
+
+Tarefas:
+
+Adicionar o import da nova função:
+
+import { searchOdooPartners } from "../../integrations/odooClient";
+
+
+Criar a rota GET /search-partner:
+
+odooIntegrationsRouter.get(
+  "/search-partner",
+  isAuthenticated, // ou requireAuth – usar o mesmo middleware já usado em /status
+  async (req, res) => {
+    try {
+      const q = String(req.query.q ?? "").trim();
+      if (!q) {
+        return res.status(400).json({ error: "Missing query parameter q" });
+      }
+
+      const empresaId = req.auth.empresaId; // usar a propriedade real já existente
+      const partners = await searchOdooPartners(empresaId, q);
+
+      res.json({
+        results: partners,
+      });
+    } catch (error: any) {
+      if (error.message === "ODOO_NOT_CONFIGURED") {
+        return res.status(200).json({
+          results: [],
+          notConfigured: true,
+        });
+      }
+
+      console.error("[Odoo] search-partner error:", error);
+      res.status(500).json({
+        error: "Odoo search error",
+        message: error.message ?? "Unknown error",
+      });
+    }
+  }
+);
+
+
+Garante que estás a usar o mesmo middleware de auth e o mesmo acesso a empresaId que já está a ser usado na rota /status.
+
+3) Comandos a correr
+
+Na shell do Replit:
+
+npm run dev
+
+
+Confirma que compila sem erros de TypeScript/imports.
+
+4) O que testar no fim
+
+Com a app a correr e Odoo configurado:
+
+Fazer um GET, por exemplo via curl ou REST client (com auth se necessário):
+
+curl "http://localhost:5000/api/integrations/odoo/search-partner?q=test"
+
+
+Esperar uma resposta no formato:
+
+{
+  "results": [
+    {
+      "id": 123,
+      "name": "Cliente Teste",
+      "email": "cliente@exemplo.com",
+      "phone": "123456789",
+      "mobile": null,
+      "vat": "PT123456789",
+      "city": "Lisboa",
+      "country": "Portugal",
+      "street": "Rua Exemplo 123"
+    }
+  ]
+}
+
+
+Se não houver config Odoo:
+
+{
+  "results": [],
+  "notConfigured": true
+}
+
+
+Se der erro de credenciais/rede:
+
+{
+  "error": "Odoo search error",
+  "message": "..."
+}
