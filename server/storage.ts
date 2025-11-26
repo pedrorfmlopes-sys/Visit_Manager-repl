@@ -38,6 +38,27 @@ import { db } from "./db";
 import { eq, desc, gte, sql, or, and } from "drizzle-orm";
 import { haversineDistance } from "./distanceUtils";
 
+// ============ ENTIDADES RBAC HELPER (STEP 2: Module-level function, no this) ============
+function buildEntidadeAccessWhere(
+  empresaId: string,
+  userId: string,
+  userRole: 'admin' | 'agent'
+) {
+  if (userRole === 'admin') {
+    // Admin vê todas as entidades da empresa
+    return eq(entidades.empresaId, empresaId);
+  }
+
+  // Agent: só entidades da empresa em que é criador ou assigned
+  return and(
+    eq(entidades.empresaId, empresaId),
+    or(
+      eq(entidades.createdByUserId, userId),
+      eq(entidades.assignedUserId, userId)
+    )
+  );
+}
+
 export interface IStorage {
   // Empresas (Multi-tenant)
   getEmpresa(id: string): Promise<Empresa | undefined>;
@@ -221,26 +242,9 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(users).orderBy(users.email);
   }
 
-  // ============ ENTIDADES RBAC HELPER (STEP 1: Centralized Access Control) ============
-  private buildEntidadeAccessWhere(empresaId: string, userId: string, userRole: 'admin' | 'agent') {
-    if (userRole === 'admin') {
-      // Admin vê todas as entidades da empresa
-      return eq(entidades.empresaId, empresaId);
-    }
-
-    // Agent: só entidades da empresa em que é criador ou assigned
-    return and(
-      eq(entidades.empresaId, empresaId),
-      or(
-        eq(entidades.createdByUserId, userId),
-        eq(entidades.assignedUserId, userId)
-      )
-    );
-  }
-
   // Entidades (Universal Entities) - FASE 2: filtered by empresaId
   async getEntidades(empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<Entidade[]> {
-    const baseWhere = this.buildEntidadeAccessWhere(empresaId, userId, userRole);
+    const baseWhere = buildEntidadeAccessWhere(empresaId, userId, userRole);
     
     return db.query.entidades.findMany({
       where: baseWhere,
@@ -254,7 +258,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getEntidade(id: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<EntidadeWithRelations | undefined> {
-    const baseWhere = this.buildEntidadeAccessWhere(empresaId, userId, userRole);
+    const baseWhere = buildEntidadeAccessWhere(empresaId, userId, userRole);
     const whereClause = and(eq(entidades.id, id), baseWhere);
 
     console.log("[storage.getEntidade] called with", { id, empresaId, userId, userRole });

@@ -1,0 +1,126 @@
+PROMPT PARA O AGENT – ENTIDADES-RBAC-STEP2-FIX (erro 500 no detalhe)
+
+Objetivo:
+Eliminar o erro 500 ao abrir o detalhe de Entidade, tornando o RBAC das Entidades simples e sólido (sem dependência de this).
+
+1) Refatorar buildEntidadeAccessWhere para função de módulo (sem this)
+
+Ficheiro a editar:
+server/storage.ts (onde o agent criou buildEntidadeAccessWhere e onde estão getEntidades / getEntidade).
+
+Tarefas:
+
+Se buildEntidadeAccessWhere estiver dentro de uma classe (ex.: private buildEntidadeAccessWhere(...) {}):
+
+Corta todo o método da classe.
+
+Cola-o fora da classe, no topo do ficheiro, como função normal:
+
+import { and, or, eq } from "drizzle-orm";
+import { entidades } from "../shared/schema"; // já deve existir
+
+function buildEntidadeAccessWhere(
+  empresaId: string,
+  userId: string,
+  userRole: "admin" | "agent"
+) {
+  if (userRole === "admin") {
+    // Admin vê todas as entidades da empresa
+    return eq(entidades.empresaId, empresaId);
+  }
+
+  // Agent: só entidades da empresa em que é criador ou assigned
+  return and(
+    eq(entidades.empresaId, empresaId),
+    or(
+      eq(entidades.createdByUserId, userId),
+      eq(entidades.assignedUserId, userId)
+    )
+  );
+}
+
+
+Garante que entidades.createdByUserId e entidades.assignedUserId existem com esses nomes; se na schema forem outros, ajusta aqui.
+
+Atualizar getEntidades para usar a função solta (sem this):
+
+Procura getEntidades / listEntidades de Entidades e troca:
+
+const baseWhere = this.buildEntidadeAccessWhere(empresaId, userId, userRole);
+
+
+por:
+
+const baseWhere = buildEntidadeAccessWhere(empresaId, userId, userRole);
+
+
+Atualizar getEntidade para usar a função solta:
+
+Trocar:
+
+const baseWhere = this.buildEntidadeAccessWhere(empresaId, userId, userRole);
+
+
+por:
+
+const baseWhere = buildEntidadeAccessWhere(empresaId, userId, userRole);
+
+
+Garante que não sobra nenhum this.buildEntidadeAccessWhere no ficheiro:
+
+Usa a pesquisa do editor por buildEntidadeAccessWhere.
+
+Tem de existir só a definição da função + chamadas simples buildEntidadeAccessWhere(...).
+
+2) Confirmar que as assinaturas não mudaram
+
+Ainda em server/storage.ts:
+
+getEntidade deve continuar com a mesma assinatura de antes:
+
+async getEntidade(
+  id: string,
+  empresaId: string,
+  userId: string,
+  userRole: "admin" | "agent"
+) { ... }
+
+
+getEntidades (ou listEntidades) deve continuar a receber empresaId, userId, userRole, ... da mesma forma que as rotas já usam.
+
+Não alteres as assinaturas públicas nem a interface IStorage. Só mexemos na implementação interna.
+
+3) Correr servidor e ver logs
+
+Na shell:
+
+npm run dev
+
+
+Em seguida:
+
+No browser:
+
+Vai à lista de Entidades.
+
+Clica num card.
+
+No DevTools → Network:
+
+Vê o pedido GET /api/entidades/<ID>:
+
+O status já não deve ser 500; deve ser 200 (OK) ou 404 (se realmente não existir).
+
+No console do servidor:
+
+Se ainda surgir algum erro, copia a stack trace de Error: ... para o relatório.
+
+4) Cenário esperado depois deste passo
+
+Os cards de Entidades continuam a aparecer.
+
+Ao clicar num card:
+
+Se a Entidade existe e tens permissão → detalhe abre normalmente.
+
+Só verás “Entidade não encontrada” em casos legítimos (registo apagado / sem permissão), não por erro 500.
