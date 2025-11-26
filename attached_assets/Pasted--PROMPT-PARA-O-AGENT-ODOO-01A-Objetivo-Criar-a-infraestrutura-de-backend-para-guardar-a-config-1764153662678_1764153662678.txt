@@ -1,0 +1,291 @@
+🔧 PROMPT PARA O AGENT – ODOO-01A
+
+Objetivo:
+Criar a infraestrutura de backend para guardar a configuração do Odoo por empresa:
+
+Nova tabela odoo_connections em shared/schema.ts
+
+Novo storage server/storage/odooConnections.ts
+
+Novas rotas server/routes/integrations/odoo.ts
+
+Registar essas rotas em server/routes.ts
+
+No fim, correr npm run db:push
+
+1. Atualizar shared/schema.ts – nova tabela Odoo
+
+Abre shared/schema.ts.
+
+Localiza o bloco das integrações Microsoft/Google (por volta dos comentários):
+
+// Microsoft Connections table (user-connected Microsoft accounts)
+export const microsoftConnections = pgTable("microsoft_connections", { ... });
+
+// Google Connections table (user-connected Google accounts)
+export const googleConnections = pgTable("google_connections", { ... });
+
+export const googleConnectionsRelations = relations(googleConnections, ({ one }) => ({ ... }));
+
+export const insertGoogleConnectionSchema = createInsertSchema(googleConnections)...
+export type InsertGoogleConnection = ...
+export type GoogleConnection = ...
+
+
+Logo a seguir a este bloco de Google, adiciona o seguinte código para a nova tabela de configuração do Odoo:
+
+// Odoo Connections table (per-company Odoo credentials / config)
+export const odooConnections = pgTable("odoo_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  empresaId: varchar("empresa_id", { length: 255 })
+    .notNull()
+    .references(() => empresas.id, { onDelete: "cascade" }),
+  baseUrl: varchar("base_url", { length: 500 }).notNull(),
+  dbName: varchar("db_name", { length: 255 }).notNull(),
+  username: varchar("username", { length: 255 }).notNull(),
+  apiKey: text("api_key").notNull(),
+  environment: varchar("environment", { length: 50 }).default("test").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const odooConnectionsRelations = relations(odooConnections, ({ one }) => ({
+  empresa: one(empresas, {
+    fields: [odooConnections.empresaId],
+    references: [empresas.id],
+  }),
+}));
+
+export const insertOdooConnectionSchema = createInsertSchema(odooConnections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertOdooConnection = z.infer<typeof insertOdooConnectionSchema>;
+export type OdooConnection = typeof odooConnections.$inferSelect;
+
+
+Nota: empresas, boolean, timestamp, varchar, text, sql, relations, createInsertSchema e z já estão importados no topo – não alteres os imports.
+
+2. Criar server/storage/odooConnections.ts
+
+Cria um novo ficheiro:
+
+server/storage/odooConnections.ts
+
+com o seguinte conteúdo:
+
+import {
+  odooConnections,
+  type OdooConnection,
+  type InsertOdooConnection,
+} from "@shared/schema";
+import { db } from "../db";
+import { eq } from "drizzle-orm";
+
+export class OdooConnectionsStorage {
+  async getOdooConnectionByEmpresaId(empresaId: string): Promise<OdooConnection | undefined> {
+    const [connection] = await db
+      .select()
+      .from(odooConnections)
+      .where(eq(odooConnections.empresaId, empresaId))
+      .limit(1);
+
+    return connection;
+  }
+
+  async upsertOdooConnection(input: InsertOdooConnection): Promise<OdooConnection> {
+    const [existing] = await db
+      .select()
+      .from(odooConnections)
+      .where(eq(odooConnections.empresaId, input.empresaId))
+      .limit(1);
+
+    if (existing) {
+      const [updated] = await db
+        .update(odooConnections)
+        .set({
+          baseUrl: input.baseUrl,
+          dbName: input.dbName,
+          username: input.username,
+          apiKey: input.apiKey,
+          environment: input.environment,
+          isActive: input.isActive,
+          updatedAt: new Date(),
+        })
+        .where(eq(odooConnections.id, existing.id))
+        .returning();
+
+      return updated;
+    }
+
+    const [created] = await db
+      .insert(odooConnections)
+      .values(input)
+      .returning();
+
+    return created;
+  }
+}
+
+export const odooConnectionsStorage = new OdooConnectionsStorage();
+
+3. Criar rotas server/routes/integrations/odoo.ts
+
+Cria o ficheiro:
+
+server/routes/integrations/odoo.ts
+
+com este conteúdo:
+
+import type { Router } from "express";
+import { isAuthenticated } from "../../replitAuth";
+import { getUserContext } from "../../authContext";
+import { odooConnectionsStorage } from "../../storage/odooConnections";
+import { insertOdooConnectionSchema } from "@shared/schema";
+import express from "express";
+
+export function setupOdooRoutes(app: any): void {
+  const router = express.Router();
+
+  // GET /api/integrations/odoo/status
+  // Devolve se a integração está configurada para a empresa atual
+  router.get("/status", isAuthenticated, async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) {
+        return res.status(400).json({
+          configured: false,
+          message: "User has no company assigned",
+        });
+      }
+
+      const connection = await odooConnectionsStorage.getOdooConnectionByEmpresaId(empresaId);
+
+      if (!connection) {
+        return res.json({ configured: false });
+      }
+
+      return res.json({
+        configured: true,
+        baseUrl: connection.baseUrl,
+        dbName: connection.dbName,
+        username: connection.username,
+        environment: connection.environment,
+        isActive: connection.isActive,
+      });
+    } catch (error) {
+      console.error("Error fetching Odoo connection status:", error);
+      return res.status(500).json({ message: "Failed to fetch Odoo status" });
+    }
+  });
+
+  // POST /api/integrations/odoo/save
+  // Guarda/atualiza a configuração do Odoo para a empresa atual
+  router.post("/save", isAuthenticated, async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) {
+        return res.status(400).json({ message: "User has no company assigned" });
+      }
+
+      const parseResult = insertOdooConnectionSchema.safeParse({
+        ...req.body,
+        empresaId,
+      });
+
+      if (!parseResult.success) {
+        console.error("Invalid Odoo connection payload:", parseResult.error.flatten());
+        return res.status(400).json({ message: "Invalid Odoo connection data" });
+      }
+
+      const input = parseResult.data;
+
+      await odooConnectionsStorage.upsertOdooConnection(input);
+
+      return res.json({ message: "Odoo connection saved successfully" });
+    } catch (error) {
+      console.error("Error saving Odoo connection:", error);
+      return res.status(500).json({ message: "Failed to save Odoo connection" });
+    }
+  });
+
+  app.use("/api/integrations/odoo", router);
+}
+
+4. Ligar as rotas Odoo em server/routes.ts
+
+Abre server/routes.ts.
+
+No bloco de imports no topo, onde já tens:
+
+import { setupMicrosoftRoutes } from "./routes/integrations/microsoft";
+import { setupGoogleRoutes } from "./routes/integrations/google";
+
+
+adiciona logo abaixo:
+
+import { setupOdooRoutes } from "./routes/integrations/odoo";
+
+
+Mais em baixo, perto do fim da função createServer / registerRoutes, onde já tens:
+
+  // Microsoft Integration routes
+  setupMicrosoftRoutes(app);
+
+  // Google Integration routes
+  setupGoogleRoutes(app);
+
+
+adiciona imediatamente a seguir:
+
+  // Odoo Integration routes
+  setupOdooRoutes(app);
+
+5. Sincronizar a base de dados
+
+Depois das alterações:
+
+Para garantir que não há processos pendurados:
+
+pkill node || true
+
+
+Correr a migração via Drizzle:
+
+npm run db:push
+
+
+Confirma que não há erros de schema.
+
+Voltar a arrancar o servidor:
+
+npm run dev
+
+6. Teste rápido da API Odoo (para confirmar que está tudo de pé)
+
+Com o servidor a correr e um utilizador autenticado:
+
+GET /api/integrations/odoo/status
+
+Deve devolver 200 e:
+
+{ "configured": false } se ainda não há registo.
+
+POST /api/integrations/odoo/save com um corpo JSON, por exemplo:
+
+{
+  "baseUrl": "https://minha-instancia-odoo-test.odoo.com",
+  "dbName": "odoo_test_123",
+  "username": "pedro@example.com",
+  "apiKey": "TEST-API-KEY-123",
+  "environment": "test",
+  "isActive": true
+}
+
+
+Deve devolver 200 e { "message": "Odoo connection saved successfully" }.
+
+Um novo GET /status deve passar a devolver configured: true + dados básicos.

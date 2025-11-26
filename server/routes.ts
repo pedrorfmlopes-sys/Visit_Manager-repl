@@ -10,6 +10,7 @@ import { enrichEntity, type EnrichmentInput, extractDomainFromEmail, isPersonalE
 import { ptIntelligentSearch, type PTEnrichmentInput } from "./enrichmentPT";
 import { setupMicrosoftRoutes } from "./routes/integrations/microsoft";
 import { setupGoogleRoutes } from "./routes/integrations/google";
+import { setupOdooRoutes } from "./routes/integrations/odoo";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -298,6 +299,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Google Integration routes
   setupGoogleRoutes(app);
+
+  // Odoo Integration routes
+  setupOdooRoutes(app);
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {

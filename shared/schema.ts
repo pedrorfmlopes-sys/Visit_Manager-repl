@@ -928,6 +928,38 @@ export const insertGoogleConnectionSchema = createInsertSchema(googleConnections
 export type InsertGoogleConnection = z.infer<typeof insertGoogleConnectionSchema>;
 export type GoogleConnection = typeof googleConnections.$inferSelect;
 
+// Odoo Connections table (per-company Odoo credentials / config)
+export const odooConnections = pgTable("odoo_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  empresaId: varchar("empresa_id", { length: 255 })
+    .notNull()
+    .references(() => empresas.id, { onDelete: "cascade" }),
+  baseUrl: varchar("base_url", { length: 500 }).notNull(),
+  dbName: varchar("db_name", { length: 255 }).notNull(),
+  username: varchar("username", { length: 255 }).notNull(),
+  apiKey: text("api_key").notNull(),
+  environment: varchar("environment", { length: 50 }).default("test").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const odooConnectionsRelations = relations(odooConnections, ({ one }) => ({
+  empresa: one(empresas, {
+    fields: [odooConnections.empresaId],
+    references: [empresas.id],
+  }),
+}));
+
+export const insertOdooConnectionSchema = createInsertSchema(odooConnections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertOdooConnection = z.infer<typeof insertOdooConnectionSchema>;
+export type OdooConnection = typeof odooConnections.$inferSelect;
+
 // Extended types for relations
 export type EmpresaWithRelations = Empresa & {
   users?: User[];
