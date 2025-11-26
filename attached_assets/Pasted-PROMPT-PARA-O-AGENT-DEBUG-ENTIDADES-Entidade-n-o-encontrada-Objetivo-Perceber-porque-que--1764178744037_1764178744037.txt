@@ -1,0 +1,132 @@
+PROMPT PARA O AGENT – DEBUG ENTIDADES / “Entidade não encontrada”
+
+Objetivo:
+Perceber porque é que, ao clicar num card de Entidade, aparece a mensagem “Entidade não encontrada” na página de detalhe.
+
+1) Confirmar URL e ID usados na navegação
+
+Abre o componente que lista as Entidades no backoffice (onde aparecem os cards que eu estou a clicar).
+Nomes prováveis:
+
+client/src/pages/backoffice/Entidades/EntidadesListPage.tsx
+
+ou client/src/features/entidades/EntidadesList.tsx.
+
+Verifica como é feita a navegação quando se clica no card:
+
+Se usa <Link href=...> ou useLocation() / navigate(...), etc.
+
+Garante que o path é algo do género:
+
+`/backoffice/entidades/${entidade.id}`
+
+
+e não outro campo (ex.: entidade.slug, entidade.entidadeId, etc.).
+
+Se encontrares algo diferente de entidade.id na construção da URL, corrige para entidade.id.
+
+2) Confirmar o detalhe está a ler o mesmo param
+
+Abre o componente da página de detalhe da Entidade (mesmo ficheiro que usamos antes para o card Odoo):
+
+Algo como client/src/pages/backoffice/Entidades/EntidadeDetailPage.tsx ou semelhante.
+
+Verifica como é obtido o entidadeId a partir da rota:
+
+Exemplo típico:
+
+const { id } = useParams();
+const entidadeId = id as string;
+
+
+Confirma que esse entidadeId é o que é usado para:
+
+construir a URL da API (/api/entidades/${entidadeId}),
+
+e como queryKey no React Query (se aplicável).
+
+No fim deste passo, a regra tem de ser:
+O mesmo entidade.id que está no card → vai na URL → é usado no fetch /api/entidades/:id.
+
+3) Inspecionar o endpoint backend /api/entidades/:id
+
+Abre o ficheiro de rotas das Entidades:
+
+server/routes/entidades.ts (ou equivalente).
+
+Localiza a rota GET de detalhe, algo como:
+
+entidadesRouter.get("/:id", requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { empresaId } = getUserContext(req);
+  // ...
+});
+
+
+Verifica:
+
+Se está a usar id e empresaId no WHERE da query, por exemplo:
+
+where(
+  and(
+    eq(entidades.id, id),
+    eq(entidades.empresaId, empresaId)
+  )
+)
+
+
+Se a mensagem “Entidade não encontrada” vem exatamente de um caso if (!entidade) { ... }.
+
+Para ajudar a perceber o problema, adiciona temporariamente um console.log dentro da rota, antes da query:
+
+console.log("[Entidades] Detail request", { id, empresaId });
+
+
+Assim conseguimos ver no console:
+
+qual o id que o frontend está a mandar,
+
+qual o empresaId que o user tem na sessão.
+
+4) Testes rápidos
+
+Corre o servidor:
+
+npm run dev
+
+
+No browser:
+
+Vai à lista de Entidades.
+
+Abre o DevTools → separador Network.
+
+Clica num card.
+
+Confirmar:
+
+URL da página: algo como /backoffice/entidades/<ALGUM_ID>.
+
+Request de API: /api/entidades/<MESMO_ID> (sem undefined, sem null).
+
+Status da resposta: está a vir 404? Qual é o JSON de erro?
+
+No console do servidor (Replit):
+
+Ver o log [Entidades] Detail request { id, empresaId }.
+
+Confirma se id e empresaId estão preenchidos e fazem sentido.
+
+Resultado esperado desta ronda
+
+Depois desta análise, vamos descobrir uma destas coisas:
+
+ID errado na navegação (ex.: undefined ou outro campo) → corrigimos o href/navigate.
+
+Empresa não bate certo (filtro por empresaId a excluir registos antigos ou de outra empresa) → depois decidimos se:
+
+ajustamos o filtro,
+
+ou corrigimos os dados de teste.
+
+Bug no detail (rota diferente, path diferente) → alinhar router frontend/backend.
