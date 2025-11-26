@@ -1,0 +1,242 @@
+PROMPT PARA O AGENT – ODOO-CONTACTOS-LINK-STEP1
+
+Objetivo:
+Garantir que, no detalhe de Contacto, funciona todo o fluxo Odoo:
+
+pesquisar parceiros Odoo,
+
+ligar/desligar parceiro,
+
+ver detalhes do parceiro,
+
+usando a mesma lógica que já está a funcionar nas Entidades.
+
+1) Backend – rotas para contactos (espelhar Entidades)
+
+Ficheiro a editar:
+server/routes.ts (ou server/routes/contactos.ts, conforme está organizado)
+
+Tarefas:
+
+Importar contactos da schema (se ainda não existir):
+
+import { contactos /*, entidades, visitas, ... */ } from "../shared/schema";
+
+
+Localizar a rota de link Odoo para contactos. Se não existir, criar espelhando a das Entidades:
+
+app.post(
+  "/api/contactos/:id/odoo-link",
+  requireAuth,
+  async (req: any, res) => {
+    try {
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      const contactoId = req.params.id;
+      const { odooPartnerId } = req.body as { odooPartnerId: number };
+
+      if (!empresaId) {
+        return res.status(400).json({ success: false, message: "Empresa em falta" });
+      }
+
+      if (!odooPartnerId) {
+        return res.status(400).json({
+          success: false,
+          message: "odooPartnerId em falta",
+        });
+      }
+
+      // Opcional: validar se o contacto pertence à empresa
+      const contacto = await db.query.contactos.findFirst({
+        where: and(
+          eq(contactos.id, contactoId),
+          eq(contactos.empresaId, empresaId)
+        ),
+      });
+
+      if (!contacto) {
+        return res.status(404).json({
+          success: false,
+          message: "Contacto não encontrado",
+        });
+      }
+
+      await db
+        .update(contactos)
+        .set({ odooPartnerId: String(odooPartnerId) })
+        .where(
+          and(
+            eq(contactos.id, contactoId),
+            eq(contactos.empresaId, empresaId)
+          )
+        );
+
+      return res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Odoo] /contactos/:id/odoo-link error:", {
+        message: error?.message,
+        stack: error?.stack,
+      });
+
+      return res.status(500).json({
+        success: false,
+        error: "Odoo link contacto error",
+        message: error?.message ?? "Erro ao ligar o contacto ao parceiro Odoo.",
+      });
+    }
+  }
+);
+
+
+(Opcional, se ainda não existir) rota de unlink:
+
+app.post(
+  "/api/contactos/:id/odoo-unlink",
+  requireAuth,
+  async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      const contactoId = req.params.id;
+
+      await db
+        .update(contactos)
+        .set({ odooPartnerId: null })
+        .where(
+          and(
+            eq(contactos.id, contactoId),
+            eq(contactos.empresaId, empresaId)
+          )
+        );
+
+      return res.json({ success: true });
+    } catch (error: any) {
+      console.error("[Odoo] /contactos/:id/odoo-unlink error:", {
+        message: error?.message,
+        stack: error?.stack,
+      });
+
+      return res.status(500).json({
+        success: false,
+        message: "Erro ao desligar o contacto do parceiro Odoo.",
+      });
+    }
+  }
+);
+
+
+Padrão: igual ao das Entidades, mas usando contactos e contactoId.
+
+2) Frontend – card Odoo no detalhe do Contacto
+
+Ficheiro a editar (nome provável):
+client/src/pages/contactos/ContactoDetailPage.tsx
+ou client/src/features/contactos/ContactoDetail.tsx
+
+Tarefas (espelhar o que já está em Entidades):
+
+Certificar que o contacto tem o campo odooPartnerId no tipo.
+
+Ter estado para erros/loading, se ainda não existir:
+
+const [odooSearchError, setOdooSearchError] = useState<string | null>(null);
+const [odooLinkError, setOdooLinkError] = useState<string | null>(null);
+
+
+Pesquisa de parceiros:
+
+Usar a mesma função que já está a ser usada nas Entidades (/api/integrations/odoo/search-partner),
+
+com o mesmo tratamento de erro que acabámos de alinhar (usar data.message quando success === false).
+
+Função para ligar contacto ao parceiro:
+
+const handleLinkOdooPartnerToContacto = async (partnerId: number) => {
+  if (!contacto?.id) return;
+  setOdooLinkError(null);
+
+  try {
+    const response = await fetch(
+      `/api/contactos/${contacto.id}/odoo-link`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ odooPartnerId: partnerId }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || data.success === false) {
+      throw new Error(data.message || `HTTP ${response.status}`);
+    }
+
+    // Atualizar contacto localmente
+    if (contacto) {
+      contacto.odooPartnerId = String(partnerId);
+    }
+
+    // Se houver React Query, invalidar query do contacto
+    // queryClient.invalidateQueries({ queryKey: ["/api/contactos", contactoId] });
+
+    toast?.({
+      title: "Contacto ligado ao Odoo",
+      description: `O contacto foi ligado ao parceiro Odoo #${partnerId}.`,
+    });
+  } catch (error: any) {
+    console.error("[Odoo] Error linking contacto to partner:", error);
+    setOdooLinkError(
+      error?.message || "Erro ao ligar o contacto ao parceiro Odoo."
+    );
+  }
+};
+
+
+Função para desligar (se existir botão “Desligar do Odoo”):
+
+const handleUnlinkOdooPartnerFromContacto = async () => {
+  if (!contacto?.id) return;
+  setOdooLinkError(null);
+
+  try {
+    const response = await fetch(
+      `/api/contactos/${contacto.id}/odoo-unlink`,
+      {
+        method: "POST",
+        credentials: "include",
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || data.success === false) {
+      throw new Error(data.message || `HTTP ${response.status}`);
+    }
+
+    if (contacto) {
+      contacto.odooPartnerId = null;
+    }
+
+    toast?.({
+      title: "Contacto desligado do Odoo",
+      description: "O contacto foi desligado do parceiro Odoo.",
+    });
+  } catch (error: any) {
+    console.error("[Odoo] Error unlinking contacto from partner:", error);
+    setOdooLinkError(
+      error?.message || "Erro ao desligar o contacto do parceiro Odoo."
+    );
+  }
+};
+
+
+Card Odoo no JSX do detalhe do Contacto:
+
+Copiar o layout do card Odoo das Entidades,
+
+mas a usar contacto.odooPartnerId, handleLinkOdooPartnerToContacto, handleUnlinkOdooPartnerFromContacto, etc.
+
+3) Comando e testes
+
+Na shell:
+
+npm run dev

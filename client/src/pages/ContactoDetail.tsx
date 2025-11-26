@@ -353,8 +353,10 @@ export default function ContactoDetail() {
         body: JSON.stringify({ odooPartnerId: partner.id }),
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+
+      if (!response.ok || data.success === false) {
+        throw new Error(data.message || `HTTP ${response.status}`);
       }
 
       queryClient.invalidateQueries({ queryKey: ["/api/contactos", contactoId] });
@@ -372,9 +374,16 @@ export default function ContactoDetail() {
       setTimeout(() => {
         handleFetchOdooPartner();
       }, 100);
-    } catch (error) {
-      console.error("[Odoo] Error linking partner to contacto:", error);
-      setOdooSearchError("Erro ao ligar o contacto ao parceiro Odoo.");
+
+      toast({
+        title: "Sucesso",
+        description: `Contacto ligado ao parceiro Odoo "${partner.name}"`,
+      });
+    } catch (error: any) {
+      console.error("[Odoo] Error linking contacto to partner:", error);
+      setOdooSearchError(
+        error?.message || "Erro ao ligar o contacto ao parceiro Odoo."
+      );
     }
   };
 
@@ -391,8 +400,10 @@ export default function ContactoDetail() {
         body: JSON.stringify({ odooPartnerId: null }),
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+
+      if (!response.ok || data.success === false) {
+        throw new Error(data.message || `HTTP ${response.status}`);
       }
 
       queryClient.invalidateQueries({
@@ -417,12 +428,14 @@ export default function ContactoDetail() {
         title: "Ligação removida",
         description: "O contacto deixou de estar ligado ao parceiro Odoo.",
       });
-    } catch (error) {
-      console.error("[Odoo] Error unlinking partner from contacto:", error);
-      setOdooPartnerError("Erro ao remover ligação ao parceiro Odoo.");
+    } catch (error: any) {
+      console.error("[Odoo] Error unlinking contacto from partner:", error);
+      setOdooSearchError(
+        error?.message || "Erro ao remover ligação ao parceiro Odoo."
+      );
       toast({
         title: "Erro",
-        description: "Não foi possível remover a ligação ao parceiro Odoo.",
+        description: error?.message || "Não foi possível remover a ligação ao parceiro Odoo.",
         variant: "destructive",
       });
     }

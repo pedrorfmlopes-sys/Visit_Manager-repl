@@ -808,10 +808,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         odooPartnerId: normalizedId,
       });
     } catch (error: any) {
-      console.error("[Contactos] odoo-link error:", error);
+      console.error("[Odoo] /contactos/:id/odoo-link error:", {
+        message: error?.message,
+        stack: error?.stack,
+      });
       return res.status(500).json({
-        error: "Failed to update contacto Odoo link",
-        message: error.message ?? "Unknown error",
+        success: false,
+        error: "Odoo link contacto error",
+        message: error?.message ?? "Erro ao ligar o contacto ao parceiro Odoo.",
       });
     }
   });
