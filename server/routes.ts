@@ -15,7 +15,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { randomUUID } from "crypto";
-import { insertEntidadeSchema, insertContactoSchema, insertVisitaSchema, insertTarefaSchema, lembretes, users } from "@shared/schema";
+import { insertEntidadeSchema, insertContactoSchema, insertVisitaSchema, insertTarefaSchema, lembretes, users, entidades, contactos } from "@shared/schema";
 import { generateEmailRequestSchema, getTemplate } from "@shared/emailTemplates";
 import { eq, and, desc, sql } from "drizzle-orm";
 import express from "express";
