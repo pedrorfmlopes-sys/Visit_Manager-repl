@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { ArrowLeft, MapPin, Phone, Mail, Globe, Edit, Building2, Users, UserCircle, Calendar, Sparkles, Linkedin, Facebook, Instagram, Share2, MessageCircle, Link as LinkIcon, Copy, FileText, Bell, AlertCircle, Download, Trash2, Store, Factory, Home, Handshake, Package, Briefcase, Flag } from "lucide-react";
 import { SiX } from "react-icons/si";
+import OdooLogo from "@/assets/crm/odoo.svg";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -579,7 +580,15 @@ export default function EntidadeDetail() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-xl font-semibold text-foreground">{entidade.nome}</h1>
+              <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                {entidade.nome}
+                {entidade.odooPartnerId && (
+                  <span className="inline-flex items-center gap-1 text-[11px] rounded-full border px-2 py-0.5 text-muted-foreground" data-testid="chip-odoo-ligado-entidade">
+                    <img src={OdooLogo} alt="Odoo" className="h-3 w-auto" />
+                    <span>Ligado ao CRM</span>
+                  </span>
+                )}
+              </h1>
               {entidade.entidadeTipo && (
                 <Badge variant="outline" className="mt-1 no-default-hover-elevate no-default-active-elevate flex items-center gap-1 w-fit" data-testid="badge-tipo">
                   {/* FASE 30: Show icon from entidade.entidadeTipo.icon */}

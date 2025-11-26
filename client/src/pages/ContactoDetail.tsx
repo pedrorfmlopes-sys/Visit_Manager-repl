@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { ArrowLeft, User, Phone, Mail, Building2, Edit, Share2, MessageCircle, Link as LinkIcon, Copy, FileText, Globe, MapPin, Linkedin, Instagram, Facebook, Sparkles, Trash2, Calendar, Store, AlertCircle, Flag } from "lucide-react";
 import { SiX } from "react-icons/si";
+import OdooLogo from "@/assets/crm/odoo.svg";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -518,7 +519,15 @@ export default function ContactoDetail() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-xl font-semibold text-foreground">{contacto.nome}</h1>
+              <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                {contacto.nome}
+                {contacto.odooPartnerId && (
+                  <span className="inline-flex items-center gap-1 text-[11px] rounded-full border px-2 py-0.5 text-muted-foreground" data-testid="chip-odoo-ligado-contacto">
+                    <img src={OdooLogo} alt="Odoo" className="h-3 w-auto" />
+                    <span>Ligado ao CRM</span>
+                  </span>
+                )}
+              </h1>
               {contacto.funcao && (
                 <p className="text-sm text-muted-foreground">{contacto.funcao}</p>
               )}

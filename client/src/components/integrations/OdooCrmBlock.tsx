@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, DatabaseZap } from "lucide-react";
 import type { Empresa } from "@shared/schema";
+import OdooLogo from "@/assets/crm/odoo.svg";
 
 interface OdooStatus {
   configured: boolean;
@@ -185,7 +186,7 @@ export function OdooCrmBlock({ empresa }: { empresa?: Empresa }) {
       <CardHeader className="flex flex-row items-center justify-between gap-4">
         <div>
           <CardTitle className="text-sm flex items-center gap-2">
-            <DatabaseZap className="h-4 w-4" />
+            <img src={OdooLogo} alt="Odoo" className="h-4 w-auto" />
             <span>Odoo CRM</span>
             <Badge variant="outline">Odoo</Badge>
           </CardTitle>
