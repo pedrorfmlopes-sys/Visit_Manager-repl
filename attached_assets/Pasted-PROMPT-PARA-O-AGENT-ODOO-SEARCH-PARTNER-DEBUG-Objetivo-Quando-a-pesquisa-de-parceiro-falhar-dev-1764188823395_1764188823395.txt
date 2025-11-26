@@ -1,0 +1,154 @@
+PROMPT PARA O AGENT – ODOO-SEARCH-PARTNER-DEBUG
+
+Objetivo:
+Quando a pesquisa de parceiro falhar, devolver e mostrar a mensagem real de erro do Odoo, em vez de “Erro ao pesquisar parceiros no Odoo”.
+
+1) Backend – devolver message na rota search-partner
+
+Ficheiro a editar:
+
+server/routes/integrations/odoo.ts
+
+Localiza a rota:
+
+odooIntegrationsRouter.get(
+  "/search-partner",
+  isAuthenticated,
+  async (req, res) => {
+    try {
+      // ...
+    } catch (error: any) {
+      // ...
+    }
+  }
+);
+
+
+Dentro do catch, garante que fica algo assim:
+
+} catch (error: any) {
+  console.error("[Odoo] /search-partner error:", {
+    message: error?.message,
+    stack: error?.stack,
+  });
+
+  return res.status(500).json({
+    success: false,
+    error: "Odoo search partner error",
+    message: error?.message ?? "Erro ao pesquisar parceiros no Odoo.",
+  });
+}
+
+
+Não mexas no resto da rota. Só assegura que o JSON devolve um message com error.message.
+
+2) Frontend – mostrar message vindo do backend
+
+Temos duas zonas:
+
+Pesquisa Odoo em Entidades
+
+Pesquisa Odoo em Contactos
+
+O padrão é igual nos dois.
+
+2.1 Entidades – diálogo “Procurar parceiro Odoo”
+
+Ficheiro a editar (nome provável):
+
+client/src/pages/EntidadeDetail.tsx
+ou
+
+client/src/features/entidades/EntidadeDetail.tsx
+
+Na função que faz o fetch da pesquisa (handleSearchOdooPartners ou semelhante), onde fazes o fetch('/api/integrations/odoo/search-partner?...'), ajusta o tratamento de erro:
+
+const response = await fetch(
+  `/api/integrations/odoo/search-partner?q=${encodeURIComponent(q)}`,
+  { method: "GET", credentials: "include" }
+);
+
+const data = await response.json();
+
+if (!response.ok || data.success === false) {
+  throw new Error(data.message || `HTTP ${response.status}`);
+}
+
+
+No catch dessa função, em vez de pôr sempre texto fixo, usa a mensagem do erro:
+
+} catch (error: any) {
+  console.error("[Odoo] Error searching partners for entidade:", error);
+  setOdooSearchError(
+    error?.message || "Erro ao pesquisar parceiros no Odoo."
+  );
+} finally {
+  setOdooSearchLoading(false);
+}
+
+
+Garante que setOdooSearchError é o estado que alimenta a mensagem vermelha que já estás a ver no pop-up.
+
+2.2 Contactos – diálogo “Procurar parceiro Odoo”
+
+Ficheiro a editar:
+
+client/src/pages/ContactoDetail.tsx
+(ou equivalente, onde já temos handleSearchOdooPartners para contactos)
+
+Repete a mesma lógica:
+
+Depois do fetch, lê data e valida success:
+
+const response = await fetch(
+  `/api/integrations/odoo/search-partner?q=${encodeURIComponent(q)}`,
+  {
+    method: "GET",
+    credentials: "include",
+  }
+);
+
+const data = await response.json();
+
+if (!response.ok || data.success === false) {
+  throw new Error(data.message || `HTTP ${response.status}`);
+}
+
+setOdooSearchResults(data.results ?? []);
+
+
+No catch:
+
+} catch (error: any) {
+  console.error("[Odoo] Error searching partners for contacto:", error);
+  setOdooSearchError(
+    error?.message || "Erro ao pesquisar parceiros no Odoo."
+  );
+} finally {
+  setOdooSearchLoading(false);
+}
+
+3) Correr e testar
+
+Na shell:
+
+npm run dev
+
+
+Depois, no browser:
+
+Vai a Backoffice → Entidades → abre a Entidade “Divitek Teste” (ou equivalente).
+
+No card Odoo, clica em “Ligar a Odoo”.
+
+Pesquisas outra vez por “Divitek Teste”.
+
+Quando der erro:
+
+A mensagem vermelha deve agora mostrar o texto completo vindo do backend, algo tipo:
+
+odoo.exceptions.AccessError: ...
+
+ou Database not found: ...
+
+ou Access denied: ...

@@ -102,10 +102,15 @@ export function setupOdooRoutes(app: any): void {
         });
       }
 
-      console.error("[Odoo] search-partner error:", error);
-      res.status(500).json({
-        error: "Odoo search error",
-        message: error.message ?? "Unknown error",
+      console.error("[Odoo] search-partner error:", {
+        message: error?.message,
+        stack: error?.stack,
+      });
+
+      return res.status(500).json({
+        success: false,
+        error: "Odoo search partner error",
+        message: error?.message ?? "Erro ao pesquisar parceiros no Odoo.",
       });
     }
   });

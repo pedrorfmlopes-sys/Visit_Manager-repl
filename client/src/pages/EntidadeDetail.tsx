@@ -421,11 +421,11 @@ export default function EntidadeDetail() {
         credentials: "include",
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
       const data = await response.json();
+
+      if (!response.ok || data.success === false) {
+        throw new Error(data.message || `HTTP ${response.status}`);
+      }
 
       if (data.notConfigured) {
         setOdooSearchNotConfigured(true);
@@ -434,9 +434,11 @@ export default function EntidadeDetail() {
       }
 
       setOdooSearchResults(data.results ?? []);
-    } catch (error) {
-      console.error("[Odoo] Error searching partners:", error);
-      setOdooSearchError("Erro ao pesquisar parceiros no Odoo.");
+    } catch (error: any) {
+      console.error("[Odoo] Error searching partners for entidade:", error);
+      setOdooSearchError(
+        error?.message || "Erro ao pesquisar parceiros no Odoo."
+      );
     } finally {
       setOdooSearchLoading(false);
     }

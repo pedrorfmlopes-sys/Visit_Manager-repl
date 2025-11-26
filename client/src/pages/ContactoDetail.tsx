@@ -317,11 +317,11 @@ export default function ContactoDetail() {
         credentials: "include",
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
       const data = await response.json();
+
+      if (!response.ok || data.success === false) {
+        throw new Error(data.message || `HTTP ${response.status}`);
+      }
 
       if (data.notConfigured) {
         setOdooSearchNotConfigured(true);
@@ -330,9 +330,11 @@ export default function ContactoDetail() {
       }
 
       setOdooSearchResults(data.results ?? []);
-    } catch (error) {
+    } catch (error: any) {
       console.error("[Odoo] Error searching partners for contacto:", error);
-      setOdooSearchError("Erro ao pesquisar parceiros no Odoo.");
+      setOdooSearchError(
+        error?.message || "Erro ao pesquisar parceiros no Odoo."
+      );
     } finally {
       setOdooSearchLoading(false);
     }
