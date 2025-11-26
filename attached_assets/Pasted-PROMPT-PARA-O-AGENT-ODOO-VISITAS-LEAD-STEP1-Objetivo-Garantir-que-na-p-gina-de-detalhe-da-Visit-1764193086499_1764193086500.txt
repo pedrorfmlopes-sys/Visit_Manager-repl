@@ -1,0 +1,204 @@
+PROMPT PARA O AGENT – ODOO-VISITAS-LEAD-STEP1
+
+Objetivo:
+Garantir que, na página de detalhe da Visita, o botão “Criar lead no Odoo”:
+
+cria mesmo uma crm.lead no Odoo,
+
+guarda o odooLeadId na tabela visitas,
+
+e o card da visita mostra o estado correto (ou o erro real, se falhar).
+
+1) Backend – createOdooLead com uid correto
+
+Ficheiro: server/integrations/odooClient.ts
+
+Localiza a função createOdooLead (já deve existir).
+Garante que faz:
+
+export async function createOdooLead(
+  conn: OdooConnection,
+  payload: Record<string, any>
+): Promise<number> {
+  const uid = await authenticateOdoo(conn);
+
+  const leadId = await callOdooJsonRpc<number>(conn, {
+    method: "call",
+    params: {
+      service: "object",
+      method: "execute_kw",
+      args: [
+        conn.dbName,
+        uid,
+        conn.apiKey,
+        "crm.lead",
+        "create",
+        [payload],
+      ],
+    },
+  });
+
+  if (typeof leadId !== "number") {
+    throw new Error(`Odoo create lead did not return numeric id (got: ${String(leadId)})`);
+  }
+
+  return leadId;
+}
+
+
+Usar sempre uid (não username) como 2.º argumento.
+
+2) Backend – rota POST /api/integrations/odoo/visitas/:id/create-lead
+
+Ficheiro: server/routes/integrations/odoo.ts
+
+Localiza a rota POST "/visitas/:id/create-lead".
+
+Garante uma implementação nesta linha:
+
+odooIntegrationsRouter.post(
+  "/visitas/:id/create-lead",
+  isAuthenticated,
+  async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      const visitaId = req.params.id;
+
+      if (!empresaId) {
+        return res.status(400).json({
+          success: false,
+          message: "Empresa em falta no contexto.",
+        });
+      }
+
+      // Buscar visita + entidade + contacto
+      const visita = await db.query.visitas.findFirst({
+        where: and(eq(visitas.id, visitaId), eq(visitas.empresaId, empresaId)),
+        with: {
+          entidade: true,
+          contacto: true,
+        },
+      });
+
+      if (!visita) {
+        return res.status(404).json({
+          success: false,
+          message: "Visita não encontrada.",
+        });
+      }
+
+      const conn = await getOdooConnectionForEmpresa(empresaId);
+
+      // Construir payload mínimo para crm.lead
+      const nomeEntidade = visita.entidade?.nome ?? "";
+      const nomeContacto =
+        visita.contacto?.nome ??
+        visita.entidade?.nome ??
+        "Lead Visit Manager";
+
+      const payload: Record<string, any> = {
+        name: visita.assunto || `Visita – ${nomeEntidade || nomeContacto}`,
+        partner_name: nomeEntidade || undefined,
+        contact_name: nomeContacto,
+        email_from:
+          visita.contacto?.email ??
+          visita.entidade?.email ??
+          undefined,
+        phone:
+          visita.contacto?.telefone ??
+          visita.entidade?.telefone ??
+          undefined,
+        // podes acrescentar mais campos depois (description, user_id, etc.)
+      };
+
+      const leadId = await createOdooLead(conn, payload);
+
+      // Guardar o leadId na visita
+      await db
+        .update(visitas)
+        .set({ odooLeadId: String(leadId) })
+        .where(and(eq(visitas.id, visitaId), eq(visitas.empresaId, empresaId)));
+
+      return res.json({
+        success: true,
+        leadId,
+      });
+    } catch (error: any) {
+      console.error("[Odoo] create lead from visita error:", {
+        message: error?.message,
+        stack: error?.stack,
+      });
+
+      return res.status(500).json({
+        success: false,
+        error: "Odoo create lead error",
+        message:
+          error?.message ?? "Erro ao criar lead no Odoo a partir da visita.",
+      });
+    }
+  }
+);
+
+
+Importante: usar visitas importado de ../shared/schema, como já fazemos noutros pontos.
+
+3) Frontend – tratar bem o erro/sucesso no card da Visita
+
+Ficheiro: página de detalhe da visita
+(ex.: client/src/pages/visitas/VisitaDetailPage.tsx)
+
+Na função handleCreateOdooLeadForVisita (que já criámos), ajusta o tratamento de resposta:
+
+const response = await fetch(
+  `/api/integrations/odoo/visitas/${visita.id}/create-lead`,
+  {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+  }
+);
+
+const data = await response.json();
+
+if (!response.ok || data.success === false) {
+  throw new Error(data.message || `HTTP ${response.status}`);
+}
+
+// sucesso
+if (visita) {
+  visita.odooLeadId = String(data.leadId);
+}
+
+// se usares React Query, invalida a visita
+// queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
+
+toast?.({
+  title: "Lead criada no Odoo",
+  description: `Lead #${data.leadId} criada a partir desta visita.`,
+});
+
+
+No catch:
+
+} catch (error: any) {
+  console.error("[Odoo] Error creating lead from visita:", error);
+  setOdooLeadError(
+    error?.message || "Erro ao criar lead no Odoo."
+  );
+  toast?.({
+    title: "Erro ao criar lead",
+    description: error?.message || "Não foi possível criar a lead no Odoo.",
+    variant: "destructive",
+  });
+} finally {
+  setOdooLeadCreating(false);
+}
+
+
+Usa o mesmo setOdooLeadError que já alimenta a mensagem vermelha no card Odoo da visita.
+
+4) Comandos e testes
+
+Na shell:
+
+npm run dev

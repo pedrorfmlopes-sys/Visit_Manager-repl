@@ -253,17 +253,13 @@ export default function VisitaDetail() {
 
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data?.message || `HTTP ${response.status}`);
+      if (!response.ok || data.success === false) {
+        throw new Error(data.message || `HTTP ${response.status}`);
       }
 
       if (data.notConfigured) {
         setOdooLeadNotConfigured(true);
         return;
-      }
-
-      if (!data.success) {
-        throw new Error(data?.error || "Falha ao criar lead no Odoo.");
       }
 
       // Atualizar visita localmente
@@ -280,10 +276,12 @@ export default function VisitaDetail() {
       });
     } catch (error: any) {
       console.error("[Odoo] Error creating lead from visita:", error);
-      setOdooLeadError("Erro ao criar lead no Odoo.");
+      setOdooLeadError(
+        error?.message || "Erro ao criar lead no Odoo."
+      );
       toast({
         title: "Erro ao criar lead",
-        description: "Não foi possível criar a lead no Odoo.",
+        description: error?.message || "Não foi possível criar a lead no Odoo.",
         variant: "destructive",
       });
     } finally {
