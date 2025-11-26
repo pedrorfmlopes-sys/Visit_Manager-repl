@@ -1,0 +1,289 @@
+PROMPT PARA O AGENT – ODOO-UI-ENTIDADES-STEP2
+
+Objetivo:
+Na página de detalhe da Entidade, permitir procurar um parceiro Odoo (/api/integrations/odoo/search-partner) e ligar a Entidade ao parceiro escolhido (/api/entidades/:id/odoo-link).
+
+Já existe:
+
+Card “Odoo” no EntidadeDetail.tsx
+
+odooPartnerId na entidade
+
+Botão “Ver detalhes do parceiro” que chama GET /api/integrations/odoo/partner/:id.
+
+Agora vamos tratar da ligação inicial.
+
+1) Estado para pesquisa de parceiros Odoo
+
+Ficheiro a editar:
+client/src/pages/EntidadeDetail.tsx
+
+No mesmo componente onde já tens:
+
+const [odooPartner, setOdooPartner] = useState<OdooPartner | null>(null);
+const [odooPartnerLoading, setOdooPartnerLoading] = useState(false);
+const [odooPartnerError, setOdooPartnerError] = useState<string | null>(null);
+const [odooNotConfigured, setOdooNotConfigured] = useState(false);
+
+
+Adiciona:
+
+const [odooSearchOpen, setOdooSearchOpen] = useState(false);
+const [odooSearchTerm, setOdooSearchTerm] = useState("");
+const [odooSearchResults, setOdooSearchResults] = useState<OdooPartner[]>([]);
+const [odooSearchLoading, setOdooSearchLoading] = useState(false);
+const [odooSearchError, setOdooSearchError] = useState<string | null>(null);
+const [odooSearchNotConfigured, setOdooSearchNotConfigured] = useState(false);
+
+2) Função para pesquisar parceiros Odoo
+
+Ainda em EntidadeDetail.tsx, junto à handleFetchOdooPartner, cria:
+
+const handleSearchOdooPartners = async () => {
+  const q = odooSearchTerm.trim();
+  if (!q) {
+    setOdooSearchError("Introduz um termo de pesquisa.");
+    return;
+  }
+
+  setOdooSearchLoading(true);
+  setOdooSearchError(null);
+  setOdooSearchNotConfigured(false);
+  setOdooSearchResults([]);
+
+  try {
+    const response = await fetch(`/api/integrations/odoo/search-partner?q=${encodeURIComponent(q)}`, {
+      method: "GET",
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.notConfigured) {
+      setOdooSearchNotConfigured(true);
+      setOdooSearchResults([]);
+      return;
+    }
+
+    setOdooSearchResults(data.results ?? []);
+  } catch (error) {
+    console.error("[Odoo] Error searching partners:", error);
+    setOdooSearchError("Erro ao pesquisar parceiros no Odoo.");
+  } finally {
+    setOdooSearchLoading(false);
+  }
+};
+
+3) Função para ligar Entidade → Odoo partner
+
+No mesmo ficheiro, cria uma função para chamar o endpoint já existente:
+
+const handleLinkOdooPartnerToEntidade = async (partner: OdooPartner) => {
+  if (!entidade?.id) return;
+
+  try {
+    const response = await fetch(`/api/entidades/${entidade.id}/odoo-link`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({ odooPartnerId: partner.id }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    // Sucesso: atualiza entidade localmente e faz fetch de detalhes
+    // 1) Atualizar odooPartnerId na entidade (se houver state próprio para entidade)
+    // Se estiveres a usar React Query para a entidade, faz um refetch:
+    //   queryClient.invalidateQueries(["/api/entidades", entidadeId]);
+    // Para simplificar aqui, assume que podes atualizar localmente:
+    if (entidade) {
+      entidade.odooPartnerId = String(partner.id);
+    }
+
+    setOdooPartner(null);
+    setOdooNotConfigured(false);
+    setOdooPartnerError(null);
+
+    // 2) Fecha o diálogo e carrega os detalhes do parceiro
+    setOdooSearchOpen(false);
+    setOdooSearchResults([]);
+    setOdooSearchTerm("");
+
+    await handleFetchOdooPartner();
+  } catch (error) {
+    console.error("[Odoo] Error linking partner to entidade:", error);
+    setOdooSearchError("Erro ao ligar a entidade ao parceiro Odoo.");
+  }
+};
+
+
+Se estiveres a usar React Query, adapta para invalidar/refrescar a query da entidade em vez de mutar entidade diretamente.
+
+4) UI: botão “Ligar a Odoo” + diálogo de pesquisa
+
+Ainda em EntidadeDetail.tsx, dentro do card Odoo, na parte onde hoje mostras:
+
+{!entidade.odooPartnerId ? (
+  <div>
+    <p>Esta entidade ainda não está ligada...</p>
+    <p>A ligação manual será configurada...</p>
+  </div>
+) : (
+  // ...
+)}
+
+
+Substitui o bloco do caso “não ligado” por algo deste género:
+
+{!entidade.odooPartnerId ? (
+  <div className="space-y-3">
+    <p className="text-sm text-muted-foreground">
+      Esta entidade ainda não está ligada a nenhum parceiro Odoo.
+    </p>
+    <div className="flex items-center gap-2">
+      <Button
+        size="sm"
+        onClick={() => {
+          setOdooSearchOpen(true);
+          setOdooSearchError(null);
+          setOdooSearchResults([]);
+        }}
+        data-testid="button-odoo-open-search"
+      >
+        Ligar a Odoo
+      </Button>
+    </div>
+  </div>
+) : (
+  // mantém o caso "ligado" como já está
+)}
+
+
+Depois, ainda no JSX da página (no mesmo componente), adiciona o diálogo/modal usando os componentes já existentes no projeto (ex.: Dialog, Sheet ou similar). Exemplo genérico com Dialog:
+
+<Dialog open={odooSearchOpen} onOpenChange={setOdooSearchOpen}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Procurar parceiro Odoo</DialogTitle>
+      <DialogDescription>
+        Pesquisa por nome ou email para ligar esta entidade a um parceiro do Odoo.
+      </DialogDescription>
+    </DialogHeader>
+
+    <div className="space-y-3">
+      <div className="flex gap-2">
+        <Input
+          placeholder="Nome ou email..."
+          value={odooSearchTerm}
+          onChange={(e) => setOdooSearchTerm(e.target.value)}
+          data-testid="input-odoo-search-term"
+        />
+        <Button
+          onClick={handleSearchOdooPartners}
+          disabled={odooSearchLoading}
+          data-testid="button-odoo-search"
+        >
+          {odooSearchLoading ? "A pesquisar..." : "Pesquisar"}
+        </Button>
+      </div>
+
+      {odooSearchNotConfigured && (
+        <Alert data-testid="alert-odoo-search-not-configured">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Integração não configurada</AlertTitle>
+          <AlertDescription>
+            Integração Odoo ainda não está configurada para esta empresa.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {odooSearchError && (
+        <Alert variant="destructive" data-testid="alert-odoo-search-error">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Erro</AlertTitle>
+          <AlertDescription>{odooSearchError}</AlertDescription>
+        </Alert>
+      )}
+
+      {!odooSearchLoading && !odooSearchNotConfigured && (
+        <div className="space-y-2 max-h-64 overflow-auto" data-testid="list-odoo-search-results">
+          {odooSearchResults.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              Sem resultados. Tenta outro termo de pesquisa.
+            </p>
+          )}
+
+          {odooSearchResults.map((partner) => (
+            <button
+              key={partner.id}
+              type="button"
+              onClick={() => handleLinkOdooPartnerToEntidade(partner)}
+              className="w-full text-left border rounded-md px-3 py-2 hover:bg-muted focus:outline-none"
+              data-testid={`button-odoo-select-partner-${partner.id}`}
+            >
+              <p className="font-medium">{partner.name}</p>
+              {partner.email && (
+                <p className="text-xs text-muted-foreground">
+                  {partner.email}
+                </p>
+              )}
+              {(partner.city || partner.country) && (
+                <p className="text-xs text-muted-foreground">
+                  {[partner.city, partner.country].filter(Boolean).join(", ")}
+                </p>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  </DialogContent>
+</Dialog>
+
+
+Usa os componentes (Dialog, DialogContent, Input, Button, Alert, etc.) exatamente como já estão importados neste ficheiro / noutros, para manter consistência.
+
+5) Comandos e testes
+
+Correr:
+
+npm run dev
+
+
+No browser:
+
+Abrir uma Entidade sem odooPartnerId.
+
+Verificar:
+
+Card “Odoo” mostra o botão “Ligar a Odoo”.
+
+Ao clicar, abre o diálogo de pesquisa.
+
+Pesquisar com um termo (ex.: “teste”) → ver pedido a
+/api/integrations/odoo/search-partner?q=... no Network.
+
+Clicar num resultado → ver POST para
+/api/entidades/:id/odoo-link com {"odooPartnerId": <id>}.
+
+Após sucesso:
+
+Diálogo fecha.
+
+Card passa a mostrar “Ligado ao parceiro Odoo #ID”.
+
+Botão “Ver detalhes do parceiro” funciona e mostra os dados.
+
+Testar também:
+
+Caso notConfigured vindo de /search-partner.
+
+Caso de erro (simular desligando Odoo) → mensagem de erro aparece.

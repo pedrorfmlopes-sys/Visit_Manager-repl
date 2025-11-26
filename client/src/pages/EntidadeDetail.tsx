@@ -7,7 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -48,6 +49,12 @@ export default function EntidadeDetail() {
   const [odooPartnerLoading, setOdooPartnerLoading] = useState(false);
   const [odooPartnerError, setOdooPartnerError] = useState<string | null>(null);
   const [odooNotConfigured, setOdooNotConfigured] = useState(false);
+  const [odooSearchOpen, setOdooSearchOpen] = useState(false);
+  const [odooSearchTerm, setOdooSearchTerm] = useState("");
+  const [odooSearchResults, setOdooSearchResults] = useState<OdooPartner[]>([]);
+  const [odooSearchLoading, setOdooSearchLoading] = useState(false);
+  const [odooSearchError, setOdooSearchError] = useState<string | null>(null);
+  const [odooSearchNotConfigured, setOdooSearchNotConfigured] = useState(false);
   const [pdfProOptions, setPdfProOptions] = useState({
     includePhotos: true,
     includeTasks: true,
@@ -393,6 +400,83 @@ export default function EntidadeDetail() {
       setOdooPartnerError("Erro ao carregar parceiro do Odoo");
     } finally {
       setOdooPartnerLoading(false);
+    }
+  };
+
+  const handleSearchOdooPartners = async () => {
+    const q = odooSearchTerm.trim();
+    if (!q) {
+      setOdooSearchError("Introduz um termo de pesquisa.");
+      return;
+    }
+
+    setOdooSearchLoading(true);
+    setOdooSearchError(null);
+    setOdooSearchNotConfigured(false);
+    setOdooSearchResults([]);
+
+    try {
+      const response = await fetch(`/api/integrations/odoo/search-partner?q=${encodeURIComponent(q)}`, {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.notConfigured) {
+        setOdooSearchNotConfigured(true);
+        setOdooSearchResults([]);
+        return;
+      }
+
+      setOdooSearchResults(data.results ?? []);
+    } catch (error) {
+      console.error("[Odoo] Error searching partners:", error);
+      setOdooSearchError("Erro ao pesquisar parceiros no Odoo.");
+    } finally {
+      setOdooSearchLoading(false);
+    }
+  };
+
+  const handleLinkOdooPartnerToEntidade = async (partner: OdooPartner) => {
+    if (!entidade?.id) return;
+
+    try {
+      const response = await fetch(`/api/entidades/${entidade.id}/odoo-link`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ odooPartnerId: partner.id }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["/api/entidades", entidadeId] });
+      
+      setOdooSearchOpen(false);
+      setOdooSearchResults([]);
+      setOdooSearchTerm("");
+      setOdooSearchError(null);
+
+      setTimeout(() => {
+        handleFetchOdooPartner();
+      }, 100);
+
+      toast({
+        title: "Sucesso",
+        description: `Entidade ligada ao parceiro Odoo "${partner.name}"`,
+      });
+    } catch (error) {
+      console.error("[Odoo] Error linking partner to entidade:", error);
+      setOdooSearchError("Erro ao ligar a entidade ao parceiro Odoo.");
     }
   };
 
@@ -810,13 +894,23 @@ export default function EntidadeDetail() {
           </CardHeader>
           <CardContent className="space-y-4">
             {!entidade.odooPartnerId ? (
-              <div>
+              <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">
                   Esta entidade ainda não está ligada a nenhum parceiro Odoo.
                 </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  A ligação manual será configurada numa próxima etapa.
-                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setOdooSearchOpen(true);
+                      setOdooSearchError(null);
+                      setOdooSearchResults([]);
+                    }}
+                    data-testid="button-odoo-open-search"
+                  >
+                    Ligar a Odoo
+                  </Button>
+                </div>
               </div>
             ) : (
               <>
@@ -1079,6 +1173,85 @@ export default function EntidadeDetail() {
         entidadeId={entidadeId}
         defaultTemplate="envio_catalogo"
       />
+
+      <Dialog open={odooSearchOpen} onOpenChange={setOdooSearchOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Procurar parceiro Odoo</DialogTitle>
+            <DialogDescription>
+              Pesquisa por nome ou email para ligar esta entidade a um parceiro do Odoo.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Nome ou email..."
+                value={odooSearchTerm}
+                onChange={(e) => setOdooSearchTerm(e.target.value)}
+                data-testid="input-odoo-search-term"
+              />
+              <Button
+                onClick={handleSearchOdooPartners}
+                disabled={odooSearchLoading}
+                data-testid="button-odoo-search"
+              >
+                {odooSearchLoading ? "A pesquisar..." : "Pesquisar"}
+              </Button>
+            </div>
+
+            {odooSearchNotConfigured && (
+              <Alert data-testid="alert-odoo-search-not-configured">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Integração não configurada</AlertTitle>
+                <AlertDescription>
+                  Integração Odoo ainda não está configurada para esta empresa.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {odooSearchError && (
+              <Alert variant="destructive" data-testid="alert-odoo-search-error">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Erro</AlertTitle>
+                <AlertDescription>{odooSearchError}</AlertDescription>
+              </Alert>
+            )}
+
+            {!odooSearchLoading && !odooSearchNotConfigured && (
+              <div className="space-y-2 max-h-64 overflow-auto" data-testid="list-odoo-search-results">
+                {odooSearchResults.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Sem resultados. Tenta outro termo de pesquisa.
+                  </p>
+                )}
+
+                {odooSearchResults.map((partner) => (
+                  <button
+                    key={partner.id}
+                    type="button"
+                    onClick={() => handleLinkOdooPartnerToEntidade(partner)}
+                    className="w-full text-left border rounded-md px-3 py-2 hover:bg-muted focus:outline-none"
+                    data-testid={`button-odoo-select-partner-${partner.id}`}
+                  >
+                    <p className="font-medium">{partner.name}</p>
+                    {partner.email && (
+                      <p className="text-xs text-muted-foreground">
+                        {partner.email}
+                      </p>
+                    )}
+                    {(partner.city || partner.country) && (
+                      <p className="text-xs text-muted-foreground">
+                        {[partner.city, partner.country].filter(Boolean).join(", ")}
+                      </p>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={pdfProDialogOpen} onOpenChange={setPdfProDialogOpen}>
         <DialogContent className="max-w-md">
