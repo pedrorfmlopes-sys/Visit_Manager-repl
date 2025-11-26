@@ -20,6 +20,7 @@ import AdminUsers from "@/pages/AdminUsers";
 import AdminMarcas from "@/pages/AdminMarcas";
 import { MicrosoftIntegrationCard } from "@/components/integrations/MicrosoftIntegrationCard";
 import { GoogleIntegrationCard } from "@/components/integrations/GoogleIntegrationCard";
+import { OdooIntegrationCard } from "@/components/integrations/OdooIntegrationCard";
 
 const updateEmpresaSchema = z.object({
   nome: z.string().min(1, "Nome obrigatório"),
@@ -1223,6 +1224,9 @@ export default function AdminEmpresa() {
 
           {/* Google Workspace - Active Integration */}
           <GoogleIntegrationCard />
+
+          {/* Odoo - Configuração por empresa */}
+          <OdooIntegrationCard />
 
           {/* Email & Notifications */}
           <Card>
