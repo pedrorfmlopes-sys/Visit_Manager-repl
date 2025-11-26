@@ -4,6 +4,7 @@ import { getUserContext } from "../../authContext";
 import { odooConnectionsStorage } from "../../storage/odooConnections";
 import { insertOdooConnectionSchema } from "@shared/schema";
 import { testOdooConnection, searchOdooPartners, getOdooPartnerById, createOdooLead } from "../../integrations/odooClient";
+import { createLeadForVisita } from "../../integrations/odooLeadsFromVisitas";
 import express from "express";
 
 export function setupOdooRoutes(app: any): void {
@@ -141,6 +142,48 @@ export function setupOdooRoutes(app: any): void {
       console.error("[Odoo] get partner error:", error);
       return res.status(500).json({
         error: "Odoo partner fetch error",
+        message: error?.message ?? "Unknown error",
+      });
+    }
+  });
+
+  // POST /api/integrations/odoo/visitas/:id/create-lead
+  // Cria uma lead no Odoo a partir de uma visita
+  router.post("/visitas/:id/create-lead", isAuthenticated, async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) {
+        return res.status(400).json({ error: "User has no company assigned" });
+      }
+
+      const visitaId = String(req.params.id);
+
+      const result = await createLeadForVisita(empresaId, visitaId);
+
+      return res.json({
+        success: true,
+        visitaId: result.visitaId,
+        leadId: result.leadId,
+      });
+    } catch (error: any) {
+      if (error?.message === "VISITA_NOT_FOUND") {
+        return res.status(404).json({
+          success: false,
+          error: "Visita not found",
+        });
+      }
+
+      if (error?.message === "ODOO_NOT_CONFIGURED") {
+        return res.status(200).json({
+          success: false,
+          notConfigured: true,
+        });
+      }
+
+      console.error("[Odoo] create-lead-from-visita error:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Odoo create lead from visita error",
         message: error?.message ?? "Unknown error",
       });
     }

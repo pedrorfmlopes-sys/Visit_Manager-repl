@@ -551,6 +551,8 @@ export const visitas = pgTable("visitas", {
   // Microsoft 365 Integration Fields
   outlookEventId: varchar("outlook_event_id", { length: 255 }),
   lastCalendarSyncAt: timestamp("last_calendar_sync_at"),
+  // Odoo Lead Integration
+  odooLeadId: text("odoo_lead_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -610,6 +612,7 @@ export const insertVisitaSchema = createInsertSchema(visitas).omit({
   transcricaoAudio: true,
   gabineteId: true, // DEPRECATED - use entidadeId
   odooActivityId: true,
+  odooLeadId: true, // Set by backend when creating lead
   needsSync: true,
   syncStatus: true,
   lastSyncAt: true,

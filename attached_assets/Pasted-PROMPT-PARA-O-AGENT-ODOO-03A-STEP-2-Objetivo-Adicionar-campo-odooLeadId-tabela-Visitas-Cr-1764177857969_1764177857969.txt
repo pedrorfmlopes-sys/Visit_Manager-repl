@@ -1,0 +1,283 @@
+PROMPT PARA O AGENT – ODOO-03A / STEP 2
+
+Objetivo:
+
+Adicionar campo odooLeadId à tabela Visitas.
+
+Criar um pequeno serviço que, dado um visitaId, monta uma lead para o Odoo e chama createOdooLead.
+
+Criar endpoint manual:
+POST /api/integrations/odoo/visitas/:id/create-lead
+
+⚠️ Ainda não ligar automaticamente à criação/edição de visitas. É só trigger manual.
+
+1) Adicionar campo odooLeadId à tabela Visitas
+
+Ficheiro a editar:
+
+shared/schema.ts (ou o ficheiro onde está definida a tabela visitas).
+
+Tarefas:
+
+Na definição da tabela visitas, adicionar coluna opcional:
+
+odooLeadId: text("odoo_lead_id"),
+
+
+Tipo texto, nullable.
+
+Nome da coluna: "odoo_lead_id".
+
+Garantir que o tipo TypeScript da Visita (se existir algo como export type Visita = typeof visitas.$inferSelect) inclui odooLeadId?: string | null.
+
+Se existirem mapeamentos manuais em storage/API ({ id, titulo, ... }), garantir que odooLeadId é incluído.
+
+2) Sincronizar BD
+
+Na shell:
+
+npm run db:push
+
+
+Confirma que a coluna odoo_lead_id foi criada na tabela de visitas e não há erros.
+
+3) Criar serviço: criar lead no Odoo a partir de uma Visita
+
+Novo ficheiro a criar:
+
+server/integrations/odooLeadsFromVisitas.ts
+
+Tarefas:
+
+No novo ficheiro, importar o necessário:
+
+import { db } from "../../shared/db"; // ajustar path real
+import { visitas, entidades, contactos } from "../../shared/schema"; // ajustar se os nomes forem ligeiramente diferentes
+import { and, eq } from "drizzle-orm";
+import { createOdooLead } from "./odooClient";
+
+
+Criar tipo de retorno simples:
+
+export type CreateLeadFromVisitaResult = {
+  visitaId: string;
+  leadId: number;
+};
+
+
+Implementar função principal:
+
+export async function createLeadForVisita(
+  empresaId: string,
+  visitaId: string
+): Promise<CreateLeadFromVisitaResult> {
+  // 1) Buscar visita + entidade + contacto (se existir)
+  const [row] = await db
+    .select({
+      visita: visitas,
+      entidade: entidades,
+      contacto: contactos, // left join, porque pode ser null
+    })
+    .from(visitas)
+    .innerJoin(entidades, and(
+      eq(entidades.id, visitas.entidadeId),
+      eq(entidades.empresaId, empresaId)
+    ))
+    .leftJoin(contactos, and(
+      eq(contactos.id, visitas.contactoId),
+      eq(contactos.empresaId, empresaId)
+    ))
+    .where(
+      and(
+        eq(visitas.id, visitaId),
+        eq(visitas.empresaId, empresaId)
+      )
+    );
+
+  if (!row) {
+    throw new Error("VISITA_NOT_FOUND");
+  }
+
+  const { visita, entidade, contacto } = row;
+
+  // 2) Construir campos para a lead
+  const leadName =
+    visita.titulo?.trim() ||
+    (entidade?.nome ? `Visita – ${entidade.nome}` : "Visita – sem título");
+
+  const contactName =
+    contacto?.nome?.trim() ||
+    entidade?.nome?.trim() ||
+    null;
+
+  const email =
+    contacto?.email?.trim() ||
+    entidade?.email?.trim() ||
+    null;
+
+  const phone =
+    contacto?.telefone?.trim() ||
+    entidade?.telefone?.trim() ||
+    null;
+
+  const descricaoPartes: string[] = [];
+
+  if (visita.data) {
+    descricaoPartes.push(`Data da visita: ${visita.data.toISOString()}`);
+  }
+  if (visita.notas?.trim()) {
+    descricaoPartes.push(`Notas da visita:\n${visita.notas.trim()}`);
+  }
+  if (entidade?.nome) {
+    descricaoPartes.push(`Entidade: ${entidade.nome}`);
+  }
+  if (contacto?.nome) {
+    descricaoPartes.push(`Contacto: ${contacto.nome}`);
+  }
+
+  const description =
+    descricaoPartes.length > 0
+      ? descricaoPartes.join("\n\n")
+      : "Lead criada automaticamente a partir de uma visita na aplicação Visit Manager.";
+
+  // 3) Chamar Odoo
+  const result = await createOdooLead(empresaId, {
+    name: leadName,
+    contactName,
+    email,
+    phone,
+    description,
+  });
+
+  // 4) Guardar odooLeadId na visita
+  await db
+    .update(visitas)
+    .set({ odooLeadId: String(result.id) })
+    .where(
+      and(
+        eq(visitas.id, visitaId),
+        eq(visitas.empresaId, empresaId)
+      )
+    );
+
+  return {
+    visitaId,
+    leadId: result.id,
+  };
+}
+
+
+Ajustar nomes de colunas (titulo, data, notas, entidadeId, contactoId, nome, email, telefone, etc.) aos existentes no teu schema real.
+
+4) Endpoint: POST /api/integrations/odoo/visitas/:id/create-lead
+
+Ficheiro a editar:
+
+server/routes/integrations/odoo.ts (mesmo router onde estão /status, /search-partner, /partner/:id, /test-create-lead).
+
+Tarefas:
+
+Importar o novo serviço:
+
+import { createLeadForVisita } from "../../integrations/odooLeadsFromVisitas";
+
+
+Adicionar rota:
+
+odooIntegrationsRouter.post(
+  "/visitas/:id/create-lead",
+  isAuthenticated, // usar MESMO middleware das outras rotas Odoo
+  async (req, res) => {
+    try {
+      const { empresaId } = await getUserContext(req); // ajustar ao helper real
+      if (!empresaId) {
+        return res.status(400).json({ error: "User has no company assigned" });
+      }
+
+      const visitaId = String(req.params.id);
+
+      const result = await createLeadForVisita(empresaId, visitaId);
+
+      return res.json({
+        success: true,
+        visitaId: result.visitaId,
+        leadId: result.leadId,
+      });
+    } catch (error: any) {
+      if (error?.message === "VISITA_NOT_FOUND") {
+        return res.status(404).json({
+          success: false,
+          error: "Visita not found",
+        });
+      }
+
+      if (error?.message === "ODOO_NOT_CONFIGURED") {
+        return res.status(200).json({
+          success: false,
+          notConfigured: true,
+        });
+      }
+
+      console.error("[Odoo] create-lead-from-visita error:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Odoo create lead from visita error",
+        message: error?.message ?? "Unknown error",
+      });
+    }
+  }
+);
+
+5) Comandos a correr
+
+Na shell:
+
+npm run db:push
+npm run dev
+
+
+Garante que:
+
+A migration corre sem erros.
+
+O servidor arranca sem erros de TypeScript/imports.
+
+6) O que testar no fim
+
+Ter pelo menos 1 Visita criada para uma empresa (idealmente com Entidade + Contacto preenchidos).
+
+Chamar o endpoint manualmente (via REST client / curl, com sessão autenticada):
+
+curl -X POST "http://localhost:5000/api/integrations/odoo/visitas/<VISITA_ID>/create-lead" \
+  -H "Content-Type: application/json" \
+  --cookie "SESSION=..." 
+
+
+Esperado (sucesso):
+
+{
+  "success": true,
+  "visitaId": "<VISITA_ID>",
+  "leadId": 1234
+}
+
+
+Verificar:
+
+No Odoo: lead criada em CRM → Leads, com:
+
+Nome ≈ título/entidade da visita
+
+Contacto / email / telefone (se existirem)
+
+Descrição com dados da visita
+
+Na API / BD: a visita agora deve ter odooLeadId = "1234".
+
+Casos de erro:
+
+VISITA_NOT_FOUND → HTTP 404, success: false.
+
+Odoo não configurado → HTTP 200, { success: false, notConfigured: true }.
+
+Outros erros → HTTP 500 com mensagem.
