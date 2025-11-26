@@ -16,13 +16,28 @@ export function registerCrmLeadsRoutes(app: express.Express) {
       await assertLeadsEnabled(empresaId);
 
       // FASE CRM-LEADS-VISITA-STEP1: Support visitaId query parameter for filtering
+      // FASE CRM-LEADS-ENT-CONTACTO-STEP1: Add entidadeId and contactoId filters
+      const entidadeId = typeof req.query.entidadeId === "string"
+        ? req.query.entidadeId
+        : undefined;
+      const contactoId = typeof req.query.contactoId === "string"
+        ? req.query.contactoId
+        : undefined;
       const visitaId = typeof req.query.visitaId === "string"
         ? req.query.visitaId
         : undefined;
 
-      const whereClause = visitaId
-        ? and(eq(leads.empresaId, empresaId), eq(leads.visitaId, visitaId))
-        : eq(leads.empresaId, empresaId);
+      let whereClause: any = eq(leads.empresaId, empresaId);
+
+      if (entidadeId) {
+        whereClause = and(whereClause, eq(leads.entidadeId, entidadeId));
+      }
+      if (contactoId) {
+        whereClause = and(whereClause, eq(leads.contactoId, contactoId));
+      }
+      if (visitaId) {
+        whereClause = and(whereClause, eq(leads.visitaId, visitaId));
+      }
 
       const rows = await db.query.leads.findMany({
         where: whereClause,

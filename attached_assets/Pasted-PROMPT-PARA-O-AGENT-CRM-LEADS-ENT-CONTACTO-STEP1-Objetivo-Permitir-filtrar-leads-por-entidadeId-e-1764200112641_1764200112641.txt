@@ -1,0 +1,259 @@
+PROMPT PARA O AGENT – CRM-LEADS-ENT-CONTACTO-STEP1
+Objetivo
+
+Permitir filtrar leads por entidadeId e contactoId na API.
+
+Mostrar secções “Leads desta entidade” e “Leads deste contacto” nas páginas de detalhe, respeitando o crmLeadsEnabled.
+
+1) Backend – filtros por entidadeId e contactoId
+
+Ficheiro: server/routes/crmLeads.ts
+
+Na rota GET /api/crm/leads, além de visitaId, ler também entidadeId e contactoId da query:
+
+const entidadeId =
+  typeof req.query.entidadeId === "string" ? req.query.entidadeId : undefined;
+const contactoId =
+  typeof req.query.contactoId === "string" ? req.query.contactoId : undefined;
+const visitaId =
+  typeof req.query.visitaId === "string" ? req.query.visitaId : undefined;
+
+
+Construir o where combinando filtros (todos opcionais), sempre com empresaId:
+
+let whereClause: any = eq(leads.empresaId, empresaId);
+
+if (entidadeId) {
+  whereClause = and(whereClause, eq(leads.entidadeId, entidadeId));
+}
+if (contactoId) {
+  whereClause = and(whereClause, eq(leads.contactoId, contactoId));
+}
+if (visitaId) {
+  whereClause = and(whereClause, eq(leads.visitaId, visitaId));
+}
+
+
+Usar whereClause no findMany:
+
+const rows = await db.query.leads.findMany({
+  where: whereClause,
+  orderBy: (l, { desc }) => desc(l.createdAt),
+});
+
+
+Mantém o resto da rota igual (assertLeadsEnabled, tratamento de erro, etc.).
+
+2) Frontend – “Leads desta entidade”
+
+Ficheiro: página de detalhe da entidade
+(ex.: client/src/pages/EntidadeDetailPage.tsx ou similar).
+
+2.1 Hook para carregar leads da entidade
+
+Depois de teres entidade carregada:
+
+const { data: entidadeLeadsData, isLoading: entidadeLeadsLoading } = useQuery({
+  queryKey: ["/api/crm/leads", { entidadeId: entidade?.id }],
+  enabled: !!entidade?.id,
+  queryFn: async () => {
+    const params = new URLSearchParams({ entidadeId: entidade!.id });
+    const resp = await fetch(`/api/crm/leads?${params.toString()}`, {
+      credentials: "include",
+    });
+    return resp.json();
+  },
+});
+
+const entidadeLeadsDisabled =
+  entidadeLeadsData &&
+  "success" in entidadeLeadsData &&
+  entidadeLeadsData.success === false &&
+  entidadeLeadsData.notEnabled === true;
+
+const entidadeLeads: Lead[] =
+  entidadeLeadsData && "leads" in entidadeLeadsData
+    ? entidadeLeadsData.leads
+    : [];
+
+
+Usa o mesmo tipo Lead que já tens na página de Leads / Visita.
+
+2.2 Secção de UI
+
+No JSX da Entidade, adiciona um Card, por exemplo abaixo de visitas/tarefas:
+
+<Card className="mt-4">
+  <CardHeader>
+    <CardTitle className="text-sm">Leads desta entidade</CardTitle>
+    <CardDescription className="text-xs">
+      Todas as oportunidades associadas a contactos e visitas desta entidade.
+    </CardDescription>
+  </CardHeader>
+  <CardContent>
+    {entidadeLeadsDisabled && (
+      <p className="text-xs text-amber-600">
+        O módulo de Leads CRM está desativado para esta empresa.
+      </p>
+    )}
+
+    {!entidadeLeadsDisabled && entidadeLeadsLoading && (
+      <p className="text-sm text-muted-foreground">A carregar leads...</p>
+    )}
+
+    {!entidadeLeadsDisabled &&
+      !entidadeLeadsLoading &&
+      entidadeLeads.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          Ainda não existem leads associados a esta entidade.
+        </p>
+      )}
+
+    {!entidadeLeadsDisabled &&
+      !entidadeLeadsLoading &&
+      entidadeLeads.length > 0 && (
+        <div className="space-y-2">
+          {entidadeLeads.map((lead) => (
+            <div
+              key={lead.id}
+              className="flex items-center justify-between border rounded-md px-3 py-2 text-sm"
+            >
+              <div>
+                <div className="font-medium">{lead.titulo}</div>
+                <div className="text-xs text-muted-foreground">
+                  {lead.marca ? `Marca: ${lead.marca} · ` : ""}
+                  Estado: {lead.estado}
+                </div>
+              </div>
+              <div className="text-right text-xs">
+                {lead.valorPrevisto
+                  ? `${lead.valorPrevisto} ${lead.moeda || "EUR"}`
+                  : "—"}
+                <div className="text-[10px] text-muted-foreground">
+                  {new Date(lead.createdAt).toLocaleDateString()}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+  </CardContent>
+</Card>
+
+
+Só listagem aqui; criação/edição continua via visita ou, mais tarde, numa página de detalhe do lead.
+
+3) Frontend – “Leads deste contacto”
+
+Ficheiro: página de detalhe do contacto
+(ex.: client/src/pages/ContactoDetailPage.tsx).
+
+3.1 Hook para leads do contacto
+
+Depois de teres contacto carregado:
+
+const { data: contactoLeadsData, isLoading: contactoLeadsLoading } = useQuery({
+  queryKey: ["/api/crm/leads", { contactoId: contacto?.id }],
+  enabled: !!contacto?.id,
+  queryFn: async () => {
+    const params = new URLSearchParams({ contactoId: contacto!.id });
+    const resp = await fetch(`/api/crm/leads?${params.toString()}`, {
+      credentials: "include",
+    });
+    return resp.json();
+  },
+});
+
+const contactoLeadsDisabled =
+  contactoLeadsData &&
+  "success" in contactoLeadsData &&
+  contactoLeadsData.success === false &&
+  contactoLeadsData.notEnabled === true;
+
+const contactoLeads: Lead[] =
+  contactoLeadsData && "leads" in contactoLeadsData
+    ? contactoLeadsData.leads
+    : [];
+
+3.2 Secção de UI
+
+No JSX do Contacto:
+
+<Card className="mt-4">
+  <CardHeader>
+    <CardTitle className="text-sm">Leads deste contacto</CardTitle>
+    <CardDescription className="text-xs">
+      Oportunidades associadas a este contacto, a partir de visitas ou outras fontes.
+    </CardDescription>
+  </CardHeader>
+  <CardContent>
+    {contactoLeadsDisabled && (
+      <p className="text-xs text-amber-600">
+        O módulo de Leads CRM está desativado para esta empresa.
+      </p>
+    )}
+
+    {!contactoLeadsDisabled && contactoLeadsLoading && (
+      <p className="text-sm text-muted-foreground">A carregar leads...</p>
+    )}
+
+    {!contactoLeadsDisabled &&
+      !contactoLeadsLoading &&
+      contactoLeads.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          Ainda não existem leads associados a este contacto.
+        </p>
+      )}
+
+    {!contactoLeadsDisabled &&
+      !contactoLeadsLoading &&
+      contactoLeads.length > 0 && (
+        <div className="space-y-2">
+          {contactoLeads.map((lead) => (
+            <div
+              key={lead.id}
+              className="flex items-center justify-between border rounded-md px-3 py-2 text-sm"
+            >
+              <div>
+                <div className="font-medium">{lead.titulo}</div>
+                <div className="text-xs text-muted-foreground">
+                  {lead.marca ? `Marca: ${lead.marca} · ` : ""}
+                  Estado: {lead.estado}
+                </div>
+              </div>
+              <div className="text-right text-xs">
+                {lead.valorPrevisto
+                  ? `${lead.valorPrevisto} ${lead.moeda || "EUR"}`
+                  : "—"}
+                <div className="text-[10px] text-muted-foreground">
+                  {new Date(lead.createdAt).toLocaleDateString()}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+  </CardContent>
+</Card>
+
+4) Testes
+
+Confirma em Definições → CRMs:
+
+O módulo de Leads está ativo.
+
+Cria uma visita com entidade + contacto, e adiciona 1–2 leads nessa visita.
+
+Verifica:
+
+Em /admin/leads → vês os leads.
+
+Na Visita → secção “Leads desta visita” lista os leads dessa visita.
+
+Na Entidade → “Leads desta entidade” mostra todos os leads que criaste ligados a essa entidade (mesmo de visitas diferentes).
+
+No Contacto → “Leads deste contacto” mostra os leads ligados a esse contacto.
+
+Desativa o módulo de Leads em CRMs:
+
+Em todas estas secções (Leads global, Visita, Entidade, Contacto) deves ver mensagens de “módulo desativado” e deixar de aparecer conteúdo dinâmico.

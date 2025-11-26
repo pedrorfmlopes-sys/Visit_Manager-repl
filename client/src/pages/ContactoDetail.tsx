@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, User, Phone, Mail, Building2, Edit, Share2, MessageCircle, Link as LinkIcon, Copy, FileText, Globe, MapPin, Linkedin, Instagram, Facebook, Sparkles, Trash2, Calendar, Store, AlertCircle } from "lucide-react";
+import { ArrowLeft, User, Phone, Mail, Building2, Edit, Share2, MessageCircle, Link as LinkIcon, Copy, FileText, Globe, MapPin, Linkedin, Instagram, Facebook, Sparkles, Trash2, Calendar, Store, AlertCircle, Flag } from "lucide-react";
 import { SiX } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -120,6 +120,42 @@ export default function ContactoDetail() {
     : (visitasResponse?.visitas ??
        (visitasResponse as any)?.items ??
        []);
+
+  // FASE CRM-LEADS-ENT-CONTACTO-STEP1: Load leads for this contacto
+  type Lead = {
+    id: string;
+    titulo: string;
+    marca: string | null;
+    estado: string;
+    valorPrevisto: string | null;
+    moeda: string | null;
+    createdAt: string;
+  };
+
+  type LeadsResponse = 
+    | { leads: Lead[] }
+    | { success: false; notEnabled?: boolean; message?: string };
+
+  const { data: contactoLeadsData, isLoading: contactoLeadsLoading } = useQuery<LeadsResponse>({
+    queryKey: ["/api/crm/leads", { contactoId: contacto?.id }],
+    enabled: !!contacto?.id,
+    queryFn: async () => {
+      const params = new URLSearchParams({ contactoId: contacto!.id });
+      const resp = await fetch(`/api/crm/leads?${params.toString()}`, {
+        credentials: "include",
+      });
+      return resp.json();
+    },
+  });
+
+  const contactoLeadsDisabled =
+    contactoLeadsData &&
+    "success" in contactoLeadsData &&
+    contactoLeadsData.success === false &&
+    contactoLeadsData.notEnabled === true;
+
+  const contactoLeads: Lead[] =
+    contactoLeadsData && "leads" in contactoLeadsData ? contactoLeadsData.leads : [];
 
   // Delete contacto mutation
   const deleteContactoMutation = useMutation({

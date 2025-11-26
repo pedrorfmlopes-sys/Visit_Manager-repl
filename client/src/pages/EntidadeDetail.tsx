@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, MapPin, Phone, Mail, Globe, Edit, Building2, Users, UserCircle, Calendar, Sparkles, Linkedin, Facebook, Instagram, Share2, MessageCircle, Link as LinkIcon, Copy, FileText, Bell, AlertCircle, Download, Trash2, Store, Factory, Home, Handshake, Package, Briefcase } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, Mail, Globe, Edit, Building2, Users, UserCircle, Calendar, Sparkles, Linkedin, Facebook, Instagram, Share2, MessageCircle, Link as LinkIcon, Copy, FileText, Bell, AlertCircle, Download, Trash2, Store, Factory, Home, Handshake, Package, Briefcase, Flag } from "lucide-react";
 import { SiX } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -75,6 +75,42 @@ export default function EntidadeDetail() {
   });
 
   const entityReminders = allLembretes?.filter(l => l.entidadeId === entidadeId) || [];
+
+  // FASE CRM-LEADS-ENT-CONTACTO-STEP1: Load leads for this entity
+  type Lead = {
+    id: string;
+    titulo: string;
+    marca: string | null;
+    estado: string;
+    valorPrevisto: string | null;
+    moeda: string | null;
+    createdAt: string;
+  };
+
+  type LeadsResponse = 
+    | { leads: Lead[] }
+    | { success: false; notEnabled?: boolean; message?: string };
+
+  const { data: entidadeLeadsData, isLoading: entidadeLeadsLoading } = useQuery<LeadsResponse>({
+    queryKey: ["/api/crm/leads", { entidadeId: entidade?.id }],
+    enabled: !!entidade?.id,
+    queryFn: async () => {
+      const params = new URLSearchParams({ entidadeId: entidade!.id });
+      const resp = await fetch(`/api/crm/leads?${params.toString()}`, {
+        credentials: "include",
+      });
+      return resp.json();
+    },
+  });
+
+  const entidadeLeadsDisabled =
+    entidadeLeadsData &&
+    "success" in entidadeLeadsData &&
+    entidadeLeadsData.success === false &&
+    entidadeLeadsData.notEnabled === true;
+
+  const entidadeLeads: Lead[] =
+    entidadeLeadsData && "leads" in entidadeLeadsData ? entidadeLeadsData.leads : [];
 
   // Delete entidade mutation
   const deleteEntidadeMutation = useMutation({
@@ -639,6 +675,64 @@ export default function EntidadeDetail() {
             </AlertDescription>
           </Alert>
         )}
+
+        {/* FASE CRM-LEADS-ENT-CONTACTO-STEP1: Leads desta entidade */}
+        <Card data-testid="card-leads-entidade">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Flag className="w-4 h-4" />
+              Leads desta entidade
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Todas as oportunidades associadas a contactos e visitas desta entidade.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {entidadeLeadsDisabled && (
+              <p className="text-xs text-amber-600">
+                O módulo de Leads CRM está desativado para esta empresa.
+              </p>
+            )}
+
+            {!entidadeLeadsDisabled && entidadeLeadsLoading && (
+              <p className="text-sm text-muted-foreground">A carregar leads...</p>
+            )}
+
+            {!entidadeLeadsDisabled && !entidadeLeadsLoading && entidadeLeads.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Ainda não existem leads associados a esta entidade.
+              </p>
+            )}
+
+            {!entidadeLeadsDisabled && !entidadeLeadsLoading && entidadeLeads.length > 0 && (
+              <div className="space-y-2">
+                {entidadeLeads.map((lead) => (
+                  <div
+                    key={lead.id}
+                    className="flex items-center justify-between border rounded-md px-3 py-2 text-sm"
+                    data-testid={`row-lead-entidade-${lead.id}`}
+                  >
+                    <div>
+                      <div className="font-medium">{lead.titulo}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {lead.marca ? `Marca: ${lead.marca} · ` : ""}
+                        Estado: {lead.estado}
+                      </div>
+                    </div>
+                    <div className="text-right text-xs">
+                      {lead.valorPrevisto
+                        ? `${lead.valorPrevisto} ${lead.moeda || "EUR"}`
+                        : "—"}
+                      <div className="text-[10px] text-muted-foreground">
+                        {new Date(lead.createdAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Basic Information */}
         <Card>
