@@ -1,0 +1,242 @@
+PROMPT PARA O AGENT – CRM-UI-CRMS-CARD-STEP1
+
+Objetivo:
+
+Garantir que o backend expõe/atualiza odooCrmEnabled via /api/admin/empresa.
+
+Criar um card “CRMs” nas definições e colocar lá dentro o sub-card “Odoo CRM” com toggle para ativar/desativar a integração.
+
+1) Backend – GET/PATCH /api/admin/empresa com odooCrmEnabled
+
+Ficheiro (ou equivalente):
+server/routes/admin.ts (ou onde está /api/admin/empresa)
+
+GET /api/admin/empresa
+
+Garante que devolve também odooCrmEnabled:
+
+app.get("/api/admin/empresa", requireAdmin, async (req, res) => {
+  const { empresaId } = await getUserContext(req);
+
+  const empresa = await db.query.empresas.findFirst({
+    where: eq(empresas.id, empresaId),
+    columns: {
+      id: true,
+      nome: true,
+      // ...campos já existentes
+      odooCrmEnabled: true,
+    },
+  });
+
+  return res.json({ empresa });
+});
+
+
+PATCH /api/admin/empresa
+
+Se a rota não existir, cria-a; se já existir, adiciona suporte a odooCrmEnabled:
+
+app.patch("/api/admin/empresa", requireAdmin, async (req, res) => {
+  const { empresaId } = await getUserContext(req);
+  const { nome, theme, /* outros campos */, odooCrmEnabled } = req.body;
+
+  const updateData: any = {};
+
+  if (typeof nome === "string") updateData.nome = nome;
+  if (typeof theme === "string") updateData.theme = theme;
+  // ...restante lógica já existente
+
+  if (typeof odooCrmEnabled === "boolean") {
+    updateData.odooCrmEnabled = odooCrmEnabled;
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    return res.status(400).json({ message: "No fields to update" });
+  }
+
+  await db.update(empresas).set(updateData).where(eq(empresas.id, empresaId));
+
+  const updated = await db.query.empresas.findFirst({
+    where: eq(empresas.id, empresaId),
+    columns: {
+      id: true,
+      nome: true,
+      // ...
+      odooCrmEnabled: true,
+    },
+  });
+
+  return res.json({ empresa: updated });
+});
+
+2) Frontend – Card “CRMs” + sub-card “Odoo CRM”
+
+Ficheiro (ou equivalente):
+client/src/pages/settings/ApiKeysPage.tsx
+(ou o componente onde hoje está o card Odoo em “APIs & Keys”).
+
+2.1 Criar o card pai “CRMs”
+
+Localiza a secção onde hoje é renderizado o card de Odoo.
+
+Envolve essa área num novo card:
+
+<Card className="space-y-4">
+  <CardHeader>
+    <CardTitle>CRMs</CardTitle>
+    <CardDescription>
+      Configura e ativa as integrações com sistemas CRM (Odoo, e outros no futuro).
+    </CardDescription>
+  </CardHeader>
+  <CardContent className="space-y-4">
+    {/* Aqui vamos renderizar o sub-card do Odoo */}
+  </CardContent>
+</Card>
+
+2.2 Extrair o Odoo para um sub-card “Odoo CRM”
+
+Cria um componente interno, por exemplo:
+
+type Empresa = {
+  id: string;
+  nome: string;
+  odooCrmEnabled?: boolean;
+  // ...outros campos que já usas
+};
+
+function OdooCrmBlock({ empresa }: { empresa?: Empresa }) {
+  const [odooEnabled, setOdooEnabled] = React.useState<boolean>(
+    empresa?.odooCrmEnabled ?? true
+  );
+
+  React.useEffect(() => {
+    if (empresa?.odooCrmEnabled !== undefined) {
+      setOdooEnabled(empresa.odooCrmEnabled);
+    }
+  }, [empresa?.odooCrmEnabled]);
+
+  const [saving, setSaving] = React.useState(false);
+
+  // TODO: reutilizar aqui os estados/handlers existentes de config Odoo:
+  // baseUrl, dbName, username, apiKey, etc.
+
+  const handleSaveOdooConfigAndFlag = async () => {
+    try {
+      setSaving(true);
+
+      // 1) Guardar config Odoo como já fazes hoje
+      //    (mantém a lógica existente de POST/PUT para odoo_connections)
+
+      // 2) Atualizar flag na empresa
+      const resp = await fetch("/api/admin/empresa", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ odooCrmEnabled: odooEnabled }),
+      });
+
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
+
+      toast?.({
+        title: "Configuração Odoo guardada",
+        description: odooEnabled
+          ? "Integração Odoo está ativa para esta empresa."
+          : "Integração Odoo foi desativada.",
+      });
+    } catch (error) {
+      console.error("[Settings] Error saving Odoo CRM config:", error);
+      toast?.({
+        title: "Erro ao guardar configuração Odoo",
+        description: "Verifica os dados e tenta novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card className="border border-slate-200">
+      <CardHeader className="flex flex-row items-center justify-between gap-4">
+        <div>
+          <CardTitle className="text-sm flex items-center gap-2">
+            <span>Odoo CRM</span>
+            <Badge variant="outline">Odoo</Badge>
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Integração com o Odoo CRM para esta empresa.
+          </CardDescription>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">
+            {odooEnabled ? "Ativo" : "Inativo"}
+          </span>
+          <Switch
+            checked={odooEnabled}
+            onCheckedChange={setOdooEnabled}
+            data-testid="toggle-odoo-crm-enabled"
+          />
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        {/* Reutilizar aqui os <Input> / <Label> que já usas hoje para:
+            - URL do Odoo
+            - DB Name
+            - Utilizador
+            - API Key
+            - Ambiente, etc.
+        */}
+      </CardContent>
+
+      <CardFooter className="flex justify-end">
+        <Button
+          size="sm"
+          onClick={handleSaveOdooConfigAndFlag}
+          disabled={saving}
+          data-testid="button-save-odoo-crm"
+        >
+          {saving ? "A guardar..." : "Guardar configuração Odoo"}
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}
+
+
+Na ApiKeysPage, dentro do <CardContent> do card “CRMs”, renderizar:
+
+<CardContent className="space-y-4">
+  <OdooCrmBlock empresa={empresa} />
+  {/* Futuro: <HubspotCrmBlock ... />, etc. */}
+</CardContent>
+
+
+Nota: empresa vem da query que já fazes para /api/admin/empresa.
+
+3) Testes rápidos
+
+npm run dev
+
+No browser:
+
+Ir a Definições → APIs & Keys:
+
+Ver se aparece o card “CRMs”.
+
+Dentro, ver o sub-card “Odoo CRM” com:
+
+toggle Ativo/Inativo,
+
+formulário Odoo como antes,
+
+botão “Guardar configuração Odoo”.
+
+Mudar o toggle e gravar:
+
+Confirmar em DevTools que há PATCH /api/admin/empresa com {"odooCrmEnabled": false} e true.
+
+Confirmar que, com odooCrmEnabled = false, a UI de Odoo nos cards de Entidades/Contactos/Visitas respeita a flag (botões desativados, mensagem a dizer que Odoo está desativado).
