@@ -1,0 +1,145 @@
+🔧 PROMPT PARA O AGENT – G-01B (Card Google na tab “APIs & Keys”)
+
+Objetivo: garantir que o card Google Workspace aparece na aba “APIs & Keys” da página de empresa (/admin/empresa), mostra corretamente o estado da ligação e o email, e trata os parâmetros ?google=connected / ?google=error com toasts.
+
+1) Verificar/completar o componente GoogleIntegrationCard
+
+Ficheiro:
+client/src/components/integrations/GoogleIntegrationCard.tsx
+
+Abre este ficheiro e confirma que:
+
+Existe uma interface GoogleStatus com:
+
+interface GoogleStatus {
+  connected: boolean;
+  email?: string;
+  name?: string;
+  googleUserId?: string;
+  picture?: string;
+}
+
+
+Há um useQuery para o endpoint de status:
+
+const { data, isLoading, error, refetch } = useQuery<GoogleStatus>({
+  queryKey: ["/api/integrations/google/status"],
+  gcTime: 0,
+});
+
+
+Existe um useEffect que:
+
+Lê google da querystring com new URLSearchParams(window.location.search);
+
+Se google === "connected":
+
+Mostra um toast “Conta Google ligada”;
+
+Limpa o parâmetro da URL com window.history.replaceState(...);;
+
+Chama refetch() para atualizar o estado;
+
+Se google === "error":
+
+Mostra um toast “Erro na ligação” (variant "destructive");
+
+Limpa o parâmetro da URL.
+
+A função handleConnect faz:
+
+const handleConnect = () => {
+  setIsConnecting(true);
+  window.location.href = "/api/integrations/google/login";
+};
+
+
+Se alguma destas partes não existir ou estiver diferente, ajusta o componente para corresponder exatamente a este comportamento.
+Se já estiver igual, não faças alterações.
+
+Confirma também que o JSX do card:
+
+Mostra estados distintos:
+
+isLoading → texto tipo “A verificar ligação…” com Loader2 a rodar;
+
+error → mensagem de erro + botão “Tentar novamente” que chama refetch();
+
+data && !data.connected → texto “Conta Google não ligada” + botão “Ligar conta Google” que chama handleConnect;
+
+data && data.connected → mostra nome/email + badge “Ativo” e botão “Religar / trocar conta”.
+
+2) Garantir que o card é usado na página da empresa
+
+Ficheiro:
+client/src/pages/AdminEmpresa.tsx
+
+No topo do ficheiro, verifica se já existem estes imports:
+
+import { MicrosoftIntegrationCard } from "@/components/integrations/MicrosoftIntegrationCard";
+import { GoogleIntegrationCard } from "@/components/integrations/GoogleIntegrationCard";
+
+
+Se algum faltar, adiciona-o.
+
+Se já lá estiver, não duplicar.
+
+Confirma que existe um array de secções com um item:
+
+{ id: "apis-keys", label: "APIs & Keys", icon: Code },
+
+
+Na função renderCurrentSection, confirma que existe o caso:
+
+case "apis-keys":
+  return renderApisKeysSection();
+
+
+Dentro da função renderApisKeysSection (comentário // SECÇÃO: APIs & KEYS - INTEG-01), garante que estão a ser renderizados, dentro da mesma grid/stack:
+
+{/* Microsoft 365 - Active Integration */}
+<MicrosoftIntegrationCard />
+
+{/* Google Workspace - Active Integration */}
+<GoogleIntegrationCard />
+
+
+Se o GoogleIntegrationCard ainda não estiver aqui, adiciona-o logo abaixo do MicrosoftIntegrationCard.
+
+Mantém o resto da estrutura (cards de IA, Email, Maps, etc.) como está.
+
+3) Testes manuais depois das alterações
+
+Depois de aplicares estas verificações/correções:
+
+Arranca a app (npm run dev).
+
+Vai a /admin/empresa e abre a aba “APIs & Keys”:
+
+Verifica se aparece um card “Google Workspace” com:
+
+Ícone (PlugZap);
+
+Texto de descrição do Google Calendar/Contactos.
+
+Se a conta já estava ligada (caso do Pedro):
+
+O card deve mostrar algo como:
+
+“Ligado como <email>”;
+
+Badge “Ativo”;
+
+Botão “Religar / trocar conta”.
+
+Faz também o teste de querystring:
+
+Força um redirecionamento que inclua ?google=connected (por exemplo repetindo o fluxo de login);
+
+Confirma que:
+
+Aparece o toast de sucesso;
+
+O parâmetro google desaparece da barra de endereço depois do carregamento (substituição via window.history.replaceState).
+
+Se tudo isto estiver a funcionar, considera a tarefa G-01B concluída. ✅
