@@ -1,0 +1,203 @@
+PROMPT PARA O AGENT – ENTIDADES-RBAC-STEP1 (modelo correto, sem remendos)
+
+Objetivo:
+Ter um único sítio de verdade para as regras de acesso a Entidades (admin vs agent), e garantir que:
+
+a lista e o detalhe usam exatamente a mesma lógica de permissões;
+
+deixamos de ter erros “Entidade não encontrada” vindos de inconsistências;
+
+o código fica preparado para reaproveitar o mesmo padrão em Visitas e Tarefas.
+
+1) Centralizar a regra de acesso a Entidades
+
+Ficheiro a editar (ou criar, se ainda não existir separado):
+
+Preferência: server/storage/entidadesStorage.ts
+(onde estão getEntidade, listEntidades ou funções equivalentes)
+
+Tarefas:
+
+Dentro deste ficheiro, cria uma função auxiliar para construir o where de acesso:
+
+import { and, or, eq } from "drizzle-orm";
+// ... restantes imports
+
+function buildEntidadeAccessWhere(
+  empresaId: string,
+  userId: string,
+  userRole: string
+) {
+  if (userRole === "admin") {
+    // Admin vê todas as entidades da empresa
+    return eq(entidades.empresaId, empresaId);
+  }
+
+  // Agent: só entidades da empresa em que é criador ou assigned
+  return and(
+    eq(entidades.empresaId, empresaId),
+    or(
+      eq(entidades.createdByUserId, userId),
+      eq(entidades.assignedUserId, userId)
+    )
+  );
+}
+
+
+Usa os nomes de campos reais da tabela entidades (empresaId, createdByUserId, assignedUserId ou equivalentes).
+Se os nomes forem ligeiramente diferentes, ajusta aqui.
+
+2) Garantir que getEntidade usa este helper
+
+Ainda em entidadesStorage.ts, localiza a função de detalhe, algo como:
+
+export async function getEntidade(
+  id: string,
+  empresaId: string,
+  userId: string,
+  userRole: string
+) {
+  // ...
+}
+
+
+Atualiza o where da query para usar o helper:
+
+export async function getEntidade(
+  id: string,
+  empresaId: string,
+  userId: string,
+  userRole: string
+) {
+  const whereClause = and(
+    eq(entidades.id, id),
+    buildEntidadeAccessWhere(empresaId, userId, userRole)
+  );
+
+  const entidade = await db.query.entidades.findFirst({
+    where: whereClause,
+    // with, etc. se já existirem
+  });
+
+  return entidade;
+}
+
+
+Remove qualquer lógica duplicada de RBAC dentro desta função (deve ficar sempre via buildEntidadeAccessWhere).
+
+3) Garantir que a lista usa exatamente o mesmo helper
+
+Ainda no mesmo ficheiro, localiza a função que lista entidades para o backoffice, por exemplo:
+
+export async function listEntidades(
+  empresaId: string,
+  userId: string,
+  userRole: string,
+  filtros?: ...
+) {
+  // ...
+}
+
+
+No início da função, usa o helper:
+
+const baseWhere = buildEntidadeAccessWhere(empresaId, userId, userRole);
+
+
+Se existirem filtros adicionais (texto de pesquisa, etc.), faz um and com baseWhere. Exemplo:
+
+let whereClause = baseWhere;
+
+if (searchTerm) {
+  whereClause = and(
+    whereClause,
+    or(
+      ilike(entidades.nome, `%${searchTerm}%`),
+      ilike(entidades.nif, `%${searchTerm}%`)
+      // outros campos de pesquisa, se já existirem
+    )
+  );
+}
+
+const entidadesList = await db.query.entidades.findMany({
+  where: whereClause,
+  // orderBy, limit, with, etc. mantêm-se
+});
+
+
+Ideia: não repetir a lógica de admin vs agent aqui, só chamamos buildEntidadeAccessWhere e depois acrescentamos filtros de pesquisa/paginação.
+
+4) Normalizar assinatura da função de lista e todas as chamadas
+
+Para evitar erros de ordem de parâmetros (o tal “7 chamadas trocadas”), vamos padronizar a assinatura da função de lista de entidades.
+
+Em entidadesStorage.ts, muda a assinatura de listEntidades para um objeto de parâmetros:
+
+Antes (exemplo):
+
+export async function listEntidades(
+  empresaId: string,
+  userId: string,
+  userRole: string,
+  filtros?: ListEntidadesFilters
+) { ... }
+
+
+Depois:
+
+export type ListEntidadesParams = {
+  empresaId: string;
+  userId: string;
+  userRole: string;
+  filtros?: ListEntidadesFilters; // se já existir um tipo destes
+};
+
+export async function listEntidades(params: ListEntidadesParams) {
+  const { empresaId, userId, userRole, filtros } = params;
+
+  const baseWhere = buildEntidadeAccessWhere(empresaId, userId, userRole);
+  // ... resto igual ao passo anterior
+}
+
+
+Agora, em todas as chamadas a listEntidades (ou getAllEntidades se esse for o nome), atualiza para o novo formato:
+
+Exemplo em server/routes/entidades.ts:
+
+const { empresaId, userId, userRole } = await getUserContext(req);
+
+const entidades = await listEntidades({
+  empresaId,
+  userId,
+  userRole,
+  filtros: {
+    // passar filtros atuais (search, página, etc.), se existirem
+  },
+});
+
+
+Garante que não sobra nenhuma chamada com parâmetros posicionais.
+Usa a search do editor para encontrar listEntidades( / getAllEntidades( e atualizar tudo para o padrão de objeto.
+
+5) Comando e testes
+
+Na shell:
+
+npm run dev
+
+
+No browser:
+
+Ir à lista de Entidades:
+
+Verificar que aparecem Entidades.
+
+Clicar em 3–5 cards:
+
+Confirmar que deixaste de ver “Entidade não encontrada”.
+
+Se tiveres utilizadores com perfis diferentes (admin vs agent), testar:
+
+Admin → vê todas as entidades da empresa.
+
+Agent → só vê as entidades onde é createdBy ou assigned (quer na lista, quer no detalhe).
