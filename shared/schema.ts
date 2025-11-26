@@ -134,6 +134,8 @@ export const empresas = pgTable("empresas", {
   }'`),
   // Odoo CRM Integration flag
   odooCrmEnabled: boolean("odoo_crm_enabled").notNull().default(true),
+  // CRM Leads module flag - premium feature, disabled by default
+  crmLeadsEnabled: boolean("crm_leads_enabled").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

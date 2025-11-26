@@ -1,0 +1,136 @@
+PROMPT PARA O AGENT – SUBS-LEADS-FLAG-STEP1
+
+Objetivo:
+Adicionar uma flag de subscrição para o módulo de Leads CRM por empresa, semelhante ao odooCrmEnabled, mas ainda sem UI (UI vem depois).
+
+1) Adicionar crmLeadsEnabled em empresas (schema)
+
+Ficheiro a editar:
+
+shared/schema.ts
+
+Tarefas:
+
+Na definição da tabela empresas, adicionar o campo:
+
+crmLeadsEnabled: boolean("crm_leads_enabled").notNull().default(false),
+
+
+default(false) para, por omissão, considerar os leads como funcionalidade premium que só é ativada explicitamente.
+
+Garantir que o tipo inferido de empresas continua a funcionar (ex.: typeof empresas.$inferSelect já vai incluir este campo automaticamente).
+
+2) Sincronizar a BD
+
+Na shell:
+
+npm run db:push
+
+
+Confirmar que a coluna crm_leads_enabled foi criada na tabela empresas sem erros.
+
+3) Expor crmLeadsEnabled em /api/admin/empresa
+
+Ficheiro a editar:
+
+server/routes.ts (onde já foi atualizado odooCrmEnabled no relatório)
+
+Tarefas:
+
+Em GET /api/admin/empresa, na seleção de colunas e na resposta:
+
+const empresa = await db.query.empresas.findFirst({
+  where: eq(empresas.id, empresaId),
+  columns: {
+    id: true,
+    nome: true,
+    // ...
+    odooCrmEnabled: true,
+    crmLeadsEnabled: true, // ← novo
+  },
+});
+
+return res.json({
+  empresa: {
+    // ...
+    odooCrmEnabled: empresa.odooCrmEnabled ?? true,
+    crmLeadsEnabled: empresa.crmLeadsEnabled ?? false,
+  },
+});
+
+
+Em PATCH /api/admin/empresa, no destructuring do body e no updateData:
+
+const { ..., odooCrmEnabled, crmLeadsEnabled } = req.body;
+
+const updateData: any = {};
+// ...campos existentes
+
+if (typeof odooCrmEnabled === "boolean") {
+  updateData.odooCrmEnabled = odooCrmEnabled;
+}
+
+if (typeof crmLeadsEnabled === "boolean") {
+  updateData.crmLeadsEnabled = crmLeadsEnabled;
+}
+
+// ...
+
+const updated = await db.query.empresas.findFirst({
+  where: eq(empresas.id, empresaId),
+  columns: {
+    id: true,
+    nome: true,
+    // ...
+    odooCrmEnabled: true,
+    crmLeadsEnabled: true,
+  },
+});
+
+return res.json({
+  empresa: {
+    // ...
+    odooCrmEnabled: updated.odooCrmEnabled ?? true,
+    crmLeadsEnabled: updated.crmLeadsEnabled ?? false,
+  },
+});
+
+
+Não alterar mais nada na rota – só acrescentar o suporte a crmLeadsEnabled.
+
+4) (Preparação) Helper para validar Leads – sem usar ainda
+
+Opcional mas recomendado já:
+
+Ficheiro a editar:
+
+server/integrations/crmLeads.ts (se existir)
+ou
+
+server/integrations/odooClient.ts / server/services/crmService.ts (se quiseres já deixar pronto)
+
+Adicionar algo assim (sem ainda chamar em lado nenhum):
+
+import { db } from "../../shared/db";
+import { empresas } from "../../shared/schema";
+import { eq } from "drizzle-orm";
+
+export async function assertLeadsEnabled(empresaId: string): Promise<void> {
+  const empresa = await db.query.empresas.findFirst({
+    where: eq(empresas.id, empresaId),
+    columns: {
+      id: true,
+      crmLeadsEnabled: true,
+    },
+  });
+
+  if (!empresa?.crmLeadsEnabled) {
+    const error: any = new Error("LEADS_NOT_ENABLED");
+    error.code = "LEADS_NOT_ENABLED";
+    throw error;
+  }
+}
+
+
+Importante: ainda não usar este helper em nenhuma rota (não há rotas de leads ainda).
+Vamos ligá-lo assim que criarmos as APIs de leads no próximo passo.

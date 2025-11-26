@@ -3208,6 +3208,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/admin/empresa - Get current company config
   // FASE 31-IA-01: Include IA settings with hasOwnOpenAIApiKey boolean (never expose actual key)
   // FASE CRM-UI-CRMS-CARD-STEP1: Include odooCrmEnabled for Odoo integration control
+  // FASE SUBS-LEADS-FLAG-STEP1: Include crmLeadsEnabled for Leads module control
   app.get('/api/admin/empresa', requireAdmin, async (req: any, res) => {
     try {
       const { empresaId } = await getUserContext(req);
@@ -3220,9 +3221,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // FASE 31-IA-01: Add calculated hasOwnOpenAIApiKey to response, never expose the actual key
       // FASE CRM-UI-CRMS-CARD-STEP1: Include odooCrmEnabled flag
+      // FASE SUBS-LEADS-FLAG-STEP1: Include crmLeadsEnabled flag
       const responseData = {
         ...empresa,
         odooCrmEnabled: empresa.odooCrmEnabled ?? true,
+        crmLeadsEnabled: empresa.crmLeadsEnabled ?? false,
         uiSettings: {
           ...(empresa.uiSettings || {}),
           ia: {
@@ -3280,12 +3283,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // FASE 22: Added support for uiSettings
   // FASE 31-IA-01: Added support for IA configuration and custom OpenAI API Key management
   // FASE CRM-UI-CRMS-CARD-STEP1: Added support for odooCrmEnabled flag
+  // FASE SUBS-LEADS-FLAG-STEP1: Added support for crmLeadsEnabled flag
   app.patch('/api/admin/empresa', requireAdmin, async (req: any, res) => {
     try {
       const { empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       
-      const { nome, nif, email, telefone, logoUrl, mostrarMarcasEmVisitas, mostrarGPS, theme, uiSettings, iaOpenAIApiKey, odooCrmEnabled } = req.body;
+      const { nome, nif, email, telefone, logoUrl, mostrarMarcasEmVisitas, mostrarGPS, theme, uiSettings, iaOpenAIApiKey, odooCrmEnabled, crmLeadsEnabled } = req.body;
       
       // Validate theme if provided
       if (theme !== undefined && !["light-business", "dark-pro"].includes(theme)) {
@@ -3303,6 +3307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (theme !== undefined) updateData.theme = theme;
       if (uiSettings !== undefined) updateData.uiSettings = uiSettings; // FASE 22
       if (typeof odooCrmEnabled === "boolean") updateData.odooCrmEnabled = odooCrmEnabled; // FASE CRM-UI-CRMS-CARD-STEP1
+      if (typeof crmLeadsEnabled === "boolean") updateData.crmLeadsEnabled = crmLeadsEnabled; // FASE SUBS-LEADS-FLAG-STEP1
       
       // FASE 31-IA-01: Handle custom OpenAI API Key management
       if (iaOpenAIApiKey !== undefined) {
@@ -3340,6 +3345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const responseData = {
         ...updated,
         odooCrmEnabled: updated.odooCrmEnabled ?? true,
+        crmLeadsEnabled: updated.crmLeadsEnabled ?? false,
         uiSettings: {
           ...(updated.uiSettings || {}),
           ia: {
