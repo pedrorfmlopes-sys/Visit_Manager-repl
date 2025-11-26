@@ -1,0 +1,194 @@
+PROMPT PARA O AGENT – ODOO-03A / STEP 3 (Botão “Criar lead no Odoo” na Visita)
+
+Objetivo:
+Na página de detalhe da Visita, adicionar:
+
+Card “Odoo” para mostrar estado da lead
+
+Botão para criar lead no Odoo via
+POST /api/integrations/odoo/visitas/:id/create-lead
+
+Mostrar o odooLeadId quando existir
+
+⚠️ Só UI + chamada ao endpoint já existente.
+⚠️ Ainda sem “Abrir no Odoo” nem atualização automática.
+
+1) Localizar o detalhe da Visita
+
+Ficheiro a editar (nome provável):
+
+client/src/pages/visitas/VisitaDetailPage.tsx
+ou
+
+client/src/features/visitas/VisitaDetail.tsx
+
+Garante que este componente já recebe a visita da API (GET /api/visitas/:id), incluindo o campo odooLeadId?: string | null.
+
+2) Estado local para Odoo Lead
+
+No componente de detalhe da Visita, adicionar:
+
+const [odooLeadCreating, setOdooLeadCreating] = useState(false);
+const [odooLeadError, setOdooLeadError] = useState<string | null>(null);
+const [odooLeadNotConfigured, setOdooLeadNotConfigured] = useState(false);
+
+
+Se já tiveres queryClient e visitaId neste ficheiro (React Query), usa-os nos passos seguintes.
+
+3) Handler para criar lead no Odoo a partir da Visita
+
+Ainda no mesmo componente:
+
+const handleCreateOdooLeadForVisita = async () => {
+  if (!visita?.id) return;
+
+  setOdooLeadCreating(true);
+  setOdooLeadError(null);
+  setOdooLeadNotConfigured(false);
+
+  try {
+    const response = await fetch(
+      `/api/integrations/odoo/visitas/${visita.id}/create-lead`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data?.message || `HTTP ${response.status}`);
+    }
+
+    if (data.notConfigured) {
+      setOdooLeadNotConfigured(true);
+      return;
+    }
+
+    if (!data.success) {
+      throw new Error(data?.error || "Falha ao criar lead no Odoo.");
+    }
+
+    // Atualizar visita localmente
+    if (visita) {
+      visita.odooLeadId = String(data.leadId);
+    }
+
+    // Se usares React Query, invalida a query da visita
+    // queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
+
+    toast?.({
+      title: "Lead criada no Odoo",
+      description: `Lead #${data.leadId} criada a partir desta visita.`,
+    });
+  } catch (error: any) {
+    console.error("[Odoo] Error creating lead from visita:", error);
+    setOdooLeadError("Erro ao criar lead no Odoo.");
+    toast?.({
+      title: "Erro ao criar lead",
+      description: "Não foi possível criar a lead no Odoo.",
+      variant: "destructive",
+    });
+  } finally {
+    setOdooLeadCreating(false);
+  }
+};
+
+
+Usa toast e queryClient se já estiverem configurados no ficheiro (padrão igual ao resto da app).
+
+4) Card “Odoo” no detalhe da Visita
+
+No JSX do detalhe da Visita, adicionar um card (usando os mesmos componentes que nas Entidades/Contactos: Card, CardHeader, CardContent, CardTitle, CardDescription, Button):
+
+<Card>
+  <CardHeader>
+    <CardTitle>Odoo</CardTitle>
+    <CardDescription>
+      Integração com leads do Odoo para esta visita.
+    </CardDescription>
+  </CardHeader>
+  <CardContent className="space-y-3">
+    {/* Caso ainda não exista lead no Odoo */}
+    {!visita.odooLeadId && (
+      <>
+        <p className="text-sm text-muted-foreground">
+          Esta visita ainda não tem nenhuma lead criada no Odoo.
+        </p>
+
+        {odooLeadNotConfigured && (
+          <p className="text-xs text-amber-600">
+            Integração Odoo ainda não está configurada para esta empresa.
+          </p>
+        )}
+
+        {odooLeadError && (
+          <p className="text-xs text-red-600">
+            {odooLeadError}
+          </p>
+        )}
+
+        <Button
+          size="sm"
+          onClick={handleCreateOdooLeadForVisita}
+          disabled={odooLeadCreating}
+          data-testid="button-odoo-create-lead-from-visita"
+        >
+          {odooLeadCreating ? "A criar..." : "Criar lead no Odoo"}
+        </Button>
+      </>
+    )}
+
+    {/* Caso já exista lead no Odoo */}
+    {visita.odooLeadId && (
+      <div className="space-y-2">
+        <p className="text-sm">
+          Esta visita está ligada à lead Odoo #{visita.odooLeadId}.
+        </p>
+
+        {odooLeadError && (
+          <p className="text-xs text-red-600">
+            {odooLeadError}
+          </p>
+        )}
+
+        {/* Próximos passos futuros: botão "Abrir no Odoo", etc. */}
+      </div>
+    )}
+  </CardContent>
+</Card>
+
+5) Comandos e testes
+
+Na shell:
+
+npm run db:push   # já deve estar OK, mas não faz mal se correr outra vez
+npm run dev
+
+
+No browser:
+
+Abre o detalhe de uma Visita que ainda não tenha odooLeadId.
+
+Verifica o card “Odoo”:
+
+Texto “ainda não tem lead no Odoo”.
+
+Botão “Criar lead no Odoo”.
+
+Clica no botão:
+
+No DevTools → Network, deve aparecer
+POST /api/integrations/odoo/visitas/:id/create-lead.
+
+Em caso de sucesso:
+
+Vês toast “Lead criada no Odoo”.
+
+O card passa a mostrar “ligada à lead Odoo #ID”.
+
+Testa também cenário de notConfigured e cenário de erro (simular desligando Odoo).
