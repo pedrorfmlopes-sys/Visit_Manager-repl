@@ -37,11 +37,15 @@ export function setupOdooRoutes(app: any): void {
         });
       }
 
-      console.error("[Odoo] Status error:", error);
+      console.error("[Odoo] /status error:", {
+        message: error?.message,
+        stack: error?.stack,
+      });
+      
       return res.status(500).json({
         connected: false,
-        reason: "error",
-        message: error.message ?? "Unknown error",
+        error: "Odoo status error",
+        message: error?.message ?? "Unknown error",
       });
     }
   });
