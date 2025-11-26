@@ -3,7 +3,7 @@ import { isAuthenticated } from "../../replitAuth";
 import { getUserContext } from "../../authContext";
 import { odooConnectionsStorage } from "../../storage/odooConnections";
 import { insertOdooConnectionSchema } from "@shared/schema";
-import { testOdooConnection, searchOdooPartners, getOdooPartnerById } from "../../integrations/odooClient";
+import { testOdooConnection, searchOdooPartners, getOdooPartnerById, createOdooLead } from "../../integrations/odooClient";
 import express from "express";
 
 export function setupOdooRoutes(app: any): void {
@@ -141,6 +141,66 @@ export function setupOdooRoutes(app: any): void {
       console.error("[Odoo] get partner error:", error);
       return res.status(500).json({
         error: "Odoo partner fetch error",
+        message: error?.message ?? "Unknown error",
+      });
+    }
+  });
+
+  // POST /api/integrations/odoo/test-create-lead
+  // Cria uma lead de teste no Odoo
+  router.post("/test-create-lead", isAuthenticated, async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) {
+        return res.status(400).json({ error: "User has no company assigned" });
+      }
+
+      const {
+        name,
+        contactName,
+        email,
+        phone,
+        description,
+      } = (req.body ?? {}) as {
+        name?: string;
+        contactName?: string;
+        email?: string;
+        phone?: string;
+        description?: string;
+      };
+
+      const leadName =
+        name?.trim() ||
+        "Visit Manager – Lead de teste";
+
+      const leadDescription =
+        description?.trim() ||
+        "Lead de teste enviada pela aplicação Visit Manager (endpoint /test-create-lead).";
+
+      const result = await createOdooLead(empresaId, {
+        name: leadName,
+        contactName: contactName?.trim() || null,
+        email: email?.trim() || null,
+        phone: phone?.trim() || null,
+        description: leadDescription,
+      });
+
+      return res.json({
+        success: true,
+        leadId: result.id,
+      });
+    } catch (error: any) {
+      if (error?.message === "ODOO_NOT_CONFIGURED") {
+        return res.status(200).json({
+          success: false,
+          notConfigured: true,
+        });
+      }
+
+      console.error("[Odoo] test-create-lead error:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Odoo lead creation error",
         message: error?.message ?? "Unknown error",
       });
     }

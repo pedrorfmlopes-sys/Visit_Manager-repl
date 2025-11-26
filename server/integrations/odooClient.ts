@@ -20,6 +20,14 @@ export type OdooPartner = {
   street?: string | null;
 };
 
+export type CreateOdooLeadInput = {
+  name: string;
+  contactName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  description?: string | null;
+};
+
 /**
  * Busca a configuração Odoo para uma empresa
  */
@@ -245,4 +253,49 @@ export async function getOdooPartnerById(
     country: p.country_id?.[1] ?? null,
     street: p.street ?? null,
   };
+}
+
+/**
+ * Cria uma lead (crm.lead) no Odoo
+ */
+export async function createOdooLead(
+  empresaId: string,
+  input: CreateOdooLeadInput
+): Promise<{ id: number }> {
+  const conn = await getOdooConnectionForEmpresa(empresaId);
+
+  const payload: Record<string, any> = {
+    name: input.name,
+  };
+
+  if (input.contactName) {
+    payload.contact_name = input.contactName;
+  }
+  if (input.email) {
+    payload.email_from = input.email;
+  }
+  if (input.phone) {
+    payload.phone = input.phone;
+  }
+  if (input.description) {
+    payload.description = input.description;
+  }
+
+  const result = await callOdooJsonRpc<number>(conn, {
+    method: "call",
+    params: {
+      service: "object",
+      method: "execute_kw",
+      args: [
+        conn.dbName,
+        conn.username,
+        conn.apiKey,
+        "crm.lead",
+        "create",
+        [payload],
+      ],
+    },
+  });
+
+  return { id: result };
 }

@@ -1,0 +1,208 @@
+PROMPT PARA O AGENT – ODOO-03A / STEP 1 (Testar criação de lead no Odoo)
+
+Objetivo:
+Criar no backend um serviço simples que envia uma lead de teste para o Odoo (crm.lead.create) e expor isso numa rota:
+POST /api/integrations/odoo/test-create-lead
+
+⚠️ Ainda não ligar isto às visitas/contactos reais. É só um endpoint de teste manual.
+
+1) Criar serviço de criação de lead no Odoo
+
+Ficheiro a editar:
+
+server/integrations/odooClient.ts
+
+(é o mesmo que já tem getOdooConnectionForEmpresa, callOdooJsonRpc, searchOdooPartners, getOdooPartnerById, etc.)
+
+Tarefas:
+
+No topo (ou perto de OdooPartner), adicionar um tipo simples para input da lead:
+
+export type CreateOdooLeadInput = {
+  name: string;
+  contactName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  description?: string | null;
+};
+
+
+Adicionar função exportada para criar uma lead:
+
+export async function createOdooLead(
+  empresaId: string,
+  input: CreateOdooLeadInput
+): Promise<{ id: number }> {
+  const conn = await getOdooConnectionForEmpresa(empresaId);
+
+  const payload: Record<string, any> = {
+    name: input.name,
+  };
+
+  if (input.contactName) {
+    payload.contact_name = input.contactName;
+  }
+  if (input.email) {
+    payload.email_from = input.email;
+  }
+  if (input.phone) {
+    payload.phone = input.phone;
+  }
+  if (input.description) {
+    payload.description = input.description;
+  }
+
+  const result = await callOdooJsonRpc<number>(conn, {
+    method: "call",
+    params: {
+      service: "object",
+      method: "execute_kw",
+      args: [
+        conn.dbName,
+        conn.username,
+        conn.apiKey,
+        "crm.lead",
+        "create",
+        [payload],
+      ],
+    },
+  });
+
+  return { id: result };
+}
+
+
+Usa exatamente os nomes de campos da OdooConnection já existentes (dbName, username, apiKey ou equivalentes).
+Se algum tiver outro nome no ficheiro atual, ajusta aqui.
+
+2) Criar rota POST /api/integrations/odoo/test-create-lead
+
+Ficheiro a editar:
+
+server/routes/integrations/odoo.ts
+
+(onde já tens /status, /search-partner, /partner/:id)
+
+Tarefas:
+
+Importar a nova função:
+
+import { createOdooLead } from "../../integrations/odooClient";
+
+
+Adicionar rota POST de teste:
+
+odooIntegrationsRouter.post(
+  "/test-create-lead",
+  isAuthenticated, // ou requireAuth – usar o MESMO middleware que nas outras rotas Odoo
+  async (req, res) => {
+    try {
+      const { empresaId } = getUserContext(req); // usar helper já existente
+
+      const {
+        name,
+        contactName,
+        email,
+        phone,
+        description,
+      } = (req.body ?? {}) as {
+        name?: string;
+        contactName?: string;
+        email?: string;
+        phone?: string;
+        description?: string;
+      };
+
+      const leadName =
+        name?.trim() ||
+        "Visit Manager – Lead de teste";
+
+      const leadDescription =
+        description?.trim() ||
+        "Lead de teste enviada pela aplicação Visit Manager (endpoint /test-create-lead).";
+
+      const result = await createOdooLead(empresaId, {
+        name: leadName,
+        contactName: contactName?.trim() || null,
+        email: email?.trim() || null,
+        phone: phone?.trim() || null,
+        description: leadDescription,
+      });
+
+      return res.json({
+        success: true,
+        leadId: result.id,
+      });
+    } catch (error: any) {
+      if (error?.message === "ODOO_NOT_CONFIGURED") {
+        return res.status(200).json({
+          success: false,
+          notConfigured: true,
+        });
+      }
+
+      console.error("[Odoo] test-create-lead error:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Odoo lead creation error",
+        message: error?.message ?? "Unknown error",
+      });
+    }
+  }
+);
+
+
+Usa o mesmo isAuthenticated / requireAuth e getUserContext(req) já usados no próprio ficheiro.
+
+3) Comando a correr
+
+Na shell do Replit:
+
+npm run dev
+
+
+Confirma que o servidor arranca sem erros de TypeScript/imports.
+
+4) O que testar no fim
+
+Com Odoo configurado para a empresa:
+
+Fazer um POST simples com curl / REST client:
+
+curl -X POST "http://localhost:5000/api/integrations/odoo/test-create-lead" \
+  -H "Content-Type: application/json" \
+  --cookie "SESSION=..." \
+  -d '{
+    "name": "Visit Manager – Lead de teste manual",
+    "contactName": "Pedro Tester",
+    "email": "pedro@example.com",
+    "phone": "+351 900 000 000",
+    "description": "Lead de teste criada a partir do endpoint /test-create-lead."
+  }'
+
+
+Esperado (200):
+
+{
+  "success": true,
+  "leadId": 1234
+}
+
+
+No Odoo, ir a CRM / Leads e confirmar que existe uma lead com:
+
+Nome = o name enviado,
+
+Contacto / email / telefone / descrição conforme o payload.
+
+Testes extra:
+
+Se Odoo não estiver configurado para a empresa → resposta:
+
+{
+  "success": false,
+  "notConfigured": true
+}
+
+
+Se houver erro de credenciais/rede, o endpoint responde 500 com mensagem em message.
