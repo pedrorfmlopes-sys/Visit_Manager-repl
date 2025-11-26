@@ -11,6 +11,7 @@ import {
   boolean,
   pgEnum,
   uuid,
+  numeric,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -632,6 +633,94 @@ export const insertVisitaSchema = createInsertSchema(visitas).omit({
 
 export type InsertVisita = z.infer<typeof insertVisitaSchema>;
 export type Visita = typeof visitas.$inferSelect;
+
+// FASE CRM-LEADS-01: Leads (CRM Leads) table for lead tracking
+export const leads = pgTable("leads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  empresaId: varchar("empresa_id")
+    .notNull()
+    .references(() => empresas.id, { onDelete: "cascade" }),
+  
+  entidadeId: varchar("entidade_id")
+    .notNull()
+    .references(() => entidades.id, { onDelete: "cascade" }),
+  
+  contactoId: varchar("contacto_id")
+    .notNull()
+    .references(() => contactos.id, { onDelete: "cascade" }),
+  
+  visitaId: varchar("visita_id")
+    .references(() => visitas.id, { onDelete: "set null" }),
+  
+  // Core do lead
+  titulo: text("titulo").notNull(),
+  descricao: text("descricao"),
+  
+  // Marca ligada ao lead
+  marca: text("marca"),
+  
+  // Estado / etapa
+  estado: text("estado").notNull().default("novo"),
+  
+  // Valor previsto
+  valorPrevisto: numeric("valor_previsto"),
+  moeda: varchar("moeda", { length: 3 }).default("EUR"),
+  
+  // Responsável interno
+  responsavelUserId: varchar("responsavel_user_id"),
+  
+  // Integração CRM externo
+  odooLeadId: varchar("odoo_lead_id"),
+  
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const leadsRelations = relations(leads, ({ one }) => ({
+  empresa: one(empresas, {
+    fields: [leads.empresaId],
+    references: [empresas.id],
+  }),
+  entidade: one(entidades, {
+    fields: [leads.entidadeId],
+    references: [entidades.id],
+  }),
+  contacto: one(contactos, {
+    fields: [leads.contactoId],
+    references: [contactos.id],
+  }),
+  visita: one(visitas, {
+    fields: [leads.visitaId],
+    references: [visitas.id],
+  }),
+}));
+
+export const insertLeadSchema = createInsertSchema(leads).omit({
+  id: true,
+  empresaId: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  titulo: z.string().min(1, "Título obrigatório"),
+  entidadeId: z.string().uuid("ID entidade inválido"),
+  contactoId: z.string().uuid("ID contacto inválido"),
+  visitaId: z.string().uuid().optional().nullable(),
+  descricao: z.string().optional().nullable(),
+  marca: z.string().optional().nullable(),
+  estado: z.string().default("novo"),
+  valorPrevisto: z.string().or(z.number()).optional().nullable(),
+  moeda: z.string().length(3).default("EUR"),
+  responsavelUserId: z.string().optional().nullable(),
+  odooLeadId: z.string().optional().nullable(),
+});
+
+export type InsertLead = z.infer<typeof insertLeadSchema>;
+export type Lead = typeof leads.$inferSelect;
 
 // FASE 5: Visitas Marcas (relationship table)
 export const visitasMarcas = pgTable("visitas_marcas", {
