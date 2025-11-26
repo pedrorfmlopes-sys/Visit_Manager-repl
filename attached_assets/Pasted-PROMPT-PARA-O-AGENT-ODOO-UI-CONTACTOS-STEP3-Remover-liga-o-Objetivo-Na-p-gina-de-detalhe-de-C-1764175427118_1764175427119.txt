@@ -1,0 +1,159 @@
+PROMPT PARA O AGENT – ODOO-UI-CONTACTOS-STEP3 (Remover ligação)
+
+Objetivo:
+Na página de detalhe de Contacto, permitir remover a ligação ao parceiro Odoo, usando o endpoint já existente:
+POST /api/contactos/:id/odoo-link com {"odooPartnerId": null}.
+
+Backend já está pronto. Só precisamos de UI + chamada.
+O padrão é igual ao “Unlink” que já fizemos nas Entidades.
+
+1) Adicionar handler handleUnlinkOdooPartnerFromContacto
+
+Ficheiro a editar:
+client/src/pages/ContactoDetail.tsx
+
+Perto de handleFetchOdooPartner e handleLinkOdooPartnerToContacto, criar:
+
+const handleUnlinkOdooPartnerFromContacto = async () => {
+  if (!contacto?.id) return;
+
+  try {
+    // opcional: confirmação simples
+    // if (!window.confirm("Remover ligação deste contacto ao Odoo?")) return;
+
+    const response = await fetch(`/api/contactos/${contacto.id}/odoo-link`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({ odooPartnerId: null }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    // invalidar cache do contacto (React Query)
+    queryClient.invalidateQueries({
+      queryKey: ["/api/contactos", contactoId],
+    });
+
+    // limpar estados relacionados com Odoo
+    setOdooPartner(null);
+    setOdooPartnerError(null);
+    setOdooNotConfigured(false);
+
+    setOdooSearchOpen(false);
+    setOdooSearchResults([]);
+    setOdooSearchTerm("");
+    setOdooSearchError(null);
+    setOdooSearchNotConfigured(false);
+
+    // opcional: atualizar contacto local se estiver em state
+    if (contacto) {
+      contacto.odooPartnerId = null as any;
+    }
+
+    toast({
+      title: "Ligação removida",
+      description: "O contacto deixou de estar ligado ao parceiro Odoo.",
+    });
+  } catch (error) {
+    console.error("[Odoo] Error unlinking partner from contacto:", error);
+    setOdooPartnerError("Erro ao remover ligação ao parceiro Odoo.");
+    toast({
+      title: "Erro",
+      description: "Não foi possível remover a ligação ao parceiro Odoo.",
+      variant: "destructive",
+    });
+  }
+};
+
+
+Usa o mesmo queryClient, contactoId e toast já utilizados no ficheiro (padrão igual ao de Entidades).
+
+2) Atualizar o card “Odoo” para mostrar o botão “Remover ligação”
+
+Ainda em ContactoDetail.tsx, no JSX do card Odoo, tens algo do género:
+
+{!contacto.odooPartnerId ? (
+  // estado não ligado: texto + botão "Ligar a Odoo"
+) : (
+  // estado ligado: texto + botão "Ver detalhes do parceiro"
+)}
+
+
+Dentro do ramo em que o contacto está ligado (contacto.odooPartnerId truthy), garantir que ficas com algo assim:
+
+{contacto.odooPartnerId ? (
+  <div className="space-y-3">
+    <p className="text-sm">
+      Ligado ao parceiro Odoo #{contacto.odooPartnerId}
+    </p>
+
+    <div className="flex flex-wrap items-center gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={handleFetchOdooPartner}
+        disabled={odooPartnerLoading}
+        data-testid="button-odoo-fetch-partner-contacto"
+      >
+        {odooPartnerLoading ? "A carregar..." : "Ver detalhes do parceiro"}
+      </Button>
+
+      <Button
+        size="sm"
+        variant="ghost"
+        className="text-destructive"
+        onClick={handleUnlinkOdooPartnerFromContacto}
+        data-testid="button-odoo-unlink-partner-contacto"
+      >
+        Remover ligação
+      </Button>
+    </div>
+
+    {/* resto da renderização de erros + detalhes do parceiro (já existente) */}
+  </div>
+) : (
+  // bloco "não ligado" com botão "Ligar a Odoo"
+)}
+
+
+Mantém o estilo de cores e variantes igual ao usado para o unlink nas Entidades (ghost + text-destructive).
+
+3) Comando a correr
+
+Na shell do Replit:
+
+npm run dev
+
+
+Verifica que não há erros de TypeScript / imports.
+
+4) O que testar no fim
+
+No browser, na página de detalhe de um Contacto já ligado ao Odoo:
+
+Confirmar que no card “Odoo” vês:
+
+Texto “Ligado ao parceiro Odoo #ID”.
+
+Botão “Ver detalhes do parceiro”.
+
+Novo botão “Remover ligação”.
+
+Clicar em “Remover ligação”:
+
+No DevTools → Network:
+
+Ver POST /api/contactos/:id/odoo-link com body {"odooPartnerId": null}.
+
+Após sucesso:
+
+O card passa a mostrar o estado de não ligado (mensagem + botão “Ligar a Odoo”).
+
+Estados de parceiro/pesquisa ficam limpos (sem erros antigos nem dados antigos).
+
+Opcional: atualizar/abrir novamente o contacto (para garantir que vem da API já sem odooPartnerId).

@@ -376,6 +376,56 @@ export default function ContactoDetail() {
     }
   };
 
+  const handleUnlinkOdooPartnerFromContacto = async () => {
+    if (!contacto?.id) return;
+
+    try {
+      const response = await fetch(`/api/contactos/${contacto.id}/odoo-link`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ odooPartnerId: null }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      queryClient.invalidateQueries({
+        queryKey: ["/api/contactos", contactoId],
+      });
+
+      setOdooPartner(null);
+      setOdooPartnerError(null);
+      setOdooNotConfigured(false);
+
+      setOdooSearchOpen(false);
+      setOdooSearchResults([]);
+      setOdooSearchTerm("");
+      setOdooSearchError(null);
+      setOdooSearchNotConfigured(false);
+
+      if (contacto) {
+        contacto.odooPartnerId = null as any;
+      }
+
+      toast({
+        title: "Ligação removida",
+        description: "O contacto deixou de estar ligado ao parceiro Odoo.",
+      });
+    } catch (error) {
+      console.error("[Odoo] Error unlinking partner from contacto:", error);
+      setOdooPartnerError("Erro ao remover ligação ao parceiro Odoo.");
+      toast({
+        title: "Erro",
+        description: "Não foi possível remover a ligação ao parceiro Odoo.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const shareText = formatContactForSharing(contacto);
   
   const shareOptions = [
@@ -669,9 +719,18 @@ export default function ContactoDetail() {
                     variant="outline"
                     onClick={handleFetchOdooPartner}
                     disabled={odooPartnerLoading}
-                    data-testid="button-odoo-fetch-partner"
+                    data-testid="button-odoo-fetch-partner-contacto"
                   >
                     {odooPartnerLoading ? "A carregar..." : "Ver detalhes do parceiro"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive"
+                    onClick={handleUnlinkOdooPartnerFromContacto}
+                    data-testid="button-odoo-unlink-partner-contacto"
+                  >
+                    Remover ligação
                   </Button>
                 </div>
 
