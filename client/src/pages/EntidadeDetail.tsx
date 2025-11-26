@@ -457,8 +457,10 @@ export default function EntidadeDetail() {
         body: JSON.stringify({ odooPartnerId: partner.id }),
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+
+      if (!response.ok || data.success === false) {
+        throw new Error(data.message || `HTTP ${response.status}`);
       }
 
       queryClient.invalidateQueries({ queryKey: ["/api/entidades", entidadeId] });
@@ -476,9 +478,11 @@ export default function EntidadeDetail() {
         title: "Sucesso",
         description: `Entidade ligada ao parceiro Odoo "${partner.name}"`,
       });
-    } catch (error) {
-      console.error("[Odoo] Error linking partner to entidade:", error);
-      setOdooSearchError("Erro ao ligar a entidade ao parceiro Odoo.");
+    } catch (error: any) {
+      console.error("[Odoo] Error linking entidade to partner:", error);
+      setOdooSearchError(
+        error?.message || "Erro ao ligar a entidade ao parceiro Odoo."
+      );
     }
   };
 
