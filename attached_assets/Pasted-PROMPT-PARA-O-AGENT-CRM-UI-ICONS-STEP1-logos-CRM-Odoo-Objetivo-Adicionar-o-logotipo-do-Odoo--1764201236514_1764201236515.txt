@@ -1,0 +1,154 @@
+PROMPT PARA O AGENT – CRM-UI-ICONS-STEP1 (logos CRM – Odoo)
+
+Objetivo:
+Adicionar o logotipo do Odoo à UI do CRM, em 3 pontos:
+
+Card “Odoo CRM” nas Definições → CRMs.
+
+Detalhe da Entidade quando está ligada ao Odoo.
+
+Detalhe do Contacto quando está ligado ao Odoo.
+
+Sem mexer na lógica de negócio, só UI.
+
+1) Adicionar o logo Odoo aos assets
+
+Ficheiro novo sugerido:
+
+client/src/assets/crm/odoo.svg
+
+
+Tarefas:
+
+Criar o ficheiro odoo.svg com um logo simples do Odoo (podes usar uma versão minimal, mesmo que seja só o “odoo” em vetorial).
+
+Garante que o caminho está correto para import em React (seguindo o padrão já usado para outros SVGs no projeto).
+
+Exemplo de import a usar nos componentes:
+
+import OdooLogo from "@/assets/crm/odoo.svg";
+
+
+(Ajustar o alias/caminho se o projeto usar outra convenção.)
+
+2) Card “Odoo CRM” nas Definições → CRMs
+
+Ficheiro (ou equivalente):
+
+client/src/pages/settings/ApiKeysPage.tsx
+
+
+onde está o componente OdooCrmBlock.
+
+Tarefas:
+
+No topo do ficheiro, importar o logo:
+
+import OdooLogo from "@/assets/crm/odoo.svg";
+
+
+Dentro do OdooCrmBlock, no CardTitle, acrescentar o logo:
+
+Antes (aprox.):
+
+<CardTitle className="text-sm flex items-center gap-2">
+  <span>Odoo CRM</span>
+  <Badge variant="outline">Odoo</Badge>
+</CardTitle>
+
+
+Depois:
+
+<CardTitle className="text-sm flex items-center gap-2">
+  <img src={OdooLogo} alt="Odoo" className="h-4 w-auto" />
+  <span>Odoo CRM</span>
+  <Badge variant="outline">Odoo</Badge>
+</CardTitle>
+
+
+Mantém o resto do layout como está.
+
+3) Entidade – mostrar logo CRM quando ligada ao Odoo
+
+Ficheiro (ou equivalente):
+
+client/src/pages/entidades/EntidadeDetailPage.tsx
+
+
+ou semelhante (a página de detalhe da Entidade).
+
+Tarefas:
+
+Importar o logo:
+
+import OdooLogo from "@/assets/crm/odoo.svg";
+
+
+Na zona onde mostras o nome da entidade (título principal), acrescentar um “chip” CRM apenas quando a entidade está ligada ao Odoo.
+
+Assumir que a entidade tem algo como entidade.odooPartnerId (ajusta ao nome real do campo que indica a ligação Odoo):
+
+<h1 className="text-xl font-semibold flex items-center gap-2">
+  {entidade.nome}
+
+  {entidade.odooPartnerId && (
+    <span className="inline-flex items-center gap-1 text-[11px] rounded-full border px-2 py-0.5 text-muted-foreground">
+      <img src={OdooLogo} alt="Odoo" className="h-3 w-auto" />
+      <span>Ligado ao CRM</span>
+    </span>
+  )}
+</h1>
+
+
+Não alteres outros conteúdos; só adiciona este chip condicional.
+
+4) Contacto – mostrar logo CRM quando ligado ao Odoo
+
+Ficheiro (ou equivalente):
+
+client/src/pages/contactos/ContactoDetailPage.tsx
+
+
+Tarefas:
+
+Importar o logo:
+
+import OdooLogo from "@/assets/crm/odoo.svg";
+
+
+Na zona do nome do contacto, adicionar chip semelhante, condicionado à ligação ao Odoo.
+
+Assumir campo contacto.odooPartnerId ou equivalente (ajusta ao nome real):
+
+<h1 className="text-xl font-semibold flex items-center gap-2">
+  {contacto.nome}
+
+  {contacto.odooPartnerId && (
+    <span className="inline-flex items-center gap-1 text-[11px] rounded-full border px-2 py-0.5 text-muted-foreground">
+      <img src={OdooLogo} alt="Odoo" className="h-3 w-auto" />
+      <span>Ligado ao CRM</span>
+    </span>
+  )}
+</h1>
+
+5) Testes
+
+npm run dev
+
+No browser:
+
+Definições → CRMs:
+
+Verificar que o card “Odoo CRM” mostra agora o logo à esquerda do texto.
+
+Entidades:
+
+Abrir uma entidade ligada ao Odoo → ver o chip com logo + “Ligado ao CRM” ao lado do nome.
+
+Abrir uma entidade sem ligação Odoo → não deve mostrar chip.
+
+Contactos:
+
+Igual para contactos: com ligação Odoo → chip com logo; sem ligação → nada.
+
+Não é preciso mexer em Visitas/Leads neste passo. Primeiro fechamos estes 3 pontos, depois voltamos ao resto.
