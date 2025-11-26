@@ -557,6 +557,63 @@ export default function ContactoDetail() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+        {/* FASE CRM-LEADS-ENT-CONTACTO-STEP1: Leads deste contacto */}
+        <Card data-testid="card-leads-contacto">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Flag className="w-4 h-4" />
+              Leads deste contacto
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Oportunidades associadas a este contacto, a partir de visitas ou outras fontes.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {contactoLeadsDisabled && (
+              <p className="text-xs text-amber-600">
+                O módulo de Leads CRM está desativado para esta empresa.
+              </p>
+            )}
+
+            {!contactoLeadsDisabled && contactoLeadsLoading && (
+              <p className="text-sm text-muted-foreground">A carregar leads...</p>
+            )}
+
+            {!contactoLeadsDisabled && !contactoLeadsLoading && contactoLeads.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Ainda não existem leads associados a este contacto.
+              </p>
+            )}
+
+            {!contactoLeadsDisabled && !contactoLeadsLoading && contactoLeads.length > 0 && (
+              <div className="space-y-2">
+                {contactoLeads.map((lead) => (
+                  <div
+                    key={lead.id}
+                    className="flex items-center justify-between border rounded-md px-3 py-2 text-sm"
+                    data-testid={`row-lead-contacto-${lead.id}`}
+                  >
+                    <div>
+                      <div className="font-medium">{lead.titulo}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {lead.marca ? `Marca: ${lead.marca} · ` : ""}
+                        Estado: {lead.estado}
+                      </div>
+                    </div>
+                    <div className="text-right text-xs">
+                      {lead.valorPrevisto
+                        ? `${lead.valorPrevisto} ${lead.moeda || "EUR"}`
+                        : "—"}
+                      <div className="text-[10px] text-muted-foreground">
+                        {new Date(lead.createdAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
         {/* Contact Information */}
         <Card>
           <CardHeader>
