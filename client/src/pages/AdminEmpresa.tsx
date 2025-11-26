@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Empresa, User, Marca } from "@shared/schema";
@@ -58,10 +59,21 @@ export default function AdminEmpresa() {
   // FASE 31-IA-01: Manage OpenAI API Key UI state
   const [showOpenAIKeyInput, setShowOpenAIKeyInput] = useState(false);
   const [openAIKeyValue, setOpenAIKeyValue] = useState("");
-
+  
   const { data: empresa, isLoading, error } = useQuery<Empresa>({
     queryKey: ["/api/admin/empresa"],
   });
+
+  // FASE CRM-LEADS-UI-TOGGLE-STEP1: Manage CRM Leads toggle state
+  const [leadsEnabled, setLeadsEnabled] = useState<boolean>(false);
+  const [savingLeads, setSavingLeads] = useState(false);
+
+  // Update leadsEnabled state when empresa data changes
+  React.useEffect(() => {
+    if (empresa?.crmLeadsEnabled !== undefined) {
+      setLeadsEnabled(empresa.crmLeadsEnabled);
+    }
+  }, [empresa?.crmLeadsEnabled]);
 
   const form = useForm<UpdateEmpresaForm>({
     resolver: zodResolver(updateEmpresaSchema),
@@ -102,6 +114,46 @@ export default function AdminEmpresa() {
       });
     },
   });
+
+  // FASE CRM-LEADS-UI-TOGGLE-STEP1: Handler for saving CRM Leads flag
+  const handleSaveCrmLeadsFlag = async () => {
+    try {
+      setSavingLeads(true);
+
+      const resp = await fetch("/api/admin/empresa", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          crmLeadsEnabled: leadsEnabled,
+        }),
+      });
+
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
+
+      toast({
+        title: "Definições de Leads guardadas",
+        description: leadsEnabled
+          ? "Módulo de Leads está ativo para esta empresa."
+          : "Módulo de Leads foi desativado.",
+      });
+
+      // Refresh data after successful save
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/empresa"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    } catch (error: any) {
+      console.error("[Settings] Error saving CRM leads flag:", error);
+      toast({
+        title: "Erro ao guardar definições de Leads",
+        description: "Verifica a ligação e tenta novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingLeads(false);
+    }
+  };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1233,12 +1285,44 @@ export default function AdminEmpresa() {
                 CRMs
               </CardTitle>
               <CardDescription>
-                Configura e ativa as integrações com sistemas CRM (Odoo, e outros no futuro).
+                Configura e ativa as integrações com sistemas CRM (Odoo, Leads, e outros no futuro).
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Odoo CRM Sub-Card */}
               <OdooCrmBlock empresa={empresa} />
+
+              {/* FASE CRM-LEADS-UI-TOGGLE-STEP1: Módulo de Leads CRM Toggle */}
+              <div className="border rounded-lg p-4 flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm font-medium">Módulo de Leads CRM</div>
+                  <p className="text-xs text-muted-foreground">
+                    Quando ativo, permite criar e gerir leads na app e integrá-los com o CRM.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    {leadsEnabled ? "Ativo" : "Inativo"}
+                  </span>
+                  <Switch
+                    checked={leadsEnabled}
+                    onCheckedChange={setLeadsEnabled}
+                    data-testid="toggle-crm-leads-enabled"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={handleSaveCrmLeadsFlag}
+                  disabled={savingLeads}
+                  data-testid="button-save-crm-leads"
+                >
+                  {savingLeads ? "A guardar..." : "Guardar definições de Leads"}
+                </Button>
+              </div>
               
               {/* Placeholder for future CRM integrations */}
               <div className="text-xs text-muted-foreground border-t pt-4">

@@ -1,0 +1,163 @@
+PROMPT PARA O AGENT – LEADS-UI-TOGGLE-STEP1 (toggle de Leads nas Definições)
+
+Objetivo:
+Adicionar um toggle “Módulo de Leads CRM” nas definições (no card CRMs), ligado ao campo crmLeadsEnabled de empresas, tal como já acontece com odooCrmEnabled.
+
+1) Frontend – garantir que crmLeadsEnabled chega ao settings
+
+Ficheiro a editar (ou equivalente):
+client/src/pages/settings/ApiKeysPage.tsx
+(onde já estás a buscar /api/admin/empresa e a mostrar o card CRMs com Odoo CRM)
+
+Tarefas:
+
+Garante que o tipo Empresa usado no componente inclui:
+
+type Empresa = {
+  id: string;
+  nome: string;
+  odooCrmEnabled?: boolean;
+  crmLeadsEnabled?: boolean; // ← novo
+  // ...outros campos que já existirem
+};
+
+
+Na query que chama /api/admin/empresa, confirma que o data.empresa.crmLeadsEnabled está a ser passado para o componente (se usares React Query ou SWR, isso já vem por defeito; só tens de o ler).
+
+2) Criar estado local para o toggle de Leads
+
+Ainda em ApiKeysPage (ou no componente que renderiza o card CRMs):
+
+Adiciona um estado para o módulo de leads:
+
+const [leadsEnabled, setLeadsEnabled] = React.useState<boolean>(
+  empresa?.crmLeadsEnabled ?? false
+);
+
+React.useEffect(() => {
+  if (empresa?.crmLeadsEnabled !== undefined) {
+    setLeadsEnabled(empresa.crmLeadsEnabled);
+  }
+}, [empresa?.crmLeadsEnabled]);
+
+
+A ideia é igual ao que já fazes com odooCrmEnabled.
+
+3) UI – secção “Módulo de Leads” dentro do card CRMs
+
+No JSX do card CRMs (onde já tens o sub-card “Odoo CRM”), adiciona um bloco simples para o módulo de Leads, por exemplo mesmo abaixo do Odoo:
+
+<CardContent className="space-y-4">
+  <OdooCrmBlock empresa={empresa} />
+
+  <div className="border rounded-lg p-4 flex items-center justify-between gap-4">
+    <div>
+      <div className="text-sm font-medium">Módulo de Leads CRM</div>
+      <p className="text-xs text-muted-foreground">
+        Quando ativo, permite criar e gerir leads na app e integrá-los com o CRM.
+      </p>
+    </div>
+
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-muted-foreground">
+        {leadsEnabled ? "Ativo" : "Inativo"}
+      </span>
+      <Switch
+        checked={leadsEnabled}
+        onCheckedChange={setLeadsEnabled}
+        data-testid="toggle-crm-leads-enabled"
+      />
+    </div>
+  </div>
+
+  <div className="flex justify-end">
+    <Button
+      size="sm"
+      onClick={handleSaveCrmLeadsFlag}
+      data-testid="button-save-crm-leads"
+    >
+      Guardar definições de Leads
+    </Button>
+  </div>
+</CardContent>
+
+
+Usa o mesmo Switch e Button que já são usados no resto da UI.
+
+4) Handler para guardar crmLeadsEnabled
+
+Ainda no mesmo ficheiro, cria a função:
+
+const [savingLeads, setSavingLeads] = React.useState(false);
+
+const handleSaveCrmLeadsFlag = async () => {
+  try {
+    setSavingLeads(true);
+
+    const resp = await fetch("/api/admin/empresa", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        crmLeadsEnabled: leadsEnabled,
+      }),
+    });
+
+    if (!resp.ok) {
+      throw new Error(`HTTP ${resp.status}`);
+    }
+
+    toast?.({
+      title: "Definições de Leads guardadas",
+      description: leadsEnabled
+        ? "Módulo de Leads está ativo para esta empresa."
+        : "Módulo de Leads foi desativado.",
+    });
+  } catch (error) {
+    console.error("[Settings] Error saving CRM leads flag:", error);
+    toast?.({
+      title: "Erro ao guardar definições de Leads",
+      description: "Verifica a ligação e tenta novamente.",
+      variant: "destructive",
+    });
+  } finally {
+    setSavingLeads(false);
+  }
+};
+
+
+E no botão:
+
+<Button
+  size="sm"
+  onClick={handleSaveCrmLeadsFlag}
+  disabled={savingLeads}
+>
+  {savingLeads ? "A guardar..." : "Guardar definições de Leads"}
+</Button>
+
+
+Não mexas na lógica do Odoo; este botão é só para a flag de Leads.
+
+5) Comandos e teste rápido
+
+Na shell:
+
+npm run dev
+
+
+No browser:
+
+Vai a Definições → CRMs:
+
+Vê se aparece o bloco “Módulo de Leads CRM” com o toggle.
+
+O estado inicial deve refletir o valor de crmLeadsEnabled na BD (por default false).
+
+Liga o toggle, clica “Guardar definições de Leads”:
+
+No Network, confirma PATCH /api/admin/empresa com { crmLeadsEnabled: true }.
+
+Faz GET /api/admin/empresa (via DevTools/Network) e confirma que vem crmLeadsEnabled: true.
+
+Desliga o toggle, volta a guardar e verifica que regressa a false.
