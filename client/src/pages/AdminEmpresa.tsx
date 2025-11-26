@@ -13,14 +13,14 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Empresa, User, Marca } from "@shared/schema";
-import { Upload, Building2, Bell, Zap, Lightbulb, MapPin, Calendar, PlugZap, Code, Mail, Map, Cloud, Webhook } from "lucide-react";
+import { Upload, Building2, Bell, Zap, Lightbulb, MapPin, Calendar, PlugZap, Code, Mail, Map, Cloud, Webhook, Settings2 } from "lucide-react";
 import { useRef, useState } from "react";
 import AdminEntidadeTipos from "@/pages/AdminEntidadeTipos";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminMarcas from "@/pages/AdminMarcas";
 import { MicrosoftIntegrationCard } from "@/components/integrations/MicrosoftIntegrationCard";
 import { GoogleIntegrationCard } from "@/components/integrations/GoogleIntegrationCard";
-import { OdooIntegrationCard } from "@/components/integrations/OdooIntegrationCard";
+import { OdooCrmBlock } from "@/components/integrations/OdooCrmBlock";
 
 const updateEmpresaSchema = z.object({
   nome: z.string().min(1, "Nome obrigatório"),
@@ -1225,8 +1225,27 @@ export default function AdminEmpresa() {
           {/* Google Workspace - Active Integration */}
           <GoogleIntegrationCard />
 
-          {/* Odoo - Configuração por empresa */}
-          <OdooIntegrationCard />
+          {/* CRMs - Card Parent with Odoo Sub-Card */}
+          <Card data-testid="card-crms-integrations">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings2 className="w-5 h-5 text-blue-600" />
+                CRMs
+              </CardTitle>
+              <CardDescription>
+                Configura e ativa as integrações com sistemas CRM (Odoo, e outros no futuro).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Odoo CRM Sub-Card */}
+              <OdooCrmBlock empresa={empresa} />
+              
+              {/* Placeholder for future CRM integrations */}
+              <div className="text-xs text-muted-foreground border-t pt-4">
+                Mais integrações CRM em breve...
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Email & Notifications */}
           <Card>

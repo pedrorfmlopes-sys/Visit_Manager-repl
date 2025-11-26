@@ -3207,6 +3207,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // GET /api/admin/empresa - Get current company config
   // FASE 31-IA-01: Include IA settings with hasOwnOpenAIApiKey boolean (never expose actual key)
+  // FASE CRM-UI-CRMS-CARD-STEP1: Include odooCrmEnabled for Odoo integration control
   app.get('/api/admin/empresa', requireAdmin, async (req: any, res) => {
     try {
       const { empresaId } = await getUserContext(req);
@@ -3218,8 +3219,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // FASE 31-IA-01: Add calculated hasOwnOpenAIApiKey to response, never expose the actual key
+      // FASE CRM-UI-CRMS-CARD-STEP1: Include odooCrmEnabled flag
       const responseData = {
         ...empresa,
+        odooCrmEnabled: empresa.odooCrmEnabled ?? true,
         uiSettings: {
           ...(empresa.uiSettings || {}),
           ia: {
@@ -3276,12 +3279,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // PATCH /api/admin/empresa - Update company config
   // FASE 22: Added support for uiSettings
   // FASE 31-IA-01: Added support for IA configuration and custom OpenAI API Key management
+  // FASE CRM-UI-CRMS-CARD-STEP1: Added support for odooCrmEnabled flag
   app.patch('/api/admin/empresa', requireAdmin, async (req: any, res) => {
     try {
       const { empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       
-      const { nome, nif, email, telefone, logoUrl, mostrarMarcasEmVisitas, mostrarGPS, theme, uiSettings, iaOpenAIApiKey } = req.body;
+      const { nome, nif, email, telefone, logoUrl, mostrarMarcasEmVisitas, mostrarGPS, theme, uiSettings, iaOpenAIApiKey, odooCrmEnabled } = req.body;
       
       // Validate theme if provided
       if (theme !== undefined && !["light-business", "dark-pro"].includes(theme)) {
@@ -3298,6 +3302,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (mostrarGPS !== undefined) updateData.mostrarGPS = mostrarGPS;
       if (theme !== undefined) updateData.theme = theme;
       if (uiSettings !== undefined) updateData.uiSettings = uiSettings; // FASE 22
+      if (typeof odooCrmEnabled === "boolean") updateData.odooCrmEnabled = odooCrmEnabled; // FASE CRM-UI-CRMS-CARD-STEP1
       
       // FASE 31-IA-01: Handle custom OpenAI API Key management
       if (iaOpenAIApiKey !== undefined) {
@@ -3334,6 +3339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Return response WITHOUT the actual openai_api_key
       const responseData = {
         ...updated,
+        odooCrmEnabled: updated.odooCrmEnabled ?? true,
         uiSettings: {
           ...(updated.uiSettings || {}),
           ia: {
