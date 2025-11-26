@@ -480,6 +480,49 @@ export default function EntidadeDetail() {
     }
   };
 
+  const handleUnlinkOdooPartnerFromEntidade = async () => {
+    if (!entidade?.id) return;
+
+    try {
+      const response = await fetch(`/api/entidades/${entidade.id}/odoo-link`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ odooPartnerId: null }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["/api/entidades", entidadeId] });
+      
+      setOdooPartner(null);
+      setOdooPartnerError(null);
+      setOdooNotConfigured(false);
+      setOdooSearchOpen(false);
+      setOdooSearchResults([]);
+      setOdooSearchTerm("");
+      setOdooSearchError(null);
+      setOdooSearchNotConfigured(false);
+
+      toast({
+        title: "Ligação removida",
+        description: "A entidade deixou de estar ligada ao parceiro Odoo.",
+      });
+    } catch (error) {
+      console.error("[Odoo] Error unlinking partner from entidade:", error);
+      setOdooPartnerError("Erro ao remover ligação ao parceiro Odoo.");
+      toast({
+        title: "Erro",
+        description: "Não foi possível remover a ligação ao parceiro Odoo.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-10 bg-card border-b border-card-border px-4 py-4">
@@ -914,16 +957,17 @@ export default function EntidadeDetail() {
               </div>
             ) : (
               <>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm">
-                    <span className="text-muted-foreground">Ligado ao parceiro Odoo </span>
-                    <span className="font-medium" data-testid="text-odoo-partner-id">
-                      #{entidade.odooPartnerId}
-                    </span>
-                  </p>
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Ligado ao parceiro Odoo </span>
+                  <span className="font-medium" data-testid="text-odoo-partner-id">
+                    #{entidade.odooPartnerId}
+                  </span>
+                </p>
+
+                <div className="mt-2 flex flex-wrap items-center gap-2">
                   <Button
-                    variant="outline"
                     size="sm"
+                    variant="outline"
                     onClick={handleFetchOdooPartner}
                     disabled={odooPartnerLoading}
                     data-testid="button-odoo-fetch-partner"
@@ -932,6 +976,16 @@ export default function EntidadeDetail() {
                       <div className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
                     ) : null}
                     Ver detalhes do parceiro
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive"
+                    onClick={handleUnlinkOdooPartnerFromEntidade}
+                    data-testid="button-odoo-unlink-partner"
+                  >
+                    Remover ligação
                   </Button>
                 </div>
 

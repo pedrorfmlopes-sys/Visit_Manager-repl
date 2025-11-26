@@ -1,0 +1,153 @@
+PROMPT PARA O AGENT – ODOO-UI-ENTIDADES-STEP3 (Unlink)
+
+Objetivo:
+Na página de detalhe da Entidade, permitir remover a ligação ao parceiro Odoo, usando o endpoint já existente:
+POST /api/entidades/:id/odoo-link com {"odooPartnerId": null}.
+
+Não mexer em backend. Só UI + chamadas ao endpoint.
+
+1) Adicionar handler para “Unlink” no EntidadeDetail.tsx
+
+Ficheiro a editar:
+client/src/pages/EntidadeDetail.tsx
+
+Perto de handleFetchOdooPartner e handleLinkOdooPartnerToEntidade, cria a função:
+
+const handleUnlinkOdooPartnerFromEntidade = async () => {
+  if (!entidade?.id) return;
+
+  try {
+    // opcional: confirmação simples
+    // if (!window.confirm("Remover ligação desta entidade ao Odoo?")) return;
+
+    const response = await fetch(`/api/entidades/${entidade.id}/odoo-link`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({ odooPartnerId: null }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    // invalidar cache da entidade (React Query)
+    queryClient.invalidateQueries({ queryKey: ["/api/entidades", entidadeId] });
+
+    // limpar estado local relacionado com Odoo
+    setOdooPartner(null);
+    setOdooPartnerError(null);
+    setOdooNotConfigured(false);
+    setOdooSearchOpen(false);
+    setOdooSearchResults([]);
+    setOdooSearchTerm("");
+    setOdooSearchError(null);
+    setOdooSearchNotConfigured(false);
+
+    // opcional: atualizar entidade local se estiver em state
+    if (entidade) {
+      entidade.odooPartnerId = null as any;
+    }
+
+    toast({
+      title: "Ligação removida",
+      description: "A entidade deixou de estar ligada ao parceiro Odoo.",
+    });
+  } catch (error) {
+    console.error("[Odoo] Error unlinking partner from entidade:", error);
+    setOdooPartnerError("Erro ao remover ligação ao parceiro Odoo.");
+    toast({
+      title: "Erro",
+      description: "Não foi possível remover a ligação ao parceiro Odoo.",
+      variant: "destructive",
+    });
+  }
+};
+
+
+Usa o mesmo queryClient, entidadeId, toast e padrão já usados em handleLinkOdooPartnerToEntidade.
+
+2) Atualizar UI do card “Odoo” para mostrar botão “Remover ligação”
+
+Ainda em EntidadeDetail.tsx, no JSX do card Odoo, já tens algo do género:
+
+{!entidade.odooPartnerId ? (
+  // caso não ligado → botão "Ligar a Odoo"
+) : (
+  <div> ... </div>
+)}
+
+
+Dentro do branch em que a entidade ESTÁ ligada (entidade.odooPartnerId truthy), garante que:
+
+Manténs a indicação atual, algo como:
+
+<p className="text-sm">
+  Ligado ao parceiro Odoo #{entidade.odooPartnerId}
+</p>
+
+
+Adicionas um pequeno grupo de botões, por exemplo:
+
+<div className="mt-2 flex flex-wrap items-center gap-2">
+  <Button
+    size="sm"
+    variant="outline"
+    onClick={handleFetchOdooPartner}
+    data-testid="button-odoo-refresh-partner"
+  >
+    Ver detalhes do parceiro
+  </Button>
+
+  <Button
+    size="sm"
+    variant="ghost"
+    className="text-destructive"
+    onClick={handleUnlinkOdooPartnerFromEntidade}
+    data-testid="button-odoo-unlink-partner"
+  >
+    Remover ligação
+  </Button>
+</div>
+
+
+Usa os mesmos componentes Button já importados. O variant="ghost" + text-destructive mantém o visual discreto mas claro.
+
+3) Comando a correr
+
+Na shell:
+
+npm run dev
+
+
+Verifica que não há erros de TypeScript/imports.
+
+4) O que testar no fim
+
+No browser, no detalhe de uma Entidade já ligada ao Odoo:
+
+Verifica o card “Odoo”:
+
+Mostra “Ligado ao parceiro Odoo #ID”.
+
+Vês os botões “Ver detalhes do parceiro” e “Remover ligação”.
+
+Clica em “Remover ligação”:
+
+No DevTools → Network, deve aparecer:
+
+POST /api/entidades/:id/odoo-link com body {"odooPartnerId": null}.
+
+Após sucesso:
+
+Card passa a mostrar o estado de não ligado (com o botão “Ligar a Odoo”).
+
+Se tentares carregar detalhes, já não deve fazer sentido porque não há odooPartnerId.
+
+(Opcional) Vês o toast “A entidade deixou de estar ligada ao parceiro Odoo.”
+
+Se simulares erro (ex.: desligando o backend Odoo ou mexendo nas permissões):
+
+A app mostra mensagem de erro no card e/ou toast de erro, sem crashar.
