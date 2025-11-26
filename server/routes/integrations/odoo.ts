@@ -3,40 +3,45 @@ import { isAuthenticated } from "../../replitAuth";
 import { getUserContext } from "../../authContext";
 import { odooConnectionsStorage } from "../../storage/odooConnections";
 import { insertOdooConnectionSchema } from "@shared/schema";
+import { testOdooConnection } from "../../integrations/odooClient";
 import express from "express";
 
 export function setupOdooRoutes(app: any): void {
   const router = express.Router();
 
   // GET /api/integrations/odoo/status
-  // Devolve se a integração está configurada para a empresa atual
+  // Testa a ligação com Odoo e devolve o status
   router.get("/status", isAuthenticated, async (req: any, res) => {
     try {
       const { empresaId } = await getUserContext(req);
       if (!empresaId) {
         return res.status(400).json({
-          configured: false,
+          connected: false,
+          reason: "no_company",
           message: "User has no company assigned",
         });
       }
 
-      const connection = await odooConnectionsStorage.getOdooConnectionByEmpresaId(empresaId);
-
-      if (!connection) {
-        return res.json({ configured: false });
-      }
+      const result = await testOdooConnection(empresaId);
 
       return res.json({
-        configured: true,
-        baseUrl: connection.baseUrl,
-        dbName: connection.dbName,
-        username: connection.username,
-        environment: connection.environment,
-        isActive: connection.isActive,
+        connected: true,
+        ...result,
       });
-    } catch (error) {
-      console.error("Error fetching Odoo connection status:", error);
-      return res.status(500).json({ message: "Failed to fetch Odoo status" });
+    } catch (error: any) {
+      if (error.message === "ODOO_NOT_CONFIGURED") {
+        return res.json({
+          connected: false,
+          reason: "not_configured",
+        });
+      }
+
+      console.error("[Odoo] Status error:", error);
+      return res.status(500).json({
+        connected: false,
+        reason: "error",
+        message: error.message ?? "Unknown error",
+      });
     }
   });
 

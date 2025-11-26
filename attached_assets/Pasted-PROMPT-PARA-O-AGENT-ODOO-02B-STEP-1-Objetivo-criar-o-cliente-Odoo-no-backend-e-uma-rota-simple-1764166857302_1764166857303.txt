@@ -1,0 +1,210 @@
+PROMPT PARA O AGENT – ODOO-02B / STEP 1
+
+Objetivo: criar o cliente Odoo no backend e uma rota simples de status para testar a ligação, reutilizando a configuração já guardada em odoo_connections (card Odoo em “APIs & Keys”).
+⚠️ Não fazer ainda sincronização de entidades/contactos nem search avançado. Só testar ligação.
+
+1) Criar cliente Odoo (JSON-RPC + leitura da connection)
+
+Ficheiro a criar:
+
+server/integrations/odooClient.ts
+
+Tarefas:
+
+Seguir o mesmo padrão das integrações já existentes (ex.: Google/Microsoft):
+
+Ver como está organizado o código em:
+
+server/integrations/googleClient.ts ou equivalente
+
+e/ou ficheiros de integrações Microsoft.
+
+Reutilizar o mesmo estilo de organização (helpers, tipos, padrão de erro).
+
+Dentro de odooClient.ts:
+
+Importar:
+
+db e odooConnections de shared/schema (ou o nome real da tabela de Odoo já existente).
+
+O tipo InferModel / $inferSelect se necessário.
+
+O helper HTTP já usado noutras integrações (ex.: fetchJson, fetch, etc.). Não adicionar novas libraries.
+
+Criar um tipo para a ligação, algo como:
+
+export type OdooConnection = typeof odooConnections.$inferSelect;
+
+
+Implementar função:
+
+export async function getOdooConnectionForEmpresa(empresaId: string): Promise<OdooConnection> {
+  // buscar na tabela odooConnections pelo empresaId
+  // se não existir, lançar erro específico (ex.: new Error("ODDO_NOT_CONFIGURED"))
+}
+
+
+Detalhes:
+
+Usar os campos já existentes na tabela (ex.: baseUrl, dbName, username, apiKey ou equivalentes).
+
+Não inventar novos campos; apenas mapear o que já está definido.
+
+Implementar função de autenticação via JSON-RPC:
+
+async function authenticateOdoo(conn: OdooConnection): Promise<{ userId: number }> {
+  // POST para `${conn.baseUrl}/web/session/authenticate`
+  // body JSON-RPC:
+  // {
+  //   "jsonrpc": "2.0",
+  //   "params": {
+  //     "db": conn.dbName,
+  //     "login": conn.username,
+  //     "password": conn.apiKey
+  //   }
+  // }
+  // devolver userId (ex.: result.user_id)
+}
+
+
+Implementar função pública de teste:
+
+export async function testOdooConnection(empresaId: string) {
+  const conn = await getOdooConnectionForEmpresa(empresaId);
+  const { userId } = await authenticateOdoo(conn);
+
+  return {
+    ok: true,
+    baseUrl: conn.baseUrl,
+    dbName: conn.dbName,
+    userId,
+  };
+}
+
+
+Em caso de erro (ligação falhada, credenciais erradas, etc.), lançar erro normal de JS com message descritiva (vai ser tratado na rota).
+
+2) Criar rota /api/integrations/odoo/status
+
+Ficheiros a editar/criar:
+
+Criar (se ainda não existir): server/routes/integrations/odoo.ts
+
+Atualizar registo das rotas em: server/routes/index.ts (ou onde as rotas de integrações são registadas).
+
+Tarefas:
+
+Em server/routes/integrations/odoo.ts:
+
+Seguir o mesmo padrão da rota de status do Google/Microsoft:
+
+Importar Router do Express.
+
+Importar requireAuth (ou middleware equivalente) para garantir que temos req.auth / req.empresaId.
+
+Importar testOdooConnection de ../integrations/odooClient.
+
+Implementar algo do género:
+
+import { Router } from "express";
+import { requireAuth } from "../auth/requireAuth";
+import { testOdooConnection } from "../../integrations/odooClient";
+
+export const odooIntegrationsRouter = Router();
+
+odooIntegrationsRouter.get("/status", requireAuth, async (req, res) => {
+  try {
+    const empresaId = req.auth.empresaId; // usar a propriedade real já usada noutras integrações
+    const result = await testOdooConnection(empresaId);
+
+    res.json({
+      connected: true,
+      ...result,
+    });
+  } catch (error: any) {
+    if (error.message === "ODDO_NOT_CONFIGURED") {
+      return res.status(200).json({
+        connected: false,
+        reason: "not_configured",
+      });
+    }
+
+    console.error("[Odoo] Status error:", error);
+    res.status(500).json({
+      connected: false,
+      reason: "error",
+      message: error.message ?? "Unknown error",
+    });
+  }
+});
+
+
+Em server/routes/index.ts (ou equivalente), registar a rota:
+
+Ver como as rotas de integração Google/Microsoft são registadas, por exemplo:
+
+app.use("/api/integrations/google", googleIntegrationsRouter);
+
+
+Adicionar a rota Odoo da mesma forma:
+
+import { odooIntegrationsRouter } from "./integrations/odoo";
+
+app.use("/api/integrations/odoo", odooIntegrationsRouter);
+
+3) Comandos a correr
+
+Na shell do Replit:
+
+npm run dev
+
+
+Garantir que o servidor arranca sem erros de compilação TypeScript/imports.
+
+4) O que testar no fim
+
+Com a app a correr, fazer um pedido para:
+
+GET /api/integrations/odoo/status
+
+Pode ser via:
+
+Browser (se passar pelos proxies),
+
+Postman / Thunder Client,
+
+Ou curl na shell:
+
+curl http://localhost:5000/api/integrations/odoo/status
+
+
+Esperar um destes cenários:
+
+Se a connection estiver configurada corretamente:
+
+{
+  "connected": true,
+  "ok": true,
+  "baseUrl": "https://teu-odoo...",
+  "dbName": "divitek_prod",
+  "userId": 123
+}
+
+
+Se não houver config na tabela:
+
+{
+  "connected": false,
+  "reason": "not_configured"
+}
+
+
+Se houver erro de credenciais / rede:
+
+HTTP 500 com:
+
+{
+  "connected": false,
+  "reason": "error",
+  "message": "..."
+}
