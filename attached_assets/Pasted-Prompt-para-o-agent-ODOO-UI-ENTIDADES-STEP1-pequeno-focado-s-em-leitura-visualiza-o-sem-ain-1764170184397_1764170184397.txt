@@ -1,0 +1,156 @@
+Prompt para o agent – ODOO-UI-ENTIDADES-STEP1
+
+(pequeno, focado só em leitura/visualização – sem ainda fazer a pesquisa e ligação)
+
+Objetivo:
+Na página de detalhe de Entidade do backoffice, criar uma pequena secção “Odoo” que:
+
+Mostra o estado da ligação (odooPartnerId) da entidade ao Odoo;
+
+Quando existir odooPartnerId, permite carregar num botão para ir buscar e mostrar os dados do parceiro via GET /api/integrations/odoo/partner/:id;
+
+Trata os casos “não configurado”, “não encontrado” e erro genérico;
+
+Sem ainda implementar UI de pesquisa/seleção de parceiro (isso fica para o STEP seguinte).
+
+1) Localizar o componente de detalhe de Entidade
+
+Procura o componente React que renderiza a página de detalhe da Entidade no backoffice (rota /backoffice/entidades/:id).
+
+Será algo como client/src/pages/backoffice/Entidades/EntidadeDetailPage.tsx, client/src/features/entidades/EntidadeDetail.tsx ou semelhante.
+
+Garante que esse componente já recebe o objeto entidade a partir da API (GET /api/entidades/:id), que inclui agora odooPartnerId?: string | null.
+
+Não alteres ainda a forma como a entidade é carregada, só confirma onde está o “detail view” para a Entidade e usa esse ficheiro no passo seguinte.
+
+2) Adicionar secção/card “Odoo” no detalhe da Entidade
+
+No componente de detalhe de Entidade encontrado no passo anterior:
+
+Cria uma pequena secção/“card” visual com título “Odoo” (segue o estilo de cards já usados no projeto – mesma UI lib, mesma tipografia).
+
+Dentro deste card, implementa a lógica:
+
+Se entidade.odooPartnerId estiver falsy (null, undefined ou string vazia):
+
+Mostra um texto curto, por exemplo:
+“Esta entidade ainda não está ligada a nenhum parceiro Odoo.”
+
+Coloca também uma linha de “preview” do que virá a seguir, sem funcionalidade por agora, tipo:
+“A ligação manual será configurada numa próxima etapa.”
+
+Se entidade.odooPartnerId tiver um valor:
+
+Mostra algo como:
+“Ligado ao parceiro Odoo #<odooPartnerId>”
+
+Adiciona um botão “Ver detalhes do parceiro”.
+
+Não cries ainda inputs de pesquisa ou dropdowns – apenas leitura + botão.
+
+3) Chamar o endpoint GET /api/integrations/odoo/partner/:id
+
+No mesmo componente:
+
+Cria um tipo TypeScript local para o parceiro Odoo (não importa se já existe igual no backend, aqui podes duplicar para simplificar):
+
+type OdooPartner = {
+  id: number;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  mobile?: string | null;
+  vat?: string | null;
+  city?: string | null;
+  country?: string | null;
+  street?: string | null;
+};
+
+
+Adiciona useState / useEffect (ou o hook de data fetching que este projeto já usar – ex.: React Query) para gerir:
+
+partnerLoading: boolean
+
+partnerError: string | null
+
+partner: OdooPartner | null
+
+notConfigured: boolean (flag para quando o Odoo não está configurado)
+
+Ao clicar no botão “Ver detalhes do parceiro”:
+
+Se entidade.odooPartnerId não for válido, não faz nada (só retorna).
+
+Converte o odooPartnerId em número (Number(odooPartnerId)) antes de chamar a API.
+
+Faz GET /api/integrations/odoo/partner/:id:
+
+Sucesso (HTTP 200 + { partner }): guarda o partner em state e limpa partnerError.
+
+Caso { notConfigured: true }: mete notConfigured = true e partner = null.
+
+404 ({ error: "Partner not found" }): define partner = null e põe partnerError = "Parceiro não encontrado no Odoo.".
+
+Erro genérico (error, message): define partnerError com uma mensagem simples ("Erro ao carregar parceiro do Odoo.").
+
+Usa o mecanismo de fetch que já esteja a ser usado no projeto (ex.: fetch simples, axios ou React Query). Não introduzas uma nova lib.
+
+4) Renderização dos detalhes do parceiro
+
+Ainda no card “Odoo”:
+
+Se partnerLoading estiver true, mostra um pequeno indicador de loading (texto simples ou skeleton, conforme o padrão existente).
+
+Se notConfigured for true, mostra uma mensagem curta, por exemplo:
+“Integração Odoo ainda não está configurada para esta empresa.”
+
+Se partnerError não for null, mostra essa mensagem em estilo de aviso/erro discreto.
+
+Se partner existir, mostra um pequeno bloco com os campos principais:
+
+Nome
+
+Email
+
+Telefone / Telemóvel
+
+NIF (vat)
+
+Cidade + País
+
+Rua
+Usa o mesmo estilo de texto/tabulação que já exista para mostrar detalhes de entidade/contacto (sem inventar componentes novos pesados).
+
+5) Comandos a correr e o que testar
+
+Corre:
+
+npm run dev
+
+
+Abre o front:
+
+Vai ao backoffice → lista de Entidades → abre o detalhe de uma Entidade.
+
+Testes manuais básicos (mesmo que alguns dependam de dados reais):
+
+Com odooPartnerId null (ou sem este campo): o card “Odoo” aparece com a mensagem “não ligado” e sem botão de detalhes funcional.
+
+Com odooPartnerId preenchido (podes forçar um valor temporário no mock/seed ou no próprio objeto entidade para testar):
+
+Vês a indicação “Ligado ao parceiro Odoo #ID”.
+
+Ao clicar em “Ver detalhes do parceiro”, a app chama o endpoint correto (ver no DevTools → Network).
+
+Se a resposta contiver { partner: { ... } }, o bloco de detalhes é mostrado sem erros.
+
+Garante que a página continua a compilar normalmente e que não introduziste warnings/erros de TypeScript.
+
+Não implementes ainda:
+
+UI de pesquisa de parceiros Odoo;
+
+Botões para ligar/desligar do Odoo;
+
+Sincronização de dados locais com os campos do parceiro.
+Isso ficará para próximos passos.

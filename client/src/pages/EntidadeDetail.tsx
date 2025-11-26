@@ -23,6 +23,18 @@ import { apiRequest } from "@/lib/queryClient";
 import type { EntidadeWithRelations, Lembrete } from "@shared/schema";
 import { useState } from "react";
 
+type OdooPartner = {
+  id: number;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  mobile?: string | null;
+  vat?: string | null;
+  city?: string | null;
+  country?: string | null;
+  street?: string | null;
+};
+
 export default function EntidadeDetail() {
   const [, params] = useRoute("/entidades/:id");
   const [, setLocation] = useLocation();
@@ -32,6 +44,10 @@ export default function EntidadeDetail() {
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [pdfProDialogOpen, setPdfProDialogOpen] = useState(false);
+  const [odooPartner, setOdooPartner] = useState<OdooPartner | null>(null);
+  const [odooPartnerLoading, setOdooPartnerLoading] = useState(false);
+  const [odooPartnerError, setOdooPartnerError] = useState<string | null>(null);
+  const [odooNotConfigured, setOdooNotConfigured] = useState(false);
   const [pdfProOptions, setPdfProOptions] = useState({
     includePhotos: true,
     includeTasks: true,
@@ -329,6 +345,55 @@ export default function EntidadeDetail() {
       return;
     }
     window.open(url, '_blank');
+  };
+
+  const handleFetchOdooPartner = async () => {
+    if (!entidade?.odooPartnerId) {
+      return;
+    }
+
+    const partnerId = Number(entidade.odooPartnerId);
+    if (Number.isNaN(partnerId)) {
+      setOdooPartnerError("ID de parceiro inválido");
+      return;
+    }
+
+    setOdooPartnerLoading(true);
+    setOdooPartnerError(null);
+    setOdooNotConfigured(false);
+    setOdooPartner(null);
+
+    try {
+      const response = await fetch(`/api/integrations/odoo/partner/${partnerId}`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          setOdooPartnerError("Parceiro não encontrado no Odoo");
+          return;
+        }
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.notConfigured) {
+        setOdooNotConfigured(true);
+        setOdooPartner(null);
+        return;
+      }
+
+      if (data.partner) {
+        setOdooPartner(data.partner);
+      }
+    } catch (error: any) {
+      console.error("[Odoo] Error fetching partner:", error);
+      setOdooPartnerError("Erro ao carregar parceiro do Odoo");
+    } finally {
+      setOdooPartnerLoading(false);
+    }
   };
 
   return (
@@ -734,6 +799,134 @@ export default function EntidadeDetail() {
             </CardContent>
           </Card>
         )}
+
+        {/* Odoo Integration */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Store className="h-5 w-5" />
+              Odoo
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!entidade.odooPartnerId ? (
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  Esta entidade ainda não está ligada a nenhum parceiro Odoo.
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  A ligação manual será configurada numa próxima etapa.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">Ligado ao parceiro Odoo </span>
+                    <span className="font-medium" data-testid="text-odoo-partner-id">
+                      #{entidade.odooPartnerId}
+                    </span>
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleFetchOdooPartner}
+                    disabled={odooPartnerLoading}
+                    data-testid="button-odoo-fetch-partner"
+                  >
+                    {odooPartnerLoading ? (
+                      <div className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                    ) : null}
+                    Ver detalhes do parceiro
+                  </Button>
+                </div>
+
+                {odooPartnerLoading && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <div className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    A carregar...
+                  </div>
+                )}
+
+                {odooNotConfigured && (
+                  <Alert data-testid="alert-odoo-not-configured">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Integração não configurada</AlertTitle>
+                    <AlertDescription>
+                      Integração Odoo ainda não está configurada para esta empresa.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {odooPartnerError && (
+                  <Alert variant="destructive" data-testid="alert-odoo-error">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Erro</AlertTitle>
+                    <AlertDescription>{odooPartnerError}</AlertDescription>
+                  </Alert>
+                )}
+
+                {odooPartner && (
+                  <div className="space-y-3 pt-2 border-t">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Nome</p>
+                      <p className="font-medium" data-testid="text-odoo-partner-name">
+                        {odooPartner.name}
+                      </p>
+                    </div>
+
+                    {odooPartner.email && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Email</p>
+                        <p className="text-sm" data-testid="text-odoo-partner-email">
+                          {odooPartner.email}
+                        </p>
+                      </div>
+                    )}
+
+                    {(odooPartner.phone || odooPartner.mobile) && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Telefone</p>
+                        <p className="text-sm" data-testid="text-odoo-partner-phone">
+                          {odooPartner.phone || odooPartner.mobile}
+                        </p>
+                      </div>
+                    )}
+
+                    {odooPartner.vat && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">NIF</p>
+                        <p className="text-sm" data-testid="text-odoo-partner-vat">
+                          {odooPartner.vat}
+                        </p>
+                      </div>
+                    )}
+
+                    {(odooPartner.city || odooPartner.country) && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Localização</p>
+                        <p className="text-sm" data-testid="text-odoo-partner-location">
+                          {[odooPartner.city, odooPartner.country]
+                            .filter(Boolean)
+                            .join(", ")}
+                        </p>
+                      </div>
+                    )}
+
+                    {odooPartner.street && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Rua</p>
+                        <p className="text-sm" data-testid="text-odoo-partner-street">
+                          {odooPartner.street}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Geolocation */}
         {gpsLocation && (
