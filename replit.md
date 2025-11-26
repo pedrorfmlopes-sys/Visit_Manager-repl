@@ -4,7 +4,10 @@
 This Progressive Web Application (PWA) is designed to streamline commercial visit management for field sales professionals. It enables tracking of entities, contacts, and visits, offering AI-powered summaries, audio transcription, automated notifications, geolocation, calendar integration, PDF export, and advanced analytics. The primary goal is to enhance data quality and provide actionable insights to sales teams. It is a full-stack TypeScript solution featuring a React frontend, Express backend, and PostgreSQL with Drizzle ORM, built with a mobile-first, multi-tenant architecture, user data isolation, and Role-Based Access Control (RBAC).
 
 ## User Preferences
-Preferred communication style: Simple, everyday language.
+- Preferred communication style: Simple, everyday language.
+- **MANDATORY: Create a detailed report (Resumo_*.md) after EVERY prompt/step until user says otherwise.**
+- Follow prompts EXACTLY without adding extra features or "inventions"
+- Always use test IDs and comprehensive documentation
 
 ## System Architecture
 
