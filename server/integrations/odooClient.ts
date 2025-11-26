@@ -114,31 +114,56 @@ async function callOdooJsonRpc<T>(
   conn: OdooConnection,
   payload: any
 ): Promise<T> {
-  const response = await fetch(`${conn.baseUrl}/jsonrpc`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: Date.now(),
-      ...payload,
-    }),
-  });
+  try {
+    const response = await fetch(`${conn.baseUrl}/jsonrpc`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: Date.now(),
+        ...payload,
+      }),
+    });
 
-  if (!response.ok) {
-    throw new Error(`[Odoo] HTTP error ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const json = await response.json();
+
+    if (json.error) {
+      // LOGAR ERRO COMPLETO
+      console.error("[Odoo] JSON-RPC error payload:", json.error);
+
+      const name = json.error?.data?.name ?? json.error?.name ?? "OdooError";
+      const message =
+        json.error?.data?.message ??
+        json.error?.message ??
+        "Odoo Server Error";
+
+      // Incluir um excerto de debug (sem ser gigante)
+      const debugShort =
+        typeof json.error?.data?.debug === "string"
+          ? json.error.data.debug.slice(0, 500)
+          : undefined;
+
+      const fullMessage = debugShort
+        ? `${name}: ${message} | DEBUG: ${debugShort}`
+        : `${name}: ${message}`;
+
+      throw new Error(fullMessage);
+    }
+
+    return json.result as T;
+  } catch (error: any) {
+    console.error("[Odoo] callOdooJsonRpc error:", {
+      message: error?.message,
+      stack: error?.stack,
+    });
+    throw error;
   }
-
-  const data = await response.json();
-
-  if (data.error) {
-    throw new Error(
-      `[Odoo] RPC error: ${data.error.message ?? "Unknown error"}`
-    );
-  }
-
-  return data.result as T;
 }
 
 /**

@@ -1,0 +1,93 @@
+Objetivo:
+Fazer o callOdooJsonRpc mostrar o erro completo devolvido pelo Odoo, em vez de só "Odoo error: Odoo Server Error", para conseguir perceber a causa real.
+
+1) Editar callOdooJsonRpc no cliente Odoo
+
+Ficheiro a editar:
+server/integrations/odooClient.ts
+
+Localiza a função callOdooJsonRpc (ou nome muito semelhante), que faz o POST para o Odoo e no catch lança um new Error("Odoo error: ...").
+
+Dentro do try/catch, ajusta o tratamento de erro para algo equivalente a isto:
+
+export async function callOdooJsonRpc<T>(
+  conn: OdooConnection,
+  body: any
+): Promise<T> {
+  try {
+    const response = await fetch(conn.url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: Date.now(),
+        ...body,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const json = await response.json();
+
+    if (json.error) {
+      // LOGAR ERRO COMPLETO
+      console.error("[Odoo] JSON-RPC error payload:", json.error);
+
+      const name = json.error?.data?.name ?? json.error?.name ?? "OdooError";
+      const message =
+        json.error?.data?.message ??
+        json.error?.message ??
+        "Odoo Server Error";
+
+      // Incluir um excerto de debug (sem ser gigante)
+      const debugShort =
+        typeof json.error?.data?.debug === "string"
+          ? json.error.data.debug.slice(0, 500)
+          : undefined;
+
+      const fullMessage = debugShort
+        ? `${name}: ${message} | DEBUG: ${debugShort}`
+        : `${name}: ${message}`;
+
+      throw new Error(fullMessage);
+    }
+
+    return json.result as T;
+  } catch (error: any) {
+    console.error("[Odoo] callOdooJsonRpc error:", {
+      message: error?.message,
+      stack: error?.stack,
+    });
+    throw error;
+  }
+}
+
+
+Importante:
+– Mantém a estrutura base da função (URL, headers, etc.) que já existe.
+– O essencial é: quando json.error existe, fazer console.error com json.error e lançar um Error com name + message + um excerto de debug.
+
+2) Correr e testar o /status outra vez
+
+Na shell:
+
+npm run dev
+
+
+No browser:
+
+Vai ao backoffice → APIs & Keys → Odoo
+
+Clica em “Tentar novamente”.
+
+Ver:
+
+DevTools → Network → request status → Response → campo message (agora deve vir algo bem maior, tipo odoo.exceptions.AccessError: ... ou parecido).
+
+Console do servidor → logs [Odoo] JSON-RPC error payload: e [Odoo] callOdooJsonRpc error: ...
+
+Copia a string completa de message que vem agora na resposta do /status (mesmo que seja grande) e diz-ma.
