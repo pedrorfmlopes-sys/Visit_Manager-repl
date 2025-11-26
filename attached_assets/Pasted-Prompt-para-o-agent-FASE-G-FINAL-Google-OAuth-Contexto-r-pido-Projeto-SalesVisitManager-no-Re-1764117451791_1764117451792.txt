@@ -1,0 +1,118 @@
+Prompt para o agent – FASE G-FINAL (Google OAuth)
+
+Contexto rápido
+
+Projeto: SalesVisitManager no Replit.
+
+Já existem:
+
+shared/schema.ts com a tabela googleConnections / google_connections.
+
+server/storage/googleConnections.ts com getGoogleConnectionByUserId e upsertGoogleConnection.
+
+server/routes/integrations/google.ts com os endpoints /login, /callback e /status.
+
+Variáveis de ambiente no Replit: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI já estão definidas.
+
+O fluxo de login abre a janela do Google, mas depois de tudo o /api/integrations/google/status continua a devolver { connected: false }.
+
+Objetivo
+Finalizar a integração Google de forma robusta, garantindo que:
+
+Depois de um login Google bem-sucedido, é criada/atualizada uma linha em google_connections para o userId autenticado.
+
+O endpoint GET /api/integrations/google/status devolve:
+
+{ connected: false } se não existir ligação;
+
+{ connected: true, email, name, googleUserId, picture } se existir.
+
+O card de Google na página /admin/empresa (tab “APIs & Keys” / integrações) mostra corretamente:
+
+“Desligado” quando connected: false;
+
+“Ligado como <email>” quando connected: true`.
+
+Tarefas detalhadas
+
+Rever schema e storage
+
+Confirmar que a tabela google_connections em shared/schema.ts tem os campos esperados:
+id, userId, googleUserId, email, name, picture, accessToken, refreshToken, expiresAt, createdAt, updatedAt.
+
+Confirmar que googleConnectionsStorage.getGoogleConnectionByUserId(userId) faz SELECT pelo campo userId correto.
+
+Confirmar que upsertGoogleConnection faz INSERT/UPDATE nessa mesma tabela e nunca cria ligações duplicadas para o mesmo userId.
+
+Se encontares divergências entre schema e storage, corrige e executa npm run db:push.
+
+Garantir que o callback guarda a ligação
+
+Em server/routes/integrations/google.ts, na rota /callback:
+
+Garante que, depois de obter accessToken, refreshToken, expiresIn e o userinfo (sub, email, name, picture), é chamado:
+const { userId } = await getUserContext(req);
+e depois googleConnectionsStorage.upsertGoogleConnection({ userId, googleUserId, email, name, picture, accessToken, refreshToken, expiresAt }).
+
+Verifica se getUserContext(req) funciona neste endpoint (se for preciso, reaproveita a mesma estratégia usada na integração Microsoft para ligar o callback à sessão do utilizador).
+
+Garante que, em caso de sucesso, faz res.clearCookie("google_oauth_state") e redireciona para /admin/empresa?tab=apis-keys&google=connected.
+
+Corrigir o endpoint /status se necessário
+
+Em GET /api/integrations/google/status:
+
+Usa isAuthenticated + getUserContext(req) para obter userId.
+
+Usa googleConnectionsStorage.getGoogleConnectionByUserId(userId).
+
+Se não houver registo: return res.json({ connected: false });
+
+Se houver: res.json({ connected: true, email, name, googleUserId, picture });
+
+Remove logs de erro genéricos que já não sejam necessários e mantém só mensagens úteis.
+
+Ligar corretamente à UI
+
+Em client/src/pages/AdminEmpresa.tsx (ou no componente onde está o card de Google / tab “APIs & Keys”):
+
+Garante que há um estado googleStatus semelhante ao da Microsoft:
+
+const [googleStatus, setGoogleStatus] = useState<{ connected: boolean; email?: string; name?: string } | null>(null);
+
+
+No useEffect de carregamento da página, faz fetch("/api/integrations/google/status") e atualiza googleStatus.
+
+No botão “Ligar Google” chama window.location.href = "/api/integrations/google/login";.
+
+No card, mostra:
+
+Se googleStatus?.connected === true: badge “Ligado” e email.
+
+Se não: badge “Desligado” e botão para ligar.
+
+Teste manual
+
+Com o servidor a correr:
+
+Fazer login normal na app.
+
+Ir a /admin/empresa → tab integrações/“APIs & Keys”.
+
+Clicar “Ligar Google”.
+
+Completar o login Google.
+
+Confirmar no log do servidor que o callback correu sem erros.
+
+Confirmar que:
+
+A tabela google_connections tem um registo para o userId atual.
+
+GET /api/integrations/google/status devolve connected: true.
+
+A UI mostra “Google ligado” com o email correto.
+
+Se encontrar algum erro intermédio, corrigir e repetir até o fluxo ficar estável.
+
+Importante: Não mexer noutros módulos (visitas, tarefas, IA, etc.). Focar apenas em fechar esta integração Google de forma limpa e estável.

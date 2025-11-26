@@ -19,6 +19,7 @@ import AdminEntidadeTipos from "@/pages/AdminEntidadeTipos";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminMarcas from "@/pages/AdminMarcas";
 import { MicrosoftIntegrationCard } from "@/components/integrations/MicrosoftIntegrationCard";
+import { GoogleIntegrationCard } from "@/components/integrations/GoogleIntegrationCard";
 
 const updateEmpresaSchema = z.object({
   nome: z.string().min(1, "Nome obrigatório"),
@@ -1220,25 +1221,8 @@ export default function AdminEmpresa() {
           {/* Microsoft 365 - Active Integration */}
           <MicrosoftIntegrationCard />
 
-          {/* Google Workspace */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <PlugZap className="w-5 h-5 text-orange-600" />
-                Google Workspace
-              </CardTitle>
-              <CardDescription>Calendar, Contacts, Drive</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Suporte planeado para Google Calendar, Contactos e Drive, com sincronização automática de dados de empresa.
-              </p>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium">Estado</span>
-                <Badge variant="secondary">Planeado</Badge>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Google Workspace - Active Integration */}
+          <GoogleIntegrationCard />
 
           {/* Email & Notifications */}
           <Card>
