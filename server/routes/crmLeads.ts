@@ -2,15 +2,15 @@ import express from "express";
 import { and, eq } from "drizzle-orm";
 import { db } from "../storage";
 import { leads, insertLeadSchema } from "../../shared/schema";
-import { requireAuth } from "../auth/requireAuth";
-import { getUserContext } from "../auth/getUserContext";
+import { isAuthenticated } from "../replitAuth";
+import { getUserContext } from "../authContext";
 import { assertLeadsEnabled } from "../integrations/crmLeads";
 
 export function registerCrmLeadsRoutes(app: express.Express) {
   const router = express.Router();
 
   // GET /api/crm/leads - List all leads for empresa
-  router.get("/", requireAuth, async (req, res) => {
+  router.get("/", isAuthenticated, async (req, res) => {
     try {
       const { empresaId } = await getUserContext(req);
       await assertLeadsEnabled(empresaId);
@@ -36,7 +36,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
   });
 
   // GET /api/crm/leads/:id - Get specific lead
-  router.get("/:id", requireAuth, async (req, res) => {
+  router.get("/:id", isAuthenticated, async (req, res) => {
     try {
       const { empresaId } = await getUserContext(req);
       await assertLeadsEnabled(empresaId);
@@ -67,7 +67,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
   });
 
   // POST /api/crm/leads - Create new lead
-  router.post("/", requireAuth, async (req, res) => {
+  router.post("/", isAuthenticated, async (req, res) => {
     try {
       const { empresaId } = await getUserContext(req);
       await assertLeadsEnabled(empresaId);
@@ -148,7 +148,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
   });
 
   // PATCH /api/crm/leads/:id - Update lead
-  router.patch("/:id", requireAuth, async (req, res) => {
+  router.patch("/:id", isAuthenticated, async (req, res) => {
     try {
       const { empresaId } = await getUserContext(req);
       await assertLeadsEnabled(empresaId);

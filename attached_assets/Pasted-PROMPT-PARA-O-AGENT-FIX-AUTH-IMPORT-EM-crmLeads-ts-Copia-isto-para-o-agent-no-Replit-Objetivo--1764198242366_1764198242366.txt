@@ -1,0 +1,88 @@
+PROMPT PARA O AGENT – FIX AUTH IMPORT EM crmLeads.ts
+
+Copia isto para o agent no Replit:
+
+Objetivo:
+Corrigir o erro ERR_MODULE_NOT_FOUND em server/routes/crmLeads.ts ajustando o import do middleware de autenticação (requireAuth ou isAuthenticated) para usar o mesmo caminho que já é usado em server/routes.ts.
+
+1) Ver qual é o import correto no projeto
+
+Abre o ficheiro:
+
+server/routes.ts
+
+
+Procura a linha onde é importado o middleware de autenticação, por exemplo:
+
+import { requireAuth } from "./auth/requireAuth";
+// ou
+import { requireAuth } from "../replitAuth";
+// ou
+import { isAuthenticated } from "../replitAuth";
+
+
+Nota: o que interessa é o caminho e o nome realmente usado.
+Se a app usa requireAuth, usamos requireAuth; se usa isAuthenticated, usamos isAuthenticated.
+
+2) Ajustar o import em server/routes/crmLeads.ts
+
+Abre:
+
+server/routes/crmLeads.ts
+
+
+Encontra o import problemático, algo como:
+
+import { requireAuth } from "../auth/requireAuth";
+
+
+Substitui esse import pelo mesmo que está em server/routes.ts. Exemplos (escolher o que for real no projeto):
+
+Se em server/routes.ts for:
+
+import { requireAuth } from "./auth/requireAuth";
+
+
+então em crmLeads.ts deve ficar:
+
+import { requireAuth } from "../auth/requireAuth";
+
+
+(ou o caminho relativo equivalente, mas com o mesmo ficheiro/nome)
+
+Se em server/routes.ts for:
+
+import { requireAuth } from "../replitAuth";
+
+
+então em crmLeads.ts deve ficar:
+
+import { requireAuth } from "../replitAuth";
+
+
+Se o projeto não tem requireAuth e usa só isAuthenticated, então:
+
+importa isAuthenticated:
+
+import { isAuthenticated } from "../replitAuth";
+
+
+e troca nos handlers:
+
+router.get("/", isAuthenticated, async (req, res) => { ... });
+router.post("/", isAuthenticated, async (req, res) => { ... });
+// etc.
+
+
+Regra: o middleware e o caminho usados em crmLeads.ts têm de ser exatamente os mesmos que já estão a ser usados nas outras rotas protegidas (/api/entidades, /api/visitas, etc.).
+
+3) Voltar a arrancar o servidor
+
+Na shell:
+
+npm run dev
+
+
+Se ainda der erro, corrige o próximo erro de topo (por exemplo outro import mal referenciado).
+
+Não faças refactors grandes; só arranja imports/caminhos até npm run dev arrancar limpo.

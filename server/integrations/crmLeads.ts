@@ -1,4 +1,4 @@
-import { db } from "@shared/db";
+import { db } from "../db";
 import { empresas } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
