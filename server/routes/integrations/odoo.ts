@@ -11,29 +11,32 @@ export function setupOdooRoutes(app: any): void {
   const router = express.Router();
 
   // GET /api/integrations/odoo/status
-  // Testa a ligação com Odoo e devolve o status
+  // Testa a ligação com Odoo de forma simples e robusta
   router.get("/status", isAuthenticated, async (req: any, res) => {
     try {
       const { empresaId } = await getUserContext(req);
+
       if (!empresaId) {
         return res.status(400).json({
           connected: false,
-          reason: "no_company",
-          message: "User has no company assigned",
+          error: "Empresa não encontrada no contexto do utilizador",
         });
       }
 
+      // Testa a ligação com Odoo - se falhar, lança erro
       const result = await testOdooConnection(empresaId);
 
+      // Se chegámos aqui, a ligação está funcional.
       return res.json({
         connected: true,
-        ...result,
+        userId: result.userId,
       });
     } catch (error: any) {
-      if (error.message === "ODOO_NOT_CONFIGURED") {
-        return res.json({
+      // Caso em que a integração ainda não está configurada para esta empresa
+      if (error?.message === "ODOO_NOT_CONFIGURED") {
+        return res.status(200).json({
           connected: false,
-          reason: "not_configured",
+          notConfigured: true,
         });
       }
 
@@ -41,7 +44,7 @@ export function setupOdooRoutes(app: any): void {
         message: error?.message,
         stack: error?.stack,
       });
-      
+
       return res.status(500).json({
         connected: false,
         error: "Odoo status error",

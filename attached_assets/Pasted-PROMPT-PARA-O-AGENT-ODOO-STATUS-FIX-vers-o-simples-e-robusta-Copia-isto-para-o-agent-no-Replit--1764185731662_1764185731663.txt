@@ -1,0 +1,113 @@
+PROMPT PARA O AGENT – ODOO-STATUS-FIX (versão simples e robusta)
+
+Copia isto para o agent no Replit:
+
+Objetivo:
+Corrigir o GET /api/integrations/odoo/status para testar a ligação ao Odoo de forma simples e fiável, usando o helper callOdooJsonRpc e uma operação leve em res.partner.
+
+1) Atualizar rota /status das integrações Odoo
+
+Ficheiro a editar:
+
+server/routes/integrations/odoo.ts
+
+Tarefas:
+
+Garante que tens estes imports no topo do ficheiro (ajusta caminhos se necessário, mas são os mesmos que já usamos nas outras rotas Odoo):
+
+import { getOdooConnectionForEmpresa, callOdooJsonRpc } from "../../integrations/odooClient";
+import { getUserContext } from "../../auth/getUserContext"; // ou o helper equivalente já usado neste ficheiro
+
+
+Substitui TODO o conteúdo da rota GET /status por esta implementação:
+
+odooIntegrationsRouter.get(
+  "/status",
+  isAuthenticated, // usa o mesmo middleware que nas outras rotas Odoo
+  async (req, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+
+      if (!empresaId) {
+        return res.status(400).json({
+          connected: false,
+          error: "Empresa não encontrada no contexto do utilizador",
+        });
+      }
+
+      // Vai buscar a configuração Odoo para esta empresa.
+      const conn = await getOdooConnectionForEmpresa(empresaId);
+
+      // Faz uma chamada simples a res.partner.search com limite 1.
+      // Se as credenciais estiverem erradas, o Odoo devolve erro e o callOdooJsonRpc lança exceção.
+      await callOdooJsonRpc<any>(conn, {
+        method: "call",
+        params: {
+          service: "object",
+          method: "execute_kw",
+          args: [
+            conn.dbName,
+            conn.username,
+            conn.apiKey,
+            "res.partner",
+            "search",
+            [[]],
+            { limit: 1 },
+          ],
+        },
+      });
+
+      // Se chegámos aqui, a ligação está funcional.
+      return res.json({
+        connected: true,
+      });
+    } catch (error: any) {
+      // Caso em que a integração ainda não está configurada para esta empresa
+      if (error?.message === "ODOO_NOT_CONFIGURED") {
+        return res.status(200).json({
+          connected: false,
+          notConfigured: true,
+        });
+      }
+
+      console.error("[Odoo] /status error:", {
+        message: error?.message,
+        stack: error?.stack,
+      });
+
+      return res.status(500).json({
+        connected: false,
+        error: "Odoo status error",
+        message: error?.message ?? "Unknown error",
+      });
+    }
+  }
+);
+
+
+Importante: substitui apenas a rota /status; não mexas nas outras rotas Odoo.
+
+2) Correr e testar
+
+Na shell do Replit:
+
+npm run dev
+
+
+No browser:
+
+Vai ao backoffice → APIs & Keys → Odoo.
+
+Clica em “Tentar novamente”.
+
+Verifica:
+
+Se as credenciais estiverem bem: o cartão deve passar a indicar que a integração está Ligada / sem erro.
+
+Se ainda houver erro:
+
+No DevTools → Network → request status → separador Response:
+
+Vê o campo message e diz-me o que aparece.
+
+Isso vai ser já a mensagem vinda diretamente do Odoo (ex.: “Access denied” ou “Database not found”).
