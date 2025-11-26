@@ -1,0 +1,221 @@
+PROMPT PARA O AGENT – Odoo / STEP seguinte: GET /partner/:id
+
+Objetivo:
+Criar uma função no cliente Odoo para buscar um parceiro específico por ID e expor isso numa rota
+GET /api/integrations/odoo/partner/:id.
+
+Já existem:
+
+callOdooJsonRpc
+
+searchOdooPartners
+
+getOdooConnectionForEmpresa
+Usa o mesmo padrão.
+
+1) Atualizar server/integrations/odooClient.ts
+
+Ficheiro a editar:
+
+server/integrations/odooClient.ts
+
+Tarefas:
+
+Confirmar que o tipo OdooPartner já existe (não criar novo):
+
+export type OdooPartner = {
+  id: number;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  mobile?: string | null;
+  vat?: string | null;
+  city?: string | null;
+  country?: string | null;
+  street?: string | null;
+};
+
+
+Adicionar função exportada para buscar um parceiro por ID:
+
+export async function getOdooPartnerById(
+  empresaId: string,
+  partnerId: number
+): Promise<OdooPartner | null> {
+  const conn = await getOdooConnectionForEmpresa(empresaId);
+
+  const result = await callOdooJsonRpc<any[]>(conn, {
+    method: "call",
+    params: {
+      service: "object",
+      method: "execute_kw",
+      args: [
+        conn.dbName,
+        conn.username,
+        conn.apiKey,
+        "res.partner",
+        "search_read",
+        [[["id", "=", partnerId]]],
+        {
+          fields: [
+            "name",
+            "email",
+            "phone",
+            "mobile",
+            "vat",
+            "city",
+            "country_id",
+            "street",
+          ],
+          limit: 1,
+        },
+      ],
+    },
+  });
+
+  if (!result || result.length === 0) {
+    return null;
+  }
+
+  const p = result[0];
+
+  return {
+    id: p.id,
+    name: p.name,
+    email: p.email ?? null,
+    phone: p.phone ?? null,
+    mobile: p.mobile ?? null,
+    vat: p.vat ?? null,
+    city: p.city ?? null,
+    country: p.country_id?.[1] ?? null,
+    street: p.street ?? null,
+  };
+}
+
+
+Se algum nome de campo na OdooConnection estiver diferente (dbName, username, apiKey), ajustar para o que já existe no ficheiro.
+
+2) Atualizar server/routes/integrations/odoo.ts
+
+Ficheiro a editar:
+
+server/routes/integrations/odoo.ts
+
+Tarefas:
+
+Adicionar o import da nova função:
+
+import { getOdooPartnerById } from "../../integrations/odooClient";
+
+
+Criar rota GET /partner/:id no router Odoo já existente (o mesmo usado para /status e /search-partner):
+
+odooIntegrationsRouter.get(
+  "/partner/:id",
+  isAuthenticated, // usar o mesmo middleware já usado nas outras rotas Odoo
+  async (req, res) => {
+    try {
+      const rawId = req.params.id;
+      const partnerId = Number(rawId);
+
+      if (!rawId || Number.isNaN(partnerId)) {
+        return res.status(400).json({ error: "Invalid partner id" });
+      }
+
+      const { empresaId } = getUserContext(req); // usar helper já existente
+
+      const partner = await getOdooPartnerById(empresaId, partnerId);
+
+      if (!partner) {
+        return res.status(404).json({ error: "Partner not found" });
+      }
+
+      return res.json({ partner });
+    } catch (error: any) {
+      if (error?.message === "ODOO_NOT_CONFIGURED") {
+        return res.status(200).json({
+          notConfigured: true,
+          partner: null,
+        });
+      }
+
+      console.error("[Odoo] get partner error:", error);
+      return res.status(500).json({
+        error: "Odoo partner fetch error",
+        message: error?.message ?? "Unknown error",
+      });
+    }
+  }
+);
+
+
+Usa o mesmo padrão de getUserContext(req) e tratamento de ODOO_NOT_CONFIGURED que já está implementado nas outras rotas Odoo.
+
+3) Comando a correr
+
+Na shell:
+
+npm run dev
+
+
+Verificar que o servidor compila sem erros de TypeScript/imports.
+
+4) O que testar no fim
+
+Com a app a correr e Odoo configurado:
+
+Parceiro existente (ID válido):
+
+curl "http://localhost:5000/api/integrations/odoo/partner/123"
+
+
+Esperado:
+
+{
+  "partner": {
+    "id": 123,
+    "name": "Cliente Teste",
+    "email": "cliente@teste.com",
+    "phone": "915000000",
+    "mobile": null,
+    "vat": "PT123456789",
+    "city": "Lisboa",
+    "country": "Portugal",
+    "street": "Rua Exemplo 123"
+  }
+}
+
+
+Parceiro inexistente:
+
+curl "http://localhost:5000/api/integrations/odoo/partner/99999999"
+
+
+Esperado:
+
+{
+  "error": "Partner not found"
+}
+
+
+(HTTP 404)
+
+Odoo não configurado:
+
+{
+  "notConfigured": true,
+  "partner": null
+}
+
+
+ID inválido (ex.: string):
+
+curl "http://localhost:5000/api/integrations/odoo/partner/abc"
+
+
+Esperado:
+
+{ "error": "Invalid partner id" }
+
+
+(HTTP 400)

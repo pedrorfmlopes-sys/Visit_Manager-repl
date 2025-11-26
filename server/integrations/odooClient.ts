@@ -189,3 +189,60 @@ export async function searchOdooPartners(
     street: p.street ?? null,
   }));
 }
+
+/**
+ * Busca um parceiro específico por ID no Odoo
+ */
+export async function getOdooPartnerById(
+  empresaId: string,
+  partnerId: number
+): Promise<OdooPartner | null> {
+  const conn = await getOdooConnectionForEmpresa(empresaId);
+
+  const result = await callOdooJsonRpc<any[]>(conn, {
+    method: "call",
+    params: {
+      service: "object",
+      method: "execute_kw",
+      args: [
+        conn.dbName,
+        conn.username,
+        conn.apiKey,
+        "res.partner",
+        "search_read",
+        [[["id", "=", partnerId]]],
+        {
+          fields: [
+            "name",
+            "email",
+            "phone",
+            "mobile",
+            "vat",
+            "city",
+            "country_id",
+            "street",
+          ],
+          limit: 1,
+        },
+      ],
+    },
+  });
+
+  if (!result || result.length === 0) {
+    return null;
+  }
+
+  const p = result[0];
+
+  return {
+    id: p.id,
+    name: p.name,
+    email: p.email ?? null,
+    phone: p.phone ?? null,
+    mobile: p.mobile ?? null,
+    vat: p.vat ?? null,
+    city: p.city ?? null,
+    country: p.country_id?.[1] ?? null,
+    street: p.street ?? null,
+  };
+}

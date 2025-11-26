@@ -3,7 +3,7 @@ import { isAuthenticated } from "../../replitAuth";
 import { getUserContext } from "../../authContext";
 import { odooConnectionsStorage } from "../../storage/odooConnections";
 import { insertOdooConnectionSchema } from "@shared/schema";
-import { testOdooConnection, searchOdooPartners } from "../../integrations/odooClient";
+import { testOdooConnection, searchOdooPartners, getOdooPartnerById } from "../../integrations/odooClient";
 import express from "express";
 
 export function setupOdooRoutes(app: any): void {
@@ -106,6 +106,42 @@ export function setupOdooRoutes(app: any): void {
       res.status(500).json({
         error: "Odoo search error",
         message: error.message ?? "Unknown error",
+      });
+    }
+  });
+
+  // GET /api/integrations/odoo/partner/:id
+  // Busca um parceiro específico por ID no Odoo
+  router.get("/partner/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const rawId = req.params.id;
+      const partnerId = Number(rawId);
+
+      if (!rawId || Number.isNaN(partnerId)) {
+        return res.status(400).json({ error: "Invalid partner id" });
+      }
+
+      const { empresaId } = await getUserContext(req);
+
+      const partner = await getOdooPartnerById(empresaId, partnerId);
+
+      if (!partner) {
+        return res.status(404).json({ error: "Partner not found" });
+      }
+
+      return res.json({ partner });
+    } catch (error: any) {
+      if (error?.message === "ODOO_NOT_CONFIGURED") {
+        return res.status(200).json({
+          notConfigured: true,
+          partner: null,
+        });
+      }
+
+      console.error("[Odoo] get partner error:", error);
+      return res.status(500).json({
+        error: "Odoo partner fetch error",
+        message: error?.message ?? "Unknown error",
       });
     }
   });
