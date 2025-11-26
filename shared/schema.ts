@@ -339,6 +339,7 @@ export const entidades = pgTable("entidades", {
   assignedUserId: varchar("assigned_user_id", { length: 255 }),
   // Odoo Integration Fields
   odooEntityId: integer("odoo_entity_id"),
+  odooPartnerId: text("odoo_partner_id"),
   needsSync: boolean("needs_sync").default(false).notNull(),
   syncStatus: syncStatusEnum("sync_status").default('never'),
   lastSyncAt: timestamp("last_sync_at"),
@@ -380,6 +381,7 @@ export const insertEntidadeSchema = createInsertSchema(entidades).omit({
   createdAt: true,
   updatedAt: true,
   odooEntityId: true,
+  odooPartnerId: true,
   needsSync: true,
   syncStatus: true,
   lastSyncAt: true,
@@ -445,6 +447,7 @@ export const contactos = pgTable("contactos", {
   assignedUserId: varchar("assigned_user_id", { length: 255 }),
   // Odoo Integration Fields
   odooContactId: integer("odoo_contact_id"),
+  odooPartnerId: text("odoo_partner_id"),
   needsSync: boolean("needs_sync").default(false).notNull(),
   syncStatus: syncStatusEnum("sync_status").default('never'),
   lastSyncAt: timestamp("last_sync_at"),
@@ -500,6 +503,7 @@ export const insertContactoSchema = createInsertSchema(contactos).omit({
   updatedAt: true,
   gabineteId: true, // DEPRECATED - use entidadeId
   odooContactId: true,
+  odooPartnerId: true,
   needsSync: true,
   syncStatus: true,
   lastSyncAt: true,

@@ -1,0 +1,93 @@
+PROMPT PARA O AGENT – ODOO-02A / STEP 1
+
+Objetivo: adicionar campos de ligação ao Odoo nas tabelas de Entidades e Contactos (odooPartnerId), sincronizar a BD e expor o campo na API.
+⚠️ Importante: não implementar ainda rotas novas de Odoo, nem chamadas à API do Odoo. Só estrutura de dados.
+
+1) Atualizar schema Drizzle (Entidades e Contactos)
+
+Ficheiro principal a editar:
+
+shared/schema.ts (ou equivalente onde estão definidas as tabelas entidades e contactos).
+
+Tarefas:
+
+Na definição da tabela entidades:
+
+Adicionar uma coluna opcional odooPartnerId:
+
+Tipo texto, nullable.
+
+Nome da coluna na BD: "odoo_partner_id".
+
+Exemplo de intenção (ajustar ao estilo já usado no ficheiro):
+
+odooPartnerId: text("odoo_partner_id"),
+
+
+e garantir que é tratada como opcional no tipo (string | null).
+
+Na definição da tabela contactos:
+
+Adicionar coluna equivalente odooPartnerId:
+
+Tipo texto, nullable.
+
+Nome da coluna na BD: "odoo_partner_id".
+
+Mesma lógica de tipagem: string | null.
+
+Garante que os tipos TypeScript expostos para Entidade e Contacto (se houver tipos derivados da tabela ou de InferModel) incluem agora odooPartnerId?: string | null.
+
+Se o projeto já tiver outros campos de integrações externas (ex.: ids de Google/Microsoft), seguir o mesmo padrão de naming e tipagem.
+
+2) Sincronizar BD
+
+Na shell do Replit, correr:
+
+npm run db:push
+
+
+Confirmar que o comando termina sem erros e que as colunas odoo_partner_id foram criadas para as tabelas correspondentes.
+
+3) Garantir que a API devolve o novo campo
+
+Procurar o código de storage e rotas de Entidades, por exemplo:
+
+server/storage/entidadesStorage.ts (ou nome equivalente)
+
+server/routes/entidades.ts (ou onde são definidas as rotas /api/entidades)
+
+Tarefas:
+
+Garantir que qualquer SELECT / db.select() / return de Entidade inclui o campo odooPartnerId (ao usar o objeto entidades completo isto já deve acontecer automaticamente, mas confirma).
+
+Se houver mapeamentos manuais ({ id: row.id, nome: row.nome, ... }), acrescentar odooPartnerId: row.odooPartnerId.
+
+Repetir o mesmo para Contactos:
+
+Procurar storage/rotas, ex.: server/storage/contactosStorage.ts, server/routes/contactos.ts ou equivalentes.
+
+Garantir que o campo odooPartnerId é incluído nas respostas JSON de Contactos.
+
+4) Testes rápidos
+
+Correr a app em modo dev:
+
+npm run dev
+
+
+No browser:
+
+Abrir a app e ir às listas/detalhes de Entidades e Contactos.
+
+Criar ou editar 1 Entidade e 1 Contacto (não é preciso preencher nada de Odoo ainda).
+
+No DevTools do browser → separador Network:
+
+Intercetar as chamadas às APIs de Entidades e Contactos (listagem ou detalhe).
+
+Confirmar que cada registo devolvido tem agora o campo:
+
+odooPartnerId (com valor null para já).
+
+Não criar nenhuma rota nova de Odoo, nem fazer chamadas HTTP para o Odoo nesta prompt. Só estrutura (schema + API a expor o campo).
