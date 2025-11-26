@@ -1,0 +1,124 @@
+PROMPT PARA O AGENT – DEBUG-ENTIDADES-FIX (alinhamento lista/detalhe)
+
+Objetivo:
+Garantir que qualquer Entidade que aparece na lista é também acessível no detalhe, para evitar o erro “Entidade não encontrada” ao clicar num card.
+
+Hoje:
+
+O detalhe usa storage.getEntidade(id, empresaId, userId, userRole) com RBAC:
+
+admin: filtra por entidades.id + entidades.empresaId
+
+agent: filtra por entidades.id + empresaId e
+createdByUserId = userId ou assignedUserId = userId.
+
+A lista de entidades (storage.listEntidades + rota /api/entidades) pode estar a usar um filtro mais permissivo, mostrando entidades que depois o detalhe não consegue carregar (retorna null).
+
+Vamos alinhar.
+
+1) Rever e alinhar storage.listEntidades
+
+Ficheiro a editar:
+
+server/storage.ts (onde já está definida getEntidade e também a função de listar entidades, algo como listEntidades ou getEntidades).
+
+Tarefas:
+
+Localizar a função que lista entidades para o backoffice, algo deste género:
+
+async listEntidades(
+  empresaId: string,
+  userId: string,
+  userRole: 'admin' | 'agent',
+  filtros?: ...
+): Promise<EntidadeWithRelations[]> {
+  // ...
+}
+
+
+Garante que o where desta função utiliza a MESMA lógica de RBAC que getEntidade:
+
+Para admin:
+
+whereClause = eq(entidades.empresaId, empresaId);
+
+
+Para agent:
+
+whereClause = and(
+  eq(entidades.empresaId, empresaId),
+  or(
+    eq(entidades.createdByUserId, userId),
+    eq(entidades.assignedUserId, userId)
+  )
+);
+
+
+Se atualmente listEntidades estiver com um filtro diferente/muito aberto (por exemplo apenas empresaId ou até sem filtro de utilizador), substitui a condição pelo mesmo padrão acima, reutilizando o mesmo estilo que já existe em getEntidade:
+
+let whereClause;
+if (userRole === 'admin') {
+  whereClause = eq(entidades.empresaId, empresaId);
+} else {
+  whereClause = and(
+    eq(entidades.empresaId, empresaId),
+    or(
+      eq(entidades.createdByUserId, userId),
+      eq(entidades.assignedUserId, userId)
+    )
+  );
+}
+
+const entidadesList = await db.query.entidades.findMany({
+  where: whereClause,
+  // ... (orderBy, limit, with, etc. tal como já existia)
+});
+
+
+Ideia chave: se um agent não tem permissão para ver uma entidade no detalhe, essa entidade também não deve aparecer na lista.
+
+Não alteres getEntidade neste passo – só garantimos que a lista segue a mesma regra.
+
+2) Confirmar rota /api/entidades usa listEntidades com user/empresa certos
+
+Ficheiro a editar:
+
+server/routes.ts (onde está app.get('/api/entidades', ...))
+
+Tarefas:
+
+Verifica se a rota /api/entidades está a chamar storage.listEntidades(...) com:
+
+const { userId, userRole, empresaId } = await getUserContext(req);
+// ...
+const entidades = await storage.listEntidades(empresaId, userId, userRole, ...);
+
+
+Se estiver a passar valores diferentes (por ex. empresa hardcoded, userId em falta ou role ignorado), corrige para usar exatamente userId, userRole e empresaId de getUserContext(req).
+
+3) Comandos e teste
+
+Na shell:
+
+npm run dev
+
+
+No browser:
+
+Vai à lista de Entidades.
+
+Clica em alguns cards (incluindo os que antes davam “Entidade não encontrada”).
+
+Comportamento esperado:
+
+Se uma Entidade aparece na lista → o detalhe abre sem erro.
+
+Se uma Entidade não cumpre as regras de permissão (agent não é creator nem assigned), já não deve aparecer na lista.
+
+Se depois disto continuares a ter algum caso específico a dar “Entidade não encontrada”, tira um exemplo com:
+
+ID da entidade na URL
+
+Logs [Entidades] GET /api/entidades/:id e [storage.getEntidade] DB result para esse ID
+
+e eu preparo o próximo passo de correção em cima disso.
