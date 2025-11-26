@@ -1,0 +1,236 @@
+PROMPT PARA O AGENT – ODOO-02A / STEP 3
+
+Objetivo: criar endpoints simples para ligar/desligar Entidades e Contactos a um parceiro Odoo, atualizando o campo odooPartnerId nas respetivas tabelas.
+
+⚠️ Não chamar ainda o Odoo aqui. Assume-se que o partnerId já vem validado do frontend (via /search-partner). Aqui só guardamos / limpamos o ID.
+
+1) Storage para atualizar odooPartnerId
+
+Ficheiros a editar (ajustar aos nomes reais):
+
+server/storage/entidadesStorage.ts (ou equivalente)
+
+server/storage/contactosStorage.ts (ou equivalente)
+
+Tarefas:
+
+No storage de Entidades, adicionar uma função:
+
+export async function updateEntidadeOdooPartnerId(
+  empresaId: string,
+  entidadeId: string,
+  odooPartnerId: string | null
+) {
+  await db
+    .update(entidades)
+    .set({ odooPartnerId })
+    .where(
+      and(
+        eq(entidades.id, entidadeId),
+        eq(entidades.empresaId, empresaId)
+      )
+    );
+}
+
+
+Usar:
+
+db já existente.
+
+tabela entidades do schema Drizzle.
+
+and, eq dos helpers de Drizzle.
+
+Importante: garantir filtro por empresaId (multi-tenant seguro).
+
+No storage de Contactos, criar função equivalente:
+
+export async function updateContactoOdooPartnerId(
+  empresaId: string,
+  contactoId: string,
+  odooPartnerId: string | null
+) {
+  await db
+    .update(contactos)
+    .set({ odooPartnerId })
+    .where(
+      and(
+        eq(contactos.id, contactoId),
+        eq(contactos.empresaId, empresaId)
+      )
+    );
+}
+
+
+Se o nome das colunas de empresa for diferente (empresa_id ou similar), usar os nomes reais já usados no projeto.
+
+2) Endpoints para link/unlink Odoo em Entidades e Contactos
+
+Ficheiros a editar:
+
+server/routes/entidades.ts (ou equivalente)
+
+server/routes/contactos.ts (ou equivalente)
+
+2.1) Endpoint para Entidades
+
+Em server/routes/entidades.ts:
+
+Importar as funções e helpers necessários:
+
+import { updateEntidadeOdooPartnerId } from "../storage/entidadesStorage";
+import { requireAuth } from "../auth/requireAuth"; // ou middleware equivalente já usado
+import { getUserContext } from "../auth/userContext"; // se for este o padrão atual
+
+
+Criar rota POST ou PATCH (escolher o que está mais alinhado com o projeto) para:
+
+POST /api/entidades/:id/odoo-link
+
+Exemplo:
+
+entidadesRouter.post(
+  "/:id/odoo-link",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { odooPartnerId } = req.body as {
+        odooPartnerId?: number | string | null;
+      };
+
+      if (odooPartnerId === undefined) {
+        return res.status(400).json({ error: "Missing odooPartnerId in body" });
+      }
+
+      const { empresaId } = getUserContext(req);
+
+      // Normalizar para string ou null (BD está como texto)
+      const normalizedId =
+        odooPartnerId === null || odooPartnerId === ""
+          ? null
+          : String(odooPartnerId);
+
+      await updateEntidadeOdooPartnerId(empresaId, id, normalizedId);
+
+      return res.json({
+        success: true,
+        entidadeId: id,
+        odooPartnerId: normalizedId,
+      });
+    } catch (error: any) {
+      console.error("[Entidades] odoo-link error:", error);
+      return res.status(500).json({
+        error: "Failed to update entidade Odoo link",
+        message: error.message ?? "Unknown error",
+      });
+    }
+  }
+);
+
+
+Este endpoint serve tanto para ligar (enviar um ID) como para desligar (enviar null ou "").
+
+2.2) Endpoint para Contactos
+
+Em server/routes/contactos.ts:
+
+Importar:
+
+import { updateContactoOdooPartnerId } from "../storage/contactosStorage";
+import { requireAuth } from "../auth/requireAuth";
+import { getUserContext } from "../auth/userContext";
+
+
+Criar rota semelhante:
+
+POST /api/contactos/:id/odoo-link
+
+Exemplo:
+
+contactosRouter.post(
+  "/:id/odoo-link",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { odooPartnerId } = req.body as {
+        odooPartnerId?: number | string | null;
+      };
+
+      if (odooPartnerId === undefined) {
+        return res.status(400).json({ error: "Missing odooPartnerId in body" });
+      }
+
+      const { empresaId } = getUserContext(req);
+
+      const normalizedId =
+        odooPartnerId === null || odooPartnerId === ""
+          ? null
+          : String(odooPartnerId);
+
+      await updateContactoOdooPartnerId(empresaId, id, normalizedId);
+
+      return res.json({
+        success: true,
+        contactoId: id,
+        odooPartnerId: normalizedId,
+      });
+    } catch (error: any) {
+      console.error("[Contactos] odoo-link error:", error);
+      return res.status(500).json({
+        error: "Failed to update contacto Odoo link",
+        message: error.message ?? "Unknown error",
+      });
+    }
+  }
+);
+
+3) Comando a correr
+
+Na shell do Replit, garantir que o servidor arranca sem erros:
+
+npm run dev
+
+4) O que testar no fim
+
+Com a app a correr:
+
+Testar ligação de Entidade a Odoo partner:
+
+curl -X POST "http://localhost:5000/api/entidades/<ENTIDADE_ID>/odoo-link" \
+  -H "Content-Type: application/json" \
+  -d '{"odooPartnerId": 12345}'
+
+
+Esperado:
+
+{
+  "success": true,
+  "entidadeId": "<ENTIDADE_ID>",
+  "odooPartnerId": "12345"
+}
+
+
+Testar remoção do link (desassociar):
+
+curl -X POST "http://localhost:5000/api/entidades/<ENTIDADE_ID>/odoo-link" \
+  -H "Content-Type: application/json" \
+  -d '{"odooPartnerId": null}'
+
+
+Esperado:
+
+{
+  "success": true,
+  "entidadeId": "<ENTIDADE_ID>",
+  "odooPartnerId": null
+}
+
+
+Repetir os mesmos testes para Contactos com:
+
+curl -X POST "http://localhost:5000/api/contactos/<CONTACTO_ID>/odoo-link" ...
+
+
+Confirmar na BD (ou via API de detalhe/listagem) que o campo odooPartnerId está a ser atualizado corretamente para Entidades e Contactos.

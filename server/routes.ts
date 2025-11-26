@@ -658,6 +658,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/entidades/:id/odoo-link - Link/unlink entidade to Odoo partner
+  app.post('/api/entidades/:id/odoo-link', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { odooPartnerId } = req.body as { odooPartnerId?: number | string | null };
+
+      if (odooPartnerId === undefined) {
+        return res.status(400).json({ error: "Missing odooPartnerId in body" });
+      }
+
+      const { empresaId } = await getUserContext(req);
+
+      const normalizedId = odooPartnerId === null || odooPartnerId === "" ? null : String(odooPartnerId);
+
+      await db
+        .update(entidades)
+        .set({ odooPartnerId: normalizedId })
+        .where(and(eq(entidades.id, id), eq(entidades.empresaId, empresaId)));
+
+      return res.json({
+        success: true,
+        entidadeId: id,
+        odooPartnerId: normalizedId,
+      });
+    } catch (error: any) {
+      console.error("[Entidades] odoo-link error:", error);
+      return res.status(500).json({
+        error: "Failed to update entidade Odoo link",
+        message: error.message ?? "Unknown error",
+      });
+    }
+  });
+
   // Contactos endpoints - FASE 2: filtered by empresaId
   app.get('/api/contactos', isAuthenticated, async (req: any, res) => {
     try {
@@ -728,6 +761,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting contacto:", error);
       res.status(500).json({ message: "Failed to delete contacto" });
+    }
+  });
+
+  // POST /api/contactos/:id/odoo-link - Link/unlink contacto to Odoo partner
+  app.post('/api/contactos/:id/odoo-link', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { odooPartnerId } = req.body as { odooPartnerId?: number | string | null };
+
+      if (odooPartnerId === undefined) {
+        return res.status(400).json({ error: "Missing odooPartnerId in body" });
+      }
+
+      const { empresaId } = await getUserContext(req);
+
+      const normalizedId = odooPartnerId === null || odooPartnerId === "" ? null : String(odooPartnerId);
+
+      await db
+        .update(contactos)
+        .set({ odooPartnerId: normalizedId })
+        .where(and(eq(contactos.id, id), eq(contactos.empresaId, empresaId)));
+
+      return res.json({
+        success: true,
+        contactoId: id,
+        odooPartnerId: normalizedId,
+      });
+    } catch (error: any) {
+      console.error("[Contactos] odoo-link error:", error);
+      return res.status(500).json({
+        error: "Failed to update contacto Odoo link",
+        message: error.message ?? "Unknown error",
+      });
     }
   });
 
