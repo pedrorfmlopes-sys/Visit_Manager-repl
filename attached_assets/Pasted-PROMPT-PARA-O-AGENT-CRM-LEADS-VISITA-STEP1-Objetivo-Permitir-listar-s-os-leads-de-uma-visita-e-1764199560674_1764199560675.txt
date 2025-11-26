@@ -1,0 +1,372 @@
+PROMPT PARA O AGENT – CRM-LEADS-VISITA-STEP1
+
+Objetivo:
+
+Permitir listar só os leads de uma visita específica.
+
+Adicionar na página de detalhe da Visita uma secção “Leads desta visita”, com:
+
+lista de leads ligados à visita,
+
+botão “Adicionar lead” que cria um lead via API /api/crm/leads.
+
+Respeitar o crmLeadsEnabled (se módulo estiver desativado, só mostrar aviso).
+
+1) Backend – filtro por visitaId em /api/crm/leads
+
+Ficheiro a editar:
+server/routes/crmLeads.ts
+
+Tarefas:
+
+Na rota GET /api/crm/leads, ler um visitaId opcional da query string:
+
+router.get("/", requireAuth, async (req, res) => {
+  try {
+    const { empresaId } = await getUserContext(req);
+    await assertLeadsEnabled(empresaId);
+
+    const visitaId = typeof req.query.visitaId === "string"
+      ? req.query.visitaId
+      : undefined;
+
+    const whereClause = visitaId
+      ? and(eq(leads.empresaId, empresaId), eq(leads.visitaId, visitaId))
+      : eq(leads.empresaId, empresaId);
+
+    const rows = await db.query.leads.findMany({
+      where: whereClause,
+      orderBy: (l, { desc }) => desc(l.createdAt),
+    });
+
+    return res.json({ leads: rows });
+  } catch (error: any) {
+    if (error?.code === "LEADS_NOT_ENABLED") {
+      return res.status(200).json({
+        success: false,
+        notEnabled: true,
+        message: "Módulo de Leads não está ativo para esta empresa.",
+      });
+    }
+
+    console.error("[CRM Leads] GET / error:", error);
+    return res.status(500).json({ success: false, message: "Erro ao listar leads." });
+  }
+});
+
+
+Mantém o resto da lógica igual; só adiciona o suporte ao visitaId.
+
+2) Frontend – secção “Leads desta visita” na página da Visita
+
+Ficheiro a editar (ou equivalente):
+Página de detalhe da visita, algo como:
+
+client/src/pages/VisitaDetailPage.tsx
+
+ou client/src/pages/visitas/VisitaDetailPage.tsx
+
+Usa o mesmo padrão de imports (Card, Button, useQuery, Dialog/Sheet, etc.) que já existe no projeto.
+
+2.1 Hook para carregar leads da visita
+
+Depois de teres o visita carregado (já existe), adiciona um useQuery:
+
+const { data: leadsData, isLoading: leadsLoading } = useQuery({
+  queryKey: ["/api/crm/leads", { visitaId: visita?.id }],
+  enabled: !!visita?.id, // só corre quando houver visita
+  queryFn: async () => {
+    const params = new URLSearchParams({ visitaId: visita!.id });
+    const resp = await fetch(`/api/crm/leads?${params.toString()}`, {
+      credentials: "include",
+    });
+    return resp.json();
+  },
+});
+
+
+Deriva estados:
+
+const leadsDisabled =
+  leadsData &&
+  "success" in leadsData &&
+  leadsData.success === false &&
+  leadsData.notEnabled === true;
+
+const leads: Lead[] =
+  leadsData && "leads" in leadsData ? leadsData.leads : [];
+
+
+Cria o tipo Lead localmente igual ao da AdminLeadsPage (id, titulo, marca, estado, valorPrevisto, moeda, createdAt, etc.), ou reutiliza se tiveres tipos partilhados.
+
+2.2 UI da secção “Leads desta visita”
+
+No JSX da página, algures abaixo dos cards actuais (visão geral, tarefas, Odoo, etc.), adiciona:
+
+<Card className="mt-4">
+  <CardHeader className="flex items-center justify-between">
+    <div>
+      <CardTitle className="text-sm">Leads desta visita</CardTitle>
+      <CardDescription className="text-xs">
+        Oportunidades associadas a esta visita (0..N leads).
+      </CardDescription>
+    </div>
+
+    {!leadsDisabled && (
+      <Button
+        size="sm"
+        onClick={() => setLeadDialogOpen(true)}
+        disabled={leadsLoading}
+      >
+        Adicionar lead
+      </Button>
+    )}
+  </CardHeader>
+
+  <CardContent>
+    {leadsDisabled && (
+      <p className="text-xs text-amber-600">
+        O módulo de Leads CRM está desativado para esta empresa.
+      </p>
+    )}
+
+    {!leadsDisabled && leadsLoading && (
+      <p className="text-sm text-muted-foreground">A carregar leads...</p>
+    )}
+
+    {!leadsDisabled && !leadsLoading && leads.length === 0 && (
+      <p className="text-sm text-muted-foreground">
+        Ainda não existem leads associados a esta visita.
+      </p>
+    )}
+
+    {!leadsDisabled && !leadsLoading && leads.length > 0 && (
+      <div className="space-y-2">
+        {leads.map((lead) => (
+          <div
+            key={lead.id}
+            className="flex items-center justify-between border rounded-md px-3 py-2 text-sm"
+          >
+            <div>
+              <div className="font-medium">{lead.titulo}</div>
+              <div className="text-xs text-muted-foreground">
+                {lead.marca ? `Marca: ${lead.marca} · ` : ""}
+                Estado: {lead.estado}
+              </div>
+            </div>
+            <div className="text-right text-xs">
+              {lead.valorPrevisto
+                ? `${lead.valorPrevisto} ${lead.moeda || "EUR"}`
+                : "—"}
+              <div className="text-[10px] text-muted-foreground">
+                {new Date(lead.createdAt).toLocaleDateString()}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </CardContent>
+</Card>
+
+
+Usa os componentes Card, CardHeader, CardTitle, etc., do design system do projeto.
+
+2.3 Modal/Form para criar lead a partir da visita
+
+No topo do componente, cria estado:
+
+const [leadDialogOpen, setLeadDialogOpen] = useState(false);
+const [leadSaving, setLeadSaving] = useState(false);
+const [leadForm, setLeadForm] = useState({
+  titulo: "",
+  marca: "",
+  estado: "novo",
+  valorPrevisto: "",
+});
+
+
+Usa o componente de diálogo já existente (ex.: Dialog / AlertDialog / Sheet). Exemplo com Dialog:
+
+<Dialog open={leadDialogOpen} onOpenChange={setLeadDialogOpen}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Novo lead desta visita</DialogTitle>
+      <DialogDescription>
+        Cria uma oportunidade ligada a esta visita, entidade e contacto.
+      </DialogDescription>
+    </DialogHeader>
+
+    <div className="space-y-3 mt-2">
+      <div className="space-y-1">
+        <Label htmlFor="lead-titulo">Título</Label>
+        <Input
+          id="lead-titulo"
+          value={leadForm.titulo}
+          onChange={(e) =>
+            setLeadForm((f) => ({ ...f, titulo: e.target.value }))
+          }
+          placeholder="Ex.: Projeto Moradia X – Ritmonio"
+        />
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="lead-marca">Marca</Label>
+        <Input
+          id="lead-marca"
+          value={leadForm.marca}
+          onChange={(e) =>
+            setLeadForm((f) => ({ ...f, marca: e.target.value }))
+          }
+          placeholder="Ex.: Ritmonio, Revestech..."
+        />
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="lead-estado">Estado</Label>
+        <select
+          id="lead-estado"
+          className="border rounded px-2 py-1 text-sm w-full bg-background"
+          value={leadForm.estado}
+          onChange={(e) =>
+            setLeadForm((f) => ({ ...f, estado: e.target.value }))
+          }
+        >
+          <option value="novo">Novo</option>
+          <option value="em_analise">Em análise</option>
+          <option value="proposta_enviada">Proposta enviada</option>
+          <option value="ganho">Ganho</option>
+          <option value="perdido">Perdido</option>
+        </select>
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="lead-valor">Valor previsto</Label>
+        <Input
+          id="lead-valor"
+          type="number"
+          min="0"
+          step="0.01"
+          value={leadForm.valorPrevisto}
+          onChange={(e) =>
+            setLeadForm((f) => ({ ...f, valorPrevisto: e.target.value }))
+          }
+          placeholder="Opcional"
+        />
+      </div>
+    </div>
+
+    <DialogFooter className="mt-4">
+      <Button
+        variant="ghost"
+        onClick={() => setLeadDialogOpen(false)}
+        type="button"
+      >
+        Cancelar
+      </Button>
+      <Button
+        onClick={handleCreateLeadFromVisita}
+        disabled={leadSaving || !leadForm.titulo.trim()}
+        type="button"
+      >
+        {leadSaving ? "A criar..." : "Criar lead"}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+
+
+Implementar handleCreateLeadFromVisita:
+
+const queryClient = useQueryClient(); // se ainda não estiver importado
+
+const handleCreateLeadFromVisita = async () => {
+  if (!visita?.id || !visita.entidadeId || !visita.contactoId) {
+    // garantir que temos contexto mínimo
+    return;
+  }
+
+  try {
+    setLeadSaving(true);
+
+    const body = {
+      entidadeId: visita.entidadeId,
+      contactoId: visita.contactoId,
+      visitaId: visita.id,
+      titulo: leadForm.titulo.trim(),
+      descricao: null,
+      marca: leadForm.marca || null,
+      estado: leadForm.estado || "novo",
+      valorPrevisto: leadForm.valorPrevisto
+        ? Number(leadForm.valorPrevisto)
+        : null,
+      moeda: "EUR",
+      responsavelUserId: visita.responsavelUserId ?? null, // se existir este campo
+    };
+
+    const resp = await fetch("/api/crm/leads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(body),
+    });
+
+    const json = await resp.json();
+
+    if (!resp.ok || json.success === false) {
+      throw new Error(json.message || `HTTP ${resp.status}`);
+    }
+
+    toast?.({
+      title: "Lead criado",
+      description: "Lead criado a partir desta visita.",
+    });
+
+    setLeadDialogOpen(false);
+    setLeadForm({
+      titulo: "",
+      marca: "",
+      estado: "novo",
+      valorPrevisto: "",
+    });
+
+    await queryClient.invalidateQueries({
+      queryKey: ["/api/crm/leads", { visitaId: visita.id }],
+    });
+  } catch (error: any) {
+    console.error("[CRM Leads] Error creating lead from visita:", error);
+    toast?.({
+      title: "Erro ao criar lead",
+      description:
+        error?.message || "Não foi possível criar o lead desta visita.",
+      variant: "destructive",
+    });
+  } finally {
+    setLeadSaving(false);
+  }
+};
+
+
+Ajusta visita.entidadeId, visita.contactoId, visita.responsavelUserId aos nomes reais do objeto visita aí no componente.
+
+3) Testes
+
+Garante em Definições → CRMs que o Módulo de Leads está ativo.
+
+Cria uma visita com entidade e contacto associados.
+
+Abre o detalhe da visita:
+
+Vê a secção “Leads desta visita”.
+
+Deve mostrar “Ainda não existem leads…” (primeira vez).
+
+Clica em “Adicionar lead”, preenche título e, opcionalmente, marca/valor, grava.
+
+Verifica:
+
+Toast de sucesso,
+
+A secção passa a listar o lead criado,
+
+Em /admin/leads deves ver o mesmo lead na lista global.

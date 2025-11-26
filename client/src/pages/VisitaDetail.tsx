@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import DOMPurify from 'dompurify';
-import { ArrowLeft, ArrowRight, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles, Bell, Volume2, Trash2, Loader2, Mic, Plus, X, Edit, AlertTriangle, Users } from "lucide-react";
+import { ArrowLeft, ArrowRight, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles, Bell, Volume2, Trash2, Loader2, Mic, Plus, X, Edit, AlertTriangle, Users, Flag } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { pt } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import type { VisitaWithRelations, Tarefa, InsertTarefa, InsertVisita, Lembrete, VisitasAudio } from "@shared/schema";
@@ -85,6 +85,16 @@ export default function VisitaDetail() {
   const [odooLeadNotConfigured, setOdooLeadNotConfigured] = useState(false);
   const { data: currentUser } = useCurrentUser();
   const isAdmin = useIsAdmin();
+  
+  // FASE CRM-LEADS-VISITA-STEP1: Leads section state
+  const [leadDialogOpen, setLeadDialogOpen] = useState(false);
+  const [leadSaving, setLeadSaving] = useState(false);
+  const [leadForm, setLeadForm] = useState({
+    titulo: "",
+    marca: "",
+    estado: "novo",
+    valorPrevisto: "",
+  });
   
   const { isOnline, shareViaWhatsApp, shareViaEmail, copyToClipboard, copyLink } = useShareActions();
 
@@ -176,6 +186,42 @@ export default function VisitaDetail() {
     select: (data) => data.filter((t) => t.visitaId === visitaId),
   });
 
+  // FASE CRM-LEADS-VISITA-STEP1: Load leads for this visit
+  type Lead = {
+    id: string;
+    titulo: string;
+    marca: string | null;
+    estado: string;
+    valorPrevisto: string | null;
+    moeda: string | null;
+    createdAt: string;
+  };
+  
+  type LeadsResponse = 
+    | { leads: Lead[] }
+    | { success: false; notEnabled?: boolean; message?: string };
+
+  const { data: leadsData, isLoading: leadsLoading } = useQuery<LeadsResponse>({
+    queryKey: ["/api/crm/leads", { visitaId: visita?.id }],
+    enabled: !!visita?.id,
+    queryFn: async () => {
+      const params = new URLSearchParams({ visitaId: visita!.id });
+      const resp = await fetch(`/api/crm/leads?${params.toString()}`, {
+        credentials: "include",
+      });
+      return resp.json();
+    },
+  });
+
+  const leadsDisabled =
+    leadsData &&
+    "success" in leadsData &&
+    leadsData.success === false &&
+    leadsData.notEnabled === true;
+
+  const leads: Lead[] =
+    leadsData && "leads" in leadsData ? leadsData.leads : [];
+
   const { data: allLembretes } = useQuery<Lembrete[]>({
     queryKey: ['/api/lembretes'],
   });
@@ -230,6 +276,78 @@ export default function VisitaDetail() {
       toast({ title: "Erro", description: "Falha na transcrição.", variant: "destructive" });
     },
   });
+
+  // FASE CRM-LEADS-VISITA-STEP1: Create CRM lead from visita
+  const handleCreateLeadFromVisita = async () => {
+    if (!visita?.id || !visita.entidadeId || !visita.contactoId) {
+      toast({
+        title: "Erro",
+        description: "Contexto de visita incompleto.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setLeadSaving(true);
+
+      const body = {
+        entidadeId: visita.entidadeId,
+        contactoId: visita.contactoId,
+        visitaId: visita.id,
+        titulo: leadForm.titulo.trim(),
+        descricao: null,
+        marca: leadForm.marca || null,
+        estado: leadForm.estado || "novo",
+        valorPrevisto: leadForm.valorPrevisto
+          ? Number(leadForm.valorPrevisto)
+          : null,
+        moeda: "EUR",
+        responsavelUserId: null,
+      };
+
+      const resp = await fetch("/api/crm/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+
+      const json = await resp.json();
+
+      if (!resp.ok || json.success === false) {
+        throw new Error(json.message || `HTTP ${resp.status}`);
+      }
+
+      toast({
+        title: "Lead criado",
+        description: "Lead criado a partir desta visita.",
+      });
+
+      setLeadDialogOpen(false);
+      setLeadForm({
+        titulo: "",
+        marca: "",
+        estado: "novo",
+        valorPrevisto: "",
+      });
+
+      // Invalidate query to refresh leads list
+      await queryClient.invalidateQueries({
+        queryKey: ["/api/crm/leads", { visitaId: visita.id }],
+      });
+    } catch (error: any) {
+      console.error("[CRM Leads] Error creating lead from visita:", error);
+      toast({
+        title: "Erro ao criar lead",
+        description:
+          error?.message || "Não foi possível criar o lead desta visita.",
+        variant: "destructive",
+      });
+    } finally {
+      setLeadSaving(false);
+    }
+  };
 
   // Odoo Lead: Create lead from visita
   const handleCreateOdooLeadForVisita = async () => {
@@ -2040,6 +2158,174 @@ export default function VisitaDetail() {
         visitaId={visitaId}
         defaultTemplate="followup_pos_visita"
       />
+
+      {/* FASE CRM-LEADS-VISITA-STEP1: CRM Leads Section */}
+      {visita && (
+        <Card data-testid="card-leads-visita" className="mt-6">
+          <CardHeader className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Flag className="w-4 h-4" />
+                Leads desta visita
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Oportunidades associadas a esta visita (0..N leads).
+              </CardDescription>
+            </div>
+
+            {!leadsDisabled && (
+              <Button
+                size="sm"
+                onClick={() => setLeadDialogOpen(true)}
+                disabled={leadsLoading}
+                data-testid="button-add-lead-from-visita"
+              >
+                Adicionar lead
+              </Button>
+            )}
+          </CardHeader>
+
+          <CardContent>
+            {leadsDisabled && (
+              <p className="text-xs text-amber-600">
+                O módulo de Leads CRM está desativado para esta empresa.
+              </p>
+            )}
+
+            {!leadsDisabled && leadsLoading && (
+              <p className="text-sm text-muted-foreground">A carregar leads...</p>
+            )}
+
+            {!leadsDisabled && !leadsLoading && leads.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Ainda não existem leads associados a esta visita.
+              </p>
+            )}
+
+            {!leadsDisabled && !leadsLoading && leads.length > 0 && (
+              <div className="space-y-2">
+                {leads.map((lead) => (
+                  <div
+                    key={lead.id}
+                    className="flex items-center justify-between border rounded-md px-3 py-2 text-sm"
+                    data-testid={`row-lead-visita-${lead.id}`}
+                  >
+                    <div>
+                      <div className="font-medium">{lead.titulo}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {lead.marca ? `Marca: ${lead.marca} · ` : ""}
+                        Estado: {lead.estado}
+                      </div>
+                    </div>
+                    <div className="text-right text-xs">
+                      {lead.valorPrevisto
+                        ? `${lead.valorPrevisto} ${lead.moeda || "EUR"}`
+                        : "—"}
+                      <div className="text-[10px] text-muted-foreground">
+                        {new Date(lead.createdAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* FASE CRM-LEADS-VISITA-STEP1: Create Lead Dialog */}
+      <Dialog open={leadDialogOpen} onOpenChange={setLeadDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Novo lead desta visita</DialogTitle>
+            <DialogDescription>
+              Cria uma oportunidade ligada a esta visita, entidade e contacto.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 mt-2">
+            <div className="space-y-1">
+              <Label htmlFor="lead-titulo">Título</Label>
+              <Input
+                id="lead-titulo"
+                value={leadForm.titulo}
+                onChange={(e) =>
+                  setLeadForm((f) => ({ ...f, titulo: e.target.value }))
+                }
+                placeholder="Ex.: Projeto Moradia X – Ritmonio"
+                data-testid="input-lead-titulo"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="lead-marca">Marca</Label>
+              <Input
+                id="lead-marca"
+                value={leadForm.marca}
+                onChange={(e) =>
+                  setLeadForm((f) => ({ ...f, marca: e.target.value }))
+                }
+                placeholder="Ex.: Ritmonio, Revestech..."
+                data-testid="input-lead-marca"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="lead-estado">Estado</Label>
+              <select
+                id="lead-estado"
+                className="border rounded px-2 py-1 text-sm w-full bg-background"
+                value={leadForm.estado}
+                onChange={(e) =>
+                  setLeadForm((f) => ({ ...f, estado: e.target.value }))
+                }
+                data-testid="select-lead-estado"
+              >
+                <option value="novo">Novo</option>
+                <option value="em_analise">Em análise</option>
+                <option value="proposta_enviada">Proposta enviada</option>
+                <option value="ganho">Ganho</option>
+                <option value="perdido">Perdido</option>
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="lead-valor">Valor previsto</Label>
+              <Input
+                id="lead-valor"
+                type="number"
+                min="0"
+                step="0.01"
+                value={leadForm.valorPrevisto}
+                onChange={(e) =>
+                  setLeadForm((f) => ({ ...f, valorPrevisto: e.target.value }))
+                }
+                placeholder="Opcional"
+                data-testid="input-lead-valor"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="mt-4">
+            <Button
+              variant="ghost"
+              onClick={() => setLeadDialogOpen(false)}
+              type="button"
+              data-testid="button-cancel-lead"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleCreateLeadFromVisita}
+              disabled={leadSaving || !leadForm.titulo.trim()}
+              type="button"
+              data-testid="button-create-lead-dialog"
+            >
+              {leadSaving ? "A criar..." : "Criar lead"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Odoo Integration */}
       {visita && (

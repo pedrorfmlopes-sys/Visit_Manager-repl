@@ -9,14 +9,23 @@ import { assertLeadsEnabled } from "../integrations/crmLeads";
 export function registerCrmLeadsRoutes(app: express.Express) {
   const router = express.Router();
 
-  // GET /api/crm/leads - List all leads for empresa
+  // GET /api/crm/leads - List all leads for empresa (with optional visitaId filter)
   router.get("/", isAuthenticated, async (req, res) => {
     try {
       const { empresaId } = await getUserContext(req);
       await assertLeadsEnabled(empresaId);
 
+      // FASE CRM-LEADS-VISITA-STEP1: Support visitaId query parameter for filtering
+      const visitaId = typeof req.query.visitaId === "string"
+        ? req.query.visitaId
+        : undefined;
+
+      const whereClause = visitaId
+        ? and(eq(leads.empresaId, empresaId), eq(leads.visitaId, visitaId))
+        : eq(leads.empresaId, empresaId);
+
       const rows = await db.query.leads.findMany({
-        where: eq(leads.empresaId, empresaId),
+        where: whereClause,
         orderBy: (l, { desc }) => desc(l.createdAt),
       });
 
