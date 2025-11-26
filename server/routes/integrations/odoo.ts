@@ -130,6 +130,8 @@ export function setupOdooRoutes(app: any): void {
 
       const { empresaId } = await getUserContext(req);
 
+      await assertOdooEnabled(empresaId);
+
       const partner = await getOdooPartnerById(empresaId, partnerId);
 
       if (!partner) {
@@ -138,6 +140,15 @@ export function setupOdooRoutes(app: any): void {
 
       return res.json({ partner });
     } catch (error: any) {
+      if (error?.message === "ODOO_NOT_ENABLED" || error?.code === "ODOO_NOT_ENABLED") {
+        return res.status(200).json({
+          notConfigured: true,
+          notEnabled: true,
+          partner: null,
+          message: "Integração Odoo não está ativa para esta empresa.",
+        });
+      }
+
       if (error?.message === "ODOO_NOT_CONFIGURED") {
         return res.status(200).json({
           notConfigured: true,
@@ -162,6 +173,8 @@ export function setupOdooRoutes(app: any): void {
         return res.status(400).json({ error: "User has no company assigned" });
       }
 
+      await assertOdooEnabled(empresaId);
+
       const visitaId = String(req.params.id);
 
       const result = await createLeadForVisita(empresaId, visitaId);
@@ -172,6 +185,14 @@ export function setupOdooRoutes(app: any): void {
         leadId: result.leadId,
       });
     } catch (error: any) {
+      if (error?.message === "ODOO_NOT_ENABLED" || error?.code === "ODOO_NOT_ENABLED") {
+        return res.status(200).json({
+          success: false,
+          notEnabled: true,
+          message: "Integração Odoo não está ativa para esta empresa.",
+        });
+      }
+
       if (error?.message === "VISITA_NOT_FOUND") {
         return res.status(404).json({
           success: false,
