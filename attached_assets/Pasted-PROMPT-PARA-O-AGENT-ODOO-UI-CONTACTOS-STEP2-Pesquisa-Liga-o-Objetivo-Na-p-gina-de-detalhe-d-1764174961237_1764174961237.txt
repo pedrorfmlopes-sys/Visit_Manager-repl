@@ -1,0 +1,278 @@
+PROMPT PARA O AGENT – ODOO-UI-CONTACTOS-STEP2 (Pesquisa + Ligação)
+
+Objetivo:
+Na página de detalhe de Contacto, permitir:
+
+Pesquisar parceiros Odoo (GET /api/integrations/odoo/search-partner?q=...)
+
+Ligar o contacto ao parceiro escolhido (POST /api/contactos/:id/odoo-link)
+
+⚠️ Backend já existe. Só UI + chamadas.
+⚠️ Unlink fica para o STEP3.
+
+1) Adicionar estado para pesquisa Odoo (Contactos)
+
+Ficheiro a editar:
+client/src/pages/ContactoDetail.tsx
+
+Junto dos estados já existentes (odooPartner, odooPartnerLoading, etc.), adiciona:
+
+const [odooSearchOpen, setOdooSearchOpen] = useState(false);
+const [odooSearchTerm, setOdooSearchTerm] = useState("");
+const [odooSearchResults, setOdooSearchResults] = useState<OdooPartner[]>([]);
+const [odooSearchLoading, setOdooSearchLoading] = useState(false);
+const [odooSearchError, setOdooSearchError] = useState<string | null>(null);
+const [odooSearchNotConfigured, setOdooSearchNotConfigured] = useState(false);
+
+2) Função para pesquisar parceiros Odoo (Contactos)
+
+Ainda em ContactoDetail.tsx, perto de handleFetchOdooPartner, cria:
+
+const handleSearchOdooPartners = async () => {
+  const q = odooSearchTerm.trim();
+  if (!q) {
+    setOdooSearchError("Introduz um termo de pesquisa.");
+    return;
+  }
+
+  setOdooSearchLoading(true);
+  setOdooSearchError(null);
+  setOdooSearchNotConfigured(false);
+  setOdooSearchResults([]);
+
+  try {
+    const response = await fetch(
+      `/api/integrations/odoo/search-partner?q=${encodeURIComponent(q)}`,
+      {
+        method: "GET",
+        credentials: "include",
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.notConfigured) {
+      setOdooSearchNotConfigured(true);
+      setOdooSearchResults([]);
+      return;
+    }
+
+    setOdooSearchResults(data.results ?? []);
+  } catch (error) {
+    console.error("[Odoo] Error searching partners for contacto:", error);
+    setOdooSearchError("Erro ao pesquisar parceiros no Odoo.");
+  } finally {
+    setOdooSearchLoading(false);
+  }
+};
+
+3) Função para ligar Contacto → parceiro Odoo
+
+No mesmo ficheiro, cria:
+
+const handleLinkOdooPartnerToContacto = async (partner: OdooPartner) => {
+  if (!contacto?.id) return;
+
+  try {
+    const response = await fetch(`/api/contactos/${contacto.id}/odoo-link`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({ odooPartnerId: partner.id }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    // Se usares React Query para o contacto, invalida a query:
+    // queryClient.invalidateQueries({ queryKey: ["/api/contactos", contactoId] });
+
+    // Atualizar contacto localmente (fallback simples):
+    if (contacto) {
+      contacto.odooPartnerId = String(partner.id);
+    }
+
+    // Limpar estado de pesquisa
+    setOdooSearchOpen(false);
+    setOdooSearchResults([]);
+    setOdooSearchTerm("");
+    setOdooSearchError(null);
+    setOdooSearchNotConfigured(false);
+
+    // Limpar partner atual e voltar a buscar detalhes
+    setOdooPartner(null);
+    setOdooNotConfigured(false);
+    setOdooPartnerError(null);
+    await handleFetchOdooPartner();
+  } catch (error) {
+    console.error("[Odoo] Error linking partner to contacto:", error);
+    setOdooSearchError("Erro ao ligar o contacto ao parceiro Odoo.");
+  }
+};
+
+
+Se já estiver configurado queryClient neste ficheiro, usa o mesmo padrão que nas Entidades para invalidar e refazer fetch.
+
+4) UI – Botão “Ligar a Odoo” + diálogo de pesquisa
+
+No JSX do card “Odoo” em ContactoDetail.tsx, na parte em que o contacto não tem odooPartnerId, substitui o conteúdo por algo semelhante a:
+
+{!contacto.odooPartnerId ? (
+  <>
+    <p className="text-sm text-muted-foreground">
+      Este contacto ainda não está ligado a nenhum parceiro Odoo.
+    </p>
+    <p className="text-xs text-muted-foreground">
+      Podes ligar este contacto a um parceiro Odoo pesquisando por nome ou email.
+    </p>
+    <div className="mt-3">
+      <Button
+        size="sm"
+        onClick={() => {
+          setOdooSearchOpen(true);
+          setOdooSearchError(null);
+          setOdooSearchResults([]);
+        }}
+        data-testid="button-odoo-open-search-contacto"
+      >
+        Ligar a Odoo
+      </Button>
+    </div>
+  </>
+) : (
+  // mantém o bloco existente para contacto ligado (ver detalhes)
+)}
+
+
+Depois, ainda no mesmo componente, adiciona um Dialog (ou componente equivalente já usado nas Entidades) com:
+
+<Dialog open={odooSearchOpen} onOpenChange={setOdooSearchOpen}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Procurar parceiro Odoo</DialogTitle>
+      <DialogDescription>
+        Pesquisa por nome ou email para ligar este contacto a um parceiro do Odoo.
+      </DialogDescription>
+    </DialogHeader>
+
+    <div className="space-y-3">
+      <div className="flex gap-2">
+        <Input
+          placeholder="Nome ou email..."
+          value={odooSearchTerm}
+          onChange={(e) => setOdooSearchTerm(e.target.value)}
+          data-testid="input-odoo-search-term-contacto"
+        />
+        <Button
+          onClick={handleSearchOdooPartners}
+          disabled={odooSearchLoading}
+          data-testid="button-odoo-search-contacto"
+        >
+          {odooSearchLoading ? "A pesquisar..." : "Pesquisar"}
+        </Button>
+      </div>
+
+      {odooSearchNotConfigured && (
+        <Alert data-testid="alert-odoo-search-not-configured-contacto">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Integração não configurada</AlertTitle>
+          <AlertDescription>
+            Integração Odoo ainda não está configurada para esta empresa.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {odooSearchError && (
+        <Alert
+          variant="destructive"
+          data-testid="alert-odoo-search-error-contacto"
+        >
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Erro</AlertTitle>
+          <AlertDescription>{odooSearchError}</AlertDescription>
+        </Alert>
+      )}
+
+      {!odooSearchLoading && !odooSearchNotConfigured && (
+        <div
+          className="space-y-2 max-h-64 overflow-auto"
+          data-testid="list-odoo-search-results-contacto"
+        >
+          {odooSearchResults.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              Sem resultados. Tenta outro termo de pesquisa.
+            </p>
+          )}
+
+          {odooSearchResults.map((partner) => (
+            <button
+              key={partner.id}
+              type="button"
+              onClick={() => handleLinkOdooPartnerToContacto(partner)}
+              className="w-full text-left border rounded-md px-3 py-2 hover:bg-muted focus:outline-none"
+              data-testid={`button-odoo-select-partner-contacto-${partner.id}`}
+            >
+              <p className="font-medium">{partner.name}</p>
+              {partner.email && (
+                <p className="text-xs text-muted-foreground">
+                  {partner.email}
+                </p>
+              )}
+              {(partner.city || partner.country) && (
+                <p className="text-xs text-muted-foreground">
+                  {[partner.city, partner.country]
+                    .filter(Boolean)
+                    .join(", ")}
+                </p>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  </DialogContent>
+</Dialog>
+
+
+Usa os mesmos componentes (Dialog, DialogContent, DialogHeader, Input, Button, Alert, etc.) já existentes/importados.
+Se ainda não estiverem importados neste ficheiro, copia os imports do ficheiro de Entidades.
+
+5) Comando e testes
+
+Na shell:
+
+npm run dev
+
+
+No browser:
+
+Abre detalhe de um Contacto sem odooPartnerId:
+
+Card “Odoo” mostra o botão “Ligar a Odoo”.
+
+Ao clicar, abre o diálogo de pesquisa.
+
+Pesquisa por um termo → confirmar no DevTools:
+
+GET /api/integrations/odoo/search-partner?q=...
+
+Clica num resultado:
+
+Ver POST /api/contactos/:id/odoo-link com body {"odooPartnerId": <id>}.
+
+Após sucesso, o card deve passar para o estado “ligado ao parceiro Odoo #ID”.
+
+O botão “Ver detalhes do parceiro” deve funcionar e mostrar os dados.
+
+Testar também:
+
+Caso notConfigured da rota de search.
+
+Mensagem de erro (odooSearchError) em caso de falha.

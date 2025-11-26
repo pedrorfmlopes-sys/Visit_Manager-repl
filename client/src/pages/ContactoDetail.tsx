@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { ShareDialog, useShareActions } from "@/components/ShareDialog";
 import { EmailAIDialog } from "@/components/EmailAIDialog";
 import { QuickActionButton } from "@/components/QuickActionButton";
@@ -52,6 +54,12 @@ export default function ContactoDetail() {
   const [odooPartnerLoading, setOdooPartnerLoading] = useState(false);
   const [odooPartnerError, setOdooPartnerError] = useState<string | null>(null);
   const [odooNotConfigured, setOdooNotConfigured] = useState(false);
+  const [odooSearchOpen, setOdooSearchOpen] = useState(false);
+  const [odooSearchTerm, setOdooSearchTerm] = useState("");
+  const [odooSearchResults, setOdooSearchResults] = useState<OdooPartner[]>([]);
+  const [odooSearchLoading, setOdooSearchLoading] = useState(false);
+  const [odooSearchError, setOdooSearchError] = useState<string | null>(null);
+  const [odooSearchNotConfigured, setOdooSearchNotConfigured] = useState(false);
   
   const { isOnline, shareViaWhatsApp, shareViaEmail, copyToClipboard, copyLink } = useShareActions();
 
@@ -288,6 +296,83 @@ export default function ContactoDetail() {
       setOdooPartnerError("Erro ao carregar parceiro do Odoo.");
     } finally {
       setOdooPartnerLoading(false);
+    }
+  };
+
+  const handleSearchOdooPartners = async () => {
+    const q = odooSearchTerm.trim();
+    if (!q) {
+      setOdooSearchError("Introduz um termo de pesquisa.");
+      return;
+    }
+
+    setOdooSearchLoading(true);
+    setOdooSearchError(null);
+    setOdooSearchNotConfigured(false);
+    setOdooSearchResults([]);
+
+    try {
+      const response = await fetch(`/api/integrations/odoo/search-partner?q=${encodeURIComponent(q)}`, {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.notConfigured) {
+        setOdooSearchNotConfigured(true);
+        setOdooSearchResults([]);
+        return;
+      }
+
+      setOdooSearchResults(data.results ?? []);
+    } catch (error) {
+      console.error("[Odoo] Error searching partners for contacto:", error);
+      setOdooSearchError("Erro ao pesquisar parceiros no Odoo.");
+    } finally {
+      setOdooSearchLoading(false);
+    }
+  };
+
+  const handleLinkOdooPartnerToContacto = async (partner: OdooPartner) => {
+    if (!contacto?.id) return;
+
+    try {
+      const response = await fetch(`/api/contactos/${contacto.id}/odoo-link`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ odooPartnerId: partner.id }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["/api/contactos", contactoId] });
+
+      setOdooSearchOpen(false);
+      setOdooSearchResults([]);
+      setOdooSearchTerm("");
+      setOdooSearchError(null);
+      setOdooSearchNotConfigured(false);
+
+      setOdooPartner(null);
+      setOdooNotConfigured(false);
+      setOdooPartnerError(null);
+
+      setTimeout(() => {
+        handleFetchOdooPartner();
+      }, 100);
+    } catch (error) {
+      console.error("[Odoo] Error linking partner to contacto:", error);
+      setOdooSearchError("Erro ao ligar o contacto ao parceiro Odoo.");
     }
   };
 
@@ -548,14 +633,27 @@ export default function ContactoDetail() {
           </CardHeader>
           <CardContent className="space-y-3">
             {!contacto.odooPartnerId ? (
-              <>
+              <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">
                   Este contacto ainda não está ligado a nenhum parceiro Odoo.
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  A ligação manual será configurada numa próxima etapa.
+                  Podes ligar este contacto a um parceiro Odoo pesquisando por nome ou email.
                 </p>
-              </>
+                <div className="mt-3">
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setOdooSearchOpen(true);
+                      setOdooSearchError(null);
+                      setOdooSearchResults([]);
+                    }}
+                    data-testid="button-odoo-open-search-contacto"
+                  >
+                    Ligar a Odoo
+                  </Button>
+                </div>
+              </div>
             ) : (
               <>
                 <p className="text-sm">
@@ -730,6 +828,85 @@ export default function ContactoDetail() {
         contactoId={contactoId}
         defaultTemplate="agradecimento"
       />
+
+      <Dialog open={odooSearchOpen} onOpenChange={setOdooSearchOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Procurar parceiro Odoo</DialogTitle>
+            <DialogDescription>
+              Pesquisa por nome ou email para ligar este contacto a um parceiro do Odoo.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Nome ou email..."
+                value={odooSearchTerm}
+                onChange={(e) => setOdooSearchTerm(e.target.value)}
+                data-testid="input-odoo-search-term-contacto"
+              />
+              <Button
+                onClick={handleSearchOdooPartners}
+                disabled={odooSearchLoading}
+                data-testid="button-odoo-search-contacto"
+              >
+                {odooSearchLoading ? "A pesquisar..." : "Pesquisar"}
+              </Button>
+            </div>
+
+            {odooSearchNotConfigured && (
+              <Alert data-testid="alert-odoo-search-not-configured-contacto">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Integração não configurada</AlertTitle>
+                <AlertDescription>
+                  Integração Odoo ainda não está configurada para esta empresa.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {odooSearchError && (
+              <Alert variant="destructive" data-testid="alert-odoo-search-error-contacto">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Erro</AlertTitle>
+                <AlertDescription>{odooSearchError}</AlertDescription>
+              </Alert>
+            )}
+
+            {!odooSearchLoading && !odooSearchNotConfigured && (
+              <div className="space-y-2 max-h-64 overflow-auto" data-testid="list-odoo-search-results-contacto">
+                {odooSearchResults.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Sem resultados. Tenta outro termo de pesquisa.
+                  </p>
+                )}
+
+                {odooSearchResults.map((partner) => (
+                  <button
+                    key={partner.id}
+                    type="button"
+                    onClick={() => handleLinkOdooPartnerToContacto(partner)}
+                    className="w-full text-left border rounded-md px-3 py-2 hover:bg-muted focus:outline-none"
+                    data-testid={`button-odoo-select-partner-contacto-${partner.id}`}
+                  >
+                    <p className="font-medium">{partner.name}</p>
+                    {partner.email && (
+                      <p className="text-xs text-muted-foreground">
+                        {partner.email}
+                      </p>
+                    )}
+                    {(partner.city || partner.country) && (
+                      <p className="text-xs text-muted-foreground">
+                        {[partner.city, partner.country].filter(Boolean).join(", ")}
+                      </p>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
