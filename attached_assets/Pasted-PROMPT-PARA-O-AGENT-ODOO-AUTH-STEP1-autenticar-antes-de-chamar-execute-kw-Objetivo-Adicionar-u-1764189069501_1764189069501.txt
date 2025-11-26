@@ -1,0 +1,168 @@
+PROMPT PARA O AGENT – ODOO-AUTH-STEP1 (autenticar antes de chamar execute_kw)
+
+Objetivo:
+Adicionar uma função authenticateOdoo que devolve o uid e usá-la nas chamadas Odoo (search-partner, getPartner, createLead), em vez de enviar o email como se fosse um inteiro.
+
+1) Adicionar authenticateOdoo no cliente Odoo
+
+Ficheiro a editar:
+server/integrations/odooClient.ts
+
+Perto de callOdooJsonRpc e do tipo OdooConnection, cria esta função:
+
+export async function authenticateOdoo(conn: OdooConnection): Promise<number> {
+  const uid = await callOdooJsonRpc<number>(conn, {
+    method: "call",
+    params: {
+      service: "common",
+      method: "authenticate",
+      args: [
+        conn.dbName,
+        conn.username, // login (email)
+        conn.apiKey,   // API key como password
+        {},
+      ],
+    },
+  });
+
+  if (typeof uid !== "number") {
+    throw new Error(
+      `Odoo authenticate did not return a numeric uid (got: ${String(uid)})`
+    );
+  }
+
+  return uid;
+}
+
+
+Mantém os nomes de propriedades (dbName, username, apiKey) exatamente como já existem no OdooConnection.
+
+2) Usar uid no searchOdooPartners (em vez de username)
+
+Ainda em odooClient.ts, localiza a função que faz a pesquisa de parceiros, algo como searchOdooPartners(empresaId, query).
+
+Dentro dela:
+
+Depois de obter const conn = await getOdooConnectionForEmpresa(empresaId);, chama:
+
+const uid = await authenticateOdoo(conn);
+
+
+Na chamada a callOdooJsonRpc, altera os args de:
+
+args: [
+  conn.dbName,
+  conn.username,
+  conn.apiKey,
+  "res.partner",
+  "search_read",
+  // ...
+],
+
+
+para:
+
+args: [
+  conn.dbName,
+  uid,
+  conn.apiKey,
+  "res.partner",
+  "search_read",
+  // ...
+],
+
+
+Ou search, search_read – usa exatamente o que já lá estiver, só troca o segundo argumento para uid.
+
+3) Usar uid em getOdooPartnerById
+
+Na função getOdooPartnerById(empresaId, partnerId):
+
+Depois de obter conn, adiciona:
+
+const uid = await authenticateOdoo(conn);
+
+
+Na chamada a callOdooJsonRpc, troca:
+
+args: [
+  conn.dbName,
+  conn.username,
+  conn.apiKey,
+  "res.partner",
+  "read",
+  [[partnerId]],
+  { /* fields */ },
+],
+
+
+por:
+
+args: [
+  conn.dbName,
+  uid,
+  conn.apiKey,
+  "res.partner",
+  "read",
+  [[partnerId]],
+  { /* fields */ },
+],
+
+4) Usar uid em createOdooLead
+
+Na função createOdooLead(empresaId, input) que criámos para as leads:
+
+Depois de const conn = await getOdooConnectionForEmpresa(empresaId);, faz:
+
+const uid = await authenticateOdoo(conn);
+
+
+Na chamada a callOdooJsonRpc, troca:
+
+args: [
+  conn.dbName,
+  conn.username,
+  conn.apiKey,
+  "crm.lead",
+  "create",
+  [payload],
+],
+
+
+por:
+
+args: [
+  conn.dbName,
+  uid,
+  conn.apiKey,
+  "crm.lead",
+  "create",
+  [payload],
+],
+
+5) Garantir que callOdooJsonRpc continua igual (só a parte de erro melhorada)
+
+Não alteres agora a lógica do POST (URL, headers, etc.) – só já tínhamos ajustado a parte de json.error. Mantém isso.
+
+6) Correr e testar
+
+Na shell:
+
+npm run dev
+
+
+Depois, no browser:
+
+Vai a Backoffice → Entidades → abre a Entidade que queres ligar.
+
+Card Odoo → “Ligar a Odoo” → pesquisa por Divitek Teste.
+
+Esperado:
+
+A pesquisa já não deve dar o erro invalid literal for int().
+
+Deves ver resultados vindos do Odoo (os parceiros que criaste).
+
+Ao clicar num resultado, a Entidade fica ligada ao parceiro Odoo.
+
+Se ainda der erro, a mensagem agora já será outra (tipo permissões ou outra coisa específica). Mas este passo resolve exatamente o erro que viste: o Odoo a tentar converter o teu email em inteiro.

@@ -47,9 +47,9 @@ export async function getOdooConnectionForEmpresa(empresaId: string): Promise<Od
 }
 
 /**
- * Autentica com a instância Odoo via JSON-RPC
+ * Autentica com a instância Odoo via web/session/authenticate (usado por testOdooConnection)
  */
-async function authenticateOdoo(conn: OdooConnection): Promise<OdooAuthResponse> {
+async function authenticateOdooWebSession(conn: OdooConnection): Promise<OdooAuthResponse> {
   const url = new URL("/web/session/authenticate", conn.baseUrl).toString();
 
   const response = await fetch(url, {
@@ -88,6 +88,33 @@ async function authenticateOdoo(conn: OdooConnection): Promise<OdooAuthResponse>
 }
 
 /**
+ * Autentica com a instância Odoo via JSON-RPC common.authenticate (para execute_kw)
+ */
+export async function authenticateOdoo(conn: OdooConnection): Promise<number> {
+  const uid = await callOdooJsonRpc<number>(conn, {
+    method: "call",
+    params: {
+      service: "common",
+      method: "authenticate",
+      args: [
+        conn.dbName,
+        conn.username, // login (email)
+        conn.apiKey,   // API key como password
+        {},
+      ],
+    },
+  });
+
+  if (typeof uid !== "number") {
+    throw new Error(
+      `Odoo authenticate did not return a numeric uid (got: ${String(uid)})`
+    );
+  }
+
+  return uid;
+}
+
+/**
  * Testa a ligação com Odoo
  */
 export async function testOdooConnection(empresaId: string): Promise<{
@@ -97,7 +124,7 @@ export async function testOdooConnection(empresaId: string): Promise<{
   userId: number;
 }> {
   const conn = await getOdooConnectionForEmpresa(empresaId);
-  const auth = await authenticateOdoo(conn);
+  const auth = await authenticateOdooWebSession(conn);
 
   return {
     ok: true,
@@ -174,6 +201,7 @@ export async function searchOdooPartners(
   query: string
 ): Promise<OdooPartner[]> {
   const conn = await getOdooConnectionForEmpresa(empresaId);
+  const uid = await authenticateOdoo(conn);
 
   const result = await callOdooJsonRpc<any[]>(conn, {
     method: "call",
@@ -182,7 +210,7 @@ export async function searchOdooPartners(
       method: "execute_kw",
       args: [
         conn.dbName,
-        conn.username,
+        uid,
         conn.apiKey,
         "res.partner",
         "search_read",
@@ -231,6 +259,7 @@ export async function getOdooPartnerById(
   partnerId: number
 ): Promise<OdooPartner | null> {
   const conn = await getOdooConnectionForEmpresa(empresaId);
+  const uid = await authenticateOdoo(conn);
 
   const result = await callOdooJsonRpc<any[]>(conn, {
     method: "call",
@@ -239,7 +268,7 @@ export async function getOdooPartnerById(
       method: "execute_kw",
       args: [
         conn.dbName,
-        conn.username,
+        uid,
         conn.apiKey,
         "res.partner",
         "search_read",
@@ -288,6 +317,7 @@ export async function createOdooLead(
   input: CreateOdooLeadInput
 ): Promise<{ id: number }> {
   const conn = await getOdooConnectionForEmpresa(empresaId);
+  const uid = await authenticateOdoo(conn);
 
   const payload: Record<string, any> = {
     name: input.name,
@@ -313,7 +343,7 @@ export async function createOdooLead(
       method: "execute_kw",
       args: [
         conn.dbName,
-        conn.username,
+        uid,
         conn.apiKey,
         "crm.lead",
         "create",
