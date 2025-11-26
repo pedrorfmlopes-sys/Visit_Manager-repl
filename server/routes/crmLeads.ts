@@ -1,6 +1,6 @@
 import express from "express";
 import { and, eq } from "drizzle-orm";
-import { db } from "../storage";
+import { db } from "../db";
 import { leads, insertLeadSchema } from "../../shared/schema";
 import { isAuthenticated } from "../replitAuth";
 import { getUserContext } from "../authContext";
