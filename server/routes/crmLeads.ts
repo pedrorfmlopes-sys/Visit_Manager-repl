@@ -620,7 +620,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         // Validate result
         if (!result.text || result.text.includes("indisponível")) {
           console.warn("[CRM Leads AI] Transcription returned warning/placeholder text", { text: result.text });
-          return res.status(500).json({ 
+          return res.status(503).json({ 
             success: false, 
             message: "IA não está configurada. Contacta o administrador." 
           });

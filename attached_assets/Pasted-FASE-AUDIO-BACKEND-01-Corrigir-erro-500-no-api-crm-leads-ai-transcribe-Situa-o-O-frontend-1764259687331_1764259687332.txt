@@ -1,0 +1,64 @@
+FASE AUDIO-BACKEND-01 – Corrigir erro 500 no /api/crm/leads/ai/transcribe
+
+Situação:
+- O frontend já está a funcionar com o hook useAudioTranscription e o endpoint /api/crm/leads/ai/transcribe.
+- Ao clicar "Transcrever áudio" numa VISITA:
+  - Recebo um toast com:
+    "Erro na transcrição
+     HTTP 500: {"success":false,"message":"Falha ao transcrever áudio. Por favor, tenta novamente."}"
+- Ou seja, o handler está a devolver 500 com JSON { success:false, message:"Falha ao transcrever áudio. Por favor, tenta novamente." }.
+
+Objetivo:
+- Descobrir a causa REAL do 500 neste endpoint e corrigir.
+- Garantir que:
+  - Se a IA estiver bem configurada, a transcrição funciona (success:true, text).
+  - Se a IA NÃO estiver configurada ou houver problema específico, a mensagem devolvida é clara (ex: "IA não está configurada" ou "Formato de áudio não suportado"), mas sem 500 inesperado.
+
+Tarefas:
+
+1) Inspecionar o handler em server/routes/crmLeads.ts para:
+   - POST /api/crm/leads/ai/transcribe
+   - Ver como chama transcribeAudio() em server/openai.ts.
+   - Adicionar logs temporários no try/catch para ver:
+     - mimetype recebido
+     - tamanho do ficheiro
+     - erro real (error.message, error.response?.status, error.response?.data).
+
+2) Analisar server/openai.ts, função transcribeAudio():
+   - Ver modelo usado (whisper-1 ou outro).
+   - Ver formato esperado do ficheiro (stream, path, mimeType).
+   - Ver se aceita audio/webm (MediaRecorder) e ficheiros carregados.
+
+3) Fazer um teste automático:
+   - Criar um pequeno script de teste (ex.: scripts/testTranscribeCore.ts) que:
+     - Envie um ficheiro de áudio de teste para /api/crm/leads/ai/transcribe.
+     - Mostre a resposta completa.
+   - Confirmar se o erro é:
+     - falta de OPENAI_API_KEY,
+     - formato não suportado,
+     - ou outra coisa (401/403, etc.).
+
+4) Corrigir a função e o handler:
+   - Se for problema de formato:
+     - garantir que webm é aceite OU tratar o ficheiro corretamente.
+   - Se for problema de config (ex.: falta OPENAI_API_KEY):
+     - devolver { success:false, message:"IA não está configurada. Contacta o administrador." } com status 200 ou 400, NÃO 500.
+   - Se for erro de rede/timeout:
+     - mapear para uma mensagem amigável (ex.: "Serviço de transcrição indisponível. Tenta mais tarde.").
+
+5) Após correção, testar TU MESMO em dev:
+   - Fazendo o teste automatizado.
+   - E confirmando que:
+     - O endpoint já não devolve 500.
+     - Em sucesso, devolve JSON com text.
+     - Em falha, devolve JSON com mensagem clara (sem 500 genérico).
+
+6) Atualizar RELATORIO_FASE-AUDIO-BACKEND-01.txt com:
+   - Causa raiz do 500.
+   - Ficheiros alterados (linhas principais).
+   - Como ficou o comportamento final (mensagens devolvidas).
+
+Restrições:
+- NÃO alterar o hook useAudioTranscription nesta fase.
+- NÃO mexer na UI (VisitaForm / AdminLeadDetailPage).
+- Foco exclusivo: backend de /api/crm/leads/ai/transcribe.
