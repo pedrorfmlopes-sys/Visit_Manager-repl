@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ExternalLink } from "lucide-react";
 import { useLocation } from "wouter";
 
 type Lead = {
@@ -93,7 +93,14 @@ export default function AdminLeadDetailPage() {
         <h1 className="text-xl font-semibold">Lead: {lead.titulo}</h1>
       </div>
 
-      <LeadDetailForm lead={lead} />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2">
+          <LeadDetailForm lead={lead} />
+        </div>
+        <div>
+          <OdooCrmCard leadId={lead.id} odooLeadId={lead.odooLeadId} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -344,5 +351,137 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+type OdooStatusResponse =
+  | { configured: true; baseUrl: string; isActive: boolean }
+  | { configured: false; message?: string };
+
+function OdooCrmCard({ leadId, odooLeadId }: { leadId: string; odooLeadId: string | null }) {
+  const { toast } = useToast();
+  const [syncing, setSyncing] = useState(false);
+
+  const { data: odooStatus, isLoading: statusLoading } = useQuery<OdooStatusResponse>({
+    queryKey: ["/api/integrations/odoo/status"],
+    queryFn: async () => {
+      const resp = await fetch("/api/integrations/odoo/status", {
+        credentials: "include",
+      });
+      return resp.json();
+    },
+  });
+
+  const handleSync = async () => {
+    try {
+      setSyncing(true);
+
+      const resp = await fetch(`/api/crm/leads/${leadId}/odoo/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+
+      const json = await resp.json();
+
+      if (!resp.ok || json.success === false) {
+        throw new Error(json.message || `HTTP ${resp.status}`);
+      }
+
+      const message = json.created
+        ? "Lead criado no Odoo."
+        : "Lead sincronizado com Odoo.";
+
+      toast({
+        title: "Sucesso",
+        description: message,
+      });
+
+      // Refazer fetch do lead para atualizar odooLeadId
+      await queryClient.invalidateQueries({
+        queryKey: ["/api/crm/leads", leadId],
+      });
+    } catch (error: any) {
+      console.error("[Odoo Sync] Error:", error);
+      toast({
+        title: "Erro ao sincronizar",
+        description: error?.message || "Tenta novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const isOdooConfigured = odooStatus && "configured" in odooStatus && odooStatus.configured;
+  const odooBaseUrl = isOdooConfigured ? (odooStatus as any).baseUrl : null;
+  const odooLeadUrl = odooLeadId && odooBaseUrl
+    ? `${odooBaseUrl}/web#id=${odooLeadId}&model=crm.lead&view_type=form`
+    : null;
+
+  return (
+    <Card data-testid="card-odoo-crm">
+      <CardHeader>
+        <CardTitle className="text-sm">Odoo CRM</CardTitle>
+        <CardDescription className="text-xs">
+          Sincronizar lead com Odoo
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {statusLoading ? (
+          <p className="text-xs text-muted-foreground">A carregar estado...</p>
+        ) : !isOdooConfigured ? (
+          <p className="text-xs text-amber-600">
+            Odoo não está configurado ou está desligado para esta empresa.
+          </p>
+        ) : (
+          <>
+            {odooLeadId ? (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Lead sincronizado: <span className="font-mono text-xs">{odooLeadId}</span>
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={handleSync}
+                    disabled={syncing}
+                    data-testid="button-sincronizar-odoo"
+                  >
+                    {syncing ? "A sincronizar..." : "Sincronizar"}
+                  </Button>
+                  {odooLeadUrl && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => window.open(odooLeadUrl, "_blank")}
+                      data-testid="button-abrir-odoo"
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      Abrir
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Lead não sincronizado com Odoo.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={handleSync}
+                  disabled={syncing}
+                  data-testid="button-criar-odoo"
+                  className="w-full"
+                >
+                  {syncing ? "A criar..." : "Criar lead no Odoo"}
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }

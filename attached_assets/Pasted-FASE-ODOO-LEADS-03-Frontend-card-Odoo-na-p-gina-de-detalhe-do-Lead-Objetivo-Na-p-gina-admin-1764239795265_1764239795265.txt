@@ -1,0 +1,41 @@
+FASE ODOO-LEADS-03 – Frontend: card Odoo na página de detalhe do Lead
+
+Objetivo:
+Na página /admin/leads/:id (AdminLeadDetailPage), adicionar um card “Odoo CRM” que permita criar/sincronizar o lead com o Odoo e abrir o registo no Odoo.
+
+Tarefas:
+1) Em AdminLeadDetailPage, adicionar um novo card lateral ou na zona de detalhe chamado “Odoo CRM”.
+   - Este card deve receber do hook que carrega o lead:
+     - os dados do lead, incluindo odooLeadId.
+   - O card deve também usar um hook (ex.: useQuery) para chamar GET /api/integrations/odoo/status e obter:
+     - se a integração está configurada e conectada,
+     - eventualmente uma mensagem de erro simples em caso de falha.
+
+2) Comportamento do card:
+   - Se a integração Odoo não estiver configurada/ligada:
+     - Mostrar texto do tipo “Odoo não está configurado ou está desligado para esta empresa.”
+     - Não mostrar botões de sync (ou mostrá-los disabled com tooltip).
+   - Se estiver tudo OK:
+     - Se lead.odooLeadId estiver vazio:
+       - Mostrar botão “Criar lead no Odoo”.
+     - Se lead.odooLeadId tiver valor:
+       - Mostrar botão “Sincronizar com Odoo”.
+       - Mostrar também um link/botão “Abrir no Odoo” que abre numa nova aba a URL:
+         - baseUrl + "/web#id=" + odooLeadId + "&model=crm.lead&view_type=form"
+         (usa a baseUrl da config Odoo da empresa; se necessário, criar um pequeno helper no backend ou devolver esta URL no endpoint de status).
+
+3) Ao clicar nos botões de criar/sincronizar:
+   - Fazer POST /api/crm/leads/:id/odoo/sync.
+   - Mostrar estado de loading enquanto a chamada está a decorrer.
+   - Em sucesso:
+     - Mostrar toast:
+       - Se created === true: “Lead criado no Odoo.”
+       - Caso contrário: “Lead sincronizado com Odoo.”
+     - Refazer o fetch do lead para atualizar odooLeadId e restantes dados.
+   - Em erro:
+     - Mostrar a mensagem vinda de json.message em toast.
+
+4) UX:
+   - Garantir que o card mantém o estilo consistente com os restantes cards da AdminLeadDetailPage (usar os mesmos componentes de UI, ex.: Card do shadcn, botões padrão, etc.).
+
+Fazer apenas estas alterações no frontend nesta fase.
