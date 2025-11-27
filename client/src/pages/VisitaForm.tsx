@@ -21,6 +21,7 @@ import { useGeolocation } from "@/hooks/useGeolocation";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useCurrentUser, useAllUsers, useIsAdmin } from "@/hooks/use-user-context";
 import { useAuth } from "@/hooks/useAuth";
+import { useAudioTranscription } from "@/hooks/useAudioTranscription";
 import { LocationPreview } from "@/components/LocationPreview";
 import { insertVisitaSchema, type InsertVisita, type Entidade, type Contacto, type InsertTarefa, type Marca } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
@@ -68,13 +69,29 @@ export default function VisitaForm() {
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const { location: gpsLocation, error: gpsError, isLoading: gpsLoading, requestLocation } = useGeolocation(true);
   
-  // FASE 7.2: Audio recording
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
+  // FASE IA-AUDIO-02: Use unified audio transcription hook for pre-save transcription
+  const audio = useAudioTranscription({
+    transcriptionEndpoint: '/api/visitas/ai/transcribe',
+    onTranscriptionComplete: (text) => {
+      // Append transcribed text to notas field
+      const currentNotas = form.getValues("notas") || "";
+      const updatedNotas = currentNotas 
+        ? currentNotas + "\n\n[Áudio transcrito]\n" + text
+        : text;
+      form.setValue("notas", updatedNotas);
+      toast({
+        title: "Áudio transcrito",
+        description: "Texto adicionado às notas da visita.",
+      });
+    },
+    onError: (error) => {
+      console.error("[VisitaForm] Audio transcription error:", error);
+    }
+  });
+
+  // Fallback for old audio recording (kept for backward compatibility if needed)
+  // PHASE 7.2: Audio recording (can be deprecated once audio hook is fully integrated)
   const [pendingClips, setPendingClips] = useState<File[]>([]);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [supportsRecording, setSupportsRecording] = useState(
     typeof navigator !== 'undefined' && 
     (navigator.mediaDevices?.getUserMedia !== undefined || (navigator as any).getUserMedia !== undefined) &&
@@ -840,6 +857,63 @@ export default function VisitaForm() {
               )}
             />
 
+            {/* FASE IA-AUDIO-02: Audio Recording and Transcription Controls */}
+            <Card className="bg-muted/50 border-primary/20">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Mic className="h-4 w-4" />
+                  Ditar Anotações
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    type="button"
+                    variant={audio.isRecording ? "destructive" : "default"}
+                    size="sm"
+                    onClick={audio.isRecording ? audio.stopRecording : audio.startRecording}
+                    disabled={!audio.supportsRecording}
+                    data-testid="button-audio-record"
+                  >
+                    <Mic className="h-4 w-4 mr-2" />
+                    {audio.isRecording 
+                      ? `Parar (${audio.recordingTime}s)` 
+                      : 'Gravar'}
+                  </Button>
+                  
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await audio.transcribe();
+                      } catch (error) {
+                        // Error already handled by hook
+                      }
+                    }}
+                    disabled={!audio.hasAudio || audio.isTranscribing}
+                    data-testid="button-audio-transcribe"
+                  >
+                    <Volume2 className="h-4 w-4 mr-2" />
+                    {audio.isTranscribing ? 'A transcrever...' : 'Transcrever áudio'}
+                  </Button>
+                </div>
+                
+                {!audio.supportsRecording && (
+                  <p className="text-xs text-muted-foreground">
+                    Gravação de áudio não suportada neste browser. Usa o campo de texto normalmente.
+                  </p>
+                )}
+                
+                {audio.hasAudio && !audio.isRecording && (
+                  <p className="text-xs text-green-600 dark:text-green-400">
+                    Áudio gravado e pronto para transcrever
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
             <FormField
               control={form.control}
               name="notas"
@@ -850,7 +924,7 @@ export default function VisitaForm() {
                     <RichTextEditor
                       content={field.value || ""}
                       onChange={field.onChange}
-                      placeholder="Descreva os pontos principais da visita..."
+                      placeholder="Descreva os pontos principais da visita. Ou usa o botão acima para ditar..."
                       className="border-input"
                     />
                   </FormControl>
