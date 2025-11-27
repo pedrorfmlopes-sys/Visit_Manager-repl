@@ -20,6 +20,15 @@ export type OdooPartner = {
   street?: string | null;
 };
 
+export type OdooLeadAttachment = {
+  id: number;
+  name: string;
+  mimetype: string | null;
+  fileSize: number | null;
+  createdAt: string;
+  downloadUrl: string;
+};
+
 export type CreateOdooLeadInput = {
   name: string;
   contactName?: string | null;
@@ -324,6 +333,58 @@ export async function getOdooPartnerById(
     country: p.country_id?.[1] ?? null,
     street: p.street ?? null,
   };
+}
+
+/**
+ * Lista anexos (ir.attachment) de uma lead (crm.lead) no Odoo
+ */
+export async function listLeadAttachments(params: {
+  empresaId: string;
+  odooLeadId: string;
+}): Promise<OdooLeadAttachment[]> {
+  const { empresaId, odooLeadId } = params;
+  
+  const conn = await getOdooConnectionForEmpresa(empresaId);
+  const uid = await authenticateOdoo(conn);
+  
+  const odooLeadIdInt = parseInt(odooLeadId, 10);
+  if (isNaN(odooLeadIdInt)) {
+    throw new Error(`Invalid odooLeadId: ${odooLeadId}`);
+  }
+  
+  const result = await callOdooJsonRpc<any[]>(conn, {
+    method: "call",
+    params: {
+      service: "object",
+      method: "execute_kw",
+      args: [
+        conn.dbName,
+        uid,
+        conn.apiKey,
+        "ir.attachment",
+        "search_read",
+        [
+          [
+            ["res_model", "=", "crm.lead"],
+            ["res_id", "=", odooLeadIdInt],
+            ["type", "=", "binary"],
+          ],
+        ],
+        {
+          fields: ["id", "name", "mimetype", "file_size", "create_date"],
+        },
+      ],
+    },
+  });
+  
+  return result.map((attachment) => ({
+    id: attachment.id,
+    name: attachment.name,
+    mimetype: attachment.mimetype ?? null,
+    fileSize: attachment.file_size ?? null,
+    createdAt: attachment.create_date,
+    downloadUrl: `${conn.baseUrl}/web/content/${attachment.id}?download=1`,
+  }));
 }
 
 /**
