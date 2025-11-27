@@ -1,0 +1,301 @@
+================================================================================
+RELATORIO TECNICO: FASE LEADS-EXT-02 - TABELA LEADS_MARCAS
+================================================================================
+
+Data: 27 Novembro 2025
+Projeto: Commercial Visits Management PWA - Lead Brands Association
+Status: COMPLETO - Backend Schema + Migracao BD
+Escopo: Apenas backend - tabela de juncao sem mudancas em endpoints/frontend
+
+================================================================================
+1. OBJETIVO CUMPRIDO
+================================================================================
+
+Criar estrutura backend para permitir associar multiplas marcas a cada lead.
+
+Tarefas Completadas:
+  1) Tabela leads_marcas criada em shared/schema.ts
+  2) Relacoes Drizzle configuradas
+  3) Insert schema e tipos TypeScript exportados
+  4) Migracao BD executada com sucesso (npm run db:push)
+  5) TypeScript compilation validada (npm run build)
+  6) Servidor rodando sem erros
+
+================================================================================
+2. MUDANCAS IMPLEMENTADAS
+================================================================================
+
+2.1 FICHEIRO: shared/schema.ts
+---
+
+A) Nova Tabela - leads_marcas (linhas 758-763)
+
+export const leadsMarcas = pgTable("leads_marcas", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leadId: varchar("lead_id").notNull().references(() => leads.id, { onDelete: 'cascade' }),
+  marcaId: varchar("marca_id").notNull().references(() => marcas.id, { onDelete: 'restrict' }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+Campos:
+  - id: UUID, primary key (auto-gerado)
+  - leadId: FK → leads.id, ON DELETE CASCADE
+    -> Se lead for eliminado, todas as marcas associadas sao removidas
+  - marcaId: FK → marcas.id, ON DELETE RESTRICT
+    -> Nao permite eliminar uma marca se tiver leads associados
+  - createdAt: timestamp, auto-preenchido com now()
+
+B) Relacoes Drizzle (linhas 766-775)
+
+export const leadsMarcasRelations = relations(leadsMarcas, ({ one }) => ({
+  lead: one(leads, {
+    fields: [leadsMarcas.leadId],
+    references: [leads.id],
+  }),
+  marca: one(marcas, {
+    fields: [leadsMarcas.marcaId],
+    references: [marcas.id],
+  }),
+}));
+
+Permite: leadsMarcas -> lead, leadsMarcas -> marca
+
+C) Insert Schema e Tipos (linhas 777-783)
+
+export const insertLeadsMarcasSchema = createInsertSchema(leadsMarcas).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertLeadsMarcas = z.infer<typeof insertLeadsMarcasSchema>;
+export type LeadsMarcas = typeof leadsMarcas.$inferSelect;
+
+Tipos exportados:
+  - InsertLeadsMarcas: Para criar novos registos (sem id, createdAt)
+  - LeadsMarcas: Tipo full do registo em BD
+
+D) Relacao em leadsRelations (linha 705)
+
+export const leadsRelations = relations(leads, ({ one, many }) => ({
+  ...
+  contactosAssociados: many(leadsContactos),
+  marcasAssociadas: many(leadsMarcas),  <- NOVO
+}));
+
+Permite: lead -> leadsMarcas[]
+
+2.2 MIGRACAO BD
+---
+
+Comando: npm run db:push
+
+Output:
+  [OK] Pulling schema from database...
+  [OK] Changes applied
+
+Tabela criada em PostgreSQL:
+  Schema: public.leads_marcas
+  
+  Colunas:
+    - id: character varying, primary key
+    - lead_id: character varying, not null, FK
+    - marca_id: character varying, not null, FK
+    - created_at: timestamp without time zone, not null
+
+  Foreign Keys:
+    - leads_marcas.lead_id → leads.id (ON DELETE CASCADE)
+    - leads_marcas.marca_id → marcas.id (ON DELETE RESTRICT)
+
+  Indices:
+    - PRIMARY KEY (id)
+
+2.3 VALIDACAO TYPESCRIPT
+---
+
+Comando: npm run build
+
+Output:
+  - Sem erros de compilacao
+  - Sem erros TypeScript relacionados com leadsMarcas
+  - Build bem-sucedido (346.5kb)
+
+Notas:
+  - 2 LSP errors existentes em visitas (pre-existentes, nao causados por esta mudanca)
+  - Schema.ts compila corretamente com new table e relacoes
+
+================================================================================
+3. ESTRUTURA ATUAL EM BD
+================================================================================
+
+Tabelas Relacionadas:
+
+  marcas
+  ├─ id: PK
+  ├─ empresaId: FK → empresas
+  ├─ nome, codigo, descricao, logoUrl, ativa
+  └─ createdAt, updatedAt
+
+  leads
+  ├─ id: PK
+  ├─ empresaId: FK → empresas
+  ├─ entidadeId: FK → entidades
+  ├─ contactoId: FK → contactos (primary contact)
+  ├─ visitaId: FK → visitas (optional)
+  ├─ titulo, descricao, marca (texto)
+  ├─ estado, valorPrevisto, moeda
+  ├─ responsavelUserId
+  ├─ odooLeadId (sync com Odoo)
+  ├─ createdAt, updatedAt
+  └─ Relations:
+      ├─ empresa
+      ├─ entidade
+      ├─ contacto
+      ├─ visita
+      ├─ contactosAssociados: many(leadsContactos)
+      └─ marcasAssociadas: many(leadsMarcas) <- NOVO
+
+  leads_contactos (junction table - ja existente)
+  ├─ id: PK
+  ├─ leadId: FK → leads
+  ├─ contactoId: FK → contactos
+  ├─ role (opcional)
+  └─ createdAt
+
+  leads_marcas (junction table - NOVO)
+  ├─ id: PK
+  ├─ leadId: FK → leads (CASCADE)
+  ├─ marcaId: FK → marcas (RESTRICT)
+  └─ createdAt
+
+Fluxo de Dados (futuro):
+  1. Lead criado com contactoId (primary contact)
+  2. Lead pode ter N contactos em leads_contactos
+  3. Lead pode ter N marcas em leads_marcas <- NOVO
+  4. Campos marca em leads continua como texto resumido (compatibilidade)
+
+================================================================================
+4. COMPATIBILIDADE
+================================================================================
+
+Backwards Compatibility: OK
+
+- Leads existentes continuam a funcionar (sem mudancas)
+- Campo marca em leads permanece (texto simples)
+- Nenhuma alteracao a endpoints/rotas neste passo
+- Nenhuma alteracao a frontend neste passo
+- Migracao foi pure-additive (apenas novo, nenhuma remocao)
+
+Pre-requisitos para fases futuras:
+  1) POST/PATCH /api/crm/leads devem aceitar marcasIds: string[]
+  2) GET endpoints devem incluir marcas[] no response
+  3) Frontend multi-select para marcas (reutilizar do visitas)
+  4) OdooClient deve enriquecer descricao com marcas (optional nesta fase)
+
+================================================================================
+5. TESTES REALIZADOS
+================================================================================
+
+5.1 Migracao BD
+  OK npm run db:push executado com sucesso
+  OK Tabela leads_marcas criada em Neon
+  OK Foreign keys configuradas corretamente
+  OK Indices criados (PK)
+
+5.2 TypeScript Compilation
+  OK npm run build sem erros
+  OK Tipos exportados corretamente
+  OK Schema validacao com Zod OK
+
+5.3 Servidor
+  OK npm run dev rodando em http://localhost:5000
+  OK Sem erros de compilacao ou runtime
+  OK Endpoints existentes continuam a funcionar
+
+5.4 LSP Diagnostics
+  - 2 erros pre-existentes em visitas (nao relacionados)
+  - Nenhum erro novo em shared/schema.ts relacionado com leadsMarcas
+
+================================================================================
+6. PROXIMOS PASSOS (Fora deste passo)
+================================================================================
+
+FASE 2 - Integrar com Endpoints:
+  1) POST /api/crm/leads:
+     - Aceitar marcasIds: string[]
+     - Criar registos em leads_marcas
+     - Atualizar campo marca com nomes
+
+  2) PATCH /api/crm/leads/:id:
+     - Aceitar marcasIds: string[]
+     - Delete/recreate records em leads_marcas
+     - Atualizar campo marca
+
+  3) GET /api/crm/leads/:id:
+     - Include marcas[] no response
+     - Estrutura: { id, nome, codigo, logoUrl }
+
+FASE 3 - Frontend:
+  1) Form de lead:
+     - Multi-select para marcas (reutilizar visitas)
+     - Submit com marcasIds
+
+  2) Listas:
+     - Mostrar badges de marcas compactas
+     - Max 2-3 marcas, "+N" se houver mais
+
+  3) Detalhe:
+     - Mostrar todas as marcas como chips
+
+FASE 4 - Odoo Sync:
+  1) OdooClient:
+     - Enriquecer descricao com marcas
+     - Ex: "Marcas: Ritmonio, Bette"
+
+================================================================================
+7. COMANDOS PARA VALIDACAO (se necessario repetir)
+================================================================================
+
+Replicar migracao:
+  npm run db:push
+
+Validar compilacao:
+  npm run build
+
+Iniciar servidor:
+  npm run dev
+
+Verificar dados:
+  SELECT * FROM leads_marcas;  (em psql/Neon)
+
+================================================================================
+8. CONCLUSAO
+================================================================================
+
+STATUS: COMPLETO - SCHEMA BACKEND + MIGRACAO BD
+
+Implementado com sucesso:
+  OK Tabela leads_marcas com 4 campos (id, leadId, marcaId, createdAt)
+  OK Foreign keys com ON DELETE CASCADE (lead) e RESTRICT (marca)
+  OK Relacoes Drizzle bidirecionais
+  OK Insert schema e tipos TypeScript exportados
+  OK Migracao BD aplicada (tabela criada em Neon)
+  OK TypeScript compilation OK
+  OK Servidor rodando sem erros
+  OK Nenhuma mudanca em endpoints/frontend
+
+Proximas fases podem agora:
+  - Adicionar marcasIds ao POST/PATCH sem quebrar nada
+  - Incluir marcas[] em GET responses
+  - Construir frontend multi-select
+  - Enriquecer Odoo sync com dados de marcas
+
+Estrutura backend esta PRONTA para integracao com endpoints.
+
+================================================================================
+FIM DO RELATORIO
+================================================================================
+
+Versao: 1.0
+Data: 27 Novembro 2025
+Escopo: Backend schema APENAS (sem endpoints/frontend)
+Status: PRONTO PARA PROXIMA FASE

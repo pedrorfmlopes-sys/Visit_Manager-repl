@@ -699,6 +699,7 @@ export const leadsRelations = relations(leads, ({ one, many }) => ({
     references: [visitas.id],
   }),
   contactosAssociados: many(leadsContactos),
+  marcasAssociadas: many(leadsMarcas),
 }));
 
 export const insertLeadSchema = createInsertSchema(leads).omit({
@@ -751,6 +752,33 @@ export const insertLeadsContactosSchema = createInsertSchema(leadsContactos).omi
 
 export type InsertLeadsContactos = z.infer<typeof insertLeadsContactosSchema>;
 export type LeadsContactos = typeof leadsContactos.$inferSelect;
+
+// FASE LEADS-EXT-02: Leads Marcas (relationship table for multiple brands per lead)
+export const leadsMarcas = pgTable("leads_marcas", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leadId: varchar("lead_id").notNull().references(() => leads.id, { onDelete: 'cascade' }),
+  marcaId: varchar("marca_id").notNull().references(() => marcas.id, { onDelete: 'restrict' }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const leadsMarcasRelations = relations(leadsMarcas, ({ one }) => ({
+  lead: one(leads, {
+    fields: [leadsMarcas.leadId],
+    references: [leads.id],
+  }),
+  marca: one(marcas, {
+    fields: [leadsMarcas.marcaId],
+    references: [marcas.id],
+  }),
+}));
+
+export const insertLeadsMarcasSchema = createInsertSchema(leadsMarcas).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertLeadsMarcas = z.infer<typeof insertLeadsMarcasSchema>;
+export type LeadsMarcas = typeof leadsMarcas.$inferSelect;
 
 // FASE 5: Visitas Marcas (relationship table)
 export const visitasMarcas = pgTable("visitas_marcas", {
