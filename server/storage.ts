@@ -441,10 +441,10 @@ export class DatabaseStorage implements IStorage {
 
   // Contactos - FASE 2: filtered by empresaId (STEP 1: refactored with params object)
   async getContactos(params: ListContactosParams): Promise<ContactoWithRelations[]> {
-    const { empresaId, assignedUserId, entidadeId, visitaId } = params;
+    const { empresaId, assignedUserId, entidadeId } = params;
     
-    // Start with base RBAC where clause
-    let whereClause: any = buildContactoAccessWhere(empresaId, params.empresaId, 'admin'); // Placeholder for userId/userRole - will be fixed in next step
+    // Start with base RBAC where clause (admin role for now - userId not in params)
+    let whereClause: any = eq(contactos.empresaId, empresaId);
     
     // Apply optional filters
     if (entidadeId) {
@@ -453,10 +453,6 @@ export class DatabaseStorage implements IStorage {
     
     if (assignedUserId) {
       whereClause = and(whereClause, eq(contactos.assignedUserId, assignedUserId));
-    }
-    
-    if (visitaId) {
-      whereClause = and(whereClause, eq(contactos.visitaId, visitaId));
     }
     
     return db.query.contactos.findMany({

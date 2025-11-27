@@ -9,6 +9,22 @@ This Progressive Web Application (PWA) is designed to streamline commercial visi
 - Follow prompts EXACTLY without adding extra features or "inventions"
 - Always use test IDs and comprehensive documentation
 
+## Recent Implementation (Nov 26, 2025)
+
+### CRM Leads Module (Complete)
+- ✅ Schema with 14 fields + 4 CRUD routes
+- ✅ Admin UI: List page (/admin/leads) + Detail page (/admin/leads/:id) with inline editing
+- ✅ User UI: "Leads desta entidade/contacto/visita" cards in detail pages
+- ✅ Branding: Odoo logo (SVG) in 5 locations with state indicators (colored vs grayscale)
+- ✅ Cache: Invalidates 5 query keys on update (list, detail, visita, entidade, contacto)
+- ✅ Feature toggle: crmLeadsEnabled flag in empresa settings
+
+### RBAC Refactoring (In Progress)
+- ✅ **ENTIDADES-RBAC-STEP1**: Centralized `buildEntidadeAccessWhere` helper + `ListEntidadesParams` object
+- ✅ **CONTACTOS-RBAC-STEP1**: Applied same pattern - `buildContactoAccessWhere` helper + `ListContactosParams` object
+- Updated 3 calls in routes.ts to use new params object format
+- 📋 TODO: Apply same pattern to Visitas, Tarefas in next sprints
+
 ## System Architecture
 
 ### Frontend Architecture
