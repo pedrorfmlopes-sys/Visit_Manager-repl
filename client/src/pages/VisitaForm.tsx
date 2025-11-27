@@ -69,34 +69,8 @@ export default function VisitaForm() {
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const { location: gpsLocation, error: gpsError, isLoading: gpsLoading, requestLocation } = useGeolocation(true);
   
-  // FASE IA-AUDIO-02: Use unified audio transcription hook for pre-save transcription
-  const audio = useAudioTranscription({
-    transcriptionEndpoint: '/api/visitas/ai/transcribe',
-    onTranscriptionComplete: (text) => {
-      // Append transcribed text to notas field
-      const currentNotas = form.getValues("notas") || "";
-      const updatedNotas = currentNotas 
-        ? currentNotas + "\n\n[Áudio transcrito]\n" + text
-        : text;
-      form.setValue("notas", updatedNotas);
-      toast({
-        title: "Áudio transcrito",
-        description: "Texto adicionado às notas da visita.",
-      });
-    },
-    onError: (error) => {
-      console.error("[VisitaForm] Audio transcription error:", error);
-    }
-  });
-
-  // Fallback for old audio recording (kept for backward compatibility if needed)
-  // PHASE 7.2: Audio recording (can be deprecated once audio hook is fully integrated)
-  const [pendingClips, setPendingClips] = useState<File[]>([]);
-  const [supportsRecording, setSupportsRecording] = useState(
-    typeof navigator !== 'undefined' && 
-    (navigator.mediaDevices?.getUserMedia !== undefined || (navigator as any).getUserMedia !== undefined) &&
-    typeof MediaRecorder !== 'undefined'
-  );
+  // FASE-AUDIO-CORE-02: Use unified audio transcription hook
+  const audio = useAudioTranscription();
   
   // Task creation state
   const [createTask, setCreateTask] = useState(false);
@@ -293,34 +267,6 @@ export default function VisitaForm() {
       queryClient.invalidateQueries({ queryKey: ["/api/entidades"] });
       queryClient.refetchQueries({ queryKey: ["/api/entidades"] });
       
-      // FASE 7.2: Upload pending audio clips after visita is created
-      if (pendingClips.length > 0 && visitaData.id) {
-        try {
-          await Promise.all(
-            pendingClips.map(async (clip) => {
-              const clipFormData = new FormData();
-              clipFormData.append('audio', clip);
-              const response = await fetch(`/api/visitas/${visitaData.id}/audio`, {
-                method: 'POST',
-                credentials: 'include',
-                body: clipFormData,
-              });
-              if (!response.ok) throw new Error('Failed to upload audio');
-              return response.ok;
-            })
-          );
-          setPendingClips([]);
-          queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaData.id, "audio"] });
-        } catch (error) {
-          console.error("Failed to upload pending clips:", error);
-          toast({ 
-            title: "Atenção", 
-            description: "Visita criada mas alguns áudios não foram enviados.",
-            variant: "destructive"
-          });
-        }
-      }
-      
       // Create task if requested
       if (createTask && taskTitle) {
         if (!currentUser) {
@@ -502,78 +448,6 @@ export default function VisitaForm() {
     setMediaFiles(prev => [...prev, ...files].slice(0, 5));
   };
 
-  // FASE 7.2: Recording functions
-  const uploadRecordedAudio = async (blob: Blob, visitaId?: string) => {
-    try {
-      const file = new File([blob], `visita-audio-${Date.now()}.webm`, { type: 'audio/webm' });
-      
-      if (!visitaId) {
-        // Nova visita - guardar em pendingClips
-        setPendingClips(prev => [...prev, file]);
-        toast({ title: "Áudio gravado", description: "Será enviado quando criares a visita." });
-        return;
-      }
-      
-      // Edição - enviar imediato
-      const formData = new FormData();
-      formData.append('audio', file);
-      
-      const response = await fetch(`/api/visitas/${visitaId}/audio`, {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      });
-      
-      if (!response.ok) throw new Error('Failed to upload audio');
-      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId, "audio"] });
-      toast({ title: "Sucesso", description: "Áudio gravado e enviado!" });
-    } catch (error) {
-      toast({ title: "Erro", description: "Falha ao enviar áudio.", variant: "destructive" });
-    }
-  };
-
-  const startRecording = async () => {
-    if (!supportsRecording) {
-      toast({ title: "Erro", description: "Gravação de áudio não suportada neste dispositivo.", variant: "destructive" });
-      return;
-    }
-    
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-      
-      mediaRecorder.ondataavailable = (e) => {
-        audioChunksRef.current.push(e.data);
-      };
-      
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        stream.getTracks().forEach(track => track.stop());
-        await uploadRecordedAudio(audioBlob);
-      };
-      
-      mediaRecorder.start();
-      setIsRecording(true);
-      setRecordingTime(0);
-      
-      if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
-      recordingIntervalRef.current = setInterval(() => {
-        setRecordingTime(t => t + 1);
-      }, 1000);
-    } catch (error) {
-      toast({ title: "Erro", description: "Permissão de microfone negada ou indisponível.", variant: "destructive" });
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -857,7 +731,7 @@ export default function VisitaForm() {
               )}
             />
 
-            {/* FASE IA-AUDIO-02: Audio Recording and Transcription Controls */}
+            {/* FASE-AUDIO-CORE-02: Audio Recording and Transcription Controls */}
             <Card className="bg-muted/50 border-primary/20">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -872,13 +746,10 @@ export default function VisitaForm() {
                     variant={audio.isRecording ? "destructive" : "default"}
                     size="sm"
                     onClick={audio.isRecording ? audio.stopRecording : audio.startRecording}
-                    disabled={!audio.supportsRecording}
                     data-testid="button-audio-record"
                   >
                     <Mic className="h-4 w-4 mr-2" />
-                    {audio.isRecording 
-                      ? `Parar (${audio.recordingTime}s)` 
-                      : 'Gravar'}
+                    {audio.isRecording ? 'Parar' : 'Gravar'}
                   </Button>
                   
                   <Button
@@ -887,9 +758,18 @@ export default function VisitaForm() {
                     size="sm"
                     onClick={async () => {
                       try {
-                        await audio.transcribe();
+                        const text = await audio.transcribe();
+                        const currentNotas = form.getValues("notas") || "";
+                        const updatedNotas = currentNotas 
+                          ? currentNotas + "\n\n" + text
+                          : text;
+                        form.setValue("notas", updatedNotas);
+                        toast({
+                          title: "Áudio transcrito",
+                          description: "Texto adicionado às notas.",
+                        });
                       } catch (error) {
-                        // Error already handled by hook
+                        // Error already handled and logged by hook
                       }
                     }}
                     disabled={!audio.hasAudio || audio.isTranscribing}
@@ -898,13 +778,34 @@ export default function VisitaForm() {
                     <Volume2 className="h-4 w-4 mr-2" />
                     {audio.isTranscribing ? 'A transcrever...' : 'Transcrever áudio'}
                   </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        const text = await audio.selectFileAndTranscribe();
+                        const currentNotas = form.getValues("notas") || "";
+                        const updatedNotas = currentNotas 
+                          ? currentNotas + "\n\n" + text
+                          : text;
+                        form.setValue("notas", updatedNotas);
+                        toast({
+                          title: "Ficheiro transcrito",
+                          description: "Texto adicionado às notas.",
+                        });
+                      } catch (error) {
+                        // Error already handled by hook
+                      }
+                    }}
+                    disabled={audio.isTranscribing}
+                    data-testid="button-audio-file"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Ficheiro
+                  </Button>
                 </div>
-                
-                {!audio.supportsRecording && (
-                  <p className="text-xs text-muted-foreground">
-                    Gravação de áudio não suportada neste browser. Usa o campo de texto normalmente.
-                  </p>
-                )}
                 
                 {audio.hasAudio && !audio.isRecording && (
                   <p className="text-xs text-green-600 dark:text-green-400">
@@ -1033,29 +934,7 @@ export default function VisitaForm() {
             )}
 
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <FormLabel>Áudio da Visita</FormLabel>
-                {supportsRecording && (
-                  <Button
-                    type="button"
-                    variant={isRecording ? "destructive" : "outline"}
-                    size="sm"
-                    onClick={isRecording ? stopRecording : startRecording}
-                    data-testid="button-record-audio-form"
-                  >
-                    <Mic className="h-3 w-3 mr-1" />
-                    {isRecording ? `Parar (${recordingTime}s)` : "Gravar"}
-                  </Button>
-                )}
-              </div>
-              
-              {isRecording && (
-                <div className="p-3 bg-destructive/10 border border-destructive rounded-md flex items-center gap-2">
-                  <div className="h-2 w-2 bg-red-500 rounded-full animate-pulse" />
-                  <p className="text-sm text-destructive font-medium">A gravar... {recordingTime}s</p>
-                </div>
-              )}
-              
+              <FormLabel>Áudio da Visita (Suplementar)</FormLabel>
               <div className="flex items-center gap-2">
                 <Input
                   type="file"
@@ -1079,33 +958,8 @@ export default function VisitaForm() {
                   </Button>
                 </div>
               )}
-              
-              {pendingClips.length > 0 && (
-                <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
-                  <p className="text-xs font-medium mb-2 text-blue-900 dark:text-blue-100">Áudios gravados nesta sessão ({pendingClips.length}):</p>
-                  <div className="space-y-2">
-                    {pendingClips.map((clip, idx) => (
-                      <div key={idx} className="flex items-center gap-2 text-xs p-2 bg-background rounded">
-                        <Volume2 className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                        <span className="flex-1">{clip.name}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setPendingClips(prev => prev.filter((_, i) => i !== idx))}
-                          className="h-6 w-6"
-                          data-testid={`button-remove-clip-${idx}`}
-                        >
-                          <Trash2 className="h-3 w-3 text-destructive" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
               <p className="text-xs text-muted-foreground">
-                A IA irá transcrever automaticamente o áudio
+                Usa o botão "Ditar Anotações" acima para gravar e transcrever áudio.
               </p>
             </div>
 
