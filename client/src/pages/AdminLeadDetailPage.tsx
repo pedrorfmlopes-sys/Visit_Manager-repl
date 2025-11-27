@@ -9,12 +9,21 @@ import { Badge } from "@/components/ui/badge";
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { ArrowLeft, ExternalLink, Mic, Wand2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, Mic, Wand2, Download, FileText } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAudioTranscription } from "@/hooks/useAudioTranscription";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Marca, VisitaWithRelations, Contacto } from "@shared/schema";
+
+type OdooLeadAttachment = {
+  id: number;
+  name: string;
+  mimetype: string | null;
+  fileSize: number | null;
+  createdAt: string;
+  downloadUrl: string;
+};
 
 type Lead = {
   id: string;
@@ -200,8 +209,9 @@ export default function AdminLeadDetailPage() {
           ) : null}
         </div>
         {!isCreateMode && (
-          <div>
+          <div className="space-y-4">
             <OdooCrmCard leadId={lead.id} odooLeadId={lead.odooLeadId} />
+            <OdooAttachmentsSection leadId={lead.id} odooLeadId={lead.odooLeadId} />
           </div>
         )}
       </div>
@@ -812,6 +822,106 @@ function LeadDetailForm({
 type OdooStatusResponse =
   | { configured: true; baseUrl: string; isActive: boolean }
   | { configured: false; message?: string };
+
+function OdooAttachmentsSection({
+  leadId,
+  odooLeadId,
+}: {
+  leadId: string;
+  odooLeadId: string | null;
+}) {
+  if (!odooLeadId) {
+    return (
+      <div className="mt-2 text-xs text-slate-500">
+        Este lead ainda não existe no Odoo, por isso não há anexos para mostrar.
+      </div>
+    );
+  }
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["lead-odoo-attachments", leadId],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/leads/${leadId}/odoo/attachments`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Erro ao carregar anexos");
+      return res.json() as Promise<{
+        success: boolean;
+        attachments?: OdooLeadAttachment[];
+      }>;
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="mt-2 text-xs text-slate-500">
+        A carregar anexos do Odoo...
+      </div>
+    );
+  }
+
+  if (isError || !data?.success) {
+    return (
+      <div className="mt-2 text-xs text-red-500">
+        Erro ao carregar anexos do Odoo.
+      </div>
+    );
+  }
+
+  const attachments = data.attachments ?? [];
+
+  if (attachments.length === 0) {
+    return (
+      <div className="mt-2 text-xs text-slate-500">
+        Sem anexos registados no Odoo para este lead.
+      </div>
+    );
+  }
+
+  return (
+    <Card data-testid="card-odoo-attachments">
+      <CardHeader>
+        <CardTitle className="text-sm">Anexos (Odoo)</CardTitle>
+        <CardDescription className="text-xs">
+          Ficheiros anexados no Odoo
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-wrap gap-2">
+          {attachments.map((att) => (
+            <AttachmentChip key={att.id} attachment={att} />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AttachmentChip({ attachment }: { attachment: OdooLeadAttachment }) {
+  const formatFileSize = (bytes: number | null): string => {
+    if (!bytes) return "?";
+    if (bytes < 1024) return `${bytes}B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+  };
+
+  return (
+    <a
+      href={attachment.downloadUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs text-slate-700 dark:text-slate-300 transition-colors"
+      data-testid={`link-attachment-${attachment.id}`}
+    >
+      <FileText className="h-3 w-3 flex-shrink-0" />
+      <span className="truncate max-w-[120px]">{attachment.name}</span>
+      <span className="text-slate-500 dark:text-slate-400 text-[10px]">
+        ({formatFileSize(attachment.fileSize)})
+      </span>
+      <Download className="h-3 w-3 flex-shrink-0 ml-0.5" />
+    </a>
+  );
+}
 
 function OdooCrmCard({ leadId, odooLeadId }: { leadId: string; odooLeadId: string | null }) {
   const { toast } = useToast();

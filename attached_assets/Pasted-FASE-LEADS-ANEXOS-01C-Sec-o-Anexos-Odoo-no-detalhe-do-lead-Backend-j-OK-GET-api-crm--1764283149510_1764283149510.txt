@@ -1,0 +1,87 @@
+FASE LEADS-ANEXOS-01C – Secção "Anexos (Odoo)" no detalhe do lead
+
+Backend já OK:
+- GET /api/crm/leads/:id/odoo/attachments devolve:
+  { success: true, attachments: OdooLeadAttachment[] }
+
+Objetivo desta fase:
+- No detalhe de lead (/admin/leads/:id), mostrar uma secção com os anexos do Odoo.
+- Só leitura: listar e permitir abrir/descarregar; ainda sem upload.
+
+Ficheiro principal:
+- client/src/pages/AdminLeadDetailPage.tsx
+(usa o mesmo padrão de onde já está o card de integração Odoo para o lead)
+
+Tarefas:
+
+1) Criar componente interno: OdooAttachmentsSection
+
+   Dentro de AdminLeadDetailPage.tsx, criar algo como:
+
+   ```tsx
+   function OdooAttachmentsSection({
+     leadId,
+     odooLeadId,
+   }: {
+     leadId: string;
+     odooLeadId: string | null;
+   }) {
+     if (!odooLeadId) {
+       return (
+         <div className="mt-2 text-xs text-slate-500">
+           Este lead ainda não existe no Odoo, por isso não há anexos para mostrar.
+         </div>
+       );
+     }
+
+     const { data, isLoading, isError } = useQuery({
+       queryKey: ["lead-odoo-attachments", leadId],
+       queryFn: async () => {
+         const res = await fetch(`/api/crm/leads/${leadId}/odoo/attachments`);
+         if (!res.ok) throw new Error("Erro ao carregar anexos");
+         return res.json() as Promise<{
+           success: boolean;
+           attachments?: OdooLeadAttachment[];
+         }>;
+       },
+     });
+
+     if (isLoading) {
+       return (
+         <div className="mt-2 text-xs text-slate-500">
+           A carregar anexos do Odoo...
+         </div>
+       );
+     }
+
+     if (isError || !data?.success) {
+       return (
+         <div className="mt-2 text-xs text-red-500">
+           Erro ao carregar anexos do Odoo.
+         </div>
+       );
+     }
+
+     const attachments = data.attachments ?? [];
+
+     if (attachments.length === 0) {
+       return (
+         <div className="mt-2 text-xs text-slate-500">
+           Sem anexos registados no Odoo para este lead.
+         </div>
+       );
+     }
+
+     return (
+       <div className="mt-3">
+         <div className="text-xs font-medium text-slate-700">
+           Anexos (Odoo)
+         </div>
+         <div className="mt-2 flex flex-wrap gap-2">
+           {attachments.map((att) => (
+             <AttachmentChip key={att.id} attachment={att} />
+           ))}
+         </div>
+       </div>
+     );
+   }
