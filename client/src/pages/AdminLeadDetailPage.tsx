@@ -11,6 +11,13 @@ import { queryClient } from "@/lib/queryClient";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { useLocation } from "wouter";
 
+type Contacto = {
+  id: string;
+  nome: string;
+  email?: string | null;
+  telemovel?: string | null;
+};
+
 type Lead = {
   id: string;
   titulo: string;
@@ -28,6 +35,7 @@ type Lead = {
   entidadeNome?: string | null;
   contactoNome?: string | null;
   visitaData?: string | null;
+  contactosAssociados?: Contacto[] | null;
 };
 
 type LeadResponse =
@@ -185,69 +193,90 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
             Entidade, contacto e visita associados a este lead.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-          <div className="space-y-0.5">
-            <div className="text-xs text-muted-foreground">Entidade</div>
-            {lead.entidadeNome ? (
-              <button
-                type="button"
-                className="underline-offset-2 hover:underline text-left"
-                onClick={() => navigate(`/admin/entidades/${lead.entidadeId}`)}
-                data-testid="link-lead-entidade"
-              >
-                {lead.entidadeNome}
-              </button>
-            ) : (
-              <span className="text-xs text-muted-foreground">
-                Sem entidade associada
-              </span>
-            )}
+        <CardContent className="space-y-3 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="space-y-0.5">
+              <div className="text-xs text-muted-foreground">Entidade</div>
+              {lead.entidadeNome ? (
+                <button
+                  type="button"
+                  className="underline-offset-2 hover:underline text-left"
+                  onClick={() => navigate(`/admin/entidades/${lead.entidadeId}`)}
+                  data-testid="link-lead-entidade"
+                >
+                  {lead.entidadeNome}
+                </button>
+              ) : (
+                <span className="text-xs text-muted-foreground">
+                  Sem entidade associada
+                </span>
+              )}
+            </div>
+
+            <div className="space-y-0.5">
+              <div className="text-xs text-muted-foreground">Contacto principal</div>
+              {lead.contactoNome ? (
+                <button
+                  type="button"
+                  className="underline-offset-2 hover:underline text-left"
+                  onClick={() => navigate(`/admin/contactos/${lead.contactoId}`)}
+                  data-testid="link-lead-contacto"
+                >
+                  {lead.contactoNome}
+                </button>
+              ) : (
+                <span className="text-xs text-muted-foreground">
+                  Sem contacto associado
+                </span>
+              )}
+            </div>
+
+            <div className="space-y-0.5">
+              <div className="text-xs text-muted-foreground">Visita</div>
+              {lead.visitaId && lead.visitaData ? (
+                <button
+                  type="button"
+                  className="underline-offset-2 hover:underline text-left"
+                  onClick={() => navigate(`/admin/visitas/${lead.visitaId}`)}
+                  data-testid="link-lead-visita"
+                >
+                  {new Date(lead.visitaData).toLocaleDateString()}
+                </button>
+              ) : lead.visitaId ? (
+                <button
+                  type="button"
+                  className="underline-offset-2 hover:underline text-left"
+                  onClick={() => navigate(`/admin/visitas/${lead.visitaId}`)}
+                  data-testid="link-lead-visita"
+                >
+                  Ver visita
+                </button>
+              ) : (
+                <span className="text-xs text-muted-foreground">
+                  Sem visita associada
+                </span>
+              )}
+            </div>
           </div>
 
-          <div className="space-y-0.5">
-            <div className="text-xs text-muted-foreground">Contacto</div>
-            {lead.contactoNome ? (
-              <button
-                type="button"
-                className="underline-offset-2 hover:underline text-left"
-                onClick={() => navigate(`/admin/contactos/${lead.contactoId}`)}
-                data-testid="link-lead-contacto"
-              >
-                {lead.contactoNome}
-              </button>
-            ) : (
-              <span className="text-xs text-muted-foreground">
-                Sem contacto associado
-              </span>
-            )}
-          </div>
-
-          <div className="space-y-0.5">
-            <div className="text-xs text-muted-foreground">Visita</div>
-            {lead.visitaId && lead.visitaData ? (
-              <button
-                type="button"
-                className="underline-offset-2 hover:underline text-left"
-                onClick={() => navigate(`/admin/visitas/${lead.visitaId}`)}
-                data-testid="link-lead-visita"
-              >
-                {new Date(lead.visitaData).toLocaleDateString()}
-              </button>
-            ) : lead.visitaId ? (
-              <button
-                type="button"
-                className="underline-offset-2 hover:underline text-left"
-                onClick={() => navigate(`/admin/visitas/${lead.visitaId}`)}
-                data-testid="link-lead-visita"
-              >
-                Ver visita
-              </button>
-            ) : (
-              <span className="text-xs text-muted-foreground">
-                Sem visita associada
-              </span>
-            )}
-          </div>
+          {lead.contactosAssociados && lead.contactosAssociados.length > 0 && (
+            <div className="space-y-1.5 border-t pt-3">
+              <div className="text-xs text-muted-foreground font-medium">Outros contactos envolvidos:</div>
+              <div className="flex flex-wrap gap-2">
+                {lead.contactosAssociados.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => navigate(`/admin/contactos/${c.id}`)}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-secondary text-secondary-foreground hover:underline"
+                    data-testid={`chip-contacto-${c.id}`}
+                  >
+                    {c.nome}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

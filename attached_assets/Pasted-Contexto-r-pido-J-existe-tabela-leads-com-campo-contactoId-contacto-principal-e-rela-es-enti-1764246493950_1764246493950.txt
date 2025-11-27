@@ -1,0 +1,63 @@
+Contexto rápido:
+- Já existe tabela leads com campo contactoId (contacto principal) e relações entidade/visita.
+- No fluxo atual, o lead é sempre criado com um único contactoId obrigatório.
+
+Objetivo da fase:
+- Permitir que um lead tenha VÁRIOS contactos associados, mantendo contactoId como "contacto principal".
+- Expor esses contactos na API e mostrar no detalhe do lead.
+- Manter tudo leve para mobile (sem ecrãs pesados).
+
+Tarefas BACKEND:
+
+1) Criar tabela de junção `leads_contactos` via Drizzle:
+   - Campos:
+     - id (uuid, pk)
+     - leadId (uuid, FK → leads.id, ON DELETE CASCADE)
+     - contactoId (uuid, FK → contactos.id, ON DELETE CASCADE)
+     - role (text, opcional, ex: "Decisor", "Técnico", etc.)
+   - Atualizar shared/schema.ts com o tipo correspondente.
+
+2) Atualizar tipo retornado em GET /api/crm/leads/:id:
+   - Tipo LeadWithRelations (ou equivalente) deve passar a incluir:
+     - contactosAssociados?: Contacto[]
+   - No query do lead, fazer join para buscar os contactos da tabela leads_contactos e devolver um array de Contacto completo em contactosAssociados.
+
+3) Atualizar endpoints POST e PATCH de /api/crm/leads:
+   - No schema de input (Zod), permitir novo campo opcional:
+     - contactosIds?: string[]
+   - Lógica:
+     - CONTINUA a exigir contactoId (contacto principal) como está agora.
+     - Se contactosIds vier preenchido:
+       - Garante que contactoId está incluído em contactosIds (se não estiver, adiciona).
+     - Ao criar/atualizar:
+       - Apaga associações anteriores desta lead em leads_contactos.
+       - Insere uma linha em leads_contactos por cada contactoId de contactosIds.
+   - Se contactosIds não vier:
+       - Comportamento atual é mantido (sem contactosAssociados extra).
+
+4) Garantir que:
+   - Todas as rotas continuam a respeitar empresaId.
+   - Feature flag crmLeadsEnabled continua aplicada.
+   - Nenhuma alteração quebra o fluxo atual de criação de lead a partir de visita.
+
+Tarefas FRONTEND (mínimas nesta fase):
+
+5) AdminLeadDetailPage (página /admin/leads/:id):
+   - No card onde hoje já aparece Entidade e Contacto:
+     - Manter o "Contacto principal" como está (contactoId atual).
+     - Adicionar uma secção pequena por baixo, algo como:
+       - "Outros contactos envolvidos:"
+       - Mostrar chips com nome dos contactos do array contactosAssociados (se existir).
+   - Não criar ecrãs de edição avançada ainda; nesta fase é só para leitura.
+
+6) Modal "Novo lead desta visita":
+   - NÃO mexer nesta fase (continua a usar apenas contacto principal).  
+   - A edição avançada de contactos virá numa fase seguinte se necessário.
+
+Critérios de aceitação:
+- Criar lead continua a funcionar exatamente como antes se contactosIds não for enviado.
+- Se um lead for criado/atualizado com contactosIds, estes aparecem em contactosAssociados no GET /api/crm/leads/:id.
+- AdminLeadDetailPage mostra a lista de contactos adicionais sem quebrar layout mobile.
+- Tests manuais:
+  - Criar lead a partir de visita (flow atual) → OK.
+  - Atualizar lead via PATCH usando contactosIds → verificar na UI que aparecem os contactos extra.

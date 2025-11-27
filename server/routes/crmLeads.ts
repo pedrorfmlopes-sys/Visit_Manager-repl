@@ -1,7 +1,7 @@
 import express from "express";
 import { and, eq } from "drizzle-orm";
 import { db } from "../db";
-import { leads, insertLeadSchema } from "../../shared/schema";
+import { leads, leadsContactos, insertLeadSchema, contactos } from "../../shared/schema";
 import { isAuthenticated } from "../replitAuth";
 import { getUserContext } from "../authContext";
 import { assertLeadsEnabled } from "../integrations/crmLeads";
@@ -82,6 +82,11 @@ export function registerCrmLeadsRoutes(app: express.Express) {
           entidade: true,
           contacto: true,
           visita: true,
+          contactosAssociados: {
+            with: {
+              contacto: true,
+            },
+          },
         },
       });
 
@@ -89,12 +94,15 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         return res.status(404).json({ success: false, message: "Lead não encontrado." });
       }
 
+      const contactosAssociados = lead.contactosAssociados?.map(lc => lc.contacto) ?? [];
+
       return res.json({
         lead: {
           ...lead,
           entidadeNome: lead.entidade?.nome ?? null,
           contactoNome: lead.contacto?.nome ?? null,
           visitaData: lead.visita?.dataVisita ?? null,
+          contactosAssociados,
         },
       });
     } catch (error: any) {
@@ -132,6 +140,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         valorPrevisto,
         moeda,
         responsavelUserId,
+        contactosIds,
       } = body;
 
       // Validate required fields
@@ -154,6 +163,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         valorPrevisto: valorPrevisto ?? null,
         moeda: moeda ?? "EUR",
         responsavelUserId: responsavelUserId ?? null,
+        contactosIds: contactosIds ?? undefined,
       });
 
       if (!validation.success) {
@@ -181,6 +191,24 @@ export function registerCrmLeadsRoutes(app: express.Express) {
           responsavelUserId: responsavelUserId ?? null,
         })
         .returning();
+
+      // Handle contactosIds if provided
+      if (contactosIds && contactosIds.length > 0) {
+        const idsToInsert = Array.from(new Set([contactoId, ...contactosIds]));
+        await db.delete(leadsContactos).where(eq(leadsContactos.leadId, created.id));
+        for (const cId of idsToInsert) {
+          await db.insert(leadsContactos).values({
+            leadId: created.id,
+            contactoId: cId,
+          });
+        }
+      } else {
+        // Ensure contactoId is in leadsContactos
+        await db.insert(leadsContactos).values({
+          leadId: created.id,
+          contactoId: contactoId,
+        });
+      }
 
       console.log("[CRM Leads] POST created lead", created);
 
@@ -224,6 +252,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         moeda,
         responsavelUserId,
         odooLeadId,
+        contactosIds,
       } = req.body;
 
       const updateData: any = {};
@@ -239,18 +268,43 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         updateData.odooLeadId = odooLeadId;
       }
 
-      if (Object.keys(updateData).length === 0) {
+      const hasUpdateData = Object.keys(updateData).length > 0;
+      const hasContactosIds = contactosIds !== undefined;
+
+      if (!hasUpdateData && !hasContactosIds) {
         return res.status(400).json({ success: false, message: "Nenhum campo para atualizar." });
       }
 
-      const [updated] = await db
-        .update(leads)
-        .set(updateData)
-        .where(and(eq(leads.id, id), eq(leads.empresaId, empresaId)))
-        .returning();
+      let updated: typeof leads.$inferSelect | undefined;
+
+      if (hasUpdateData) {
+        const result = await db
+          .update(leads)
+          .set(updateData)
+          .where(and(eq(leads.id, id), eq(leads.empresaId, empresaId)))
+          .returning();
+        updated = result[0];
+      } else {
+        const result = await db.query.leads.findFirst({
+          where: and(eq(leads.id, id), eq(leads.empresaId, empresaId)),
+        });
+        updated = result;
+      }
 
       if (!updated) {
         return res.status(404).json({ success: false, message: "Lead não encontrado." });
+      }
+
+      // Handle contactosIds if provided
+      if (hasContactosIds && contactosIds.length > 0) {
+        const idsToInsert = Array.from(new Set(contactosIds));
+        await db.delete(leadsContactos).where(eq(leadsContactos.leadId, id));
+        for (const cId of idsToInsert) {
+          await db.insert(leadsContactos).values({
+            leadId: id,
+            contactoId: cId,
+          });
+        }
       }
 
       return res.json({ success: true, lead: updated });

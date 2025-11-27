@@ -681,7 +681,7 @@ export const leads = pgTable("leads", {
     .defaultNow(),
 });
 
-export const leadsRelations = relations(leads, ({ one }) => ({
+export const leadsRelations = relations(leads, ({ one, many }) => ({
   empresa: one(empresas, {
     fields: [leads.empresaId],
     references: [empresas.id],
@@ -698,6 +698,7 @@ export const leadsRelations = relations(leads, ({ one }) => ({
     fields: [leads.visitaId],
     references: [visitas.id],
   }),
+  contactosAssociados: many(leadsContactos),
 }));
 
 export const insertLeadSchema = createInsertSchema(leads).omit({
@@ -717,10 +718,39 @@ export const insertLeadSchema = createInsertSchema(leads).omit({
   moeda: z.string().length(3).default("EUR"),
   responsavelUserId: z.string().optional().nullable(),
   odooLeadId: z.string().optional().nullable(),
+  contactosIds: z.array(z.string().uuid()).optional(),
 });
 
 export type InsertLead = z.infer<typeof insertLeadSchema>;
 export type Lead = typeof leads.$inferSelect;
+
+// FASE CRM-LEADS-02: Leads Contactos (relationship table for multiple contacts per lead)
+export const leadsContactos = pgTable("leads_contactos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leadId: varchar("lead_id").notNull().references(() => leads.id, { onDelete: 'cascade' }),
+  contactoId: varchar("contacto_id").notNull().references(() => contactos.id, { onDelete: 'cascade' }),
+  role: text("role"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const leadsContactosRelations = relations(leadsContactos, ({ one }) => ({
+  lead: one(leads, {
+    fields: [leadsContactos.leadId],
+    references: [leads.id],
+  }),
+  contacto: one(contactos, {
+    fields: [leadsContactos.contactoId],
+    references: [contactos.id],
+  }),
+}));
+
+export const insertLeadsContactosSchema = createInsertSchema(leadsContactos).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertLeadsContactos = z.infer<typeof insertLeadsContactosSchema>;
+export type LeadsContactos = typeof leadsContactos.$inferSelect;
 
 // FASE 5: Visitas Marcas (relationship table)
 export const visitasMarcas = pgTable("visitas_marcas", {
