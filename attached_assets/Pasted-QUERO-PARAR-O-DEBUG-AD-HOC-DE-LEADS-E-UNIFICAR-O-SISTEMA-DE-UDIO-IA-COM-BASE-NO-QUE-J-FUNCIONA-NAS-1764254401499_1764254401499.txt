@@ -1,0 +1,127 @@
+QUERO PARAR O DEBUG AD-HOC DE LEADS E UNIFICAR O SISTEMA DE ÁUDIO/IA COM BASE NO QUE JÁ FUNCIONA NAS VISITAS.
+
+Situação atual (do utilizador):
+- Nas VISITAS:
+  - Já existe um sistema de ditar/gravar áudio e depois usar IA para transcrever.
+  - O utilizador relata que **funciona**.
+  - Limitação UX: o botão de transcrição só aparece/deixa usar depois da visita estar gravada. Idealmente devia ser possível transcrever logo na criação/edição, antes de gravar a visita.
+- Nos LEADS:
+  - Implementámos gravação direta (MediaRecorder) + transcrição + botão IA.
+  - Na prática, a transcrição de áudio do lead continua a falhar com:
+    - 500 no /api/crm/leads/ai/transcribe
+    - Mensagem: "Falha ao transcrever áudio. Por favor, tenta novamente."
+  - O utilizador quer evitar mais debugging aqui e simplesmente **reutilizar o mesmo sistema que já funciona nas VISITAS**.
+
+OBJETIVO GLOBAL DESTA FASE:
+- Criar uma **infraestrutra única e reutilizável de Áudio + Transcrição IA** baseada na implementação das VISITAS (que o utilizador confirma que está ok).
+- Aplicar esta infraestrutura:
+  1) Na criação/edição de VISITAS (permitir gravar e transcrever antes de gravar a visita).
+  2) Na edição de LEADS (substituir/alinhar a implementação actual com a mesma infra).
+- No fim, o comportamento entre VISITAS e LEADS deve ser consistente.
+
+Tarefas concretas (passo a passo):
+
+1) Mapear o fluxo que já funciona em VISITAS
+   - Encontrar no frontend os componentes/páginas que tratam de:
+     - Gravação de áudio numa visita.
+     - Botão para mandar esse áudio para a IA transcrever.
+     - Colocar o resultado num campo de texto/nota da visita.
+   - Encontrar no backend o endpoint usado por VISITAS para transcrever áudio:
+     - Pode ser algo como: /api/visitas/ai/transcribe ou similar.
+   - Confirmar que esse fluxo **funciona**:
+     - Grava → envia áudio → OpenAI/Whisper → devolve texto → aparece na visita.
+
+2) Extrair uma infra comum de áudio + transcrição
+   FRONTEND:
+   - Criar um hook ou módulo partilhado, por exemplo:
+     - client/src/hooks/useAudioTranscription.ts
+   - Este hook deve encapsular:
+     - startRecording / stopRecording (MediaRecorder + getUserMedia);
+     - estado isRecording, transcribing;
+     - armazenamento do último Blob gravado (audioBlob);
+     - função `transcribe()` que:
+       - usa o audioBlob (ou um File passado como argumento);
+       - faz POST para um endpoint de transcrição;
+       - devolve o texto ou lança erro.
+   - Criar também, se fizer sentido, um pequeno componente reutilizável de UI:
+     - ex.: `<AudioDictationControls onTranscription={texto => ...} />`
+     - Com:
+       - Botão “Gravar/Parar”;
+       - Botão “Transcrever” (apenas ativo se existir audioBlob);
+       - Botão “Ficheiro” opcional para upload manual.
+
+   BACKEND:
+   - Identificar a função/endpoint que VISITAS usam hoje para transcrever.
+   - Criar um endpoint **GENÉRICO** (se ainda não existir), por exemplo:
+     - POST /api/ai/transcribe-audio
+       - Recebe multipart/form-data com campo "file".
+       - Usa transcribeAudio() de server/openai.ts (mesma função que já funciona nas VISITAS).
+       - Devolve { success: true, text } ou { success: false, message }.
+   - Se já existir um endpoint equivalente (usado por VISITAS), podes:
+     - Reutilizar diretamente esse endpoint para LEADS.
+     - Ou criar um alias para manter compatibilidade.
+
+   IMPORTANTE:
+   - Queremos **uma única pipeline** de backend para transcrição de áudio, usada por VISITAS e LEADS.
+   - Evitar ter um código de transcrição “especial” só para leads que depois foge ao que funciona nas visitas.
+
+3) Aplicar o módulo unificado às VISITAS
+   - Na página de criação/edição de visita:
+     - Substituir a lógica ad-hoc actual por `useAudioTranscription` (ou componente comum).
+     - Garantir que o utilizador pode:
+       1. Gravar áudio antes de gravar a visita.
+       2. Clicar “Transcrever” logo de seguida.
+       3. Ver o texto transcrito cair no campo pretendido (ex.: notas / descrição / resumo) **sem precisar de já ter o ID da visita gravado**.
+   - Se actualmente a transcrição está acoplada a um ID de visita já gravada, refatorar para:
+     - Transcrição “stateless”: o endpoint recebe apenas o ficheiro de áudio, devolve texto, e o frontend decide onde meter o texto.
+     - Manter compatível com o que já funcionava sempre que possível.
+
+4) Aplicar o módulo unificado aos LEADS
+   - Em client/src/pages/AdminLeadDetailPage.tsx:
+     - Substituir a implementação actual de gravação + transcrição (que tem dado problemas) para usar o **mesmo hook/component de áudio** das VISITAS.
+     - UI final para o campo “Descrição” deve ficar equivalente à de VISITA:
+       - Botão “Gravar/Parar” (usa isRecording do hook).
+       - Botão “Transcrever áudio” que:
+         - Usa o audioBlob (ou ficheiro escolhido);
+         - Chama o endpoint comum /api/ai/transcribe-audio;
+         - Acrescenta o texto no campo descrição (idealmente com um prefixo [Áudio transcrito], se já estiver implementado).
+       - Botão “Ficheiro” (opcional) para upload manual (reutilizando a mesma função transcribe()).
+     - Manter o botão “IA” (summarize/melhorar texto) tal como está; não mexer na lógica do summarize.
+
+   - Remover ou simplificar o endpoint /api/crm/leads/ai/transcribe se ele estiver duplicado:
+     - Se atualmente este endpoint tem código diferente e problemático, faz com que seja apenas um “proxy”/wrapper para o endpoint comum.
+     - Exemplo: handler de leads chama internamente a função comum de transcrição.
+
+5) Testes (feitos por TI, agent):
+   - VISITAS:
+     - Criar uma visita (SEM gravar imediatamente).
+     - Gravar áudio → clicar “Transcrever” → texto aparece no campo de notas/descrição.
+     - Verificar que funciona tanto em criação como em edição.
+   - LEADS:
+     - Abrir lead → gravar áudio → clicar “Transcrever áudio”.
+     - Confirmar:
+       - Request vai para o endpoint comum (ex.: /api/ai/transcribe-audio).
+       - Resposta success: true com texto.
+       - Texto aparece no campo descrição.
+     - Testar também upload via botão “Ficheiro”.
+   - Testar um cenário de erro (ex.: remover temporariamente OPENAI_API_KEY) para garantir:
+     - Mensagem de erro visível e amigável.
+     - Nada fica preso em loading.
+
+6) Documentação:
+   - Criar um relatório, por exemplo:
+     - RELATORIO_FASE-IA-AUDIO-UNIFICADO.txt
+   - Incluir:
+     - Onde está o hook/component partilhado (`useAudioTranscription` ou similar).
+     - Qual o endpoint backend comum usado pelas VISITAS e LEADS.
+     - Como ficou o fluxo de criação de VISITA (gravar + transcrever antes de gravar a visita).
+     - Como ficou o fluxo de edição de LEAD (gravar + transcrever).
+     - Quais endpoints antigos foram simplificados/encapsulados.
+
+Restrições importantes:
+- NÃO introduzir novos serviços de IA; continuar a usar OpenAI/Whisper e o que já está configurado para VISITAS.
+- NÃO mexer em Odoo, leads_marcas, anexos, etc., nesta fase.
+- Focar apenas em:
+  - unificar o áudio + transcrição IA,
+  - corrigir os problemas de LEADS ao reaproveitar o que já funciona em VISITAS,
+  - melhorar a UX de VISITAS para permitir transcrever logo na criação.
