@@ -24,19 +24,48 @@ export async function transcribeAudio(audioFilePath: string): Promise<{ text: st
   }
 
   try {
+    // FASE-LEADS-IA-03: Detailed logging for debugging
+    const stats = fs.statSync(audioFilePath);
+    console.log("[OpenAI] transcribeAudio starting", { 
+      filePath: audioFilePath, 
+      fileSize: stats.size,
+      isFile: stats.isFile(),
+    });
+
+    // Validate file size (must have content)
+    if (stats.size === 0) {
+      const err = new Error("Audio file is empty (0 bytes)");
+      console.error("[OpenAI] transcribeAudio error: empty file", { filePath: audioFilePath });
+      throw err;
+    }
+
+    // Create read stream
     const audioReadStream = fs.createReadStream(audioFilePath);
 
+    // Call Whisper API
+    console.log("[OpenAI] Calling whisper-1 API with audio stream...");
     const transcription = await openai.audio.transcriptions.create({
       file: audioReadStream,
       model: "whisper-1",
     });
 
+    console.log("[OpenAI] Whisper API success", { 
+      textLength: transcription.text?.length || 0,
+      text: transcription.text?.substring(0, 100) || "[empty]",
+    });
+
     return {
       text: transcription.text,
     };
-  } catch (error) {
-    console.error("Error transcribing audio:", error);
-    throw new Error("Failed to transcribe audio");
+  } catch (error: any) {
+    console.error("[OpenAI] transcribeAudio error:", {
+      message: error?.message || String(error),
+      code: error?.code,
+      status: error?.status,
+      type: error?.type,
+      stack: error?.stack,
+    });
+    throw error; // Re-throw for handler to catch
   }
 }
 

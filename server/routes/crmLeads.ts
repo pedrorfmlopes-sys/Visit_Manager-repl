@@ -575,8 +575,25 @@ export function registerCrmLeadsRoutes(app: express.Express) {
       await assertLeadsEnabled(empresaId);
 
       if (!req.file) {
-        console.error("[CRM Leads AI] No file provided in request");
+        console.error("[CRM Leads AI] POST /ai/transcribe: No file provided");
         return res.status(400).json({ success: false, message: "Nenhum ficheiro de áudio fornecido." });
+      }
+
+      // FASE-LEADS-IA-03: Log file details from multer
+      console.log("[CRM Leads AI] File received from multer", { 
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        originalName: req.file.originalname,
+        fieldName: req.file.fieldname,
+      });
+
+      // Validate file size on arrival
+      if (!req.file.buffer || req.file.buffer.length === 0) {
+        console.error("[CRM Leads AI] POST /ai/transcribe: Empty buffer received");
+        return res.status(400).json({ 
+          success: false, 
+          message: "Ficheiro de áudio vazio ou inválido." 
+        });
       }
 
       // Save file to temp location for transcription
@@ -585,37 +602,92 @@ export function registerCrmLeadsRoutes(app: express.Express) {
       
       try {
         // Write buffer to file
+        console.log("[CRM Leads AI] Writing buffer to temp file...", { tmpFile, bufferSize: req.file.buffer.length });
         await fs.promises.writeFile(tmpFile, req.file.buffer);
-        console.log("[CRM Leads AI] Temp file created", { tmpFile, size: req.file.buffer.length });
+        console.log("[CRM Leads AI] Temp file created successfully", { tmpFile });
+
+        // Verify file was written
+        const stats = fs.statSync(tmpFile);
+        console.log("[CRM Leads AI] Temp file verification", { tmpFile, actualSize: stats.size });
 
         // Transcribe audio
+        console.log("[CRM Leads AI] Calling transcribeAudio()...");
         const result = await transcribeAudio(tmpFile);
         
         // Clean up temp file
         await fs.promises.unlink(tmpFile).catch(() => {});
         
+        // Validate result
+        if (!result.text || result.text.includes("indisponível")) {
+          console.warn("[CRM Leads AI] Transcription returned warning/placeholder text", { text: result.text });
+          return res.status(500).json({ 
+            success: false, 
+            message: "IA não está configurada. Contacta o administrador." 
+          });
+        }
+
         console.log("[CRM Leads AI] Transcription success", { empresaId, textLength: result.text.length });
         return res.json({ success: true, text: result.text });
       } catch (transcribeError: any) {
         // Clean up temp file on error
         await fs.promises.unlink(tmpFile).catch(() => {});
         
-        // Log detailed error server-side
-        console.error("[CRM Leads AI] Transcription error details:", {
-          error: transcribeError?.message || String(transcribeError),
+        // Distinguish between different error types
+        console.error("[CRM Leads AI] Transcription error caught:", {
+          message: transcribeError?.message || String(transcribeError),
+          code: transcribeError?.code,
+          status: transcribeError?.status,
           stack: transcribeError?.stack,
-          tmpFile,
         });
+
+        // Determine error type and return appropriate message
+        const errorMsg = transcribeError?.message || String(transcribeError) || "Unknown error";
         
-        // Return friendly error to client (not technical details)
+        if (errorMsg.includes("empty") || errorMsg.includes("0 bytes")) {
+          return res.status(400).json({ 
+            success: false, 
+            message: "Ficheiro de áudio vazio. Grava de novo." 
+          });
+        }
+        
+        if (errorMsg.includes("API key") || errorMsg.includes("not configured")) {
+          return res.status(503).json({ 
+            success: false, 
+            message: "IA não está configurada. Contacta o administrador." 
+          });
+        }
+
+        if (errorMsg.includes("401") || errorMsg.includes("Unauthorized")) {
+          return res.status(503).json({ 
+            success: false, 
+            message: "Erro de autenticação com serviço de IA. Contacta o administrador." 
+          });
+        }
+
+        if (errorMsg.includes("429") || errorMsg.includes("rate limit")) {
+          return res.status(429).json({ 
+            success: false, 
+            message: "Serviço de transcrição sobrecarregado. Tenta de novo em alguns momentos." 
+          });
+        }
+
+        if (errorMsg.includes("timeout") || errorMsg.includes("ECONNREFUSED")) {
+          return res.status(503).json({ 
+            success: false, 
+            message: "Serviço de transcrição indisponível. Tenta de novo mais tarde." 
+          });
+        }
+
+        // Generic fallback for other errors
         return res.status(500).json({ 
           success: false, 
           message: "Falha ao transcrever áudio. Por favor, tenta novamente." 
         });
       }
     } catch (error: any) {
-      console.error("[CRM Leads AI] Transcription handler error:", {
-        error: error?.message || String(error),
+      console.error("[CRM Leads AI] Handler error (outer catch):", {
+        message: error?.message || String(error),
+        code: error?.code,
         stack: error?.stack,
       });
       return res.status(500).json({ 

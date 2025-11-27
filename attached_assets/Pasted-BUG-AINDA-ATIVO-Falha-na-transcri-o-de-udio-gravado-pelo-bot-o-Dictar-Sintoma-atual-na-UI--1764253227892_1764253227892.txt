@@ -1,0 +1,99 @@
+BUG AINDA ATIVO: Falha na transcrição de áudio gravado pelo botão "Dictar".
+
+Sintoma atual na UI:
+- No formulário de edição de lead (/admin/leads/:id), o botão "Dictar" já grava áudio (FASE-LEADS-IA-02).
+- Depois de gravar e parar, aparece toast:
+  "Falha na transcrição
+   Falha ao transcrever áudio. Por favor, tenta novamente."
+- Ou seja, o endpoint POST /api/crm/leads/ai/transcribe está a devolver:
+  { success: false, message: "Falha ao transcrever áudio. Por favor, tenta novamente." }
+
+Contexto técnico (segundo os relatórios):
+- Backend:
+  - POST /api/crm/leads/ai/transcribe está em server/routes/crmLeads.ts.
+  - Usa transcribeAudio() de server/openai.ts com modelo Whisper.
+  - Escreve o ficheiro em /tmp, chama transcribeAudio, depois apaga.
+- Frontend:
+  - AdminLeadDetailPage.tsx:
+    - Usa MediaRecorder para gravar áudio em WebM (type "audio/webm").
+    - Cria um Blob e envia via transcribeBlob() para /api/crm/leads/ai/transcribe.
+    - Em erro, mostra esse toast genérico.
+- Já corrigiste o problema de `require is not defined`. Agora o erro é outro.
+
+QUERO QUE TU FAÇAS O DEBUG COMPLETO, SEM TESTES MANUAIS MEUS, ATÉ SABERES O MOTIVO EXATO E CORRIGIRES.
+
+Tarefas:
+
+1) Ver logs e exceção real:
+   - No handler do POST /api/crm/leads/ai/transcribe, adiciona logs temporários específicos:
+     - Antes de chamar transcribeAudio(): loga mimetype, tamanho do ficheiro (bytes) e caminho temp.
+     - No catch: loga o erro completo (`console.error("[CRM Leads AI] Transcription error", error);`).
+   - Corre o servidor em dev e simula uma chamada ao endpoint tu mesmo (sem frontend) com um ficheiro .webm pequeno (podes usar um ficheiro de teste em /tests/assets).
+   - Lê a stack real que está a causar o "Falha ao transcrever áudio".
+
+2) Reproduzir o cenário com WebM (tipo MediaRecorder):
+   - Cria um pequeno script de teste (ex.: scripts/testTranscribeWebm.ts) ou teste com supertest que:
+     - Faz POST para /api/crm/leads/ai/transcribe com:
+       - Content-Type: multipart/form-data
+       - Campo "file" com um ficheiro .webm real ou de teste (mimetype audio/webm).
+     - Mostra a resposta JSON.
+   - Objetivo:
+     - Ver se o erro acontece apenas com WebM ou com qualquer formato.
+
+3) Corrigir o que estiver a falhar em transcribeAudio():
+   - Abre server/openai.ts e revê implementação de transcribeAudio():
+     - Como é criada a chamada para OpenAI (client.audio.transcriptions.create / whisper-1, etc).
+     - Que tipos de ficheiro / mimetypes são aceites.
+   - Possíveis problemas a verificar e corrigir:
+     a) Ficheiro vazio (tamanho 0):
+        - Se o Blob vindo do MediaRecorder estiver vazio, deteta isso e devolve erro 400 com mensagem clara.
+     b) Tipo/mimetype não suportado:
+        - Garante que audio/webm é aceite.
+        - Se for preciso, força extensão ".webm" ao ficheiro temporário.
+     c) Falta de OPENAI_API_KEY ou má config:
+        - Se OPENAI_API_KEY não estiver definida OU se getOpenAIClient() lançar erro, deteta isso explícitamente.
+        - Nesse caso, devolve algo como:
+          { success: false, message: "IA não está configurada (OPENAI_API_KEY em falta)." }
+        - Não mascarar como “Falha ao transcrever áudio, tenta novamente”.
+     d) Qualquer outro erro da API:
+        - Log completo no servidor.
+        - Resposta ao cliente com mensagem genérica, mas no log fica detalhado.
+
+4) Melhorar o handler /api/crm/leads/ai/transcribe:
+   - No catch atual, em vez de uma mensagem sempre igual, distingue os casos:
+     - Se for erro de configuração (ex.: OPENAI_API_KEY em falta):
+       - message: "IA não está configurada. Contacta o administrador."
+     - Se for erro de formato/ficheiro:
+       - message: "Formato de áudio não suportado. Usa um ficheiro curto em MP3/WAV/WEBM."
+     - Se for erro de rede/timeout da OpenAI:
+       - message: "Serviço de transcrição indisponível. Tenta de novo mais tarde."
+   - Mantém o toast no frontend genérico, mas baseado em `message` devolvida pelo backend.
+
+5) Testes automatizados (tu corres):
+   - Teste A: Transcrição com ficheiro de teste em WAV/MP3 (para garantir que a pipeline base funciona).
+   - Teste B: Transcrição com ficheiro de teste em WEBM (simulando o MediaRecorder).
+   - Para cada teste, verifica:
+     - Que a resposta é success: true e text não vazio
+       OU, se for impossível usar OpenAI real no ambiente, pelo menos que:
+       - O erro é explicito (ex.: "IA não está configurada") e não uma falha genérica.
+
+6) Só depois disto, testa com o frontend:
+   - Abre /admin/leads/:id em dev.
+   - Usa o botão "Dictar" com gravação curta (5-10 segundos).
+   - Garante que:
+     - O toast de sucesso aparece (não o de falha).
+     - O texto transcrito cai na descrição.
+   - Se não conseguires testar com áudio real, certifica-te pelo menos que:
+     - O endpoint responde corretamente no teste automatizado.
+     - E o frontend trata as respostas conforme esperado.
+
+7) Atualiza a documentação:
+   - Cria RELATORIO_FASE-LEADS-IA-03-FIX-TRANSCRIBE-FINAL.txt com:
+     - Causa raiz do erro (ex.: tipo de ficheiro, config de OpenAI, etc.).
+     - O que foi alterado em server/openai.ts e server/routes/crmLeads.ts.
+     - Como os testes automatizados garantem que agora funciona com WebM (MediaRecorder) e com upload de ficheiro.
+
+IMPORTANTE:
+- NÃO alterar AdminLeadDetailPage.tsx nesta fase.
+- NÃO mexer em outras features de IA (summarize), Odoo, ou leads_marcas.
+- Foco total: fazer com que /api/crm/leads/ai/transcribe funcione com o áudio gravado pelo MediaRecorder (audio/webm) ou, pelo menos, devolva mensagens de erro bem explícitas se a IA não estiver configurada.
