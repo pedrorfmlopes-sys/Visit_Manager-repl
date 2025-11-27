@@ -1,0 +1,60 @@
+FASE LEADS-EXT-02-FRONTEND – Multi-select de marcas e badges nos leads
+
+Contexto técnico (já feito no backend):
+- Existe tabela leads_marcas e relations configuradas.
+- GET /api/crm/leads e GET /api/crm/leads/:id já devolvem `marcas: { id, nome }[]` para cada lead.
+- POST /api/crm/leads e PATCH /api/crm/leads/:id aceitam `marcasIds?: string[]` e mantêm leads_marcas + campo texto `marca` em sync.
+
+Objetivo desta fase (só frontend):
+- No formulário de criação/edição de lead, deixar de usar input texto "Marca" e passar a usar um multi-select de marcas da empresa.
+- Nas listas e detalhe de lead, mostrar marcas como badges compactos (mobile-friendly).
+
+Tarefas FRONTEND:
+
+1) Identificar o formulário de lead:
+   - Modal "Novo lead desta visita" (criação de lead a partir de visita).
+   - Página de detalhe /admin/leads/:id (edição de lead).
+   Usa o form atual que já envia titulo, descricao, estado, valorPrevisto, etc.
+
+2) Substituir o campo de marca texto por multi-select:
+   - Reutilizar o componente de seleção de marcas/representações que já é usado nas Visitas (para garantir consistência de UX).
+   - O componente deve permitir múltipla seleção.
+   - O valor submetido no form deve ser `marcasIds: string[]` (IDs das marcas).
+   - No load do lead (modo edição), o multi-select deve vir pré-preenchido com as marcas atuais (usando o array `lead.marcas` que já vem do backend).
+   - Garantir que, se o lead não tiver marcas, o componente aparece vazio (sem crash).
+
+3) Submissão do formulário:
+   - Na criação (POST) e edição (PATCH), incluir `marcasIds` no payload se houver marcas selecionadas.
+   - Se não houver marcas selecionadas, não enviar `marcasIds` (deixar o backend manter o comportamento atual).
+   - Validar que, após guardar, o GET de lead reflete as marcas escolhidas (o form deve ser atualizado com os novos valores).
+
+4) Listas de leads (admin e contexto):
+   - Em /admin/leads (lista principal) e nas listas de:
+     - "Leads desta visita"
+     - "Leads desta entidade"
+     - "Leads deste contacto"
+   - Em cada card/linha de lead:
+     - Mostrar no máximo 2 badges de marcas (ex.: nome curto ou nome truncado).
+     - Se houver mais de 2 marcas, mostrar “+N” (ex.: "+2") em vez de listar todas.
+   - Os badges devem ser visuais mas compactos (pensar em mobile):
+     - Texto pequeno, sem ocupar muitas linhas.
+
+5) Detalhe do lead (/admin/leads/:id):
+   - Na zona onde já mostras o contexto do lead (Entidade, Contacto, etc.), adicionar uma secção "Marcas":
+     - Mostrar todas as marcas como chips/badges (scroll horizontal se necessário).
+   - Garantir que esta secção não polui o card principal em mobile (usar layout compacto).
+
+6) Compatibilidade:
+   - Leads antigos, sem marcas, devem continuar a abrir normalmente:
+     - Form com multi-select vazio.
+     - Listas sem badges.
+   - Se o backend retornar `marcas: []`, o UI deve lidar bem com isso.
+
+7) NÃO FAZER NESTA FASE:
+   - Não mexer em nada da integração com Odoo.
+   - Não mexer em filtros por marca.
+   - Não mexer em IA nem anexos.
+
+No final desta fase quero:
+- Conseguir criar/editar leads escolhendo 1..N marcas da empresa via multi-select.
+- Ver as marcas desses leads como badges nas listas e no detalhe, de forma legível em telemóvel.
