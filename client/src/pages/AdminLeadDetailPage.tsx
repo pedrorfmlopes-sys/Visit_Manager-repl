@@ -169,11 +169,11 @@ export default function AdminLeadDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
           {isCreateMode && !hasContext && (
-            <div className="p-4 bg-destructive/10 border border-destructive rounded text-sm text-destructive">
-              Erro: Esta visita não tem contexto suficiente para criar um lead (entidade ou contacto ausentes).
+            <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded text-sm text-amber-800 dark:text-amber-200 mb-4">
+              Nota: Para pre-preencher contexto, abra este formulário a partir de uma visita existente.
             </div>
           )}
-          {((isCreateMode && hasContext) || !isCreateMode) ? (
+          {(isCreateMode || !isCreateMode) ? (
             <LeadDetailForm 
               lead={lead} 
               isCreateMode={isCreateMode} 
