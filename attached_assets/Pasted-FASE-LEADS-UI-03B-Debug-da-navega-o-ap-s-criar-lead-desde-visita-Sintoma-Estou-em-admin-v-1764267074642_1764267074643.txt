@@ -1,0 +1,79 @@
+FASE LEADS-UI-03B – Debug da navegação após criar lead desde visita
+
+Sintoma:
+- Estou em /admin/visitas/:id.
+- Clico em "Novo lead desta visita", preencho o modal e clico em "Criar lead".
+- O lead é criado, mas fico na mesma página/fluxo da visita.
+- NÃO navega para o formulário completo do lead em /admin/leads/:id.
+
+Relatório FASE-LEADS-UI-03 diz que já foi implementado:
+- Ficheiro: client/src/pages/VisitaDetail.tsx
+- Função: handleCreateLeadFromVisita
+- Código esperado:
+
+  if (json?.lead?.id) {
+    setLocation(`/admin/leads/${json.lead.id}`);
+  }
+
+Na prática isto não está a acontecer.
+
+OBJETIVO:
+Garantir que, quando o POST /api/crm/leads é bem-sucedido e devolve lead.id,
+a app navega MESMO para /admin/leads/:id após fechar o modal.
+
+TAREFAS:
+
+1) Confirmar que handleCreateLeadFromVisita é MESMO o handler do modal:
+   - No VisitaDetail.tsx, rever o JSX do modal "Novo lead desta visita".
+   - Confirmar que o submit/onClick "Criar lead" chama handleCreateLeadFromVisita
+     (e não outra função antiga).
+
+2) Adicionar logs temporários em handleCreateLeadFromVisita:
+   - Logo após o fetch /api/crm/leads e antes do setLocation, em caso de sucesso:
+
+     console.log("[VisitaDetail] Lead created response", json);
+     console.log("[VisitaDetail] About to navigate to", `/admin/leads/${json?.lead?.id}`);
+
+   - No catch:
+
+     console.error("[VisitaDetail] Error creating lead from visita", error);
+
+3) Verificar a resposta real do backend:
+   - Em dev, criar um lead desde uma visita com DevTools aberto.
+   - Ver o POST /api/crm/leads:
+     - status 200/201
+     - body deve ter { success: true, lead: { id: "..." } }.
+   - Se o campo não for json.lead.id (por ex. json.data.id), ajusta o código de navegação para usar o campo correto.
+
+4) Confirmar uso correto de setLocation:
+   - Ver como useLocation() está a ser usado em VisitaDetail.tsx (ex.: na navegação após apagar visita).
+   - Usar EXACTAMENTE o mesmo padrão para navegar para `/admin/leads/${id}`.
+
+5) Ajustar o fluxo se necessário:
+   - Se o modal estiver a usar outro handler, apontar para handleCreateLeadFromVisita.
+   - Garantir que, em caso de sucesso, o bloco:
+
+     if (json?.lead?.id) {
+       setLocation(`/admin/leads/${json.lead.id}`);
+     }
+
+     é sempre executado (sem returns prematuros antes disso).
+
+6) Testes manuais:
+   - Em /admin/visitas/:id:
+     - Clicar "Novo lead desta visita".
+     - Preencher e criar.
+   - Esperado:
+     - Modal fecha.
+     - No console aparecem os logs:
+       - "[VisitaDetail] Lead created response ..."
+       - "[VisitaDetail] About to navigate to /admin/leads/<id>"
+     - A UI navega automaticamente para /admin/leads/<id>.
+     - O formulário completo do lead é mostrado.
+
+7) Remover ou comentar os logs de debug no final, deixando o código limpo.
+
+Criar RELATORIO_FASE-LEADS-UI-03B-NAVEGACAO-FIX.txt a explicar:
+- Qual era a causa (handler errado, json.lead.id inexistente, etc.).
+- Que alterações foram feitas em VisitaDetail.tsx.
+- Como ficou o fluxo final.

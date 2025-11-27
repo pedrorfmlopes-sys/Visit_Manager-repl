@@ -340,6 +340,14 @@ export default function VisitaDetail() {
 
       const json = await resp.json();
 
+      console.log("[VisitaDetail] POST /api/crm/leads response", {
+        status: resp.status,
+        statusOk: resp.ok,
+        json,
+        leadId: json?.lead?.id,
+        hasLeadId: !!json?.lead?.id,
+      });
+
       if (!resp.ok || json.success === false) {
         throw new Error(json.message || `HTTP ${resp.status}`);
       }
@@ -364,8 +372,16 @@ export default function VisitaDetail() {
       });
 
       // FASE LEADS-UI-03: Navigate to lead detail page after creation
+      console.log("[VisitaDetail] About to navigate, checking json?.lead?.id", {
+        leadId: json?.lead?.id,
+        shouldNavigate: !!json?.lead?.id,
+      });
+      
       if (json?.lead?.id) {
+        console.log("[VisitaDetail] NAVIGATING to /admin/leads/" + json.lead.id);
         setLocation(`/admin/leads/${json.lead.id}`);
+      } else {
+        console.warn("[VisitaDetail] NO lead.id in response, NOT navigating");
       }
     } catch (error: any) {
       console.error("[CRM Leads] erro ao criar lead:", error);
