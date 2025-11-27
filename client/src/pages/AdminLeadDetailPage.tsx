@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -288,6 +289,19 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
                   >
                     {c.nome}
                   </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {lead.marcas && lead.marcas.length > 0 && (
+            <div className="space-y-1.5 border-t pt-3">
+              <div className="text-xs text-muted-foreground font-medium">Marcas associadas:</div>
+              <div className="flex flex-wrap gap-2">
+                {lead.marcas.map((marca) => (
+                  <Badge key={marca.id} variant="secondary" data-testid={`badge-lead-detalhe-marca-${marca.id}`}>
+                    {marca.nome}
+                  </Badge>
                 ))}
               </div>
             </div>

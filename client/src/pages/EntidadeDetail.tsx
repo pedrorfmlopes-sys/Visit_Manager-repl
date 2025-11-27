@@ -88,6 +88,7 @@ export default function EntidadeDetail() {
     valorPrevisto: string | null;
     moeda: string | null;
     createdAt: string;
+    marcas?: { id: string; nome: string }[] | null;
   };
 
   type LeadsResponse = 
@@ -725,9 +726,22 @@ export default function EntidadeDetail() {
                   >
                     <div>
                       <div className="font-medium">{lead.titulo}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {lead.marca ? `Marca: ${lead.marca} · ` : ""}
-                        Estado: {lead.estado}
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        {lead.marcas && lead.marcas.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {lead.marcas.slice(0, 2).map((marca) => (
+                              <Badge key={marca.id} variant="secondary" className="text-xs" data-testid={`badge-lead-entidade-marca-${marca.id}`}>
+                                {marca.nome}
+                              </Badge>
+                            ))}
+                            {lead.marcas.length > 2 && (
+                              <Badge variant="outline" className="text-xs" data-testid={`badge-lead-entidade-marcas-more-${lead.id}`}>
+                                +{lead.marcas.length - 2}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                        <div>Estado: {lead.estado}</div>
                       </div>
                     </div>
                     <div className="text-right text-xs">

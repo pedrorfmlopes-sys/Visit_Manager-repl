@@ -3,7 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
+import type { Marca } from "@shared/schema";
 
 type Lead = {
   id: string;
@@ -16,6 +18,7 @@ type Lead = {
   valorPrevisto: string | null;
   moeda: string | null;
   createdAt: string;
+  marcas?: Marca[] | null;
 };
 
 type LeadsResponse =
@@ -136,7 +139,22 @@ export default function AdminLeadsPage() {
                       >
                         <td className="py-2 pr-2">{lead.titulo}</td>
                         <td className="py-2 pr-2">
-                          {lead.marca ?? "—"}
+                          {lead.marcas && lead.marcas.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {lead.marcas.slice(0, 2).map((marca) => (
+                                <Badge key={marca.id} variant="secondary" className="text-xs" data-testid={`badge-lead-marca-${marca.id}`}>
+                                  {marca.nome}
+                                </Badge>
+                              ))}
+                              {lead.marcas.length > 2 && (
+                                <Badge variant="outline" className="text-xs" data-testid={`badge-lead-marcas-more-${lead.id}`}>
+                                  +{lead.marcas.length - 2}
+                                </Badge>
+                              )}
+                            </div>
+                          ) : (
+                            "—"
+                          )}
                         </td>
                         <td className="py-2 pr-2 capitalize">
                           {lead.estado}
