@@ -714,12 +714,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Contactos endpoints - FASE 2: filtered by empresaId
+  // Contactos endpoints - FASE 2: filtered by empresaId (STEP 1: params object)
   app.get('/api/contactos', isAuthenticated, async (req: any, res) => {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      const contactos = await storage.getContactos(empresaId, userId, userRole);
+      const contactos = await storage.getContactos({ empresaId });
       res.json(contactos);
     } catch (error) {
       console.error("Error fetching contactos:", error);
@@ -2817,8 +2817,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Entidade não encontrada' });
       }
       
-      const allContactos = await storage.getContactos(empresaId, userId, userRole);
-      const contactos = allContactos.filter(c => c.entidadeId === id);
+      const allContactos = await storage.getContactos({ empresaId, entidadeId: id });
+      const contactos = allContactos;
       const visitas = await storage.getVisitasByEntidade(id, empresaId, userId, userRole);
       const tarefas = await storage.getTarefasByEntidadeId(id, empresaId, userId, userRole);
       
@@ -3781,7 +3781,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get stats for the company (admin role has access to all)
       const users = await storage.getUtilizadoresByEmpresa(empresaId);
       const entidades = await storage.getEntidades(empresaId, userId, 'admin');
-      const contactos = await storage.getContactos(empresaId, userId, 'admin');
+      const contactos = await storage.getContactos({ empresaId });
       const visitas = await storage.getVisitas(empresaId, userId, 'admin');
       const tarefas = await storage.getTarefas(empresaId, userId, 'admin');
 

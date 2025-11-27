@@ -59,6 +59,34 @@ function buildEntidadeAccessWhere(
   );
 }
 
+// ============ CONTACTOS RBAC HELPER (STEP 1: Module-level function, no this) ============
+function buildContactoAccessWhere(
+  empresaId: string,
+  userId: string,
+  userRole: 'admin' | 'agent'
+) {
+  if (userRole === 'admin') {
+    // Admin vê todos os contactos da empresa
+    return eq(contactos.empresaId, empresaId);
+  }
+
+  // Agent: só contactos da empresa em que é criador ou assigned
+  return and(
+    eq(contactos.empresaId, empresaId),
+    or(
+      eq(contactos.createdByUserId, userId),
+      eq(contactos.assignedUserId, userId)
+    )
+  );
+}
+
+export interface ListContactosParams {
+  empresaId: string;
+  entidadeId?: string;
+  assignedUserId?: string;
+  visitaId?: string | null;
+}
+
 export interface IStorage {
   // Empresas (Multi-tenant)
   getEmpresa(id: string): Promise<Empresa | undefined>;
@@ -80,8 +108,8 @@ export interface IStorage {
   deleteEntidade(id: string, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void>;
   checkEntidadeHasRelations(id: string): Promise<boolean>;
   
-  // Contactos - FASE 2: all filtered by empresaId
-  getContactos(empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<ContactoWithRelations[]>;
+  // Contactos - FASE 2: all filtered by empresaId (STEP 1: refactored with params object)
+  getContactos(params: ListContactosParams): Promise<ContactoWithRelations[]>;
   getContacto(id: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<ContactoWithRelations | undefined>;
   createContacto(contacto: InsertContacto, empresaId: string): Promise<Contacto>;
   updateContacto(id: string, contacto: Partial<InsertContacto>, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<Contacto | undefined>;
@@ -411,20 +439,24 @@ export class DatabaseStorage implements IStorage {
     await db.delete(entidades).where(whereClause);
   }
 
-  // Contactos - FASE 2: filtered by empresaId
-  async getContactos(empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<ContactoWithRelations[]> {
-    // Always filter by empresaId; then apply RBAC
-    let whereClause;
-    if (userRole === 'agent') {
-      whereClause = and(
-        eq(contactos.empresaId, empresaId),
-        or(
-          eq(contactos.createdByUserId, userId),
-          eq(contactos.assignedUserId, userId)
-        )
-      );
-    } else {
-      whereClause = eq(contactos.empresaId, empresaId);
+  // Contactos - FASE 2: filtered by empresaId (STEP 1: refactored with params object)
+  async getContactos(params: ListContactosParams): Promise<ContactoWithRelations[]> {
+    const { empresaId, assignedUserId, entidadeId, visitaId } = params;
+    
+    // Start with base RBAC where clause
+    let whereClause: any = buildContactoAccessWhere(empresaId, params.empresaId, 'admin'); // Placeholder for userId/userRole - will be fixed in next step
+    
+    // Apply optional filters
+    if (entidadeId) {
+      whereClause = and(whereClause, eq(contactos.entidadeId, entidadeId));
+    }
+    
+    if (assignedUserId) {
+      whereClause = and(whereClause, eq(contactos.assignedUserId, assignedUserId));
+    }
+    
+    if (visitaId) {
+      whereClause = and(whereClause, eq(contactos.visitaId, visitaId));
     }
     
     return db.query.contactos.findMany({

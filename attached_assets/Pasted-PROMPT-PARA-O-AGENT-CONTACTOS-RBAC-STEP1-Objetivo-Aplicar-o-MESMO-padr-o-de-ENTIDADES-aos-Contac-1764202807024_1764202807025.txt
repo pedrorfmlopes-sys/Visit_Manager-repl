@@ -1,0 +1,143 @@
+PROMPT PARA O AGENT – CONTACTOS-RBAC-STEP1
+
+Objetivo:
+Aplicar o MESMO padrão de ENTIDADES aos Contactos:
+
+Centralizar RBAC num helper buildContactoAccessWhere(empresaId);
+
+Refatorar getContactos para receber um objeto ListContactosParams;
+
+Atualizar as chamadas a getContactos para usar o novo formato.
+
+1) Criar helper RBAC de Contactos
+
+Ficheiro a editar:
+
+server/integrations/contactos.ts
+(ou o ficheiro onde está hoje a função getContactos / queries de contactos)
+
+Tarefas:
+
+Importar o que for preciso de Drizzle e schema (ajusta aos imports existentes):
+
+import { and, eq, or, isNull } from "drizzle-orm";
+import { contactos } from "../../shared/schema";
+
+
+Criar o helper, inspirado no buildEntidadeAccessWhere:
+
+function buildContactoAccessWhere(empresaId: string) {
+  return and(
+    eq(contactos.empresaId, empresaId),
+    or(eq(contactos.deleted, false), isNull(contactos.deleted))
+  );
+}
+
+
+Se a tabela contactos não tiver coluna deleted, simplifica para só eq(contactos.empresaId, empresaId).
+
+2) Refatorar getContactos para usar params object
+
+Ainda em server/integrations/contactos.ts:
+
+Criar interface:
+
+export interface ListContactosParams {
+  empresaId: string;
+  entidadeId?: string;
+  assignedUserId?: string;
+  visitaId?: string | null;
+}
+
+
+(Ajusta os filtros opcionais aos que já existem hoje em getContactos.)
+
+Alterar a assinatura de getContactos:
+
+Antes (exemplo):
+
+export async function getContactos(
+  empresaId: string,
+  entidadeId?: string,
+  assignedUserId?: string,
+  visitaId?: string | null
+) { ... }
+
+
+Depois:
+
+export async function getContactos(params: ListContactosParams) {
+  const { empresaId, entidadeId, assignedUserId, visitaId } = params;
+
+  // usar buildContactoAccessWhere(empresaId) como base do WHERE
+  // e ir acrescentando filtros opcionais (entidadeId, assignedUserId, visitaId)
+}
+
+
+Na query principal, usar o helper:
+
+let whereClause: any = buildContactoAccessWhere(empresaId);
+
+if (entidadeId) {
+  whereClause = and(whereClause, eq(contactos.entidadeId, entidadeId));
+}
+
+if (assignedUserId) {
+  whereClause = and(whereClause, eq(contactos.assignedUserId, assignedUserId));
+}
+
+if (visitaId) {
+  whereClause = and(whereClause, eq(contactos.visitaId, visitaId));
+}
+
+const rows = await db.query.contactos.findMany({
+  where: whereClause,
+  // resto igual (orderBy, relations, etc.)
+});
+
+3) Atualizar chamadas a getContactos
+
+Ficheiro a editar:
+
+server/routes.ts
+(e/ou outros ficheiros onde getContactos é usado)
+
+Tarefas:
+
+Procurar todas as chamadas a getContactos(.
+
+Para cada uma, substituir o padrão antigo por objeto:
+
+Antes (exemplos):
+
+const contactos = await getContactos(empresaId);
+const contactos = await getContactos(empresaId, entidadeId);
+const contactos = await getContactos(empresaId, entidadeId, assignedUserId);
+
+
+Depois:
+
+const contactos = await getContactos({ empresaId });
+const contactos = await getContactos({ empresaId, entidadeId });
+const contactos = await getContactos({ empresaId, entidadeId, assignedUserId });
+
+
+Regra: empresaId é sempre obrigatório no objeto.
+
+4) Testes rápidos
+
+npm run dev
+
+No browser / via API:
+
+Lista de contactos:
+
+/api/contactos (ou equivalente) → deve listar apenas contactos da empresa do utilizador.
+
+Contactos da entidade:
+
+abrir detalhe de uma entidade → secção de contactos deve continuar a funcionar.
+
+Contactos ligados à visita (se existir essa vista) → deve listar sem erros.
+
+Garante que não há erros TS/Node relacionados com getContactos ou buildContactoAccessWhere.
