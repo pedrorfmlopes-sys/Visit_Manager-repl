@@ -72,6 +72,36 @@ export default function VisitaForm() {
   // FASE-AUDIO-CORE-02: Use unified audio transcription hook
   const audio = useAudioTranscription();
   
+  // FASE-AUDIO-CORE-04: Handler for transcribing recorded audio
+  const handleTranscreverVisita = async () => {
+    try {
+      const text = await audio.transcribe();
+      if (!text) {
+        toast({
+          title: "Transcrição vazia",
+          description: "O áudio não contém texto reconhecível.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const currentNotas = form.getValues("notas") || "";
+      const updatedNotas = currentNotas ? currentNotas + "\n\n" + text : text;
+      form.setValue("notas", updatedNotas);
+      toast({
+        title: "Sucesso",
+        description: "Áudio transcrito e adicionado às notas.",
+      });
+    } catch (error: any) {
+      console.error("[VisitaForm] Erro na transcrição:", error);
+      const errorMsg = error instanceof Error ? error.message : "Falha na transcrição de áudio.";
+      toast({
+        title: "Erro na transcrição",
+        description: errorMsg || "Falha na transcrição de áudio.",
+        variant: "destructive",
+      });
+    }
+  };
+  
   // Task creation state
   const [createTask, setCreateTask] = useState(false);
   const [taskTitle, setTaskTitle] = useState("");
@@ -756,22 +786,7 @@ export default function VisitaForm() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={async () => {
-                      try {
-                        const text = await audio.transcribe();
-                        const currentNotas = form.getValues("notas") || "";
-                        const updatedNotas = currentNotas 
-                          ? currentNotas + "\n\n" + text
-                          : text;
-                        form.setValue("notas", updatedNotas);
-                        toast({
-                          title: "Áudio transcrito",
-                          description: "Texto adicionado às notas.",
-                        });
-                      } catch (error) {
-                        // Error already handled and logged by hook
-                      }
-                    }}
+                    onClick={handleTranscreverVisita}
                     disabled={!audio.hasAudio || audio.isTranscribing}
                     data-testid="button-audio-transcribe"
                   >

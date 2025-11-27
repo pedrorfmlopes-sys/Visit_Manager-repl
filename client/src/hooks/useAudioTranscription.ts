@@ -7,12 +7,13 @@ import { useState, useRef, useCallback, useEffect } from 'react';
  * - Usa o mesmo endpoint de transcrição que Visitas já usam
  */
 export function useAudioTranscription(opts?: { endpoint?: string }) {
-  const endpoint = opts?.endpoint || '/api/visitas/ai/transcribe';
+  const endpoint = opts?.endpoint || '/api/crm/leads/ai/transcribe';
   
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [hasAudio, setHasAudio] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
 
   // References
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -20,6 +21,7 @@ export function useAudioTranscription(opts?: { endpoint?: string }) {
   const audioChunksRef = useRef<Blob[]>([]);
   const audioBlobRef = useRef<Blob | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -29,6 +31,27 @@ export function useAudioTranscription(opts?: { endpoint?: string }) {
       }
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
+    };
+  }, [isRecording]);
+
+  // Timer effect: increment recordingSeconds while isRecording
+  useEffect(() => {
+    if (isRecording) {
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
+    }
+    return () => {
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
       }
     };
   }, [isRecording]);
@@ -89,6 +112,7 @@ export function useAudioTranscription(opts?: { endpoint?: string }) {
       console.log('[useAudioTranscription] Stopping recording...');
       mediaRecorderRef.current.stop();
       setIsRecording(false);
+      setRecordingSeconds(0);
     }
   }, [isRecording]);
 
@@ -198,6 +222,7 @@ export function useAudioTranscription(opts?: { endpoint?: string }) {
     isRecording,
     isTranscribing,
     hasAudio,
+    recordingSeconds,
     startRecording,
     stopRecording,
     transcribe,

@@ -150,6 +150,36 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
 
   const [saving, setSaving] = useState(false);
 
+  // FASE-AUDIO-CORE-04: Handler for transcribing recorded audio
+  const handleTranscreverLead = async () => {
+    try {
+      const text = await audio.transcribe();
+      if (!text) {
+        toast({
+          title: "Transcrição vazia",
+          description: "O áudio não contém texto reconhecível.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setForm((f) => ({
+        ...f,
+        descricao: f.descricao ? f.descricao + "\n\n" + text : text,
+      }));
+      toast({
+        title: "Sucesso",
+        description: "Áudio transcrito e adicionado à descrição.",
+      });
+    } catch (error: any) {
+      console.error("[AdminLeadDetailPage] Erro na transcrição:", error);
+      const errorMsg = error instanceof Error ? error.message : "Falha na transcrição de áudio.";
+      toast({
+        title: "Erro na transcrição",
+        description: errorMsg || "Falha na transcrição de áudio.",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Handle text summarization
   const handleSummarizeText = async () => {
@@ -399,18 +429,7 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
                   type="button"
                   size="sm"
                   variant="outline"
-                  onClick={async () => {
-                    try {
-                      const text = await audio.transcribe();
-                      setForm((f) => ({ ...f, descricao: (f.descricao || "") ? f.descricao + "\n\n" + text : text }));
-                      toast({
-                        title: "Áudio transcrito",
-                        description: "Texto adicionado à descrição.",
-                      });
-                    } catch (error) {
-                      // Error already handled by hook
-                    }
-                  }}
+                  onClick={handleTranscreverLead}
                   disabled={!audio.hasAudio || audio.isTranscribing}
                   data-testid="button-lead-transcribe-audio"
                 >

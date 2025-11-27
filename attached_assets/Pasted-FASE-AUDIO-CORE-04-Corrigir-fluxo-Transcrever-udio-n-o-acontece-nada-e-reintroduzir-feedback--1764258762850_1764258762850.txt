@@ -1,0 +1,90 @@
+FASE AUDIO-CORE-04 – Corrigir fluxo "Transcrever áudio" (não acontece nada) e reintroduzir feedback visual (timer + erros)
+
+Sintomas do utilizador:
+- O hook useAudioTranscription já está criado e integrado em:
+  - VisitaForm.tsx (campo "notas")
+  - AdminLeadDetailPage.tsx (campo "descricao")
+- Botão "Dictar" funciona: fica vermelho, texto muda para "Parar" e mensagem "Áudio gravado e pronto para transcrever" aparece depois de parar.
+- MAS:
+  - Ao clicar em "Transcrever áudio", não acontece nada:
+    - Não aparece texto no campo.
+    - Não aparece toast de erro.
+    - A sensação é que o botão não faz nada.
+
+Nota: na FASE-AUDIO-CORE-02 o timer foi removido (simplificado), mas o utilizador gostava de voltar a ter feedback de tempo de gravação e, sobretudo, ver feedback quando a transcrição falha. (Ver RELATORIO_FASE-AUDIO-CORE-02.txt) 
+
+OBJETIVOS DESTA FASE:
+1) Garantir que, ao clicar "Transcrever áudio", acontece UMA destas duas coisas de forma visível:
+   - Sucesso → texto é adicionado ao campo e aparece toast "Áudio transcrito".
+   - Erro → aparece toast com mensagem clara ("IA não está configurada", "Erro na transcrição", etc.).
+   Nunca mais "não acontece nada".
+
+2) Reintroduzir um timer simples de gravação (segundos) através do hook, para haver feedback visual durante a gravação.
+
+3) Verificar/confirmar o motivo do erro real da transcrição no backend (/api/visitas/ai/transcribe) e documentar.
+
+TAREFAS DETALHADAS:
+
+1) Atualizar hook useAudioTranscription (client/src/hooks/useAudioTranscription.ts)
+   - Adicionar uma nova propriedade exposta:
+     - `recordingSeconds: number` (começa em 0; incrementa 1/s enquanto isRecording === true; é resetado a 0 quando stopRecording é chamado).
+   - Implementar internamente com setInterval/clearInterval, garantindo cleanup no unmount.
+   - Manter API existente (isRecording, isTranscribing, hasAudio, startRecording, stopRecording, transcribe, selectFileAndTranscribe).
+
+   - Rever implementação de `transcribe()` e `selectFileAndTranscribe()`:
+     - Garantir que:
+       - Se response.ok === false:
+         - lê `response.text()` e lança Error com essa mensagem (sem tentar parse JSON).
+       - Se JSON inválido, lança Error com mensagem clara.
+       - Se `data.success === false`, lança Error com `data.message || "Erro na transcrição"`.
+     - NÃO mostrar toast no hook (continua agnóstico), apenas `throw`.
+
+2) Atualizar VisitaForm.tsx
+   - Onde hoje já faz:
+     - `const audio = useAudioTranscription();`
+   - No handler do botão "Transcrever áudio":
+     - Garantir que é algo como:
+
+       ```ts
+       async function handleTranscreverVisita() {
+         try {
+           const text = await audio.transcribe();
+           if (!text) {
+             toast.error("Transcrição vazia");
+             return;
+           }
+           form.setValue("notas", (prev) =>
+             prev ? prev + "\\n\\n" + text : text
+           );
+           toast.success("Áudio transcrito");
+         } catch (err) {
+           console.error("[Visita] Erro na transcrição", err);
+           toast.error(
+             err instanceof Error
+               ? err.message || "Falha na transcrição de áudio."
+               : "Falha na transcrição de áudio."
+           );
+         }
+       }
+       ```
+
+     - Substituir o onClick do botão "Transcrever áudio" para usar esta função.
+
+   - No JSX:
+     - Mostrar o timer perto do botão, por exemplo:
+       - "Tempo: {audio.recordingSeconds}s" quando isRecording === true.
+       - Não complicar, apenas texto pequeno ao lado/below do botão.
+
+3) Atualizar AdminLeadDetailPage.tsx (Leads)
+   - Idem VisitaForm, mas para o campo `descricao`:
+
+     ```ts
+     async function handleTranscreverLead() {
+       try {
+         const text = await audio.transcribe();
+         if (!text) {
+           toast.error("Transcrição vazia");
+           return;
+         }
+         form.setValue("descricao", (prev) =>
+           prev ? prev + "\\n\\n" + text : text
