@@ -116,6 +116,10 @@ export function registerCrmLeadsRoutes(app: express.Express) {
       const { empresaId } = await getUserContext(req);
       await assertLeadsEnabled(empresaId);
 
+      const body = req.body;
+
+      console.log("[CRM Leads] POST body", body);
+
       const {
         entidadeId,
         contactoId,
@@ -127,7 +131,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         valorPrevisto,
         moeda,
         responsavelUserId,
-      } = req.body;
+      } = body;
 
       // Validate required fields
       if (!entidadeId || !contactoId || !titulo) {
@@ -152,6 +156,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
       });
 
       if (!validation.success) {
+        console.log("[CRM Leads] POST validation errors:", validation.error.flatten());
         return res.status(400).json({
           success: false,
           message: "Validação falhou",
@@ -188,8 +193,17 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         });
       }
 
-      console.error("[CRM Leads] POST / error:", error);
-      return res.status(500).json({ success: false, message: "Erro ao criar lead." });
+      console.error("[CRM Leads] POST /api/crm/leads error:", {
+        message: error?.message,
+        code: error?.code,
+        detail: error?.detail,
+        stack: error?.stack,
+      });
+
+      return res.status(500).json({
+        success: false,
+        message: error?.message || "Erro inesperado ao criar lead.",
+      });
     }
   });
 

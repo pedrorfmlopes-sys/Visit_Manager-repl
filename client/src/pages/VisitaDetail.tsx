@@ -346,11 +346,10 @@ export default function VisitaDetail() {
         queryKey: ["/api/crm/leads", { visitaId: visita.id }],
       });
     } catch (error: any) {
-      console.error("[CRM Leads] Error creating lead from visita:", error);
+      console.error("[CRM Leads] erro ao criar lead:", error);
       toast({
         title: "Erro ao criar lead",
-        description:
-          error?.message || "Não foi possível criar o lead desta visita.",
+        description: error?.message || "Erro ao criar lead.",
         variant: "destructive",
       });
     } finally {

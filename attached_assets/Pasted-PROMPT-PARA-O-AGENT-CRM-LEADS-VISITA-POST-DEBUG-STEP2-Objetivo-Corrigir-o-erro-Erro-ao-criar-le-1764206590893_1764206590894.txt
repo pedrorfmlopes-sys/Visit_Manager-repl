@@ -1,0 +1,192 @@
+PROMPT PARA O AGENT – CRM-LEADS-VISITA-POST-DEBUG-STEP2
+
+Objetivo:
+Corrigir o erro “Erro ao criar lead” ao criar um lead a partir da visita.
+Vamos:
+
+Ver o erro real no backend em POST /api/crm/leads.
+
+Garantir que o estado e restantes campos enviados pelo frontend batem certo com o schema Drizzle.
+
+1) Backend – log detalhado do POST /api/crm/leads
+
+Ficheiro: server/routes/crmLeads.ts
+
+Localiza a rota router.post("/", requireAuth, async (req, res) => { ... }).
+
+Garante que todo o conteúdo está dentro de um try/catch.
+No catch, coloca um log mais detalhado e devolve a mensagem para o frontend:
+
+router.post("/", requireAuth, async (req, res) => {
+  try {
+    const { empresaId, userId } = await getUserContext(req);
+    await assertLeadsEnabled(empresaId);
+
+    const body = req.body;
+
+    console.log("[CRM Leads] POST body", body);
+
+    // ... lógica atual de validação + insert ...
+
+  } catch (error: any) {
+    console.error("[CRM Leads] POST /api/crm/leads error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message:
+        error?.message ||
+        "Erro inesperado ao criar lead.",
+    });
+  }
+});
+
+
+Não alteres ainda a lógica do insert; só adiciona/ajusta o console.error e o message claro na resposta.
+
+2) Frontend – mostrar a mensagem vinda do backend
+
+Ficheiro: client/src/pages/VisitaDetail.tsx
+
+Na função handleCreateLeadFromVisita, dentro do try onde fazes o fetch("/api/crm/leads"...), depois de receberes a resposta, garante que:
+
+const resp = await fetch("/api/crm/leads", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  credentials: "include",
+  body: JSON.stringify(body),
+});
+
+const json = await resp.json();
+
+if (!resp.ok || json.success === false) {
+  throw new Error(json.message || `HTTP ${resp.status}`);
+}
+
+
+No catch dessa função, usa error.message na toast:
+
+} catch (error: any) {
+  console.error("[CRM Leads] erro ao criar lead:", error);
+  toast({
+    title: "Erro ao criar lead",
+    description:
+      error?.message || "Erro ao criar lead.",
+    variant: "destructive",
+  });
+}
+
+
+Assim vamos ver o erro concreto vindo do backend.
+
+3) Ver o erro real
+
+npm run dev
+
+No browser, abre uma visita com entidade + contacto e tenta criar um lead.
+
+Quando aparecer a toast de erro, olha para:
+
+Consola do servidor → log [CRM Leads] POST /api/crm/leads error: ...
+
+Consola do browser → log [CRM Leads] erro ao criar lead: ...
+
+Com base na mensagem (provável: erro de enum/valor inválido em estado ou outro campo não-null):
+
+4) Ajustar o campo estado (provável causa)
+
+Ficheiro: shared/schema.ts (ou onde está o schema leads / enum de estado)
+
+Verifica como está definido o estado do lead.
+Exemplo típico:
+
+export const leadEstadoEnum = pgEnum("lead_estado", [
+  "novo",
+  "em_analise",
+  "proposta_enviada",
+  "ganho",
+  "perdido",
+]);
+
+
+e no schema:
+
+estado: leadEstadoEnum("estado").notNull().default("novo"),
+
+
+Agora abre o componente do modal “Novo lead desta visita”:
+
+Ficheiro: client/src/components/leads/LeadFromVisitaDialog.tsx
+(ajusta ao nome real, é o diálogo que usas na visita).
+
+Garante que os values do select de estado são os mesmos do enum, e só o label é “bonito”.
+Exemplo:
+
+const ESTADOS_LEAD = [
+  { value: "novo", label: "Novo" },
+  { value: "em_analise", label: "Em análise" },
+  { value: "proposta_enviada", label: "Proposta enviada" },
+  { value: "ganho", label: "Ganho" },
+  { value: "perdido", label: "Perdido" },
+];
+
+
+No JSX:
+
+<Select
+  value={leadForm.estado}
+  onValueChange={(value) =>
+    setLeadForm((f) => ({ ...f, estado: value }))
+  }
+>
+  <SelectTrigger>
+    <SelectValue placeholder="Seleciona o estado" />
+  </SelectTrigger>
+  <SelectContent>
+    {ESTADOS_LEAD.map((opt) => (
+      <SelectItem key={opt.value} value={opt.value}>
+        {opt.label}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+
+
+Na construção do body para o POST, certifica-te de que mandas o value “cru” (sem capitalizar):
+
+const body = {
+  entidadeId: visita.entidadeId,
+  contactoId: contactoIdFromVisita!,
+  visitaId: visita.id,
+  titulo: leadForm.titulo.trim(),
+  marca: leadForm.marca || null,
+  estado: leadForm.estado || "novo",
+  valorPrevisto: leadForm.valorPrevisto
+    ? Number(leadForm.valorPrevisto)
+    : null,
+  moeda: "EUR",
+  responsavelUserId: null,
+};
+
+5) Testes finais
+
+npm run dev
+
+No browser:
+
+Na mesma visita, volta a abrir “Novo lead desta visita”.
+
+Preenche Título, Marca, escolhe Estado, Valor previsto.
+
+“Criar lead”.
+
+Verifica:
+
+Não aparece toast de erro.
+
+O card “Leads desta visita” mostra o lead.
+
+/admin/leads mostra o lead.
+
+Entidade e Contacto associados mostram o lead nos respetivos painéis.
+
+Se, depois destas alterações, o log do backend ainda mostrar outro erro específico (ex.: campo valorPrevisto ou moeda), usa a mensagem exata para ajustar esse campo – mas o fluxo de debug acima já deixa tudo preparado.
