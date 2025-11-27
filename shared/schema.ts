@@ -1101,6 +1101,7 @@ export type VisitaWithRelations = Visita & {
   assignedUser?: User | null;
   createdByUser?: User | null;
   visitasPosteriores?: VisitaWithRelations[];
+  contactosPresentes?: Contacto[];
 };
 
 export type TarefaWithRelations = Tarefa & {

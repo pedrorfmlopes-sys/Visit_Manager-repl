@@ -1,0 +1,124 @@
+PROMPT PARA O AGENT – CRM-LEADS-VISITA-CONTACT-ID-FIX
+
+Objetivo:
+Ao criar um lead a partir de uma visita, usar um contactoId válido da tabela contactos, para não rebentar a FK leads_contacto_id_contactos_id_fk.
+
+1) Ver a estrutura real dos contactos da visita
+
+Ficheiro: client/src/pages/VisitaDetail.tsx
+
+Procura o tipo/interface usado para a visita no detalhe, algo como VisitaWithRelations, VisitaDetail ou semelhante.
+
+Vê dentro desse tipo a propriedade onde vêm os contactos da visita. Os formatos mais prováveis são:
+
+visita.contactos: { id: string; nome: string; ... }[]
+(id = id da tabela contactos)
+
+ou
+
+visita.contactos: { id: string; contactoId: string; contacto: { id: string; nome: string } }[]
+(id = id da pivot; contactoId = FK para contactos.id)
+
+ou algo semelhante (ex.: contacto_id).
+
+Não assumas que id é sempre o da tabela contactos — confirma no tipo.
+
+2) Ajustar o cálculo de contactoIdFromVisita
+
+Ainda em VisitaDetail.tsx, na função handleCreateLeadFromVisita, vamos substituir a lógica de fallback do contacto.
+
+Localiza a linha onde definimos contactoIdFromVisita (que neste momento está a usar visita.contactos[0].id).
+
+Substitui por uma lógica que:
+
+Usa visita.contactoId se existir;
+
+Caso contrário, tenta ir buscar o ID do contacto real ao array de contactos da visita.
+
+Exemplos de acordo com o formato que encontrares:
+
+Caso A – visita.contactos já é array de contactos reais
+
+Se o tipo for algo como:
+
+type VisitaContacto = {
+  id: string;      // id do contacto (tabela contactos)
+  nome: string;
+  ...
+};
+visita.contactos: VisitaContacto[];
+
+
+então:
+
+const contactoIdFromVisita: string | null =
+  visita?.contactoId ||
+  (Array.isArray(visita?.contactos) && visita.contactos[0]?.id) ||
+  null;
+
+Caso B – visita.contactos é array da pivot com contactoId
+
+Se for algo como:
+
+type VisitaContactoPivot = {
+  id: string;             // id da pivot
+  contactoId: string;     // FK contactos.id
+  contacto: { id: string; nome: string; ... };
+};
+visita.contactos: VisitaContactoPivot[];
+
+
+então:
+
+const contactoIdFromVisita: string | null =
+  visita?.contactoId ||
+  (Array.isArray(visita?.contactos) && visita.contactos[0]?.contactoId) ||
+  null;
+
+
+Ajusta contactoId para o nome real da propriedade se for diferente (ex.: contact_id).
+
+Mantém o resto da função igual, incluindo:
+
+if (!visita?.id || !visita.entidadeId || !contactoIdFromVisita) {
+  toast({
+    title: "Erro",
+    description:
+      "Esta visita não tem contexto suficiente para criar um lead. Garante que está associada a uma entidade e pelo menos a um contacto.",
+    variant: "destructive",
+  });
+  return;
+}
+
+const body = {
+  entidadeId: visita.entidadeId,
+  contactoId: contactoIdFromVisita!,
+  visitaId: visita.id,
+  ...
+};
+
+3) Testes rápidos
+
+npm run dev
+
+No browser:
+
+Abre uma visita que:
+
+está ligada a uma entidade,
+
+tem pelo menos um contacto presente.
+
+Clica em “Adicionar lead”, preenche título/marca/valor, cria lead.
+
+Verifica:
+
+O POST /api/crm/leads já não rebenta com FK,
+
+Vês o novo lead na secção “Leads desta visita”,
+
+/admin/leads lista esse lead,
+
+Entidade e Contacto mostram o lead nas respetivas listas.
+
+Não mexas ainda na parte de marcas / Odoo; este passo é só para garantirmos que o ID do contacto usado na FK é mesmo o da tabela contactos.

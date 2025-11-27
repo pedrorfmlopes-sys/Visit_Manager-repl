@@ -280,11 +280,11 @@ export default function VisitaDetail() {
   // FASE CRM-LEADS-VISITA-STEP1: Create CRM lead from visita
   const handleCreateLeadFromVisita = async () => {
     // Determinar contactoId da visita:
-    // 1º tenta visita.contactoId
-    // 2º se vazio, tenta o primeiro contacto da lista de contactos da visita (se existir)
+    // 1º tenta visita.contactoId (single contact, legacy field)
+    // 2º se vazio, tenta o primeiro contacto de contactosPresentes (pivot table)
     const contactoIdFromVisita: string | null =
       visita?.contactoId ||
-      (Array.isArray((visita as any)?.contactos) && (visita as any).contactos[0]?.id) ||
+      (Array.isArray(visita?.contactosPresentes) && visita.contactosPresentes[0]?.id) ||
       null;
 
     if (!visita?.id || !visita.entidadeId || !contactoIdFromVisita) {
