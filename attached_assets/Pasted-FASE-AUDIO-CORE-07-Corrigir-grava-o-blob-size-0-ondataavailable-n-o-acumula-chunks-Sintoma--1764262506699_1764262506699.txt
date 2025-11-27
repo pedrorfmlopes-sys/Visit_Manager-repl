@@ -1,0 +1,77 @@
+FASE AUDIO-CORE-07 – Corrigir gravação: blob size 0 (ondataavailable não acumula chunks)
+
+Sintoma atual (confirmado em DevTools):
+- Console ao gravar:
+  [useAudioTranscription] Starting recording...
+  [useAudioTranscription] Recording started with 500ms timeslice
+  [useAudioTranscription] Recording stopped, blob size: 0
+  [useAudioTranscription] Recording stopped, audio ready for transcription
+  [useAudioTranscription] Stopping recording...
+- NÃO aparecem logs "Audio chunk received ..."
+- Ao transcrever, o backend responde 400 "Ficheiro de áudio vazio ou inválido."
+
+Conclusão:
+- mediaRecorder.start(500) está a ser chamado,
+- mas ondataavailable não está a encher audioChunksRef.current,
+- por isso o Blob final tem size 0.
+
+Objetivo:
+- Garantir que startRecording/stopRecording em client/src/hooks/useAudioTranscription.ts
+  acumulam chunks corretamente em audioChunksRef.current e geram um Blob com size > 0.
+
+Tarefas:
+
+1) Abrir client/src/hooks/useAudioTranscription.ts e rever as funções:
+   - startRecording
+   - stopRecording
+   - setup do MediaRecorder (ondataavailable, onstop)
+
+2) Implementar este padrão (adaptado ao nosso código):
+
+   - startRecording:
+     - Pedir getUserMedia({ audio:true }).
+     - Criar novo MediaRecorder(stream, { mimeType: 'audio/webm' }).
+     - Fazer:
+       audioChunksRef.current = [];
+       mediaRecorder.ondataavailable = (event) => {
+         if (event.data && event.data.size > 0) {
+           audioChunksRef.current.push(event.data);
+           console.log('[useAudioTranscription] Audio chunk received', {
+             size: event.data.size,
+             chunks: audioChunksRef.current.length,
+           });
+         }
+       };
+       mediaRecorder.onstop = () => {
+         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+         console.log('[useAudioTranscription] Recording stopped, blob size:', blob.size);
+         audioBlobRef.current = blob;
+         setHasAudio(blob.size > 0);
+         stream.getTracks().forEach((t) => t.stop());
+       };
+       mediaRecorderRef.current = mediaRecorder;
+       mediaRecorder.start(500);
+       console.log('[useAudioTranscription] Recording started with 500ms timeslice');
+       setIsRecording(true);
+
+   - stopRecording:
+       console.log('[useAudioTranscription] Stopping recording...');
+       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+         mediaRecorderRef.current.stop();
+       }
+
+3) Não mexer em:
+   - transcribe() (que já converte Blob → File e envia),
+   - nem no VisitaForm/AdminLeadDetailPage.
+
+4) Testar em /visitas/nova:
+   - Gravar 3–5 segundos -> ver no console:
+     - "Audio chunk received ..." pelo menos 1 vez
+     - "Recording stopped, blob size: NNNN" com NNNN > 1000
+   - Clicar "Transcrever áudio" -> confirmar se:
+     - backend já não devolve "ficheiro vazio ou inválido"
+     - e, se a IA estiver configurada, vem texto.
+
+5) Documentar em RELATORIO_FASE-AUDIO-CORE-07-BLOB-CHUNKS.txt
+   - Como ficou o startRecording/stopRecording.
+   - Qual foi o blob.size observado nos testes.

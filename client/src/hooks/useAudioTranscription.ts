@@ -58,6 +58,7 @@ export function useAudioTranscription(opts?: { endpoint?: string }) {
 
   /**
    * Start audio recording using MediaRecorder
+   * FASE-AUDIO-CORE-07: Fixed blob size 0 by adding explicit mimeType
    */
   const startRecording = useCallback(async () => {
     try {
@@ -67,27 +68,28 @@ export function useAudioTranscription(opts?: { endpoint?: string }) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
 
-      // Create MediaRecorder
-      const mediaRecorder = new MediaRecorder(stream);
+      // Create MediaRecorder with explicit mime type
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
       // Accumulate audio chunks
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
+        if (event.data && event.data.size > 0) {
           audioChunksRef.current.push(event.data);
           console.log('[useAudioTranscription] Audio chunk received', { size: event.data.size, chunks: audioChunksRef.current.length });
         }
       };
 
-      // Handle stop event
+      // Handle stop event - create blob from accumulated chunks
       mediaRecorder.onstop = () => {
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        audioChunksRef.current = [];
+        console.log('[useAudioTranscription] Recording stopped, blob size:', blob.size, 'chunks:', audioChunksRef.current.length);
         audioBlobRef.current = blob;
-        console.log('[useAudioTranscription] Recording stopped, blob size:', blob.size);
-        setHasAudio(true);
-        console.log('[useAudioTranscription] Recording stopped, audio ready for transcription');
+        setHasAudio(blob.size > 0);
+        
+        // Stop all audio tracks to free up microphone
+        stream.getTracks().forEach((track) => track.stop());
       };
 
       // Handle error
@@ -96,8 +98,8 @@ export function useAudioTranscription(opts?: { endpoint?: string }) {
         setIsRecording(false);
       };
 
-      // Start recording with timeslice to force data events
-      mediaRecorder.start(500); // Request data every 500ms
+      // Start recording with timeslice to force data events every 500ms
+      mediaRecorder.start(500);
       setIsRecording(true);
       setHasAudio(false);
       setRecordingSeconds(0);
@@ -109,15 +111,16 @@ export function useAudioTranscription(opts?: { endpoint?: string }) {
 
   /**
    * Stop audio recording
+   * FASE-AUDIO-CORE-07: Check state before stopping to prevent issues
    */
   const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && isRecording) {
-      console.log('[useAudioTranscription] Stopping recording...');
+    console.log('[useAudioTranscription] Stopping recording...');
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      setRecordingSeconds(0);
     }
-  }, [isRecording]);
+    setIsRecording(false);
+    setRecordingSeconds(0);
+  }, []);
 
   /**
    * Transcribe the audio blob that was recorded via startRecording/stopRecording
