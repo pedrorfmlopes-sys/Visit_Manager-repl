@@ -1260,19 +1260,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createMarca(marca: InsertMarca): Promise<Marca> {
-    const [newMarca] = await db
-      .insert(marcas)
-      .values(marca)
-      .returning();
-    return newMarca;
+    console.log("[DEBUG STORAGE] createMarca input:", JSON.stringify(marca));
+    try {
+      const result = await db
+        .insert(marcas)
+        .values(marca as any)
+        .returning();
+      console.log("[DEBUG STORAGE] createMarca result array length:", result.length, "data:", JSON.stringify(result[0]));
+      if (!result[0]) {
+        throw new Error("Insert returned empty result - possible constraint violation");
+      }
+      return result[0];
+    } catch (error) {
+      console.error("[ERROR STORAGE] createMarca failed:", error instanceof Error ? error.message : String(error));
+      throw error;
+    }
   }
 
   async updateMarca(id: string, marca: Partial<InsertMarca>, empresaId: string): Promise<Marca | undefined> {
+    console.log("[DEBUG STORAGE] updateMarca input:", { id, marca, empresaId });
     const [updated] = await db
       .update(marcas)
       .set({ ...marca, updatedAt: new Date() })
       .where(and(eq(marcas.id, id), eq(marcas.empresaId, empresaId)))
       .returning();
+    console.log("[DEBUG STORAGE] updateMarca result:", updated);
     return updated;
   }
 

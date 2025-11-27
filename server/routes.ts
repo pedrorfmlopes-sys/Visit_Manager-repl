@@ -3453,7 +3453,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/admin/marcas - Create new brand
   app.post('/api/admin/marcas', requireAdmin, async (req: any, res) => {
     try {
+      console.log("[DEBUG ROUTE] POST /api/admin/marcas - body:", req.body);
       const { empresaId } = await getUserContext(req);
+      console.log("[DEBUG ROUTE] getUserContext empresaId:", empresaId);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       
       const { nome, codigo, descricao, logoUrl, ativa } = req.body;
@@ -3472,17 +3474,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ativa: ativa !== false, // default true
       });
       
+      console.log("[DEBUG ROUTE] POST /api/admin/marcas created:", newMarca);
       res.json(newMarca);
     } catch (error) {
-      console.error("Error creating marca:", error);
-      res.status(400).json({ message: "Failed to create marca" });
+      console.error("[ERROR] Error creating marca:", error);
+      res.status(400).json({ success: false, message: "Failed to create marca", error: (error as any)?.message });
     }
   });
 
   // PATCH /api/admin/marcas/:id - Update brand
   app.patch('/api/admin/marcas/:id', requireAdmin, async (req: any, res) => {
     try {
+      console.log("[DEBUG ROUTE] PATCH /api/admin/marcas/:id - body:", req.body, "id:", req.params.id);
       const { empresaId } = await getUserContext(req);
+      console.log("[DEBUG ROUTE] getUserContext empresaId:", empresaId);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       
       const { nome, codigo, descricao, logoUrl, ativa } = req.body;
@@ -3494,14 +3499,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (logoUrl !== undefined) updateData.logoUrl = logoUrl;
       if (ativa !== undefined) updateData.ativa = ativa;
       
+      console.log("[DEBUG ROUTE] updateData:", updateData);
       const updated = await storage.updateMarca(req.params.id, updateData, empresaId);
+      console.log("[DEBUG ROUTE] PATCH result:", updated);
       if (!updated) {
         return res.status(404).json({ message: "Marca not found or unauthorized" });
       }
       res.json(updated);
     } catch (error) {
-      console.error("Error updating marca:", error);
-      res.status(500).json({ message: "Failed to update marca" });
+      console.error("[ERROR] Error updating marca:", error);
+      res.status(500).json({ success: false, message: "Failed to update marca", error: (error as any)?.message });
     }
   });
 
