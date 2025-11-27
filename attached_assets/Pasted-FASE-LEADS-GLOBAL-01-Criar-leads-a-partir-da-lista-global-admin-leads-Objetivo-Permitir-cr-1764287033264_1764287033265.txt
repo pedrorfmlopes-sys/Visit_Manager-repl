@@ -1,0 +1,61 @@
+FASE-LEADS-GLOBAL-01 – Criar leads a partir da lista global (/admin/leads)
+
+Objetivo:
+Permitir criar novos leads diretamente a partir da página de lista de leads (/admin/leads),
+sem depender de uma visita. Aproveitar o create mode já existente em AdminLeadDetailPage
+(id === "new") e o parâmetro returnTo.
+
+Contexto atual (importante NÃO estragar):
+- Já existe create mode em /admin/leads/new, usado quando venho de uma visita:
+  /admin/leads/new?visitaId=...&entidadeId=...&contactoId=...&returnTo=...
+- AdminLeadDetailPage já trata:
+  - isCreateMode = id === "new"
+  - lê search params (visitaId, entidadeId, contactoId, returnTo)
+  - faz POST /api/crm/leads em create mode
+  - no fim usa returnTo para voltar à visita.
+- Este fluxo tem de continuar a funcionar exatamente como está.
+
+Tarefas:
+
+1) Botão "Novo lead" em /admin/leads
+   - Ficheiro: página de lista de leads (ex.: client/src/pages/AdminLeadsPage.tsx
+     ou similar – usa o ficheiro que já existe para a lista global).
+   - Adicionar um botão visível no topo (ex.: canto superior direito do card):
+     - Label: "Novo lead"
+     - Variante compatível com o design atual (ex.: <Button variant="default" size="sm">).
+   - Ao clicar:
+     - Navegar para /admin/leads/new
+     - Incluir o parâmetro returnTo com o path atual da lista:
+       /admin/leads/new?returnTo=/admin/leads
+     - NÃO passar visitaId/entidadeId/contactoId neste fluxo (vão em branco).
+
+2) Confirmar comportamento em AdminLeadDetailPage (sem alterações grandes)
+   - Garantir que o código atual já suporta o caso:
+     - id === "new"
+     - visitaId/entidadeId/contactoId ausentes
+     - returnTo=/admin/leads
+   - Se for preciso, apenas ajustar o fallback de navegação:
+     - Após criar o lead com sucesso (POST /api/crm/leads):
+       - Se houver returnTo → navegar para esse URL (já existe).
+       - Se não houver returnTo → fallback para /admin/leads.
+   - Não alterar a lógica específica quando existe visitaId (fluxo visita → lead → volta visita).
+
+3) Testes manuais rápidos
+   - Cenário A: criar lead a partir da lista
+     1. Abrir /admin/leads.
+     2. Clicar "Novo lead".
+     3. Confirmar que abre /admin/leads/new com título "Novo lead".
+     4. Preencher título e restantes campos mínimos.
+     5. Gravar.
+     6. Esperado: volta para /admin/leads e o novo lead aparece na tabela.
+   - Cenário B: criar lead a partir de visita (regressão)
+     1. Abrir uma visita com entidade/contacto.
+     2. Clicar "Novo lead desta visita".
+     3. Confirmar que abre /admin/leads/new com o contexto da visita.
+     4. Gravar.
+     5. Esperado: volta à visita e o novo lead aparece na secção “Leads desta visita”.
+
+Restrições:
+- Não mexer em lógica Odoo, anexos ou áudio.
+- Não introduzir novos endpoints backend.
+- Manter o módulo de Leads e as feature flags a funcionar como estão.

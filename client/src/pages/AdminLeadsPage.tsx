@@ -52,6 +52,13 @@ export default function AdminLeadsPage() {
             Lista de oportunidades / leads da empresa.
           </p>
         </div>
+        <Button
+          onClick={() => navigate("/admin/leads/new?returnTo=/admin/leads")}
+          size="sm"
+          data-testid="button-novo-lead"
+        >
+          Novo lead
+        </Button>
       </div>
 
       {isLoading && (

@@ -410,10 +410,15 @@ function LeadDetailForm({
           visitaId && queryClient.invalidateQueries({ queryKey: ["/api/crm/leads", { visitaId }] }),
         ]);
 
-        // BUG-FIX: Navigate based on visitaId priority (if created from visita)
-        const target = visitaId
-          ? `/visitas/${visitaId}`
-          : `/admin/leads/${createdId}`;
+        // FASE-LEADS-GLOBAL-01: Navigate with returnTo support
+        // Priority: returnTo > visitaId > detail page
+        let target = `/admin/leads/${createdId}`;
+        
+        if (returnTo) {
+          target = returnTo;
+        } else if (visitaId) {
+          target = `/visitas/${visitaId}`;
+        }
 
         console.log("[AdminLeadDetail] handleSave target:", {
           visitaId,
