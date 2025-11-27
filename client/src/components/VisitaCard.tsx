@@ -10,12 +10,20 @@ interface VisitaCardProps {
   visita: VisitaWithRelations;
   onClick: () => void;
   currentEntidadeName?: string;
+  currentUserId?: string;
 }
 
-export function VisitaCard({ visita, onClick, currentEntidadeName }: VisitaCardProps) {
+export function VisitaCard({ visita, onClick, currentEntidadeName, currentUserId }: VisitaCardProps) {
   const hasMedia = (visita.mediaUrls && visita.mediaUrls.length > 0) || visita.audioUrl;
   const dataFormatada = format(new Date(visita.dataVisita), "d 'de' MMMM, yyyy", { locale: pt });
-  const nomeEntidade = visita.entidade?.nome ?? currentEntidadeName ?? "Entidade desconhecida";
+  
+  // Contactos presentes (excluindo o utilizador atual)
+  const contactosOutros = (visita.contactosPresentes || []).filter(
+    (vc: any) => vc.contacto && vc.contacto.id !== currentUserId
+  );
+  const contactosLabel = contactosOutros.length > 0
+    ? contactosOutros.map((vc: any) => vc.contacto?.nome || vc.contacto?.email).filter(Boolean).join(", ")
+    : "Sem contactos registados";
 
   return (
     <Card
@@ -37,7 +45,7 @@ export function VisitaCard({ visita, onClick, currentEntidadeName }: VisitaCardP
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 mb-2">
             <h3 className="font-medium text-base text-foreground" data-testid={`text-visita-gabinete-${visita.id}`}>
-              {nomeEntidade}
+              {visita.entidade?.nome ?? currentEntidadeName ?? "Entidade desconhecida"}
             </h3>
             <Badge variant="secondary" className="text-xs whitespace-nowrap">
               {dataFormatada}
@@ -45,6 +53,11 @@ export function VisitaCard({ visita, onClick, currentEntidadeName }: VisitaCardP
           </div>
           
           <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <User className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="truncate">{contactosLabel}</span>
+            </div>
+            
             {visita.assignedUser && (
               <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                 <UserCheck className="h-3.5 w-3.5 flex-shrink-0" />
@@ -53,12 +66,6 @@ export function VisitaCard({ visita, onClick, currentEntidadeName }: VisitaCardP
                     ? `${visita.assignedUser.firstName} ${visita.assignedUser.lastName}`
                     : visita.assignedUser.email}
                 </span>
-              </div>
-            )}
-            {visita.contacto && (
-              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <User className="h-3.5 w-3.5 flex-shrink-0" />
-                <span className="truncate">{visita.contacto.nome}</span>
               </div>
             )}
             

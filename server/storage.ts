@@ -300,6 +300,11 @@ export class DatabaseStorage implements IStorage {
           limit: 10,
           with: {
             entidade: true,
+            contactosPresentes: {
+              with: {
+                contacto: true,
+              },
+            },
           },
         },
         entidadeTipo: true,

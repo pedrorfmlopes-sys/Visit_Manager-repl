@@ -22,6 +22,7 @@ import { QuickActionButton } from "@/components/QuickActionButton";
 import { formatEntityForSharing } from "@/lib/shareFormatters";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useCurrentUser } from "@/hooks/use-user-context";
 import type { EntidadeWithRelations, Lembrete } from "@shared/schema";
 import { useState } from "react";
 
@@ -43,6 +44,7 @@ export default function EntidadeDetail() {
   const entidadeId = params?.id;
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: currentUser } = useCurrentUser();
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [pdfProDialogOpen, setPdfProDialogOpen] = useState(false);
@@ -1279,6 +1281,7 @@ export default function EntidadeDetail() {
                     visita={visita}
                     onClick={() => setLocation(`/visitas/${visita.id}`)}
                     currentEntidadeName={entidade.nome}
+                    currentUserId={currentUser?.id}
                   />
                 ))}
                 {entidade.visitas.length > 5 && (

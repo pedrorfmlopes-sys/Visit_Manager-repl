@@ -1,0 +1,78 @@
+Prompt para o agent (Replit)
+
+Objetivo:
+Na página de detalhe da Entidade, na secção “Visitas recentes”, deixar de mostrar o nome da entidade como descrição do card e passar a mostrar os nomes dos contactos presentes na visita, excluindo o utilizador da app.
+Se a visita não tiver contactos registados (para além do próprio utilizador), mostrar algo tipo “Sem contactos registados”.
+
+1) Backend – garantir que as visitas trazem contactos presentes
+
+Abre server/storage.ts e localiza o método que carrega a entidade com as “visitas recentes” (usado em GET /api/entidades/:id).
+
+Procura por algo como getEntidade ou pela query com visitas dentro de db.query.entidades.findFirst.
+
+Garante que, na relação visitas, vêm também os contactos presentes na visita (usa o mesmo padrão que já é usado na página de detalhe da Visita):
+
+Vê como a página VisitaDetail obtém os contactos presentes (tabela/relacão visitasContactos, visitaContactos, contactos, etc.) e replica essa relação na query usada para “visitas recentes” da entidade.
+
+A ideia é que cada item de visita tenha um array de contactos relacionados, com pelo menos id e nome (ou nomeDisplay).
+
+Se necessário, cria um tipo auxiliar para o shape mínimo das visitas recentes (ex.: VisitaResumoForEntidade), mas sem alterar a API pública.
+
+2) Frontend – alterar o texto dos cards em “Visitas recentes”
+
+Abre client/src/pages/EntidadeDetail.tsx (ou o ficheiro onde está a secção “Visitas recentes” da entidade).
+
+Localiza o map onde são renderizadas as visitas recentes (ex.: entidade.visitasRecentes.map(...) ou parecido).
+
+Hoje a descrição/subtítulo do card está a usar o nome da entidade (algo como entidade.nome ou visita.entidadeNome).
+
+Substitui essa lógica por:
+
+Obter a lista de contactos presentes da visita (campo que veio do passo backend, algo tipo visita.contactos ou visita.participantes).
+
+Excluir o utilizador atual da app, usando o userId do contexto ou o campo createdByUserId/ownerUserId da visita:
+
+const currentUserId = user?.id; // ver como já é usado na página
+const contactosVisita = visita.contactos ?? [];
+const contactosOutros = contactosVisita.filter(
+  (c) => c.userId !== currentUserId
+);
+const contactosLabel =
+  contactosOutros.length > 0
+    ? contactosOutros.map((c) => c.nome).join(", ")
+    : "Sem contactos registados";
+
+
+Usar contactosLabel como texto secundário do card (no lugar onde hoje aparece o nome da entidade).
+
+Mantém o resto do layout (data da visita, ícone, link para detalhe) exatamente igual.
+
+3) Comandos
+
+No terminal:
+
+npm run dev (se ainda não estiver a correr)
+
+4) Testes manuais
+
+Abrir a app em http://localhost:5000 (ou URL do Replit).
+
+Entrar com o teu utilizador admin/agent.
+
+Ir a uma Entidade que tenha várias visitas com contactos registados:
+
+Na secção “Visitas recentes”, confirmar que:
+
+Cada card mostra, na linha secundária, os nomes dos contactos presentes, separados por vírgulas.
+
+O teu próprio utilizador não aparece nessa lista.
+
+Criar/editar uma visita sem contactos (além de ti) e confirmar que o card mostra “Sem contactos registados” em vez do nome da entidade.
+
+Verificar que ao clicar no card a navegação para o detalhe da visita continua a funcionar normalmente.
+
+Não faças refactors grandes nem alteres outras secções; mexe apenas:
+
+na query que carrega as visitas recentes da entidade no backend,
+
+e no map que renderiza os cards de “Visitas recentes” em EntidadeDetail.
