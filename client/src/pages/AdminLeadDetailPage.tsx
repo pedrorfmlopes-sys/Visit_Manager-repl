@@ -1,5 +1,5 @@
 import { useRoute, useLocation, useSearch } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -830,6 +830,11 @@ function OdooAttachmentsSection({
   leadId: string;
   odooLeadId: string | null;
 }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   if (!odooLeadId) {
     return (
       <div className="mt-2 text-xs text-slate-500">
@@ -852,6 +857,66 @@ function OdooAttachmentsSection({
     },
   });
 
+  const handleFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploading(true);
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const resp = await fetch(
+        `/api/crm/leads/${leadId}/odoo/attachments`,
+        {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        }
+      );
+
+      const json = await resp.json();
+
+      if (!resp.ok || !json.success) {
+        toast({
+          title: "Erro",
+          description:
+            json?.message ||
+            "Erro ao enviar o ficheiro para o Odoo. Tenta novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Sucesso",
+        description: "Ficheiro enviado para o Odoo com sucesso.",
+      });
+
+      // Invalidate and refetch attachments
+      await qc.invalidateQueries({
+        queryKey: ["lead-odoo-attachments", leadId],
+      });
+
+      // Clear input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (err) {
+      console.error("Erro no upload de anexo Odoo", err);
+      toast({
+        title: "Erro",
+        description: "Ocorreu um erro ao enviar o ficheiro para o Odoo.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="mt-2 text-xs text-slate-500">
@@ -870,14 +935,6 @@ function OdooAttachmentsSection({
 
   const attachments = data.attachments ?? [];
 
-  if (attachments.length === 0) {
-    return (
-      <div className="mt-2 text-xs text-slate-500">
-        Sem anexos registados no Odoo para este lead.
-      </div>
-    );
-  }
-
   return (
     <Card data-testid="card-odoo-attachments">
       <CardHeader>
@@ -886,12 +943,42 @@ function OdooAttachmentsSection({
           Ficheiros anexados no Odoo
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="flex flex-wrap gap-2">
-          {attachments.map((att) => (
-            <AttachmentChip key={att.id} attachment={att} />
-          ))}
+      <CardContent className="space-y-3">
+        {/* Upload toolbar */}
+        <div className="flex items-center gap-2">
+          <label className="inline-flex items-center gap-2 text-xs cursor-pointer">
+            <span className="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-950 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
+                  data-testid="button-upload-attachment">
+              + Carregar ficheiro
+            </span>
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleFileChange}
+              disabled={isUploading}
+              data-testid="input-file-attachment"
+            />
+          </label>
+          {isUploading && (
+            <span className="text-[11px] text-slate-500">
+              A enviar ficheiro...
+            </span>
+          )}
         </div>
+
+        {/* Attachments list */}
+        {attachments.length === 0 ? (
+          <div className="text-xs text-slate-500">
+            Sem anexos registados no Odoo para este lead.
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {attachments.map((att) => (
+              <AttachmentChip key={att.id} attachment={att} />
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

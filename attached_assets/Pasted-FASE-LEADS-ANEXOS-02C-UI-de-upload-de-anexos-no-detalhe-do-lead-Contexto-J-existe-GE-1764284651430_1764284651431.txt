@@ -1,0 +1,141 @@
+FASE LEADS-ANEXOS-02C – UI de upload de anexos no detalhe do lead
+
+Contexto:
+- Já existe:
+  - GET /api/crm/leads/:id/odoo/attachments  → lista anexos
+  - POST /api/crm/leads/:id/odoo/attachments → upload (field "file")
+  - OdooAttachmentsSection + chips a mostrar anexos Odoo no AdminLeadDetailPage
+
+Objetivo:
+No detalhe de lead (/admin/leads/:id), adicionar uma UI simples para:
+- Escolher um ficheiro
+- Fazer upload para /api/crm/leads/:id/odoo/attachments
+- Atualizar a lista de anexos (refetch dos anexos)
+
+Ficheiro principal:
+- client/src/pages/AdminLeadDetailPage.tsx
+
+Tarefas:
+
+1) Adicionar um pequeno "toolbar" de upload dentro da OdooAttachmentsSection
+
+   Dentro de OdooAttachmentsSection (que já usa useQuery para buscar anexos):
+
+   - Adicionar um estado local para controlar o upload:
+     - const [isUploading, setIsUploading] = useState(false);
+     - const queryClient = useQueryClient();
+
+   - Antes da lista de attachments (quando há odooLeadId), renderizar um bloco simples:
+
+     <div className="mt-2 flex items-center gap-2">
+       <label className="inline-flex items-center gap-2 text-xs cursor-pointer">
+         <span className="px-2 py-1 rounded border border-slate-300 bg-white shadow-sm">
+           + Carregar ficheiro
+         </span>
+         <input
+           type="file"
+           className="hidden"
+           onChange={handleFileChange}
+           disabled={isUploading}
+         />
+       </label>
+       {isUploading && (
+         <span className="text-[11px] text-slate-500">
+           A enviar ficheiro...
+         </span>
+       )}
+     </div>
+
+   - Criar a função handleFileChange:
+
+     const handleFileChange = async (
+       event: React.ChangeEvent<HTMLInputElement>
+     ) => {
+       const file = event.target.files?.[0];
+       if (!file) return;
+
+       try {
+         setIsUploading(true);
+
+         const formData = new FormData();
+         formData.append("file", file);
+
+         const resp = await fetch(
+           `/api/crm/leads/${leadId}/odoo/attachments`,
+           {
+             method: "POST",
+             body: formData,
+           }
+         );
+
+         const json = await resp.json();
+
+         if (!resp.ok || !json.success) {
+           // Usa o sistema de toast/notificação que já existir no projeto
+           showErrorToast(
+             json?.message ||
+               "Erro ao enviar o ficheiro para o Odoo. Tenta novamente."
+           );
+           return;
+         }
+
+         showSuccessToast("Ficheiro enviado para o Odoo com sucesso.");
+
+         // Refazer fetch dos anexos
+         await queryClient.invalidateQueries({
+           queryKey: ["lead-odoo-attachments", leadId],
+         });
+
+         // limpar input
+         event.target.value = "";
+       } catch (err) {
+         console.error("Erro no upload de anexo Odoo", err);
+         showErrorToast(
+           "Ocorreu um erro ao enviar o ficheiro para o Odoo."
+         );
+       } finally {
+         setIsUploading(false);
+       }
+     };
+
+   - Usa as funções de toast/notificação já existentes na página (ex.: useToast, toast(), etc.); se não houver nada, podes criar uma função simples com console.log e um TODO.
+
+2) Integração com estados existentes
+
+   - Garante que o botão de upload só aparece quando:
+     - odooLeadId não é null (ou seja, o lead já está sincronizado com o Odoo).
+   - Se o lead ainda não tiver odooLeadId, mantém o comportamento atual:
+     - mensagem "Este lead ainda não existe no Odoo" ou equivalente,
+     - sem mostrar o botão de upload.
+
+3) UX / Limites
+
+   - Respeitar os limites do backend:
+     - Tamanho máximo 10 MB → se a resposta vier com 400 e mensagem de "Ficheiro demasiado grande", mostra essa mensagem no toast.
+   - Não permitir upload duplo enquanto isUploading = true (desativar input).
+
+4) Testes manuais a fazer:
+
+   Com um lead sincronizado com o Odoo e com odooLeadId definido:
+
+   - Abrir /admin/leads/:id
+   - Na secção de "Anexos (Odoo)":
+     - Ver o botão "+ Carregar ficheiro".
+   - Escolher um PDF pequeno (por ex. 200–500 KB).
+     → Esperado:
+       - Ver "A enviar ficheiro..." enquanto o upload decorre.
+       - Ver toast de sucesso depois.
+       - A lista de anexos é atualizada e o novo ficheiro aparece na lista.
+       - Ao clicar duas vezes no novo anexo, o ficheiro abre numa nova aba do Odoo.
+
+   - Testar caso de erro:
+     - Tentar enviar um ficheiro grande (> 10 MB) se for possível,
+       ou simular erro no backend.
+     → Deve mostrar toast com a mensagem devolvida (ex.: "Ficheiro demasiado grande (máx. 10 MB).").
+
+5) Garantias
+
+   - Não quebrar o modo "new" do lead (id === "new"):
+     - OdooAttachmentsSection só deve ser usada quando há um lead existente com id + potencial odooLeadId.
+   - Não remover nem alterar o comportamento do GET anterior.
+   - Garantir que AdminLeadDetailPage.tsx compila sem erros.
