@@ -9,11 +9,13 @@ import type { VisitaWithRelations } from "@shared/schema";
 interface VisitaCardProps {
   visita: VisitaWithRelations;
   onClick: () => void;
+  currentEntidadeName?: string;
 }
 
-export function VisitaCard({ visita, onClick }: VisitaCardProps) {
+export function VisitaCard({ visita, onClick, currentEntidadeName }: VisitaCardProps) {
   const hasMedia = (visita.mediaUrls && visita.mediaUrls.length > 0) || visita.audioUrl;
   const dataFormatada = format(new Date(visita.dataVisita), "d 'de' MMMM, yyyy", { locale: pt });
+  const nomeEntidade = visita.entidade?.nome ?? currentEntidadeName ?? "Entidade desconhecida";
 
   return (
     <Card
@@ -35,7 +37,7 @@ export function VisitaCard({ visita, onClick }: VisitaCardProps) {
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 mb-2">
             <h3 className="font-medium text-base text-foreground" data-testid={`text-visita-gabinete-${visita.id}`}>
-              {visita.entidade?.nome || "Entidade desconhecida"}
+              {nomeEntidade}
             </h3>
             <Badge variant="secondary" className="text-xs whitespace-nowrap">
               {dataFormatada}

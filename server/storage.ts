@@ -298,6 +298,9 @@ export class DatabaseStorage implements IStorage {
         visitas: {
           orderBy: desc(visitas.dataVisita),
           limit: 10,
+          with: {
+            entidade: true,
+          },
         },
         entidadeTipo: true,
       },

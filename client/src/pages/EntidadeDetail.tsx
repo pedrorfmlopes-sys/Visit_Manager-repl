@@ -1278,6 +1278,7 @@ export default function EntidadeDetail() {
                     key={visita.id}
                     visita={visita}
                     onClick={() => setLocation(`/visitas/${visita.id}`)}
+                    currentEntidadeName={entidade.nome}
                   />
                 ))}
                 {entidade.visitas.length > 5 && (
