@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import DOMPurify from 'dompurify';
 import { ArrowLeft, ArrowRight, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles, Bell, Volume2, Trash2, Loader2, Mic, Plus, X, Edit, AlertTriangle, Users, Flag } from "lucide-react";
+import type { Marca } from "@shared/schema";
 import { format, addDays } from "date-fns";
 import { pt } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -89,9 +90,10 @@ export default function VisitaDetail() {
   // FASE CRM-LEADS-VISITA-STEP1: Leads section state
   const [leadDialogOpen, setLeadDialogOpen] = useState(false);
   const [leadSaving, setLeadSaving] = useState(false);
+  const [leadMarcasSearch, setLeadMarcasSearch] = useState("");
   const [leadForm, setLeadForm] = useState({
     titulo: "",
-    marca: "",
+    marcasIds: [] as string[],
     estado: "novo",
     valorPrevisto: "",
   });
@@ -237,6 +239,19 @@ export default function VisitaDetail() {
     queryKey: ["/api/contactos"],
   });
 
+  // FASE LEADS-EXT-02: Fetch marcas for lead creation
+  const { data: marcas = [] } = useQuery<Marca[]>({
+    queryKey: ["/api/marcas", "onlyAtivas"],
+    queryFn: async () => {
+      const response = await fetch("/api/marcas?onlyAtivas=true", {
+        credentials: "include"
+      });
+      if (!response.ok) throw new Error("Failed to fetch marcas");
+      return response.json();
+    },
+    enabled: !!visita?.id,
+  });
+
   const visitReminders = allLembretes?.filter(l => 
     l.entidadeId === visita?.entidadeId || l.visitaId === visitaId
   ) || [];
@@ -306,7 +321,7 @@ export default function VisitaDetail() {
         visitaId: visita.id,
         titulo: leadForm.titulo.trim(),
         descricao: null,
-        marca: leadForm.marca || null,
+        marcasIds: leadForm.marcasIds && leadForm.marcasIds.length > 0 ? leadForm.marcasIds : undefined,
         estado: leadForm.estado || "novo",
         valorPrevisto: leadForm.valorPrevisto
           ? Number(leadForm.valorPrevisto)
@@ -336,10 +351,11 @@ export default function VisitaDetail() {
       setLeadDialogOpen(false);
       setLeadForm({
         titulo: "",
-        marca: "",
+        marcasIds: [],
         estado: "novo",
         valorPrevisto: "",
       });
+      setLeadMarcasSearch("");
 
       // Invalidate query to refresh leads list
       await queryClient.invalidateQueries({
@@ -2266,16 +2282,67 @@ export default function VisitaDetail() {
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="lead-marca">Marca</Label>
-              <Input
-                id="lead-marca"
-                value={leadForm.marca}
-                onChange={(e) =>
-                  setLeadForm((f) => ({ ...f, marca: e.target.value }))
-                }
-                placeholder="Ex.: Ritmonio, Revestech..."
-                data-testid="input-lead-marca"
-              />
+              <Label>Marcas</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between"
+                    data-testid="button-lead-marcas-dropdown"
+                  >
+                    {leadForm.marcasIds?.length
+                      ? `${leadForm.marcasIds.length} marca${leadForm.marcasIds.length === 1 ? "" : "s"} selecionada${leadForm.marcasIds.length === 1 ? "" : "s"}`
+                      : "Seleciona uma ou mais marcas"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" side="bottom" align="start">
+                  <div className="p-3 border-b">
+                    <Input
+                      placeholder="Pesquisar marcas..."
+                      value={leadMarcasSearch}
+                      onChange={(e) => setLeadMarcasSearch(e.target.value)}
+                      className="h-8"
+                      data-testid="input-lead-marcas-search"
+                    />
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {marcas.length === 0 ? (
+                      <div className="px-3 py-2 text-sm text-muted-foreground">
+                        Nenhuma marca disponível
+                      </div>
+                    ) : (
+                      marcas
+                        .filter((marca) =>
+                          marca.nome.toLowerCase().includes(leadMarcasSearch.toLowerCase())
+                        )
+                        .map((marca) => {
+                          const isSelected = leadForm.marcasIds?.includes(marca.id);
+                          return (
+                            <div
+                              key={marca.id}
+                              className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted"
+                              onClick={() => {
+                                const newIds = isSelected
+                                  ? (leadForm.marcasIds || []).filter((id) => id !== marca.id)
+                                  : [...(leadForm.marcasIds || []), marca.id];
+                                setLeadForm((f) => ({ ...f, marcasIds: newIds }));
+                              }}
+                              data-testid={`button-lead-marca-${marca.id}`}
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => {}}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <span className="text-sm">{marca.nome}</span>
+                            </div>
+                          );
+                        })
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="space-y-1">

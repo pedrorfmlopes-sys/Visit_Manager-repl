@@ -1,4 +1,4 @@
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,9 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { ArrowLeft, ExternalLink } from "lucide-react";
-import { useLocation } from "wouter";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { Marca } from "@shared/schema";
 
 type Contacto = {
   id: string;
@@ -36,6 +38,7 @@ type Lead = {
   contactoNome?: string | null;
   visitaData?: string | null;
   contactosAssociados?: Contacto[] | null;
+  marcas?: Marca[] | null;
 };
 
 type LeadResponse =
@@ -116,11 +119,23 @@ export default function AdminLeadDetailPage() {
 function LeadDetailForm({ lead }: { lead: Lead }) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const [marcasSearch, setMarcasSearch] = useState("");
+
+  const { data: marcas = [] } = useQuery<Marca[]>({
+    queryKey: ["/api/marcas", "onlyAtivas"],
+    queryFn: async () => {
+      const response = await fetch("/api/marcas?onlyAtivas=true", {
+        credentials: "include"
+      });
+      if (!response.ok) throw new Error("Failed to fetch marcas");
+      return response.json();
+    },
+  });
 
   const [form, setForm] = useState({
     titulo: lead.titulo,
     descricao: lead.descricao ?? "",
-    marca: lead.marca ?? "",
+    marcasIds: lead.marcas?.map((m) => m.id) ?? [],
     estado: lead.estado ?? "novo",
     valorPrevisto: lead.valorPrevisto ?? "",
     moeda: lead.moeda ?? "EUR",
@@ -141,7 +156,7 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
       const body: any = {
         titulo: form.titulo.trim(),
         descricao: form.descricao.trim() || null,
-        marca: form.marca.trim() || null,
+        marcasIds: form.marcasIds && form.marcasIds.length > 0 ? form.marcasIds : undefined,
         estado: form.estado || "novo",
         valorPrevisto: form.valorPrevisto ? Number(form.valorPrevisto) : null,
         moeda: form.moeda || "EUR",
@@ -311,14 +326,67 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="lead-marca">Marca</Label>
-              <Input
-                id="lead-marca"
-                value={form.marca}
-                onChange={handleChange("marca")}
-                placeholder="Ex.: Ritmonio, Revestech..."
-                data-testid="input-lead-marca"
-              />
+              <Label>Marcas</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between"
+                    data-testid="button-lead-edit-marcas-dropdown"
+                  >
+                    {form.marcasIds?.length
+                      ? `${form.marcasIds.length} marca${form.marcasIds.length === 1 ? "" : "s"} selecionada${form.marcasIds.length === 1 ? "" : "s"}`
+                      : "Seleciona uma ou mais marcas"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" side="bottom" align="start">
+                  <div className="p-3 border-b">
+                    <Input
+                      placeholder="Pesquisar marcas..."
+                      value={marcasSearch}
+                      onChange={(e) => setMarcasSearch(e.target.value)}
+                      className="h-8"
+                      data-testid="input-lead-edit-marcas-search"
+                    />
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {marcas.length === 0 ? (
+                      <div className="px-3 py-2 text-sm text-muted-foreground">
+                        Nenhuma marca disponível
+                      </div>
+                    ) : (
+                      marcas
+                        .filter((marca) =>
+                          marca.nome.toLowerCase().includes(marcasSearch.toLowerCase())
+                        )
+                        .map((marca) => {
+                          const isSelected = form.marcasIds?.includes(marca.id);
+                          return (
+                            <div
+                              key={marca.id}
+                              className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted"
+                              onClick={() => {
+                                const newIds = isSelected
+                                  ? (form.marcasIds || []).filter((id) => id !== marca.id)
+                                  : [...(form.marcasIds || []), marca.id];
+                                setForm((f) => ({ ...f, marcasIds: newIds }));
+                              }}
+                              data-testid={`button-lead-edit-marca-${marca.id}`}
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => {}}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <span className="text-sm">{marca.nome}</span>
+                            </div>
+                          );
+                        })
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="space-y-1">
