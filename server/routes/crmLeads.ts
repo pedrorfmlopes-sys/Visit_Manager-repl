@@ -1,7 +1,7 @@
 import express from "express";
 import { and, eq } from "drizzle-orm";
 import { db } from "../db";
-import { leads, leadsContactos, insertLeadSchema, contactos } from "../../shared/schema";
+import { leads, leadsContactos, insertLeadSchema, contactos, leadsMarcas } from "../../shared/schema";
 import { isAuthenticated } from "../replitAuth";
 import { getUserContext } from "../authContext";
 import { assertLeadsEnabled } from "../integrations/crmLeads";
@@ -43,17 +43,33 @@ export function registerCrmLeadsRoutes(app: express.Express) {
       const rows = await db.query.leads.findMany({
         where: whereClause,
         orderBy: (l, { desc }) => desc(l.createdAt),
+        with: {
+          marcasAssociadas: {
+            with: {
+              marca: true,
+            },
+          },
+        },
       });
+
+      // Map marcasAssociadas to marcas array
+      const leadsWithMarcas = rows.map((row: any) => ({
+        ...row,
+        marcas: row.marcasAssociadas?.map((lm: any) => ({
+          id: lm.marca?.id,
+          nome: lm.marca?.nome,
+        })) ?? [],
+      }));
 
       console.log("[CRM Leads] GET /api/crm/leads", {
         empresaId,
         entidadeId,
         contactoId,
         visitaId,
-        count: rows.length,
+        count: leadsWithMarcas.length,
       });
 
-      return res.json({ leads: rows });
+      return res.json({ leads: leadsWithMarcas });
     } catch (error: any) {
       if (error?.code === "LEADS_NOT_ENABLED") {
         return res.status(200).json({
@@ -78,9 +94,10 @@ export function registerCrmLeadsRoutes(app: express.Express) {
 
       console.log("[CRM Leads] GET /:id", { id, empresaId });
 
-      // First, try loading with contactosAssociados
+      // First, try loading with contactosAssociados and marcasAssociadas
       let lead: any = null;
       let contactosAssociados: any[] = [];
+      let marcas: any[] = [];
 
       try {
         lead = await db.query.leads.findFirst({
@@ -94,16 +111,28 @@ export function registerCrmLeadsRoutes(app: express.Express) {
                 contacto: true,
               },
             },
+            marcasAssociadas: {
+              with: {
+                marca: true,
+              },
+            },
           },
         });
 
         if (lead && lead.contactosAssociados) {
           contactosAssociados = lead.contactosAssociados.map((lc: any) => lc.contacto) ?? [];
         }
+
+        if (lead && lead.marcasAssociadas) {
+          marcas = lead.marcasAssociadas.map((lm: any) => ({
+            id: lm.marca?.id,
+            nome: lm.marca?.nome,
+          })) ?? [];
+        }
       } catch (innerError: any) {
-        // If leads_contactos doesn't exist yet, load without it
-        if (innerError?.code === "42P01" || innerError?.message?.includes("leads_contactos")) {
-          console.warn("[CRM Leads] Table leads_contactos doesn't exist, loading without contactosAssociados");
+        // If leads_contactos or leads_marcas doesn't exist yet, load without them
+        if (innerError?.code === "42P01" || innerError?.message?.includes("leads_contactos") || innerError?.message?.includes("leads_marcas")) {
+          console.warn("[CRM Leads] Table doesn't exist, loading without relations", { code: innerError?.code, message: innerError?.message });
           lead = await db.query.leads.findFirst({
             where: and(eq(leads.id, id), eq(leads.empresaId, empresaId)),
             with: {
@@ -113,6 +142,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
             },
           });
           contactosAssociados = [];
+          marcas = [];
         } else {
           throw innerError;
         }
@@ -122,7 +152,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         return res.status(404).json({ success: false, message: "Lead não encontrado." });
       }
 
-      console.log("[CRM Leads] GET /:id success", { leadId: id, contactosCount: contactosAssociados.length });
+      console.log("[CRM Leads] GET /:id success", { leadId: id, contactosCount: contactosAssociados.length, marcasCount: marcas.length });
 
       return res.json({
         lead: {
@@ -131,6 +161,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
           contactoNome: lead.contacto?.nome ?? null,
           visitaData: lead.visita?.dataVisita ?? null,
           contactosAssociados,
+          marcas,
         },
       });
     } catch (error: any) {
