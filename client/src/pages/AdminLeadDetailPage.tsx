@@ -414,7 +414,7 @@ function LeadDetailForm({
 
         navigate(target);
       } else {
-        // Edit mode - stay on page and invalidate queries
+        // Edit mode - navigate to leads list
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ["/api/crm/leads"] }),
           queryClient.invalidateQueries({ queryKey: ["/api/crm/leads", lead.id] }),
@@ -422,6 +422,7 @@ function LeadDetailForm({
           queryClient.invalidateQueries({ queryKey: ["/api/crm/leads", { entidadeId: lead.entidadeId }] }),
           queryClient.invalidateQueries({ queryKey: ["/api/crm/leads", { contactoId: lead.contactoId }] }),
         ]);
+        navigate("/admin/leads");
       }
     } catch (error: any) {
       console.error("[CRM Leads] Save lead error:", error);
@@ -452,7 +453,7 @@ function LeadDetailForm({
                 <button
                   type="button"
                   className="underline-offset-2 hover:underline text-left"
-                  onClick={() => navigate(`/entidades/${lead.entidadeId}`)}
+                  onClick={() => navigate(`/entidades/${lead.entidadeId}?returnTo=${encodeURIComponent(`/admin/leads/${lead.id}`)}`)}
                   data-testid="link-lead-entidade"
                 >
                   {lead.entidadeNome}
@@ -470,7 +471,7 @@ function LeadDetailForm({
                 <button
                   type="button"
                   className="underline-offset-2 hover:underline text-left"
-                  onClick={() => navigate(`/contactos/${lead.contactoId}`)}
+                  onClick={() => navigate(`/contactos/${lead.contactoId}?returnTo=${encodeURIComponent(`/admin/leads/${lead.id}`)}`)}
                   data-testid="link-lead-contacto"
                 >
                   {lead.contactoNome}
@@ -488,7 +489,7 @@ function LeadDetailForm({
                 <button
                   type="button"
                   className="underline-offset-2 hover:underline text-left"
-                  onClick={() => navigate(`/visitas/${lead.visitaId}`)}
+                  onClick={() => navigate(`/visitas/${lead.visitaId}?returnTo=${encodeURIComponent(`/admin/leads/${lead.id}`)}`)}
                   data-testid="link-lead-visita"
                 >
                   {new Date(lead.visitaData).toLocaleDateString()}
@@ -497,7 +498,7 @@ function LeadDetailForm({
                 <button
                   type="button"
                   className="underline-offset-2 hover:underline text-left"
-                  onClick={() => navigate(`/visitas/${lead.visitaId}`)}
+                  onClick={() => navigate(`/visitas/${lead.visitaId}?returnTo=${encodeURIComponent(`/admin/leads/${lead.id}`)}`)}
                   data-testid="link-lead-visita"
                 >
                   Ver visita
@@ -518,7 +519,7 @@ function LeadDetailForm({
                   <button
                     key={c.id}
                     type="button"
-                    onClick={() => navigate(`/contactos/${c.id}`)}
+                    onClick={() => navigate(`/contactos/${c.id}?returnTo=${encodeURIComponent(`/admin/leads/${lead.id}`)}`)}
                     className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-secondary text-secondary-foreground hover:underline"
                     data-testid={`chip-contacto-${c.id}`}
                   >

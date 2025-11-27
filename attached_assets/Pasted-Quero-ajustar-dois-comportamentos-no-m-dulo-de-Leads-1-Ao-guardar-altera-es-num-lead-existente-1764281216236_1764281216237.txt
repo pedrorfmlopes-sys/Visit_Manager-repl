@@ -1,0 +1,124 @@
+Quero ajustar dois comportamentos no módulo de Leads:
+
+1) Ao guardar alterações num lead existente, deve voltar à listagem de leads.
+2) Quando abro Entidade/Visita/Contacto a partir do contexto do lead, a seta de voltar nessas páginas deve trazer-me de volta ao lead de origem (se vier de um lead), em vez de ir para a listagem.
+
+---
+
+PARTE 1 – Guardar alterações → voltar à listagem de leads
+
+Ficheiro:
+- client/src/pages/AdminLeadDetailPage.tsx
+
+Comportamento desejado:
+- Se estou em /admin/leads/:id (id !== "new") e clico em "Guardar alterações":
+  - Depois do PATCH bem-sucedido, navegar para /admin/leads.
+
+Tarefas:
+1) No handler de submit/guardar (handleSave ou equivalente):
+   - Distinguir entre create mode e edit mode:
+     - create mode: id === "new" → manter lógica atual (voltar à visita se tiver visitaId, etc.).
+     - edit mode: id !== "new" → depois de guardar com sucesso fazer:
+
+       ```ts
+       navigate("/admin/leads");
+       ```
+
+2) Garantir que isto não afeta o fluxo de criação de lead novo (id === "new").
+
+---
+
+PARTE 2 – Seta de voltar nas páginas de Entidade/Visita/Contacto deve regressar ao lead se houver returnTo
+
+Objetivo:
+- Quando estou em /admin/leads/:leadId e clico, no card "Contexto do lead", em:
+  - Entidade
+  - Contacto
+  - "Ver visita"
+  quero:
+  - Navegar para /entidades/:id, /contactos/:id ou /visitas/:id
+  - Com um parâmetro returnTo na query string, que permita depois voltar ao lead.
+
+- Nas páginas de detalhe de Entidade/Visita/Contacto:
+  - A seta de voltar deve:
+    - Se existir returnTo → fazer setLocation(returnTo)
+    - Caso contrário → comportamento atual (voltar à listagem da mesma entidade/visita/contactos)
+
+Tarefas:
+
+A) Em AdminLeadDetailPage.tsx
+   - Quando construir os links para:
+     - Entidade
+     - Contacto
+     - Visita ("Ver visita")
+   - Usar sempre um returnTo apontando para o lead atual:
+
+     ```ts
+     const currentLeadPath = `/admin/leads/${lead.id}`;
+
+     // Entidade:
+     setLocation(
+       `/entidades/${lead.entidadeId}?returnTo=${encodeURIComponent(currentLeadPath)}`
+     );
+
+     // Contacto (se existir lead.contactoId):
+     setLocation(
+       `/contactos/${lead.contactoId}?returnTo=${encodeURIComponent(currentLeadPath)}`
+     );
+
+     // Visita (se existir lead.visitaId):
+     setLocation(
+       `/visitas/${lead.visitaId}?returnTo=${encodeURIComponent(currentLeadPath)}`
+     );
+     ```
+
+   - Garantir que já não há usos de /admin/visitas, /admin/entidades, /admin/contactos nesses links.
+
+B) Nas páginas de detalhe:
+
+   - Entidade: client/src/pages/EntidadeDetailPage.tsx (ou equivalente)
+   - Visita: client/src/pages/VisitaDetail.tsx (a versão usada em /visitas/:id)
+   - Contacto: client/src/pages/ContactoDetailPage.tsx (ou equivalente)
+
+   Em cada uma:
+
+   1) Ler o returnTo dos query params:
+
+      ```ts
+      const [location, setLocation] = useLocation();
+      const search = location.split("?")[1] || "";
+      const params = new URLSearchParams(search);
+      const rawReturnTo = params.get("returnTo");
+      const returnTo = rawReturnTo ? decodeURIComponent(rawReturnTo) : null;
+      ```
+
+   2) Na seta de voltar do header, usar:
+
+      ```tsx
+      onClick={() => {
+        if (returnTo) {
+          setLocation(returnTo);
+        } else {
+          // comportamento actual: voltar à lista correspondente
+          setLocation("/entidades"); // ou "/visitas" / "/contactos" conforme o ficheiro
+        }
+      }}
+      ```
+
+Testes a fazer:
+
+1) /admin/leads → abrir lead com entidade/visita/contacto.
+   - Editar um campo e "Guardar alterações":
+     → deve voltar para /admin/leads (sem 404).
+
+2) Ainda em /admin/leads/:leadId:
+   - Clicar em "Entidade" no contexto:
+     → deve ir para /entidades/:entidadeId
+   - Clicar na seta de voltar no header da entidade:
+     → deve voltar para /admin/leads/:leadId
+
+   Repetir para:
+   - "Ver visita" → /visitas/:visitaId → seta voltar → /admin/leads/:leadId
+   - Contacto (se existir) → /contactos/:contactoId → seta voltar → /admin/leads/:leadId
+
+No final, criar um pequeno resumo das alterações (ficheiros/linhas) e confirmar que o fluxo antigo (entrar em Entidade/Visita/Contacto a partir dos menus normais) continua a funcionar: nesses casos, a seta deve voltar à respetiva listagem.

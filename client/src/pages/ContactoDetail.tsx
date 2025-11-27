@@ -514,7 +514,15 @@ export default function ContactoDetail() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setLocation("/contactos")}
+              onClick={() => {
+                const searchParams = new URLSearchParams(window.location.search);
+                const returnTo = searchParams.get("returnTo");
+                if (returnTo) {
+                  setLocation(decodeURIComponent(returnTo));
+                } else {
+                  setLocation("/contactos");
+                }
+              }}
               data-testid="button-voltar"
             >
               <ArrowLeft className="h-5 w-5" />

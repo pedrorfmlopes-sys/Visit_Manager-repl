@@ -577,7 +577,15 @@ export default function EntidadeDetail() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setLocation("/entidades")}
+              onClick={() => {
+                const searchParams = new URLSearchParams(window.location.search);
+                const returnTo = searchParams.get("returnTo");
+                if (returnTo) {
+                  setLocation(decodeURIComponent(returnTo));
+                } else {
+                  setLocation("/entidades");
+                }
+              }}
               data-testid="button-voltar"
             >
               <ArrowLeft className="h-5 w-5" />
