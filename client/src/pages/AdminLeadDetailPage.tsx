@@ -125,25 +125,8 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
   const audioInputRef = useRef<HTMLInputElement>(null);
   const [summarizing, setSummarizing] = useState(false);
   
-  // FASE IA-AUDIO-03: Use unified audio transcription hook (same as Visitas)
-  const audio = useAudioTranscription({
-    transcriptionEndpoint: '/api/visitas/ai/transcribe', // Use SAME endpoint as Visitas
-    onTranscriptionComplete: (text) => {
-      // Append transcribed text to descricao field
-      const currentDescricao = form.descricao || "";
-      const updatedDescricao = currentDescricao 
-        ? currentDescricao + "\n\n[Áudio transcrito]\n" + text
-        : text;
-      setForm((f) => ({ ...f, descricao: updatedDescricao }));
-      toast({
-        title: "Áudio transcrito",
-        description: "Texto adicionado à descrição do lead.",
-      });
-    },
-    onError: (error) => {
-      console.error("[AdminLeadDetailPage] Audio transcription error:", error);
-    }
-  });
+  // FASE-AUDIO-CORE-03: Use unified audio transcription hook (same as Visitas)
+  const audio = useAudioTranscription();
 
   const { data: marcas = [] } = useQuery<Marca[]>({
     queryKey: ["/api/marcas", "onlyAtivas"],
@@ -167,15 +150,6 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
 
   const [saving, setSaving] = useState(false);
 
-  // Handle audio transcription from file upload (via hook)
-  const handleTranscribeAudio = async (file: File) => {
-    try {
-      await audio.transcribe(file);
-      if (audioInputRef.current) audioInputRef.current.value = "";
-    } catch (error) {
-      // Error already handled by hook
-    }
-  };
 
   // Handle text summarization
   const handleSummarizeText = async () => {
@@ -410,55 +384,57 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
             <div className="flex items-center justify-between gap-2">
               <Label htmlFor="lead-descricao">Descrição</Label>
               <div className="flex gap-1">
-                <input
-                  ref={audioInputRef}
-                  type="file"
-                  accept="audio/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleTranscribeAudio(file);
-                  }}
-                  className="hidden"
-                  data-testid="input-lead-audio-upload"
-                />
                 <Button
                   type="button"
                   size="sm"
                   variant={audio.isRecording ? "destructive" : "outline"}
                   onClick={() => (audio.isRecording ? audio.stopRecording() : audio.startRecording())}
-                  disabled={!audio.supportsRecording}
                   data-testid="button-lead-dictate"
                 >
                   <Mic className="h-4 w-4 mr-1" />
-                  {audio.isRecording ? `A gravar... (${audio.recordingTime}s)` : "Dictar"}
+                  {audio.isRecording ? "Parar" : "Dictar"}
                 </Button>
                 
-                {audio.hasAudio && !audio.isRecording && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={async () => {
-                      try {
-                        await audio.transcribe();
-                      } catch (error) {
-                        // Error already handled by hook
-                      }
-                    }}
-                    disabled={audio.isTranscribing}
-                    data-testid="button-lead-transcribe-audio"
-                  >
-                    {audio.isTranscribing ? "A transcrever..." : "Transcrever áudio"}
-                  </Button>
-                )}
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  onClick={() => audioInputRef.current?.click()}
-                  disabled={audio.isTranscribing || audio.isRecording}
+                  onClick={async () => {
+                    try {
+                      const text = await audio.transcribe();
+                      setForm((f) => ({ ...f, descricao: (f.descricao || "") ? f.descricao + "\n\n" + text : text }));
+                      toast({
+                        title: "Áudio transcrito",
+                        description: "Texto adicionado à descrição.",
+                      });
+                    } catch (error) {
+                      // Error already handled by hook
+                    }
+                  }}
+                  disabled={!audio.hasAudio || audio.isTranscribing}
+                  data-testid="button-lead-transcribe-audio"
+                >
+                  {audio.isTranscribing ? "A transcrever..." : "Transcrever áudio"}
+                </Button>
+
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      const text = await audio.selectFileAndTranscribe();
+                      setForm((f) => ({ ...f, descricao: (f.descricao || "") ? f.descricao + "\n\n" + text : text }));
+                      toast({
+                        title: "Ficheiro transcrito",
+                        description: "Texto adicionado à descrição.",
+                      });
+                    } catch (error) {
+                      // Error already handled by hook
+                    }
+                  }}
+                  disabled={audio.isTranscribing}
                   data-testid="button-lead-upload-file"
-                  title="Upload de ficheiro de áudio"
                 >
                   Ficheiro
                 </Button>
