@@ -1,0 +1,200 @@
+================================================================================
+RELATORIO: FASE-AUDIO-CORE-01 - Hook useAudioTranscription (Versão Unificada)
+================================================================================
+
+Data: 27 Novembro 2025
+Status: ✅ COMPLETO
+Objetivo: Criar hook único e independente para áudio + transcrição
+
+================================================================================
+1. FICHEIRO CRIADO/REFATORADO
+================================================================================
+
+Ficheiro: client/src/hooks/useAudioTranscription.ts
+Linhas: 211 (refatorado de versão anterior para interface correta)
+
+INTERFACE FINAL (Exatamente como solicitado):
+
+  export function useAudioTranscription(opts?: { endpoint?: string }) {
+    return {
+      isRecording: boolean;
+      isTranscribing: boolean;
+      hasAudio: boolean;
+      startRecording: () => void;
+      stopRecording: () => void;
+      transcribe: () => Promise<string>;
+      selectFileAndTranscribe: () => Promise<string>;
+    };
+  }
+
+================================================================================
+2. O QUE O HOOK FAZ
+================================================================================
+
+INTERNAMENTE (implementação):
+- Usa MediaRecorder + getUserMedia para gravar áudio
+- Armazena Blob de áudio em estado interno (audioBlobRef)
+- Sem dependências de ToastProvider (removidas!)
+- Sem dependências de módulo específico (Visita, Lead, etc)
+
+EXTERNAMENTE (interface pública):
+- opts?.endpoint: Permite customizar endpoint (por defeito: /api/visitas/ai/transcribe)
+- isRecording: true durante gravação
+- isTranscribing: true durante transcrição
+- hasAudio: true após parar gravação (até transcrição)
+- startRecording(): Abre micro, começa a gravar
+- stopRecording(): Para gravação, guarda Blob
+- transcribe(): Transcreve o Blob gravado, devolve texto (Promise<string>)
+- selectFileAndTranscribe(): Abre file picker, transcreve ficheiro, devolve texto
+
+================================================================================
+3. ENDPOINT BACKEND USADO
+================================================================================
+
+Por defeito: /api/visitas/ai/transcribe
+
+IMPORTANTE:
+- Este é o MESMO endpoint que Visitas já usam
+- Não foi criado novo endpoint nesta fase
+- O hook é agnóstico: pode usar qualquer endpoint via opts
+- Formato esperado do response: { success: true, text: "..." }
+
+TRATAMENTO DE ERROS:
+- Se response.ok === false: lê response.text() e lança erro descritivo
+- Se JSON inválido: erro decente (não vai assumir HTML como JSON)
+- Se data.success === false: lança erro com mensagem do backend
+
+================================================================================
+4. CARACTERÍSTICAS PRINCIPAIS
+================================================================================
+
+OK - Hook criado com interface correta
+OK - Importar/exportar implementado
+OK - MediaRecorder + getUserMedia implementados
+OK - transcribe() implementado (Blob -> texto)
+OK - selectFileAndTranscribe() implementado (File -> texto)
+OK - Tratamento de erros robusto
+OK - Sem dependências de Toast ou módulo específico
+OK - Pronto para ser usado em Visitas e Leads
+OK - Estados (isRecording, isTranscribing, hasAudio) definidos
+OK - Endpoint customizável (default: /api/visitas/ai/transcribe)
+
+STATUS: HOOK PRONTO PARA USO
+
+================================================================================
+5. MÉTODOS DETALHADOS
+================================================================================
+
+startRecording(): void
+- Pede permissão do micro (navigator.mediaDevices.getUserMedia)
+- Cria MediaRecorder
+- Inicia gravação
+- Define isRecording = true
+- Lança erro se micro não disponível
+
+stopRecording(): void
+- Para MediaRecorder
+- Cria Blob a partir dos chunks
+- Guarda Blob em audioBlobRef
+- Define isRecording = false
+- Define hasAudio = true (pronto para transcrever)
+
+transcribe(): Promise<string>
+- Requer: hasAudio === true (senão lança erro)
+- Envia Blob para endpoint (multipart/form-data)
+- Verifica response.ok (se false, lê response.text() para erro descritivo)
+- Parse JSON: espera { success: true, text: "..." }
+- Retorna: string (texto transcrito)
+- Define isTranscribing = true durante operação
+
+selectFileAndTranscribe(): Promise<string>
+- Abre <input type="file" accept="audio/*">
+- Utilizador escolhe ficheiro
+- Envia ficheiro para endpoint (multipart/form-data)
+- Mesma validação que transcribe()
+- Retorna: string (texto transcrito)
+- Define isTranscribing = true durante operação
+
+================================================================================
+6. TRATAMENTO DE ERROS
+================================================================================
+
+Cenários cobertos:
+
+1. Micro não disponível
+   -> startRecording() lança erro "Gravacao de audio nao suportada..."
+
+2. Permissao negada
+   -> startRecording() lanca erro "Verifica as permissoes do browser..."
+
+3. MediaRecorder erro
+   -> setIsRecording(false), erro logado
+
+4. Sem audio para transcrever
+   -> transcribe() lanca "Nenhum audio gravado para transcrever."
+
+5. Nenhum ficheiro selecionado
+   -> selectFileAndTranscribe() lanca "Nenhum ficheiro selecionado."
+
+6. HTTP erro (response.ok === false)
+   -> Le response.text() -> lanca erro "HTTP XXX: [primeiro 100 chars]"
+   -> NAO tenta fazer JSON.parse em HTML
+
+7. JSON invalido
+   -> JSON.parse() lanca erro descritivo
+
+8. Backend retorna success: false
+   -> Lanca erro com data.message
+
+================================================================================
+7. NOTAS TÉCNICAS
+================================================================================
+
+MediaRecorder Type:
+- MIME type: 'audio/webm' (suportado por browsers modernos)
+- Alternativa: poderia ser 'audio/mp4', 'audio/ogg' consoante browser
+
+File FormData:
+- Campo: "file"
+- O backend espera multipart/form-data com campo "file"
+- Suporta qualquer tamanho (limitado pelo servidor)
+
+Fetch Credentials:
+- credentials: 'include' -> envia cookies/sessao
+- Necessario para autenticacao
+
+Cleanup:
+- Ao desmontar componente: para MediaRecorder, fecha mediaStream
+- Evita memory leaks e tracks de audio abertos
+
+Estado Interno:
+- audioBlobRef: Guardado em useRef (persiste entre renders)
+- Nao e limpo automaticamente apos transcrição
+- User pode transcrever multiplas vezes
+- Mas pode chamar selectFileAndTranscribe() depois
+
+================================================================================
+8. STATUS FINAL
+================================================================================
+
+FASE-AUDIO-CORE-01 COMPLETA:
+
+OK - Hook criado com interface correta
+OK - Compilação sem erros (LSP errors removidos)
+OK - Pronto para integração em VisitaForm.tsx
+OK - Pronto para integração em AdminLeadDetailPage.tsx
+OK - Documentação completa
+
+PRÓXIMAS FASES (quando solicitado):
+- FASE-AUDIO-CORE-02: Integrar em VisitaForm.tsx
+- FASE-AUDIO-CORE-03: Integrar em AdminLeadDetailPage.tsx
+- FASE-AUDIO-CORE-04: Criar endpoint genérico /api/ai/transcribe-audio (opcional)
+
+================================================================================
+FIM - FASE-AUDIO-CORE-01 COMPLETA
+================================================================================
+
+Versao: 1.0 - Hook Unificado
+Data: 27 Novembro 2025
+Status: PRONTO PARA INTEGRAÇÃO
+Próxima: Usar em VisitaForm e AdminLeadDetailPage
