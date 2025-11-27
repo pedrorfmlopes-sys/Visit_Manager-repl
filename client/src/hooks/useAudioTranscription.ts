@@ -76,6 +76,7 @@ export function useAudioTranscription(opts?: { endpoint?: string }) {
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
+          console.log('[useAudioTranscription] Audio chunk received', { size: event.data.size, chunks: audioChunksRef.current.length });
         }
       };
 
@@ -84,6 +85,7 @@ export function useAudioTranscription(opts?: { endpoint?: string }) {
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         audioChunksRef.current = [];
         audioBlobRef.current = blob;
+        console.log('[useAudioTranscription] Recording stopped, blob size:', blob.size);
         setHasAudio(true);
         console.log('[useAudioTranscription] Recording stopped, audio ready for transcription');
       };
@@ -94,11 +96,12 @@ export function useAudioTranscription(opts?: { endpoint?: string }) {
         setIsRecording(false);
       };
 
-      // Start recording
-      mediaRecorder.start();
+      // Start recording with timeslice to force data events
+      mediaRecorder.start(500); // Request data every 500ms
       setIsRecording(true);
       setHasAudio(false);
-      console.log('[useAudioTranscription] Recording started');
+      setRecordingSeconds(0);
+      console.log('[useAudioTranscription] Recording started with 500ms timeslice');
     } catch (error: any) {
       console.error('[useAudioTranscription] Error starting recording:', error);
     }

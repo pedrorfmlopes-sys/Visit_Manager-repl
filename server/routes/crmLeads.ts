@@ -678,6 +678,13 @@ export function registerCrmLeadsRoutes(app: express.Express) {
           });
         }
 
+        if (errorMsg.includes("could not be decoded") || errorMsg.includes("format is not supported")) {
+          return res.status(400).json({ 
+            success: false, 
+            message: "Formato de áudio não suportado ou ficheiro corrompido. Tenta gravar novamente." 
+          });
+        }
+
         // Generic fallback for other errors
         return res.status(500).json({ 
           success: false, 

@@ -1,0 +1,65 @@
+FASE AUDIO-BACKEND-01 – Corrigir erro 500 no /api/crm/leads/ai/transcribe
+
+Situação atual (confirmada em DevTools):
+- Quando clico "Transcrever áudio" numa VISITA:
+  - O frontend chama POST /api/crm/leads/ai/transcribe.
+  - O servidor responde HTTP 500 com body:
+    {"success":false,"message":"Falha ao transcrever áudio. Por favor, tenta novamente."}
+
+- O VisitaForm.tsx já está correto e usa o hook useAudioTranscription;
+  o erro vem do backend.
+
+Objetivo:
+- Descobrir a causa real do erro dentro do endpoint /api/crm/leads/ai/transcribe.
+- Corrigir de forma a que:
+  - Em sucesso → devolve { success:true, text:"..." } (status 200).
+  - Em falha "esperada" (ex: IA não configurada) → devolve { success:false, message:"..." } com status 200 ou 400.
+  - Deixa de devolver 500 genérico.
+
+Tarefas:
+
+1) Abrir o ficheiro da rota que implementa:
+   POST /api/crm/leads/ai/transcribe
+   (provavelmente em server/routes/crmLeads.ts).
+
+   - Ver como o ficheiro de áudio é lido do request (campo FormData).
+   - Ver como é chamada a função transcribeAudio() de server/openai.ts.
+   - No catch atual, adicionar logs detalhados:
+     - console.error("[TranscribeLead]", error, error?.response?.status, error?.response?.data)
+
+2) Abrir server/openai.ts e analisar a função transcribeAudio():
+   - Confirmar:
+     - modelo usado (whisper-1, gpt-4o-mini-transcribe, etc.).
+     - como o ficheiro é passado (fs.createReadStream, path, mimeType).
+   - Confirmar se suporta audio/webm (MediaRecorder) e ficheiros enviados via multipart/form-data.
+
+3) Executar um teste controlado no servidor:
+   - Criar um script de teste (por ex. scripts/testTranscribeAudio.ts) que:
+     - Carrega um pequeno ficheiro de teste (wav/webm) e faz POST para /api/crm/leads/ai/transcribe.
+     - Imprime a resposta completa no console.
+   - Usar isto para ver o erro real (sem passar pelo frontend).
+
+4) Corrigir a causa:
+   - Se for falta de OPENAI_API_KEY ou configuração:
+     - Devolver { success:false, message:"IA não está configurada. Contacta o administrador." } (status 200/400).
+   - Se for erro de formato (webm não aceite ou ficheiro vazio):
+     - Ajustar o envio para o formato suportado OU devolver mensagem clara:
+       { success:false, message:"Formato de áudio não suportado ou ficheiro vazio." }
+   - Se for erro 401/403 da OpenAI:
+       { success:false, message:"Chave de IA inválida ou sem permissões." }
+
+   Em todos os casos, só usar status 500 para erros realmente inesperados e, mesmo nesses, manter logging claro.
+
+5) Testar de novo:
+   - Usar o script de teste.
+   - Depois, no frontend:
+     - Gravar áudio numa visita.
+     - Clicar "Transcrever áudio".
+     - Confirmar que:
+       - Ou recebo texto nas notas,
+       - Ou recebo um toast com mensagem específica (IA não configurada, formato não suportado, etc.), mas não um 500 genérico.
+
+6) Criar RELATORIO_FASE-AUDIO-BACKEND-01.txt com:
+   - Causa raiz do erro.
+   - Ficheiros e linhas corrigidas.
+   - Mensagens finais que o utilizador vê em cada cenário.
