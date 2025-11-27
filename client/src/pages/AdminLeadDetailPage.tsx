@@ -830,18 +830,12 @@ function OdooAttachmentsSection({
   leadId: string;
   odooLeadId: string | null;
 }) {
+  // Hooks must be called unconditionally, BEFORE any return statements
   const { toast } = useToast();
   const qc = useQueryClient();
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  if (!odooLeadId) {
-    return (
-      <div className="mt-2 text-xs text-slate-500">
-        Este lead ainda não existe no Odoo, por isso não há anexos para mostrar.
-      </div>
-    );
-  }
+  const hasOdooLead = !!odooLeadId;
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["lead-odoo-attachments", leadId],
@@ -855,7 +849,17 @@ function OdooAttachmentsSection({
         attachments?: OdooLeadAttachment[];
       }>;
     },
+    enabled: hasOdooLead,
   });
+
+  // Guard check AFTER all hooks
+  if (!hasOdooLead) {
+    return (
+      <div className="mt-2 text-xs text-slate-500">
+        Este lead ainda não existe no Odoo, por isso não há anexos para mostrar.
+      </div>
+    );
+  }
 
   const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>

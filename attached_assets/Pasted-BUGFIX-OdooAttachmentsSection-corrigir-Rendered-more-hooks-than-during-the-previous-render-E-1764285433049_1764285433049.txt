@@ -1,0 +1,64 @@
+BUGFIX – OdooAttachmentsSection: corrigir "Rendered more hooks than during the previous render"
+
+Erro atual:
+- Em AdminLeadDetailPage.tsx, dentro de OdooAttachmentsSection, existe um guard:
+    if (!odooLeadId) return <div>...</div>;
+  e SÓ depois disso são chamados os hooks (useState/useRef/useQuery).
+- Quando o componente renderiza primeiro sem odooLeadId e depois com odooLeadId,
+  o número de hooks muda entre renders e o React lança:
+  "[plugin:runtime-error-plugin] Rendered more hooks than during the previous render".
+
+Objetivo:
+- Refatorar OdooAttachmentsSection para que TODOS os hooks sejam chamados sempre,
+  independentemente de odooLeadId existir ou não.
+- Usar a opção "enabled" do useQuery para só fazer o fetch quando houver odooLeadId.
+
+Tarefas:
+
+1) Em OdooAttachmentsSection (client/src/pages/AdminLeadDetailPage.tsx):
+
+   - Remover qualquer "return" ANTES dos hooks.
+   - A estrutura deve ser algo deste género:
+
+   ```tsx
+   function OdooAttachmentsSection({
+     leadId,
+     odooLeadId,
+   }: {
+     leadId: string;
+     odooLeadId: string | null;
+   }) {
+     const hasOdooLead = !!odooLeadId;
+
+     const [isUploading, setIsUploading] = useState(false);
+     const fileInputRef = useRef<HTMLInputElement | null>(null);
+     const queryClient = useQueryClient();
+
+     const { data, isLoading, isError } = useQuery({
+       queryKey: ["lead-odoo-attachments", leadId],
+       queryFn: async () => {
+         const res = await fetch(`/api/crm/leads/${leadId}/odoo/attachments`, {
+           credentials: "include",
+         });
+         if (!res.ok) throw new Error("Erro ao carregar anexos");
+         return res.json() as Promise<{
+           success: boolean;
+           attachments?: OdooLeadAttachment[];
+         }>;
+       },
+       enabled: hasOdooLead, // só faz fetch se houver odooLeadId
+     });
+
+     if (!hasOdooLead) {
+       return (
+         <div className="mt-2 text-xs text-slate-500">
+           Este lead ainda não existe no Odoo, por isso não há anexos para mostrar.
+         </div>
+       );
+     }
+
+     // manter daqui para baixo a lógica atual:
+     // - estados de loading/erro
+     // - toolbar de upload
+     // - lista de AttachmentChip
+   }
