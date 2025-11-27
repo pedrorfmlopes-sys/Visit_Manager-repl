@@ -110,10 +110,7 @@ export default function AdminMarcas() {
             </CardHeader>
             <CardContent>
               <Form {...form}>
-                <form
-                  onSubmit={form.handleSubmit((data) => createMutation.mutate(data))}
-                  className="space-y-4"
-                >
+                <div className="space-y-4">
                   <FormField
                     control={form.control}
                     name="nome"
@@ -160,7 +157,12 @@ export default function AdminMarcas() {
                   />
 
                   <div className="flex gap-2">
-                    <Button type="submit" disabled={createMutation.isPending} data-testid="button-create-marca">
+                    <Button 
+                      type="button" 
+                      disabled={createMutation.isPending} 
+                      data-testid="button-create-marca"
+                      onClick={() => form.handleSubmit((data) => createMutation.mutate(data))()}
+                    >
                       {createMutation.isPending ? "Criando..." : "Criar"}
                     </Button>
                     <Button
@@ -172,7 +174,7 @@ export default function AdminMarcas() {
                       Cancelar
                     </Button>
                   </div>
-                </form>
+                </div>
               </Form>
             </CardContent>
           </Card>
@@ -195,11 +197,7 @@ export default function AdminMarcas() {
                     data-testid={`card-marca-${marca.id}`}
                   >
                     {editingId === marca.id ? (
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          updateMutation.mutate({ id: marca.id, data: editForm });
-                        }}
+                      <div
                         className="space-y-3"
                       >
                         <Input
@@ -230,10 +228,11 @@ export default function AdminMarcas() {
                         </div>
                         <div className="flex gap-2">
                           <Button
-                            type="submit"
+                            type="button"
                             size="sm"
                             disabled={updateMutation.isPending}
                             data-testid={`button-save-marca-${marca.id}`}
+                            onClick={() => updateMutation.mutate({ id: marca.id, data: editForm })}
                           >
                             Guardar
                           </Button>
@@ -247,7 +246,7 @@ export default function AdminMarcas() {
                             Cancelar
                           </Button>
                         </div>
-                      </form>
+                      </div>
                     ) : (
                       <>
                         <div className="flex items-start justify-between">

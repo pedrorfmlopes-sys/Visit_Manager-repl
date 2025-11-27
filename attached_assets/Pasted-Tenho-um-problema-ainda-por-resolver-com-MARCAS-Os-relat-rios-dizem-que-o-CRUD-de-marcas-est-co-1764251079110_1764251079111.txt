@@ -1,0 +1,79 @@
+Tenho um problema ainda por resolver com MARCAS.
+
+Os relatórios dizem que o CRUD de marcas está corrigido e pronto para teste, mas NA PRÁTICA ainda não consigo criar marcas novas a partir do AdminEmpresa. 
+Preciso que TU faças o debug completo e testes, sem depender de testes manuais meus.
+
+Contexto (já feito, segundo os relatórios):
+- Backend:
+  - Tabela `marcas` já existe com os campos corretos.
+  - Rotas corrigidas: 
+    - GET /api/admin/marcas
+    - POST /api/admin/marcas
+    - PATCH /api/admin/marcas/:id
+  - createMarca() e updateMarca() em server/storage.ts já têm logs e melhor error handling.
+- Frontend:
+  - AdminMarcas.tsx chama:
+    - GET /api/admin/marcas com useQuery
+    - POST /api/admin/marcas para criar
+    - PATCH /api/admin/marcas/:id para editar
+  - Em onSuccess do POST, faz invalidateQueries("/api/admin/marcas") e mostra toast "Marca criada com sucesso".
+
+Sintoma atual:
+- Na UI, quando crio uma marca, não vejo erro, mas:
+  - A nova marca NÃO aparece na lista de marcas.
+- Quero que TU confirmes se:
+  - O POST está realmente a inserir na BD.
+  - O GET devolve essas marcas novas.
+  - Não há nenhum problema de empresaId ou RBAC a esconder as marcas.
+
+Quero que faças o seguinte, passo a passo, tu próprio:
+
+1) Rever backend de marcas:
+   - Abrir o código das rotas /api/admin/marcas no servidor (server/routes.ts ou ficheiro dedicado).
+   - Rever as funções createMarca() e updateMarca() em server/storage.ts.
+   - Garantir que:
+     - POST /api/admin/marcas usa createMarca() com o empresaId correto (via getUserContext).
+     - createMarca() faz MESMO insert em `marcas` e devolve o objeto inserido ou pelo menos o id.
+     - Em caso de erro SQL, a resposta do POST é { success: false, message, details }.
+
+2) Criar um teste automático simples (sem front):
+   - Cria um pequeno script de teste em Node/TypeScript (ex: scripts/testCreateMarca.ts) ou uma função temporária de debug que TU próprio vais correr no ambiente dev.
+   - Este script deve:
+     - Simular o contexto de um utilizador de teste com empresaId conhecido.
+     - Chamar diretamente createMarca() OU fazer uma chamada HTTP interna para POST /api/admin/marcas usando um payload mínimo válido, por ex.:
+       - { nome: "Marca Debug Agent", codigo: "DBG" }
+     - Depois fazer uma leitura direta da BD (usando Drizzle) para fazer SELECT na tabela `marcas` filtrando por:
+       - empresaId = empresaId de teste
+       - nome = "Marca Debug Agent"
+     - Logar claramente:
+       - "CREATE MARCA TEST - INSERTED ROW:" com o objeto que vier do SELECT.
+   - O objetivo é tu próprio confirmas no log que a linha foi inserida.
+
+3) Garantir que GET /api/admin/marcas devolve a nova marca:
+   - No mesmo script ou num segundo teste, faz uma chamada HTTP interna a GET /api/admin/marcas usando o mesmo contexto de utilizador.
+   - Verifica programaticamente se a resposta inclui a marca "Marca Debug Agent".
+   - Logar algo tipo:
+     - "GET MARCAS TEST - FOUND Marca Debug Agent: true/false"
+   - Se false, ajustar o where/filter de GET /api/admin/marcas para garantir que está a filtrar por empresaId corretamente, SEM excluir a marca acabada de criar.
+
+4) Ligar isto ao frontend de AdminMarcas:
+   - Confirmar que o tipo de dados que GET /api/admin/marcas devolve (id, nome, codigo, ativa, etc.) corresponde ao tipo Marca esperado em AdminMarcas.tsx.
+   - Garante que não há null/undefined estranhos que impeçam o React Query de renderizar a nova marca.
+   - Se necessário, adiciona data-testid ou logs no console só para confirmar que o array de marcas chega ao componente.
+
+5) No final:
+   - Garante que, ao correr a app normalmente, criar uma marca no AdminEmpresa:
+     - Aciona POST /api/admin/marcas.
+     - O backend insere a linha em `marcas`.
+     - GET /api/admin/marcas passa a devolvê-la.
+     - A lista de marcas em AdminMarcas.tsx mostra a nova marca.
+
+6) Atualiza ou cria um relatório técnico curto (ex.: RELATORIO_BUG-MARCAS-FIX-2.txt) a explicar:
+   - Qual era o problema real (ex.: insert não corria, empresaId errado, filtro do GET, etc.).
+   - O que foi alterado (ficheiros + linhas principais).
+   - Como o script de teste confirma que agora funciona.
+
+É muito importante:
+- Não mexer em nada de Leads, leads_marcas, Odoo ou badges nesta tarefa.
+- Focar apenas no CRUD de marcas (tabela `marcas`, rotas /api/admin/marcas, storage de marcas).
+- Tu próprio fazeres o teste programático e garantires que fica a funcionar, sem depender de eu testar manualmente.
