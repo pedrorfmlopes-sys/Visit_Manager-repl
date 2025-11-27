@@ -68,23 +68,68 @@ export function useAudioTranscription(opts?: { endpoint?: string }) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
 
-      // Create MediaRecorder with explicit mime type
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      // Try to create MediaRecorder with explicit mime type, fallback if not supported
+      let mediaRecorder: MediaRecorder;
+      const supportedMimeTypes = ['audio/webm', 'audio/mp4', 'audio/ogg', ''];
+      let selectedMimeType = '';
+      
+      for (const mimeType of supportedMimeTypes) {
+        try {
+          if (mimeType && !MediaRecorder.isTypeSupported(mimeType)) {
+            console.log('[useAudioTranscription] mimeType not supported:', mimeType);
+            continue;
+          }
+          const options = mimeType ? { mimeType } : {};
+          mediaRecorder = new MediaRecorder(stream, options);
+          selectedMimeType = mimeType || '(default)';
+          console.log('[useAudioTranscription] MediaRecorder created successfully with:', selectedMimeType);
+          break;
+        } catch (e) {
+          console.log('[useAudioTranscription] Failed to create with:', mimeType, e);
+          continue;
+        }
+      }
+      
+      if (!mediaRecorder) {
+        throw new Error('Failed to create MediaRecorder with any supported mime type');
+      }
+      
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
-      // Accumulate audio chunks
+      console.log('[useAudioTranscription] MediaRecorder created', { 
+        state: mediaRecorder.state,
+        mimeType: 'audio/webm'
+      });
+
+      // CRITICAL: Register ondataavailable BEFORE start()
       mediaRecorder.ondataavailable = (event) => {
+        console.log('[useAudioTranscription] ondataavailable fired', { 
+          eventDataSize: event.data?.size,
+          eventDataType: event.data?.type 
+        });
         if (event.data && event.data.size > 0) {
           audioChunksRef.current.push(event.data);
-          console.log('[useAudioTranscription] Audio chunk received', { size: event.data.size, chunks: audioChunksRef.current.length });
+          console.log('[useAudioTranscription] Audio chunk PUSHED', { 
+            size: event.data.size, 
+            totalChunks: audioChunksRef.current.length,
+            totalSize: audioChunksRef.current.reduce((sum, b) => sum + b.size, 0)
+          });
         }
       };
 
-      // Handle stop event - create blob from accumulated chunks
+      // CRITICAL: Register onstop BEFORE start()
       mediaRecorder.onstop = () => {
+        console.log('[useAudioTranscription] onstop fired', { 
+          chunks: audioChunksRef.current.length,
+          totalSize: audioChunksRef.current.reduce((sum, b) => sum + b.size, 0)
+        });
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        console.log('[useAudioTranscription] Recording stopped, blob size:', blob.size, 'chunks:', audioChunksRef.current.length);
+        console.log('[useAudioTranscription] Recording stopped - blob created', {
+          blobSize: blob.size,
+          blobType: blob.type,
+          chunks: audioChunksRef.current.length
+        });
         audioBlobRef.current = blob;
         setHasAudio(blob.size > 0);
         
@@ -98,14 +143,22 @@ export function useAudioTranscription(opts?: { endpoint?: string }) {
         setIsRecording(false);
       };
 
-      // Start recording with timeslice to force data events every 500ms
-      mediaRecorder.start(500);
+      // CRITICAL: Now start recording
+      console.log('[useAudioTranscription] About to call start(500)', { state: mediaRecorder.state });
+      try {
+        mediaRecorder.start(500);
+        console.log('[useAudioTranscription] start(500) called successfully', { state: mediaRecorder.state });
+      } catch (startError: any) {
+        console.error('[useAudioTranscription] Error calling start(500):', startError);
+        throw startError;
+      }
+      
       setIsRecording(true);
       setHasAudio(false);
       setRecordingSeconds(0);
-      console.log('[useAudioTranscription] Recording started with 500ms timeslice');
     } catch (error: any) {
-      console.error('[useAudioTranscription] Error starting recording:', error);
+      console.error('[useAudioTranscription] Fatal error in startRecording:', error);
+      setIsRecording(false);
     }
   }, []);
 

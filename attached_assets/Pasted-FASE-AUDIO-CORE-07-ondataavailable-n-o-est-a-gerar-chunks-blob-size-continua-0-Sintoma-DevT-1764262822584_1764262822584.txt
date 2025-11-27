@@ -1,0 +1,56 @@
+FASE AUDIO-CORE-07 – ondataavailable não está a gerar chunks (blob size continua 0)
+
+Sintoma (DevTools Console em /visitas/nova):
+[useAudioTranscription] Starting recording...
+[useAudioTranscription] Recording started with 500ms timeslice
+[useAudioTranscription] Recording stopped, blob size: 0 chunks: 0
+[useAudioTranscription] Stopping recording...
+
+Observações:
+- Nunca aparece o log "[useAudioTranscription] Audio chunk received { ... }".
+- Isso quer dizer que ondataavailable ou não está a ser registado, ou nunca faz push no audioChunksRef.
+- O resultado é `audioChunksRef.current.length === 0` e blob size 0.
+
+Objetivo:
+- Garantir que startRecording/stopRecording em client/src/hooks/useAudioTranscription.ts
+  estão a configurar corretamente o MediaRecorder e o ondataavailable,
+  de forma a que:
+  - ao gravar 3–5s, o console mostre pelo menos 1 log "Audio chunk received ..."
+  - no stop, o log "blob size" seja > 1000 e "chunks" > 0.
+
+Tarefas concretas:
+
+1) Rever a implementação actual de startRecording():
+   - Confirmar que:
+     - audioChunksRef.current = [] é feito ANTES de chamar mediaRecorder.start(500);
+     - mediaRecorder.ondataavailable = (event) => {
+         console.log('[useAudioTranscription] ondataavailable', { size: event.data.size });
+         if (event.data && event.data.size > 0) {
+           audioChunksRef.current.push(event.data);
+           console.log('[useAudioTranscription] Audio chunk received', {
+             size: event.data.size,
+             chunks: audioChunksRef.current.length,
+           });
+         }
+       };
+     - mediaRecorder.onstop usa **esse** audioChunksRef.current para construir o Blob:
+       const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+
+2) Rever stopRecording():
+   - Garantir que apenas chama mediaRecorder.stop() se:
+     mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive'.
+
+3) Garantir que o MediaRecorder é criado correctamente:
+   - new MediaRecorder(stream, { mimeType: 'audio/webm' }) dentro de startRecording().
+   - Guardar em mediaRecorderRef.current ANTES de chamar start(500).
+
+4) Testar:
+   - Em /visitas/nova, abrir DevTools e gravar 3–5 segundos.
+   - Verificar que agora aparecem:
+     - "[useAudioTranscription] Audio chunk received { size: ..., chunks: ... }"
+     - "[useAudioTranscription] Recording stopped, blob size: NNNN chunks: M" com NNNN > 1000 e M > 0.
+   - Só depois disso testar "Transcrever áudio".
+
+5) Atualizar RELATORIO_FASE-AUDIO-CORE-07-BLOB-CHUNKS.txt com:
+   - o código final de startRecording/ondataavailable/onstop,
+   - os valores de blob.size e número de chunks nos testes.
