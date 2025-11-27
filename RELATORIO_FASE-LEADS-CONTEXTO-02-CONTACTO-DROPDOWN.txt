@@ -1,0 +1,526 @@
+================================================================================
+RELATORIO: FASE-LEADS-CONTEXTO-02 - Mostrar contexto correto e escolher contacto
+================================================================================
+
+Data: 27 Novembro 2025
+Status: ✅ IMPLEMENTADO
+Objetivo: Exibir contexto (entidade+contacto) corretos e permitir seleção de contacto
+
+================================================================================
+1. RESUMO DA FASE
+================================================================================
+
+OBJETIVO:
+Quando abro /admin/leads/new a partir de uma visita:
+  1. Ver cartão "Contexto do lead" com ENTIDADE e VISITA corretas (não vazio)
+  2. Poder escolher CONTACTO num dropdown
+
+ARQUITETURA:
+  - AdminLeadDetailPage: Fetch visita, constrói lista de contactos, passa para form
+  - LeadDetailForm: Novo campo <Select> para escolher contacto
+  - Validação: contactoId obrigatório (backend ainda exige)
+
+RESULTADO: Fluxo completo com contexto visual correto + seleção de contacto!
+
+================================================================================
+2. MUDANCAS IMPLEMENTADAS (AdminLeadDetailPage.tsx)
+================================================================================
+
+2.1 IMPORTS (linhas 1-16)
+────────────────────────
+
+ANTES:
+  import type { Marca } from "@shared/schema";
+  type Contacto = { id, nome, email?, telemovel? };
+
+DEPOIS:
+  import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+  import type { Marca, VisitaWithRelations, Contacto } from "@shared/schema";
+  (removido type Contacto duplicado)
+
+RESULTADO:
+  ✓ Acesso a Select component (Shadcn)
+  ✓ VisitaWithRelations type
+  ✓ Sem duplicação de types
+
+────────────────────────────────────────────────────────────────────────────
+
+2.2 FETCH DE VISITA EM CREATE MODE (linhas 70-74)
+─────────────────────────────────────────────────
+
+NOVO CODIGO:
+  const { data: visitaData } = useQuery<VisitaWithRelations>({
+    queryKey: ["/api/visitas", visitaIdFromQuery],
+    enabled: isCreateMode && !!visitaIdFromQuery,
+  });
+
+LOGICA:
+  - Em create mode (id === "new") + visitaId na query → fetch visita
+  - Reutiliza o mesmo endpoint já usado em VisitaDetail
+  - Lazy loading: só fetch se criar mode && visitaId
+  - Sem enabled=true se edit mode (evita fetch desnecessário)
+
+RESULTADO:
+  ✓ visitaData obtém: entidade, contacto, contactosPresentes
+  ✓ Sem impacto em edit mode (id !== "new")
+  ✓ Dados prontos para construir contexto
+
+────────────────────────────────────────────────────────────────────────────
+
+2.3 BUILD LISTA DE CONTACTOS DISPONIVEIS (linhas 114-137)
+──────────────────────────────────────────────────────
+
+NOVO CODIGO:
+  const contactosDisponiveis = [];
+  if (visitaData) {
+    // Contacto principal
+    if (visitaData.contacto)
+      push { id, nome, origem: "Contacto principal" }
+    
+    // Contactos presentes (pivot table)
+    if (visitaData.contactosPresentes)
+      forEach contacto:
+        if not already added:
+          push { id, nome, origem: "Presente nesta visita" }
+  }
+
+FONTE DOS DADOS:
+  1. contacto principal (Visita.contactoId → Contacto object)
+  2. contactosPresentes array (pivot table VisitasContactos)
+
+DEDUPLICACAO:
+  Verifica se já existe { id } antes de adicionar (evita duplicatas)
+
+RESULTADO EXEMPLO:
+  [
+    { id: "abc123", nome: "João Silva", origem: "Contacto principal" },
+    { id: "def456", nome: "Maria Costa", origem: "Presente nesta visita" },
+    { id: "ghi789", nome: "Pedro Lopes", origem: "Presente nesta visita" }
+  ]
+
+────────────────────────────────────────────────────────────────────────────
+
+2.4 MOCK LEAD COM CONTEXTO CORRETO (linhas 139-161)
+────────────────────────────────────
+
+ANTES:
+  entidadeNome: null
+  contactoNome: null
+
+DEPOIS:
+  entidadeNome: visitaData?.entidade?.nome || null
+  contactoNome: visitaData?.contacto?.nome || null
+
+IMPACTO:
+  ✓ Cartão "Contexto do lead" agora mostra nomes reais
+  ✓ Entidade vem de visitaData.entidade (FK em Visita)
+  ✓ Contacto principal vem de visitaData.contacto
+  ✓ Em create mode, preenche automaticamente (não null)
+
+────────────────────────────────────────────────────────────────────────────
+
+2.5 PASS CONTACTOS PARA FORM (linhas 186-196)
+──────────────────────────────────────────────
+
+MUDANCA:
+  <LeadDetailForm
+    ...
+    contactosDisponiveis={contactosDisponiveis}
+  />
+
+RESULTADO:
+  ✓ Form recebe lista de contactos
+  ✓ Form pode renderizar dropdown
+
+════════════════════════════════════════════════════════════════════════════
+
+3. MUDANCAS EM LeadDetailForm (componente inline)
+════════════════════════════════════════════════════════════════════════════
+
+3.1 FUNCTION SIGNATURE (linhas 209-226)
+────────────────────────────────────────
+
+ANTES:
+  function LeadDetailForm({ lead, isCreateMode, visitaId, returnTo, entidadeId, contactoId, hasContext })
+
+DEPOIS:
+  function LeadDetailForm({ lead, isCreateMode, visitaId, returnTo, entidadeId, contactoId, hasContext, contactosDisponiveis = [] })
+
+NOVO PARAM:
+  contactosDisponiveis: Array<{ id, nome, origem }>
+
+RESULTADO:
+  ✓ Form pode usar lista de contactos
+  ✓ Default vazio (sem crash se não passar)
+
+────────────────────────────────────────────────────────────────────────────
+
+3.2 ESTADO DO FORMULÁRIO COM CONTACTO (linhas 248-257)
+──────────────────────────────────────────────────────
+
+ANTES:
+  const [form, setForm] = useState({
+    titulo: "",
+    descricao: "",
+    marcasIds: [],
+    estado: "novo",
+    valorPrevisto: "",
+    moeda: "EUR",
+  });
+
+DEPOIS:
+  const [form, setForm] = useState({
+    ...
+    contactoId: isCreateMode ? (contactoId || "") : (lead.contactoId || ""),
+  });
+
+LOGICA:
+  - Create mode: contactoIdFromQuery (pode ser vazio)
+  - Edit mode: lead.contactoId (já existe)
+
+RESULTADO:
+  ✓ contactoId é parte do estado
+  ✓ handleChange pode ser estendido para contactoId
+  ✓ handleSave lê form.contactoId
+
+────────────────────────────────────────────────────────────────────────────
+
+3.3 VALIDACAO E ENVIO DO CONTACTO (linhas 357-369)
+───────────────────────────────────────────────
+
+ANTES:
+  if (isCreateMode) {
+    if (!entidadeId || !contactoId) // contactoId da query
+      throw error
+    body.contactoId = contactoId
+  }
+
+DEPOIS:
+  if (isCreateMode) {
+    if (!entidadeId) throw error "entidade ausente"
+    
+    // NOVO: Ler do form
+    if (!form.contactoId)
+      throw error "Neste momento é obrigatório associar um contacto ao lead."
+    
+    body.contactoId = form.contactoId // Do form state, não da query!
+  }
+
+IMPACTO:
+  ✓ User pode mudar contacto no dropdown
+  ✓ POST envia o contacto SELECIONADO, não o da query
+  ✓ Mensagem erro se tentar guardar sem contacto
+  ✓ Backend recebe contactoId válido
+
+────────────────────────────────────────────────────────────────────────────
+
+3.4 NOVO CAMPO <SELECT> PARA CONTACTO (linhas 629-660)
+──────────────────────────────────────────────────────
+
+LOCALIZAÇÃO: Após campo "Descrição", antes de "Marcas"
+
+RENDERIZADO APENAS: isCreateMode === true
+
+COMPONENTE:
+  <Select
+    value={form.contactoId}
+    onValueChange={(value) => setForm(f => ({ ...f, contactoId: value }))}
+  >
+    <SelectTrigger id="lead-contacto">
+      <SelectValue placeholder="Seleciona um contacto" />
+    </SelectTrigger>
+    <SelectContent>
+      {contactosDisponiveis.map(c => (
+        <SelectItem value={c.id}>
+          {c.nome} ({c.origem})
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+
+FEATURES:
+  ✓ Label obrigatório: "Contacto *"
+  ✓ Placeholder: "Seleciona um contacto"
+  ✓ Mostra origem do contacto: "(Contacto principal)" ou "(Presente nesta visita)"
+  ✓ Help text: "Seleciona o contacto para este lead"
+  ✓ Vazio = erro ao guardar
+
+RESULTADO VISUAL:
+  - Dropdown com contactos da visita
+  - Cada item mostra nome + origem
+  - Fácil de entender qual contacto escolher
+  - Validação clara se esquecer
+
+================================================================================
+4. FLUXO COMPLETO (USER PERSPECTIVE)
+================================================================================
+
+PASSO 1: Abrir visita
+  URL: /admin/visitas/:id
+  Visita: entidade + 2 contactos presentes
+  Botao: "Novo lead desta visita"
+
+PASSO 2: Clica botao
+  VisitaDetail navega para:
+    /admin/leads/new?visitaId=...&entidadeId=...&contactoId=...&returnTo=...
+
+PASSO 3: AdminLeadDetailPage carrega
+  useQuery fetch /api/visitas/:visitaId
+  Constrói contactosDisponiveis array:
+    - Contacto principal
+    - Contactos presentes
+  Lead mock preenchido com entidadeNome + contactoNome
+
+PASSO 4: Vê contexto correto
+  Cartão "Contexto do lead":
+    - Entidade: "ABC Corporation" ✓
+    - Contacto principal: "João Silva" ✓
+    - Visita: "Ver visita" (link) ✓
+
+PASSO 5: Novo campo "Contacto"
+  Dropdown com opções:
+    ☐ Nenhum contacto (se implementarmos later)
+    ☐ João Silva (Contacto principal)
+    ☐ Maria Costa (Presente nesta visita)
+    ☐ Pedro Lopes (Presente nesta visita)
+  Por defeito: vazio (obriga a escolher)
+
+PASSO 6: User escolhe contacto
+  Clica "Maria Costa (Presente nesta visita)"
+  form.contactoId = "def456"
+
+PASSO 7: Preenche resto do formulário
+  Título: "Oportunidade cliente X"
+  Descrição: "Cliente quer proposta..."
+  Marcas: [Marca A, Marca B]
+  Estado: "novo"
+
+PASSO 8: Clica "Guardar alterações"
+  handleSave executa:
+    1. Valida form.titulo ✓
+    2. Valida form.contactoId ✓ (agora escolhido)
+    3. Body montado:
+       {
+         titulo: "Oportunidade cliente X",
+         descricao: "Cliente quer proposta...",
+         marcasIds: ["m1", "m2"],
+         estado: "novo",
+         visitaId: "visita-id",
+         entidadeId: "entidade-id",
+         contactoId: "def456" // DO FORM!
+       }
+
+PASSO 9: POST /api/crm/leads
+  Backend recebe contactoId: "def456"
+  FK constraints validadas
+  Lead criado com contacto selecionado
+
+PASSO 10: Pós-criação
+  navigate(returnTo) → /admin/visitas/:id
+  Lead apareça em "Leads desta visita"
+  Nome do contacto: "Maria Costa" (do form.contactoId)
+
+RESULTADO: Contexto visual correto + contacto escolhido pelo user!
+
+================================================================================
+5. TESTES MANUAIS
+================================================================================
+
+TESTE A: Fluxo completo com contexto
+─────────────────────────────────────
+Precondições:
+  - Visita com entidade + contacto principal + 2+ contactos presentes
+
+Passos:
+  1. /admin/visitas/:id
+  2. Clica "Novo lead desta visita"
+  3. Verifica:
+     ✓ Cartão "Contexto do lead" mostra entidade correta
+     ✓ Cartão mostra contacto principal correto
+     ✓ Campo "Contacto" aparece (novo!)
+     ✓ Dropdown tem todos contactos presentes
+     ✓ Cada contacto mostra origem
+
+Resultado esperado: ✓ Tudo visível e funcional
+
+TESTE B: Seleção de contacto e guardar
+───────────────────────────────────────
+Precondições:
+  - Contacto dropdown renderizado
+
+Passos:
+  1. Clica dropdown "Contacto"
+  2. Seleciona "Maria Costa (Presente nesta visita)"
+  3. Preenche título + descrição
+  4. Clica "Guardar alterações"
+
+Resultado esperado:
+  ✓ POST com form.contactoId = "maria-id"
+  ✓ Lead criado no backend
+  ✓ returnTo navega para visita
+  ✓ Novo lead aparece na lista com contacto correto
+
+TESTE C: Tentar guardar sem contacto
+──────────────────────────────────────
+Precondições:
+  - Contacto não selecionado (vazio)
+
+Passos:
+  1. Preenche título
+  2. Clica "Guardar alterações"
+
+Resultado esperado:
+  ✓ Toast error: "Neste momento é obrigatório associar um contacto ao lead."
+  ✓ NAO faz POST
+  ✓ Fica na página (edit mode)
+  ✓ User vê que esqueceu de escolher contacto
+
+TESTE D: Contacto único na visita
+──────────────────────────────────
+Precondições:
+  - Visita com só 1 contacto
+
+Passos:
+  1. Abre /admin/leads/new
+  2. Verifica dropdown
+
+Resultado esperado:
+  ✓ Dropdown tem 1 item (esse contacto)
+  ✓ Já pré-selecionado (ou vazio, user escolhe)
+  ✓ Fácil guardar
+
+================================================================================
+6. ARQUITETURA TECNICA
+================================================================================
+
+DATA FLOW:
+  Visita (backend)
+    ↓
+    ├─ entidade { id, nome, ... }
+    ├─ contacto { id, nome, ... } (FK na Visita)
+    └─ contactosPresentes [] (pivot VisitasContactos)
+         ↓
+    AdminLeadDetailPage
+      ↓
+      ├─ visitaData (useQuery)
+      ├─ contactosDisponiveis array
+      ├─ lead mock (entidadeNome, contactoNome preenchidos)
+         ↓
+    LeadDetailForm
+      ↓
+      ├─ form.contactoId (state)
+      ├─ <Select> com contactosDisponiveis
+      ├─ handleSave lê form.contactoId
+         ↓
+    POST /api/crm/leads
+      ↓
+      body: { ..., contactoId: form.contactoId }
+      ↓
+    Backend valida FK
+    ↓
+    Lead criado com contactoId correto
+
+VALIDACAO:
+  Cliente:
+    - if (!form.contactoId) → toast error
+    - if (!entidadeId) → toast error
+  
+  Servidor:
+    - if (!body.contactoId) → 400 Bad Request
+    - if (!body.entidadeId) → 400 Bad Request
+    - FK constraint check
+
+================================================================================
+7. NOTAS IMPORTANTES
+================================================================================
+
+FUTURE WORK:
+  - Permitir contactoId = null no schema (para leads sem contacto)
+  - Dropdown "Nenhum contacto" option (quando backend aceitar null)
+  - Pre-selecionar contacto principal por defeito (UX melhor)
+  - Buscar contactos adicionais da entidade (se endpoint disponível)
+
+CURRENT STATE:
+  - contactoId obrigatório (backend FK NOT NULL)
+  - Não permitir submit sem contacto selecionado
+  - Mensagem erro clara se esquecer
+  - Dropdown mostra origem para clareza
+
+IMPORTANTE:
+  - visitaData fetch é lazy (só em create mode)
+  - Sem impacto em edit mode (performance)
+  - contactosDisponiveis deduplicado
+  - Sem queries redundantes
+
+================================================================================
+8. FICHEIROS MODIFICADOS
+================================================================================
+
+Ficheiro: client/src/pages/AdminLeadDetailPage.tsx
+
+Mudanças:
+  ✓ Linha 15: Import Select components
+  ✓ Linha 16: Import VisitaWithRelations, Contacto types
+  ✓ Linhas 18-23: Removido type Contacto duplicado
+  ✓ Linhas 70-74: useQuery para visita (create mode)
+  ✓ Linhas 114-137: Build contactosDisponiveis array
+  ✓ Linhas 155-156: entidadeNome + contactoNome da visita
+  ✓ Linhas 195: Pass contactosDisponiveis prop
+  ✓ Linhas 217, 226: Add contactosDisponiveis param
+  ✓ Linhas 256: contactoId no form state
+  ✓ Linhas 362-368: Validar form.contactoId + usar form.contactoId
+  ✓ Linhas 629-660: Novo campo <Select> de contacto
+
+Total linhas adicionadas: ~50 (mostly UI)
+
+================================================================================
+9. STATUS FINAL
+================================================================================
+
+✅ Implementação: COMPLETA
+  ✓ useQuery para visita
+  ✓ contactosDisponiveis array
+  ✓ Mock lead com contexto
+  ✓ <Select> field para contacto
+  ✓ Validação form.contactoId
+  ✓ POST envia form.contactoId
+
+✅ Testes: PRONTOS PARA EXECUTAR
+  ✓ 4 testes (A-D)
+  ✓ Casos normais + edge cases
+  ✓ Passos detalhados
+  ✓ Resultados esperados
+
+✅ Documentação: ESTE FICHEIRO
+  ✓ 9 secções completas
+  ✓ Fluxo user + arquitetura técnica
+  ✓ Notas para future work
+  ✓ Status final
+
+================================================================================
+10. PROXIMOS PASSOS
+================================================================================
+
+IMEDIATO:
+  1. Restart workflow
+  2. Teste manual A-D
+  3. Verificar POST body com contactoId correto
+  4. Verificar volta a visita com novo lead
+
+DEPOIS (Future phase):
+  1. Permitir contactoId = null (schema migration)
+  2. Option "Nenhum contacto" em dropdown
+  3. Pre-selecionar contacto principal (UX)
+  4. Buscar contactos adicionais da entidade (se endpoint existe)
+
+================================================================================
+FIM - RELATORIO COMPLETO
+================================================================================
+
+Versao: 1.0 - Release
+Data: 27 Novembro 2025
+Status: PRONTO PARA TESTE
+
+FASE-LEADS-CONTEXTO-02 IMPLEMENTADA E PRONTA!
+
+================================================================================

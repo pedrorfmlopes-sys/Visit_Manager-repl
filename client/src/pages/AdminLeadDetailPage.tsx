@@ -13,14 +13,8 @@ import { ArrowLeft, ExternalLink, Mic, Wand2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAudioTranscription } from "@/hooks/useAudioTranscription";
-import type { Marca } from "@shared/schema";
-
-type Contacto = {
-  id: string;
-  nome: string;
-  email?: string | null;
-  telemovel?: string | null;
-};
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { Marca, VisitaWithRelations, Contacto } from "@shared/schema";
 
 type Lead = {
   id: string;
@@ -56,12 +50,18 @@ export default function AdminLeadDetailPage() {
 
   // FASE-LEADS-NEW-03: Parse query params for create mode (with context)
   const searchParams = new URLSearchParams(search);
-  const visitaId = searchParams.get("visitaId");
+  const visitaIdFromQuery = searchParams.get("visitaId");
   const entidadeId = searchParams.get("entidadeId");
-  const contactoId = searchParams.get("contactoId");
+  const contactoIdFromQuery = searchParams.get("contactoId");
   const returnTo = searchParams.get("returnTo");
   const isCreateMode = id === "new";
-  const hasContext = isCreateMode && entidadeId && contactoId;
+  const hasContext = isCreateMode && entidadeId && contactoIdFromQuery;
+
+  // FASE-LEADS-CONTEXTO-02: Fetch visita data for context display
+  const { data: visitaData } = useQuery<VisitaWithRelations>({
+    queryKey: ["/api/visitas", visitaIdFromQuery],
+    enabled: isCreateMode && !!visitaIdFromQuery,
+  });
 
   const { data, isLoading, isError } = useQuery<LeadResponse>({
     queryKey: ["/api/crm/leads", id],
@@ -101,7 +101,32 @@ export default function AdminLeadDetailPage() {
     );
   }
 
-  // FASE-LEADS-NEW-03: Create empty lead for new mode (with context from query)
+  // FASE-LEADS-CONTEXTO-02: Build contactos list from visita data
+  const contactosDisponiveis: Array<{ id: string; nome: string; origem: string }> = [];
+  if (visitaData) {
+    // Contacto principal da visita
+    if (visitaData.contacto) {
+      contactosDisponiveis.push({
+        id: visitaData.contacto.id,
+        nome: visitaData.contacto.nome || "Sem nome",
+        origem: "Contacto principal",
+      });
+    }
+    // Contactos presentes na visita
+    if (visitaData.contactosPresentes && Array.isArray(visitaData.contactosPresentes)) {
+      visitaData.contactosPresentes.forEach((c) => {
+        if (!contactosDisponiveis.find((cd) => cd.id === c.id)) {
+          contactosDisponiveis.push({
+            id: c.id,
+            nome: c.nome || "Sem nome",
+            origem: "Presente nesta visita",
+          });
+        }
+      });
+    }
+  }
+
+  // FASE-LEADS-NEW-03: Create empty lead for new mode (with context from query and visita)
   const lead = isCreateMode 
     ? {
         id: "new",
@@ -112,13 +137,13 @@ export default function AdminLeadDetailPage() {
         valorPrevisto: null,
         moeda: "EUR",
         entidadeId: entidadeId || "",
-        contactoId: contactoId || "",
-        visitaId: visitaId || null,
+        contactoId: contactoIdFromQuery || "",
+        visitaId: visitaIdFromQuery || null,
         odooLeadId: null,
         createdAt: "",
         updatedAt: "",
-        entidadeNome: null,
-        contactoNome: null,
+        entidadeNome: visitaData?.entidade?.nome || null,
+        contactoNome: visitaData?.contacto?.nome || null,
         visitaData: null,
         contactosAssociados: null,
         marcas: null,
@@ -152,11 +177,12 @@ export default function AdminLeadDetailPage() {
             <LeadDetailForm 
               lead={lead} 
               isCreateMode={isCreateMode} 
-              visitaId={visitaId} 
+              visitaId={visitaIdFromQuery} 
               returnTo={returnTo}
               entidadeId={entidadeId}
-              contactoId={contactoId}
+              contactoId={contactoIdFromQuery}
               hasContext={hasContext}
+              contactosDisponiveis={contactosDisponiveis}
             />
           ) : null}
         </div>
@@ -178,6 +204,7 @@ function LeadDetailForm({
   entidadeId = null,
   contactoId = null,
   hasContext = false,
+  contactosDisponiveis = [],
 }: { 
   lead: Lead; 
   isCreateMode?: boolean;
@@ -186,6 +213,7 @@ function LeadDetailForm({
   entidadeId?: string | null;
   contactoId?: string | null;
   hasContext?: boolean;
+  contactosDisponiveis?: Array<{ id: string; nome: string; origem: string }>;
 }) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -214,6 +242,8 @@ function LeadDetailForm({
     estado: lead.estado ?? "novo",
     valorPrevisto: lead.valorPrevisto ?? "",
     moeda: lead.moeda ?? "EUR",
+    // FASE-LEADS-CONTEXTO-02: Contacto selection for create mode
+    contactoId: isCreateMode ? (contactoId || "") : (lead.contactoId || ""),
   });
 
   const [saving, setSaving] = useState(false);
@@ -314,14 +344,18 @@ function LeadDetailForm({
         moeda: form.moeda || "EUR",
       };
 
-      // FASE-LEADS-NEW-03: POST for create mode, PATCH for edit mode (with context)
+      // FASE-LEADS-CONTEXTO-02: POST for create mode (read contactoId from form)
       if (isCreateMode) {
-        if (!entidadeId || !contactoId) {
-          throw new Error("Contexto incompleto: entidade ou contacto ausentes");
+        if (!entidadeId) {
+          throw new Error("Contexto incompleto: entidade ausente");
+        }
+        // FASE-LEADS-CONTEXTO-02: Validate contactoId selection
+        if (!form.contactoId) {
+          throw new Error("Neste momento é obrigatório associar um contacto ao lead.");
         }
         body.visitaId = visitaId || null;
         body.entidadeId = entidadeId;
-        body.contactoId = contactoId;
+        body.contactoId = form.contactoId; // Read from form state
       }
 
       const method = isCreateMode ? "POST" : "PATCH";
@@ -581,6 +615,39 @@ function LeadDetailForm({
               data-testid="textarea-lead-descricao"
             />
           </div>
+
+          {/* FASE-LEADS-CONTEXTO-02: Contacto selection field in create mode */}
+          {isCreateMode && (
+            <div className="space-y-1">
+              <Label htmlFor="lead-contacto">Contacto *</Label>
+              <Select
+                value={form.contactoId}
+                onValueChange={(value) => setForm((f) => ({ ...f, contactoId: value }))}
+              >
+                <SelectTrigger id="lead-contacto" data-testid="select-lead-contacto">
+                  <SelectValue placeholder="Seleciona um contacto" />
+                </SelectTrigger>
+                <SelectContent>
+                  {contactosDisponiveis.length === 0 ? (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                      Nenhum contacto disponível
+                    </div>
+                  ) : (
+                    contactosDisponiveis.map((contacto) => (
+                      <SelectItem key={contacto.id} value={contacto.id}>
+                        {contacto.nome} ({contacto.origem})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {contactosDisponiveis.length > 0
+                  ? "Seleciona o contacto para este lead"
+                  : "Nenhum contacto disponível nesta visita"}
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="space-y-1">

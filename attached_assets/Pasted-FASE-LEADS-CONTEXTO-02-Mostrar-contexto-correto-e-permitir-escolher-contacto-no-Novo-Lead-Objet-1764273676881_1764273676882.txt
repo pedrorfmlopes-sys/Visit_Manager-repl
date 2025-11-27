@@ -1,0 +1,102 @@
+FASE LEADS-CONTEXTO-02 – Mostrar contexto correto e permitir escolher contacto no Novo Lead
+
+Objetivo:
+Quando abro /admin/leads/new a partir de uma visita, quero:
+1) Ver o cartão "Contexto do lead" com a ENTIDADE e VISITA corretas (não vazio).
+2) Poder escolher o CONTACTO num dropdown:
+   - "Nenhum contacto"
+   - Contactos presentes na visita
+   - Outros contactos da entidade
+
+NOTA: Nesta fase podemos manter contactoId obrigatório no backend (como está).
+Mais tarde faremos a migração para permitir contactoId = null.
+
+Tarefas:
+
+1) AdminLeadDetailPage – Obter dados da visita para contexto
+   - Ficheiro: client/src/pages/AdminLeadDetailPage.tsx
+   - Em create mode (id === "new") e com visitaId na query:
+     - Usar visitaIdFromQuery para fazer fetch dos dados da visita
+       (pode reutilizar o mesmo endpoint/query hook usado em VisitaDetail.tsx).
+     - A partir da visita obtida:
+       - entidade (id + nome)
+       - contacto principal (se existir)
+       - lista contactosPresentes
+       - lista de contactos da entidade (se o endpoint já trouxer; se não, podemos ficar só com contactosPresentes nesta fase).
+
+   - Atualizar o cartão "Contexto do lead" para:
+     - mostrar o nome da entidade (obrigatório neste fluxo),
+     - mostrar o nome do contacto atualmente selecionado (ou "Sem contacto associado"),
+     - manter o link "Ver visita" já existente.
+
+2) LeadDetailForm – Campo de seleção de contacto
+   - Ficheiro: componente do formulário de lead (ex.: LeadDetailForm.tsx).
+   - Adicionar um novo campo "Contacto" com um <select> ou combobox.
+   - Opções de contactos:
+     - Valor especial: "nenhum" → representa lead sem contacto.
+     - Contactos presentes na visita (contactosPresentes).
+     - Contactos da entidade (se disponíveis).
+   - O formulário deve receber por props:
+     - listaDeContactosDisponiveis: array de { id, nome, origem } (ex.: "presente na visita", "outro da entidade").
+     - contactoIdInicial: id do contacto sugerido (ex.: contacto principal da visita) ou null.
+
+   - Em modo create (id === "new"):
+     - Preencher contactoIdInicial com:
+       - contacto principal da visita, se existir;
+       - senão, null (mostra "Nenhum contacto" selecionado).
+   - Em modo edit (lead existente):
+     - Manter o comportamento atual (usar o contactoId do lead).
+
+3) Submissão (create mode) – Enviar contacto escolhido
+   - No handleSave em create mode:
+     - Ler o contactoId escolhido no formulário:
+       - se opção "Nenhum contacto" → enviar contactoId = null OU omitir campo (de acordo com validação atual).
+       - se contacto selecionado → enviar contactoId = esse id.
+     - Manter entidadeId como obrigatório (vem da query / da visita).
+     - Body final do POST deve incluir:
+       - visitaId (se veio na query)
+       - entidadeId
+       - contactoId (ou null, se o backend já aceitar)
+       - resto dos campos do lead.
+
+   - Por agora, se o backend ainda não aceitar contactoId null:
+     - NÃO permitir submeter com "Nenhum contacto".
+     - Se o utilizador tentar gravar com "Nenhum contacto", mostrar mensagem:
+       "Neste momento é obrigatório associar um contacto ao lead."
+     - Isto evita erro 400 até fazermos a migração de schema.
+
+4) UI/UX
+   - Cartão de contexto:
+     - Mostrar sempre o nome da entidade.
+     - Mostrar "Sem contacto associado" se nenhum contacto estiver selecionado.
+   - Formulário:
+     - Campo "Contacto" com label clara e opções agrupadas, por exemplo:
+       - "Nenhum contacto"
+       - "Contactos presentes nesta visita"
+       - "Outros contactos da entidade"
+
+5) Testes manuais
+   - Criar lead a partir de uma visita que tem:
+     - entidade + 2 contactos presentes
+     - alguns contactos adicionais na entidade
+   - Verificar:
+     - Cartão "Contexto do lead" mostra entidade corretamente.
+     - Dropdown "Contacto" lista:
+       - "Nenhum contacto"
+       - contactos presentes
+       - contactos extra da entidade (se disponíveis)
+     - Ao escolher um contacto e gravar:
+       - POST /api/crm/leads contém entidadeId e contactoId corretos.
+       - Lead é criado e volta à visita (returnTo), aparecendo na lista.
+
+   - Criar lead a partir de visita com só 1 contacto:
+     - Esse contacto deve vir selecionado por defeito.
+
+   - (Opcional) Acesso direto a /admin/leads/new sem visitaId:
+     - Comportamento atual mantém-se (mostrar erro de contexto, sem formulário).
+
+Documentar em:
+- RELATORIO_FASE-LEADS-CONTEXTO-02-CONTACTO-DROPDOWN.txt
+  - Como é obtida a visita em AdminLeadDetailPage.
+  - Como é construída a lista de contactos disponíveis.
+  - Como o formulário envia contactoId no create mode.
