@@ -87,16 +87,16 @@ export default function VisitaDetail() {
   const { data: currentUser } = useCurrentUser();
   const isAdmin = useIsAdmin();
   
-  // FASE CRM-LEADS-VISITA-STEP1: Leads section state
-  const [leadDialogOpen, setLeadDialogOpen] = useState(false);
-  const [leadSaving, setLeadSaving] = useState(false);
-  const [leadMarcasSearch, setLeadMarcasSearch] = useState("");
-  const [leadForm, setLeadForm] = useState({
-    titulo: "",
-    marcasIds: [] as string[],
-    estado: "novo",
-    valorPrevisto: "",
-  });
+  // FASE CRM-LEADS-VISITA-STEP1: Leads section state (comentado - usar FASE-LEADS-NEW-01)
+  // const [leadDialogOpen, setLeadDialogOpen] = useState(false);
+  // const [leadSaving, setLeadSaving] = useState(false);
+  // const [leadMarcasSearch, setLeadMarcasSearch] = useState("");
+  // const [leadForm, setLeadForm] = useState({
+  //   titulo: "",
+  //   marcasIds: [] as string[],
+  //   estado: "novo",
+  //   valorPrevisto: "",
+  // });
   
   const { isOnline, shareViaWhatsApp, shareViaEmail, copyToClipboard, copyLink } = useShareActions();
 
@@ -293,107 +293,16 @@ export default function VisitaDetail() {
     },
   });
 
-  // FASE CRM-LEADS-VISITA-STEP1: Create CRM lead from visita
-  const handleCreateLeadFromVisita = async () => {
-    // Determinar contactoId da visita:
-    // 1º tenta visita.contactoId (single contact, legacy field)
-    // 2º se vazio, tenta o primeiro contacto de contactosPresentes (pivot table)
-    const contactoIdFromVisita: string | null =
-      visita?.contactoId ||
-      (Array.isArray(visita?.contactosPresentes) && visita.contactosPresentes[0]?.id) ||
-      null;
-
-    if (!visita?.id || !visita.entidadeId || !contactoIdFromVisita) {
-      toast({
-        title: "Erro",
-        description:
-          "Esta visita não tem contexto suficiente para criar um lead. Garante que está associada a uma entidade e pelo menos a um contacto.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setLeadSaving(true);
-
-      const body = {
-        entidadeId: visita.entidadeId,
-        contactoId: contactoIdFromVisita!,
-        visitaId: visita.id,
-        titulo: leadForm.titulo.trim(),
-        descricao: null,
-        marcasIds: leadForm.marcasIds && leadForm.marcasIds.length > 0 ? leadForm.marcasIds : undefined,
-        estado: leadForm.estado || "novo",
-        valorPrevisto: leadForm.valorPrevisto
-          ? Number(leadForm.valorPrevisto)
-          : null,
-        moeda: "EUR",
-        responsavelUserId: null,
-      };
-
-      const resp = await fetch("/api/crm/leads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(body),
-      });
-
-      const json = await resp.json();
-
-      console.log("[VisitaDetail] POST /api/crm/leads response", {
-        status: resp.status,
-        statusOk: resp.ok,
-        json,
-        leadId: json?.lead?.id,
-        hasLeadId: !!json?.lead?.id,
-      });
-
-      if (!resp.ok || json.success === false) {
-        throw new Error(json.message || `HTTP ${resp.status}`);
-      }
-
-      toast({
-        title: "Lead criado",
-        description: "Lead criado a partir desta visita.",
-      });
-
-      setLeadDialogOpen(false);
-      setLeadForm({
-        titulo: "",
-        marcasIds: [],
-        estado: "novo",
-        valorPrevisto: "",
-      });
-      setLeadMarcasSearch("");
-
-      // Invalidate query to refresh leads list
-      await queryClient.invalidateQueries({
-        queryKey: ["/api/crm/leads", { visitaId: visita.id }],
-      });
-
-      // FASE LEADS-UI-03: Navigate to lead detail page after creation
-      console.log("[VisitaDetail] About to navigate, checking json?.lead?.id", {
-        leadId: json?.lead?.id,
-        shouldNavigate: !!json?.lead?.id,
-      });
-      
-      if (json?.lead?.id) {
-        console.log("[VisitaDetail] NAVIGATING to /admin/leads/" + json.lead.id);
-        setLocation(`/admin/leads/${json.lead.id}`);
-      } else {
-        console.warn("[VisitaDetail] NO lead.id in response, NOT navigating");
-      }
-    } catch (error: any) {
-      console.error("[CRM Leads] erro ao criar lead:", error);
-      toast({
-        title: "Erro ao criar lead",
-        description: error?.message || "Erro ao criar lead.",
-        variant: "destructive",
-      });
-    } finally {
-      setLeadSaving(false);
-    }
+  // FASE-LEADS-NEW-01: Navigate to lead creation form (replaces modal)
+  const handleNovoLeadVisita = () => {
+    if (!visita?.id) return;
+    setLocation(`/admin/leads/new?visitaId=${visita.id}&returnTo=/admin/visitas/${visita.id}`);
   };
+
+  // FASE CRM-LEADS-VISITA-STEP1: Create CRM lead from visita (COMENTADO - usar FASE-LEADS-NEW-01)
+  // const handleCreateLeadFromVisita = async () => {
+  //   ... (handler comentado - ver history para detalhes)
+  // };
 
   // Odoo Lead: Create lead from visita
   const handleCreateOdooLeadForVisita = async () => {
@@ -2222,7 +2131,7 @@ export default function VisitaDetail() {
             {!leadsDisabled && (
               <Button
                 size="sm"
-                onClick={() => setLeadDialogOpen(true)}
+                onClick={handleNovoLeadVisita}
                 disabled={leadsLoading}
                 data-testid="button-add-lead-from-visita"
               >
@@ -2292,8 +2201,8 @@ export default function VisitaDetail() {
         </Card>
       )}
 
-      {/* FASE CRM-LEADS-VISITA-STEP1: Create Lead Dialog */}
-      <Dialog open={leadDialogOpen} onOpenChange={setLeadDialogOpen}>
+      {/* FASE CRM-LEADS-VISITA-STEP1: Create Lead Dialog (COMENTADO - usar FASE-LEADS-NEW-01) */}
+      {/* <Dialog open={leadDialogOpen} onOpenChange={setLeadDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Novo lead desta visita</DialogTitle>
@@ -2435,7 +2344,7 @@ export default function VisitaDetail() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
 
       {/* Odoo Integration */}
       {visita && (

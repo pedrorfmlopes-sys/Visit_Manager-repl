@@ -1,0 +1,47 @@
+FASE LEADS-NEW-01 – Abrir formulário completo ao criar lead desde a visita (sem modal pequeno)
+
+Objetivo:
+Quando estou em /admin/visitas/:visitaId e clico em "Novo lead desta visita",
+quero ir diretamente para o formulário completo do lead, em vez do modal pequeno.
+
+Comportamento desejado:
+- Clicar "Novo lead desta visita" em /admin/visitas/:visitaId
+  → navegar para /admin/leads/new?visitaId=<visitaId>&returnTo=/admin/visitas/<visitaId>
+- NÃO abrir o modal pequeno de criação de lead.
+
+Tarefas:
+
+1) Ficheiro a alterar:
+   - client/src/pages/VisitaDetail.tsx
+
+2) Remover/desativar o modal:
+   - Localizar o modal "Novo lead desta visita" (pequeno formulário com título, marcas, estado, valor).
+   - Deixar de o abrir ao clicar no botão.
+   - Podes comentar ou remover o JSX do modal e o estado isOpen associado, desde que não partilhe lógica crítica com outras partes.
+
+3) Alterar o botão "Novo lead desta visita":
+   - Em vez de abrir o modal, deve:
+     - ler o visita.id atual
+     - chamar setLocation(`/admin/leads/new?visitaId=${visita.id}&returnTo=/admin/visitas/${visita.id}`)
+
+   Exemplo de ideia (adaptar ao hook de navegação já usado no ficheiro):
+     const handleNovoLeadVisita = () => {
+       if (!visita?.id) return;
+       setLocation(`/admin/leads/new?visitaId=${visita.id}&returnTo=/admin/visitas/${visita.id}`);
+     };
+
+   - Garantir que este handler é usado no onClick do botão "Novo lead desta visita".
+
+4) Não mexer neste momento:
+   - Na API /api/crm/leads (já funciona).
+   - Na lista "Leads desta visita" (apenas deixamos de criar leads via modal).
+
+5) Teste manual:
+   - Abrir /admin/visitas/:visitaId.
+   - Clicar "Novo lead desta visita".
+   - Esperado: NÃO aparece modal; a app navega para /admin/leads/new?visitaId=...&returnTo=...
+
+6) Documentar em RELATORIO_FASE-LEADS-NEW-01-NAVEGACAO-VISITA-LEAD.txt
+   - O que foi removido (modal pequeno).
+   - Como ficou o handler do botão "Novo lead desta visita".
+   - URL final usada na navegação.
