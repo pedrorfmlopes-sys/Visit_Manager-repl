@@ -1,0 +1,86 @@
+FASE LEADS-NEW-02 – Suportar modo "novo lead" em AdminLeadDetailPage
+
+Problema atual:
+- Ao clicar "Novo lead desta visita" vou para /admin/leads/new?visitaId=...&returnTo=...
+- A página AdminLeadDetailPage assume que o param :id é sempre um lead existente.
+- Resultado: faz GET /api/crm/leads/new → 404 (lead "new" não existe) e a página não carrega.
+
+Objetivo:
+- Quando a rota for /admin/leads/new (id === "new"), quero:
+  - Ver o formulário completo de lead em modo criação (sem 404).
+  - Submeter faz POST /api/crm/leads.
+  - Em sucesso:
+    - Se houver `returnTo` na query → navegar para esse URL (ex.: /admin/visitas/:visitaId).
+    - Caso contrário → navegar para /admin/leads/:id recém-criado.
+
+Tarefas:
+
+1) Ficheiro: client/src/pages/AdminLeadDetailPage.tsx
+
+2) Ler params e query:
+   - `const { id } = useParams();`
+   - `const [searchParams] = useSearchParams();`
+   - `const visitaId = searchParams.get("visitaId");`
+   - `const returnTo = searchParams.get("returnTo");`
+   - `const isCreateMode = id === "new";`
+
+3) Evitar o 404:
+   - Se `isCreateMode === true`:
+     - NÃO chamar o useQuery / fetch que faz `GET /api/crm/leads/:id`.
+     - Inicializar o estado do formulário com valores por defeito:
+       - titulo = ""
+       - descricao = ""
+       - estado = "novo"
+       - valorPrevisto = null
+       - moeda = "EUR"
+       - marcasIds = []
+       - guardar internamente o `visitaId` vindo da query para enviar no POST.
+
+   - Se `isCreateMode === false`:
+     - Manter a lógica atual (GET /api/crm/leads/:id + PATCH na gravação).
+
+4) Submissão em modo criar:
+   - No handler de submit (onde hoje faz PATCH):
+     - Se `isCreateMode`:
+       - Fazer `POST /api/crm/leads` com o body montado a partir do estado do formulário +
+         `visitaId` (e entidade/contacto coerentes, como já se faz no modal antigo).
+       - Esperar resposta `{ success: true, lead: { id, ... } }`.
+       - Guardar `createdId = json.lead.id`.
+
+       - Depois:
+         - Se `returnTo` existir:
+             `navigate(returnTo);`
+           Senão:
+             `navigate("/admin/leads/" + createdId);`
+
+       - Opcional (nice to have):
+         - `queryClient.invalidateQueries(["visita", visitaId]);`
+         - `queryClient.invalidateQueries(["visitaLeads", visitaId]);`
+
+   - Se NÃO for create mode, manter o fluxo atual de PATCH.
+
+5) UI:
+   - Em `isCreateMode`:
+     - Título da página: "Novo lead".
+     - Botão principal: texto "Criar lead" (se for fácil de ajustar).
+
+6) Testes manuais:
+   - A partir da visita:
+     - Ir a /admin/visitas/:visitaId.
+     - Clicar "Novo lead desta visita".
+     - Deve abrir /admin/leads/new?visitaId=...&returnTo=/admin/visitas/...
+     - Preencher e submeter.
+     - Esperado:
+       - POST /api/crm/leads 201 com lead.id.
+       - Navegar de volta para /admin/visitas/:visitaId.
+       - Quadro "Leads desta visita" já mostra o novo lead.
+
+   - A partir da lista de leads:
+     - Ir diretamente a /admin/leads/:id.
+     - Editar e gravar.
+     - Comportamento atual deve manter-se (PATCH + ficar na página).
+
+Criar RELATORIO_FASE-LEADS-NEW-02-CRIAR-LEAD-VOLTA-VISITA.txt a explicar:
+- Como foi implementado o modo "new".
+- Como é lido visitaId/returnTo.
+- Qual é o fluxo final depois de gravar.

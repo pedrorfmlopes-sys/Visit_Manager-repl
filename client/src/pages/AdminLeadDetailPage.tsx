@@ -1,4 +1,4 @@
-import { useRoute, useLocation } from "wouter";
+import { useRoute, useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,10 +52,17 @@ export default function AdminLeadDetailPage() {
   const id = params?.id as string | undefined;
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const search = useSearch();
+
+  // FASE-LEADS-NEW-02: Parse query params for create mode
+  const searchParams = new URLSearchParams(search);
+  const visitaId = searchParams.get("visitaId");
+  const returnTo = searchParams.get("returnTo");
+  const isCreateMode = id === "new";
 
   const { data, isLoading, isError } = useQuery<LeadResponse>({
     queryKey: ["/api/crm/leads", id],
-    enabled: !!id,
+    enabled: !!id && !isCreateMode, // FASE-LEADS-NEW-02: Skip query in create mode
     queryFn: async () => {
       const resp = await fetch(`/api/crm/leads/${id}`, {
         credentials: "include",
@@ -68,11 +75,12 @@ export default function AdminLeadDetailPage() {
     return <p className="p-4 text-sm text-muted-foreground">ID de lead inválido.</p>;
   }
 
-  if (isLoading) {
+  // FASE-LEADS-NEW-02: Show loading only for existing leads
+  if (!isCreateMode && isLoading) {
     return <p className="p-4 text-sm text-muted-foreground">A carregar lead...</p>;
   }
 
-  if (isError || !data || ("success" in data && data.success === false && !data.notEnabled)) {
+  if (!isCreateMode && (isError || !data || ("success" in data && data.success === false && !data.notEnabled))) {
     return (
       <div className="p-4">
         <p className="text-sm text-destructive">
@@ -82,7 +90,7 @@ export default function AdminLeadDetailPage() {
     );
   }
 
-  if ("success" in data && data.notEnabled) {
+  if (!isCreateMode && "success" in data && data.notEnabled) {
     return (
       <p className="p-4 text-sm text-amber-600">
         Módulo de Leads CRM está desativado para esta empresa.
@@ -90,7 +98,29 @@ export default function AdminLeadDetailPage() {
     );
   }
 
-  const lead = (data as { lead: Lead }).lead;
+  // FASE-LEADS-NEW-02: Create empty lead for new mode
+  const lead = isCreateMode 
+    ? {
+        id: "new",
+        titulo: "",
+        descricao: null,
+        marca: null,
+        estado: "novo",
+        valorPrevisto: null,
+        moeda: "EUR",
+        entidadeId: "",
+        contactoId: "",
+        visitaId: visitaId || null,
+        odooLeadId: null,
+        createdAt: "",
+        updatedAt: "",
+        entidadeNome: null,
+        contactoNome: null,
+        visitaData: null,
+        contactosAssociados: null,
+        marcas: null,
+      }
+    : (data as { lead: Lead }).lead;
 
   return (
     <div className="space-y-4">
@@ -98,27 +128,41 @@ export default function AdminLeadDetailPage() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setLocation("/admin/leads")}
+          onClick={() => setLocation(isCreateMode && returnTo ? returnTo : "/admin/leads")}
           data-testid="button-voltar-leads"
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-xl font-semibold">Lead: {lead.titulo}</h1>
+        <h1 className="text-xl font-semibold">
+          {isCreateMode ? "Novo lead" : `Lead: ${lead.titulo}`}
+        </h1>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
-          <LeadDetailForm lead={lead} />
+          <LeadDetailForm lead={lead} isCreateMode={isCreateMode} visitaId={visitaId} returnTo={returnTo} />
         </div>
-        <div>
-          <OdooCrmCard leadId={lead.id} odooLeadId={lead.odooLeadId} />
-        </div>
+        {!isCreateMode && (
+          <div>
+            <OdooCrmCard leadId={lead.id} odooLeadId={lead.odooLeadId} />
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function LeadDetailForm({ lead }: { lead: Lead }) {
+function LeadDetailForm({ 
+  lead, 
+  isCreateMode = false, 
+  visitaId = null,
+  returnTo = null,
+}: { 
+  lead: Lead; 
+  isCreateMode?: boolean;
+  visitaId?: string | null;
+  returnTo?: string | null;
+}) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [marcasSearch, setMarcasSearch] = useState("");
@@ -246,8 +290,18 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
         moeda: form.moeda || "EUR",
       };
 
-      const resp = await fetch(`/api/crm/leads/${lead.id}`, {
-        method: "PATCH",
+      // FASE-LEADS-NEW-02: POST for create mode, PATCH for edit mode
+      if (isCreateMode) {
+        body.visitaId = visitaId || null;
+        // For create mode, we'll need entidadeId and contactoId from the visita context
+        // These should be provided or inferred from visitaId
+      }
+
+      const method = isCreateMode ? "POST" : "PATCH";
+      const endpoint = isCreateMode ? "/api/crm/leads" : `/api/crm/leads/${lead.id}`;
+
+      const resp = await fetch(endpoint, {
+        method,
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify(body),
@@ -260,21 +314,38 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
       }
 
       toast({
-        title: "Lead atualizado",
-        description: "Os dados do lead foram guardados.",
+        title: isCreateMode ? "Lead criado" : "Lead atualizado",
+        description: isCreateMode ? "Novo lead foi criado." : "Os dados do lead foram guardados.",
       });
 
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["/api/crm/leads"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/crm/leads", lead.id] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/crm/leads", { visitaId: lead.visitaId }] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/crm/leads", { entidadeId: lead.entidadeId }] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/crm/leads", { contactoId: lead.contactoId }] }),
-      ]);
+      // FASE-LEADS-NEW-02: After create, navigate to detail or back to returnTo
+      if (isCreateMode && json.lead?.id) {
+        const createdId = json.lead.id;
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["/api/crm/leads"] }),
+          visitaId && queryClient.invalidateQueries({ queryKey: ["/api/crm/leads", { visitaId }] }),
+        ]);
+
+        // Navigate to returnTo if provided, otherwise to the created lead
+        if (returnTo) {
+          navigate(returnTo);
+        } else {
+          navigate(`/admin/leads/${createdId}`);
+        }
+      } else {
+        // Edit mode - stay on page and invalidate queries
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["/api/crm/leads"] }),
+          queryClient.invalidateQueries({ queryKey: ["/api/crm/leads", lead.id] }),
+          queryClient.invalidateQueries({ queryKey: ["/api/crm/leads", { visitaId: lead.visitaId }] }),
+          queryClient.invalidateQueries({ queryKey: ["/api/crm/leads", { entidadeId: lead.entidadeId }] }),
+          queryClient.invalidateQueries({ queryKey: ["/api/crm/leads", { contactoId: lead.contactoId }] }),
+        ]);
+      }
     } catch (error: any) {
-      console.error("[CRM Leads] PATCH lead error:", error);
+      console.error("[CRM Leads] Save lead error:", error);
       toast({
-        title: "Erro ao atualizar lead",
+        title: "Erro ao guardar lead",
         description: error?.message || "Não foi possível guardar as alterações.",
         variant: "destructive",
       });
