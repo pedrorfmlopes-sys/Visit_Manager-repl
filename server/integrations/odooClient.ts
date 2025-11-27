@@ -371,3 +371,163 @@ export async function createOdooLead(
 
   return { id: result };
 }
+
+/**
+ * Cria uma lead no Odoo a partir de um Lead VM com Entidade e Contacto
+ * @param vmLead - Lead da nossa BD (VM)
+ * @param entidade - Entidade associada ao lead
+ * @param contacto - Contacto associado ao lead
+ * @param empresaId - ID da empresa
+ * @returns ID do lead criado no Odoo
+ */
+export async function createLeadFromVmLead(args: {
+  vmLead: any;
+  entidade: any;
+  contacto: any;
+  empresaId: string;
+}): Promise<number> {
+  const { vmLead, entidade, contacto, empresaId } = args;
+
+  // Validar que a entidade tem odooPartnerId
+  if (!entidade?.odooPartnerId) {
+    throw new Error(
+      `Entidade "${entidade?.nome || 'Unknown'}" não tem parceiro Odoo configurado (odooPartnerId ausente). Configure o parceiro Odoo para esta entidade antes de criar leads.`
+    );
+  }
+
+  try {
+    const conn = await getOdooConnectionForEmpresa(empresaId);
+    const uid = await authenticateOdoo(conn);
+
+    // Preparar payload para create no Odoo
+    const payload: Record<string, any> = {
+      name: vmLead.titulo,
+      partner_id: entidade.odooPartnerId, // FK para res.partner
+    };
+
+    // Adicionar campos opcionais
+    if (vmLead.descricao) {
+      payload.description = vmLead.descricao;
+    }
+
+    if (contacto) {
+      if (contacto.nome) {
+        payload.contact_name = contacto.nome;
+      }
+      if (contacto.email) {
+        payload.email_from = contacto.email;
+      }
+      if (contacto.telefone) {
+        payload.phone = contacto.telefone;
+      }
+    }
+
+    if (vmLead.valorPrevisto) {
+      payload.expected_revenue = vmLead.valorPrevisto;
+    }
+
+    // Fazer call_kw create
+    const result = await callOdooJsonRpc<number>(conn, {
+      method: "call",
+      params: {
+        service: "object",
+        method: "execute_kw",
+        args: [
+          conn.dbName,
+          uid,
+          conn.apiKey,
+          "crm.lead",
+          "create",
+          [payload],
+        ],
+      },
+    });
+
+    console.log(`[Odoo] Lead criado com sucesso. Odoo Lead ID: ${result}`);
+    return result;
+  } catch (error: any) {
+    console.error("[Odoo] Erro ao criar lead:", {
+      message: error?.message,
+      vmLeadId: vmLead?.id,
+      entidadeId: entidade?.id,
+      contactoId: contacto?.id,
+    });
+    throw error;
+  }
+}
+
+/**
+ * Actualiza uma lead no Odoo a partir de um Lead VM com Entidade e Contacto
+ * @param odooLeadId - ID da lead no Odoo
+ * @param vmLead - Lead da nossa BD (VM)
+ * @param entidade - Entidade associada ao lead
+ * @param contacto - Contacto associado ao lead
+ * @param empresaId - ID da empresa
+ */
+export async function updateLeadFromVmLead(args: {
+  odooLeadId: number;
+  vmLead: any;
+  entidade: any;
+  contacto: any;
+  empresaId: string;
+}): Promise<void> {
+  const { odooLeadId, vmLead, entidade, contacto, empresaId } = args;
+
+  try {
+    const conn = await getOdooConnectionForEmpresa(empresaId);
+    const uid = await authenticateOdoo(conn);
+
+    // Preparar payload para write no Odoo
+    const payload: Record<string, any> = {
+      name: vmLead.titulo,
+      // Não alterar partner_id (manter o original)
+    };
+
+    // Atualizar campos opcionais
+    if (vmLead.descricao) {
+      payload.description = vmLead.descricao;
+    }
+
+    if (contacto) {
+      if (contacto.nome) {
+        payload.contact_name = contacto.nome;
+      }
+      if (contacto.email) {
+        payload.email_from = contacto.email;
+      }
+      if (contacto.telefone) {
+        payload.phone = contacto.telefone;
+      }
+    }
+
+    if (vmLead.valorPrevisto !== undefined) {
+      payload.expected_revenue = vmLead.valorPrevisto;
+    }
+
+    // Fazer call_kw write
+    await callOdooJsonRpc<boolean>(conn, {
+      method: "call",
+      params: {
+        service: "object",
+        method: "execute_kw",
+        args: [
+          conn.dbName,
+          uid,
+          conn.apiKey,
+          "crm.lead",
+          "write",
+          [[odooLeadId], payload],
+        ],
+      },
+    });
+
+    console.log(`[Odoo] Lead ${odooLeadId} actualizado com sucesso`);
+  } catch (error: any) {
+    console.error("[Odoo] Erro ao actualizar lead:", {
+      message: error?.message,
+      odooLeadId,
+      vmLeadId: vmLead?.id,
+    });
+    throw error;
+  }
+}

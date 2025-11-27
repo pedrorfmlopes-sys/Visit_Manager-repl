@@ -1,0 +1,44 @@
+FASE ODOO-LEADS-01 – Backend OdooClient (crm.lead)
+
+Contexto rápido:
+- Já existe configuração Odoo por empresa (URL, dbName, username, apiKey, ambiente, ativo/desativo) e endpoint /api/integrations/odoo/status.
+- Já existe tabela leads com campo odooLeadId.
+- Quero agora um OdooClient para trabalhar com o modelo crm.lead no Odoo.
+
+Tarefas:
+1) Criar o ficheiro server/integrations/odoo/odooClient.ts (ou completar se já existir) com:
+   - Uma função helper que, dado um empresaId, vai buscar a config Odoo da empresa (OdooConnectionsStorage) e valida:
+     - Se não há config → lançar erro claro (ex.: "Odoo não está configurado para esta empresa").
+     - Se a integração estiver marcada como desligada → lançar erro claro (ex.: "Integração Odoo está desativada para esta empresa").
+   - Esta função deve preparar um pequeno cliente para fazer chamadas JSON-RPC ao Odoo, reutilizando o mesmo padrão de call_kw usado no endpoint /api/integrations/odoo/status.
+
+2) No OdooClient, criar métodos:
+   - createLeadFromVmLead(args):
+     - Recebe pelo menos: vmLead, entidade, contacto, e empresaId.
+     - Faz call_kw ao modelo "crm.lead" e cria um registo com os campos mínimos:
+       - name (vmLead.titulo)
+       - description (vmLead.descricao)
+       - partner_id (entidade.odooPartnerId, se existir; se não existir, lançar erro antes)
+       - contact_name (contacto.nome, se existir)
+       - email_from (contacto.email, se existir)
+       - phone (contacto.telefone, se existir)
+       - expected_revenue (vmLead.valorPrevisto, se existir)
+       - Outros campos podem ficar em branco / default.
+     - Devolve o ID do lead criado (integer do Odoo).
+
+   - updateLeadFromVmLead(args):
+     - Recebe pelo menos: odooLeadId, vmLead, entidade, contacto, empresaId.
+     - Faz call_kw ao modelo "crm.lead" com write, atualizando os mesmos campos acima (sem alterar partner_id a não ser que exista razão).
+     - Em sucesso, não precisa devolver nada de especial (pode devolver true/ok).
+
+3) Tratamento de erros:
+   - Todos os erros vindos do Odoo devem ser apanhados.
+   - Converter para erros de aplicação com mensagem simples (ex.: "Erro ao comunicar com Odoo") + detalhes técnicos num campo separado se fizer sentido.
+   - Não enviar stack trace bruto para o frontend.
+
+Foca-te apenas em:
+- criar o OdooClient,
+- métodos createLeadFromVmLead e updateLeadFromVmLead,
+- validações básicas da configuração Odoo.
+
+Não criar ainda endpoints HTTP nem alterações no frontend – isso é para outra fase.
