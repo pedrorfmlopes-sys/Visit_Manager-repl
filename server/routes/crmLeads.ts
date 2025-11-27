@@ -7,7 +7,7 @@ import { leads, leadsContactos, insertLeadSchema, contactos, leadsMarcas } from 
 import { isAuthenticated } from "../replitAuth";
 import { getUserContext } from "../authContext";
 import { assertLeadsEnabled } from "../integrations/crmLeads";
-import { createLeadFromVmLead, updateLeadFromVmLead } from "../integrations/odooClient";
+import { createLeadFromVmLead, updateLeadFromVmLead, listLeadAttachments, type OdooLeadAttachment } from "../integrations/odooClient";
 import { transcribeAudio, getOpenAIClient } from "../openai";
 import multer from "multer";
 
@@ -561,6 +561,78 @@ export function registerCrmLeadsRoutes(app: express.Express) {
       return res.status(500).json({
         success: false,
         message: "Erro ao sincronizar lead com Odoo.",
+      });
+    }
+  });
+
+  // GET /api/crm/leads/:id/odoo/attachments - List Odoo attachments for a lead
+  router.get("/:id/odoo/attachments", isAuthenticated, async (req, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      await assertLeadsEnabled(empresaId);
+
+      const id = req.params.id;
+
+      console.log("[CRM Leads] GET /:id/odoo/attachments", { leadId: id, empresaId });
+
+      // Load lead from database
+      const lead = await db.query.leads.findFirst({
+        where: and(eq(leads.id, id), eq(leads.empresaId, empresaId)),
+        columns: {
+          id: true,
+          odooLeadId: true,
+        },
+      });
+
+      if (!lead) {
+        return res.status(404).json({
+          success: false,
+          message: "Lead não encontrado",
+        });
+      }
+
+      // If no odooLeadId, return empty attachments
+      if (!lead.odooLeadId) {
+        return res.json({
+          success: true,
+          attachments: [],
+        });
+      }
+
+      // Fetch attachments from Odoo
+      const attachments = await listLeadAttachments({
+        empresaId,
+        odooLeadId: lead.odooLeadId,
+      });
+
+      console.log("[CRM Leads] GET /:id/odoo/attachments success", {
+        leadId: id,
+        odooLeadId: lead.odooLeadId,
+        count: attachments.length,
+      });
+
+      return res.json({
+        success: true,
+        attachments,
+      });
+    } catch (error: any) {
+      if (error?.code === "LEADS_NOT_ENABLED") {
+        return res.status(200).json({
+          success: false,
+          notEnabled: true,
+          message: "Módulo de Leads não está ativo para esta empresa.",
+        });
+      }
+
+      console.error("[CRM Leads] Erro ao listar anexos Odoo do lead", {
+        leadId: req.params.id,
+        empresaId: (await getUserContext(req).catch(() => null))?.empresaId,
+        error: error?.message,
+      });
+
+      return res.status(500).json({
+        success: false,
+        message: "Erro ao carregar anexos do Odoo. Tenta novamente mais tarde.",
       });
     }
   });

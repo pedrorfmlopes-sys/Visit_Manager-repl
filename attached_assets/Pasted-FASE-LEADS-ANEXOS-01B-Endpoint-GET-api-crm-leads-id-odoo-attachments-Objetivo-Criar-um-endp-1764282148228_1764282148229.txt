@@ -1,0 +1,69 @@
+FASE LEADS-ANEXOS-01B – Endpoint GET /api/crm/leads/:id/odoo/attachments
+
+Objetivo:
+Criar um endpoint no backend que use OdooClient.listLeadAttachments para devolver,
+em JSON, os anexos Odoo de um lead.
+
+Ficheiro principal:
+- server/routes/crmLeads.ts
+
+Tarefas:
+
+1) Importar a função do OdooClient:
+   - Importar OdooClient.listLeadAttachments e o tipo OdooLeadAttachment,
+     seguindo o padrão dos outros imports deste ficheiro.
+
+2) Adicionar rota:
+   router.get("/:id/odoo/attachments", isAuthenticated, async (req, res) => {
+     // implementação
+   });
+
+3) Lógica da rota (seguir o padrão das outras rotas de leads):
+
+   - Obter o contexto do utilizador (empresaId, userId, etc.)
+     usando o mesmo helper já utilizado nas outras rotas de crmLeads.ts.
+
+   - Validar que o módulo de leads está ativo para a empresa
+     (usar o mesmo helper/guard que já existe para as rotas de leads).
+
+   - Carregar o lead da BD (com Drizzle), filtrando por:
+       id = req.params.id
+       empresaId = empresaId do contexto
+     → Se não encontrar:
+         return res.status(404).json({
+           success: false,
+           message: "Lead não encontrado",
+         });
+
+   - Se lead.odooLeadId não existir (null/undefined/string vazia):
+       return res.json({
+         success: true,
+         attachments: [],
+       });
+
+   - Caso exista lead.odooLeadId:
+       const attachments = await listLeadAttachments({
+         empresaId,
+         odooLeadId: lead.odooLeadId,
+       });
+
+       return res.json({
+         success: true,
+         attachments,
+       });
+
+4) Tratamento de erros:
+   - Envolver em try/catch.
+   - Em caso de erro:
+       - Fazer log com prefixo tipo:
+         "[CRM LEADS] Erro ao listar anexos Odoo do lead", { leadId, empresaId, error }
+       - Retornar:
+         res.status(500).json({
+           success: false,
+           message: "Erro ao carregar anexos do Odoo. Tenta novamente mais tarde.",
+         });
+
+5) Garantir que:
+   - A rota segue o mesmo padrão de autenticação e RBAC das outras rotas de leads.
+   - O ficheiro compila sem erros (npm run build ou equivalente).
+   - Não altera o comportamento das rotas existentes.
