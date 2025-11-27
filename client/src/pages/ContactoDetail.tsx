@@ -963,7 +963,7 @@ export default function ContactoDetail() {
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-sm">
-                          {visita.gabinete?.nome || visita.entidade?.nome}
+                          {visita.gabinete?.nome || visita.entidade?.nome || "Sem entidade associada"}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">
                           {format(new Date(visita.dataVisita), "dd MMM yyyy 'às' HH:mm", { locale: pt })}

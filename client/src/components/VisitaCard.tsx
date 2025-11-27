@@ -17,8 +17,8 @@ export function VisitaCard({ visita, onClick, currentEntidadeName, currentUserId
   const hasMedia = (visita.mediaUrls && visita.mediaUrls.length > 0) || visita.audioUrl;
   const dataFormatada = format(new Date(visita.dataVisita), "d 'de' MMMM, yyyy", { locale: pt });
   
-  // Contactos presentes (excluindo o utilizador atual)
-  const contactosOutros = (visita.contactosPresentes || []).filter(
+  // Contactos presentes (excluindo o utilizador atual) - se disponível
+  const contactosOutros = (visita.contactos || []).filter(
     (vc: any) => vc.contacto && vc.contacto.id !== currentUserId
   );
   const contactosLabel = contactosOutros.length > 0

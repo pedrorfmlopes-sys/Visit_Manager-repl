@@ -300,7 +300,7 @@ export class DatabaseStorage implements IStorage {
           limit: 10,
           with: {
             entidade: true,
-            contactosPresentes: {
+            contactos: {
               with: {
                 contacto: true,
               },
