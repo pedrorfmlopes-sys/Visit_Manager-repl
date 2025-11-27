@@ -7,12 +7,15 @@ import { leads, leadsContactos, insertLeadSchema, contactos, leadsMarcas } from 
 import { isAuthenticated } from "../replitAuth";
 import { getUserContext } from "../authContext";
 import { assertLeadsEnabled } from "../integrations/crmLeads";
-import { createLeadFromVmLead, updateLeadFromVmLead, listLeadAttachments, type OdooLeadAttachment } from "../integrations/odooClient";
+import { createLeadFromVmLead, updateLeadFromVmLead, listLeadAttachments, createLeadAttachment, type OdooLeadAttachment } from "../integrations/odooClient";
 import { transcribeAudio, getOpenAIClient } from "../openai";
 import multer from "multer";
 
 export function registerCrmLeadsRoutes(app: express.Express) {
   const router = express.Router();
+
+  // Multer configuration for file uploads (used by attachment and audio routes)
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
   // GET /api/crm/leads - List all leads for empresa (with optional visitaId filter)
   router.get("/", isAuthenticated, async (req, res) => {
@@ -637,8 +640,111 @@ export function registerCrmLeadsRoutes(app: express.Express) {
     }
   });
 
-  // FASE-LEADS-IA-01: AI endpoints for lead context enrichment
-  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+  // POST /api/crm/leads/:id/odoo/attachments - Upload attachment to Odoo lead
+  router.post("/:id/odoo/attachments", isAuthenticated, upload.single("file"), async (req, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      await assertLeadsEnabled(empresaId);
+
+      const id = req.params.id;
+
+      console.log("[CRM Leads] POST /:id/odoo/attachments", { leadId: id, empresaId });
+
+      // Load lead from database
+      const lead = await db.query.leads.findFirst({
+        where: and(eq(leads.id, id), eq(leads.empresaId, empresaId)),
+        columns: {
+          id: true,
+          odooLeadId: true,
+        },
+      });
+
+      if (!lead) {
+        return res.status(404).json({
+          success: false,
+          message: "Lead não encontrado",
+        });
+      }
+
+      // Check if lead is synchronized with Odoo
+      if (!lead.odooLeadId) {
+        return res.status(400).json({
+          success: false,
+          message: "Este lead ainda não está sincronizado com o Odoo.",
+        });
+      }
+
+      // Check if file was provided
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "Nenhum ficheiro enviado.",
+        });
+      }
+
+      const file = req.file;
+      const buffer = file.buffer;
+      const fileName = file.originalname;
+      const mimetype = file.mimetype || null;
+
+      // Validate file size (max 10 MB)
+      const MAX_FILE_SIZE = 10 * 1024 * 1024;
+      if (buffer.length > MAX_FILE_SIZE) {
+        return res.status(400).json({
+          success: false,
+          message: "Ficheiro demasiado grande (máx. 10 MB).",
+        });
+      }
+
+      console.log("[CRM Leads] Upload file details", {
+        leadId: id,
+        fileName,
+        size: buffer.length,
+        mimetype,
+      });
+
+      // Call OdooClient to create attachment
+      const attachmentId = await createLeadAttachment({
+        empresaId,
+        odooLeadId: lead.odooLeadId,
+        fileName,
+        mimetype,
+        buffer,
+      });
+
+      console.log("[CRM Leads] POST /:id/odoo/attachments success", {
+        leadId: id,
+        odooLeadId: lead.odooLeadId,
+        attachmentId,
+      });
+
+      return res.json({
+        success: true,
+        attachmentId,
+      });
+    } catch (error: any) {
+      if (error?.code === "LEADS_NOT_ENABLED") {
+        return res.status(200).json({
+          success: false,
+          notEnabled: true,
+          message: "Módulo de Leads não está ativo para esta empresa.",
+        });
+      }
+
+      console.error("[CRM Leads] Erro ao fazer upload de anexo para Odoo", {
+        leadId: req.params.id,
+        fileName: req.file?.originalname,
+        empresaId: (await getUserContext(req).catch(() => null))?.empresaId,
+        error: error?.message,
+      });
+
+      return res.status(500).json({
+        success: false,
+        message: "Erro ao enviar anexo para o Odoo. Tenta novamente mais tarde.",
+      });
+    }
+  });
+
 
   // POST /api/ai/leads/transcribe - Transcribe audio to text
   router.post("/ai/transcribe", isAuthenticated, upload.single("file"), async (req, res) => {

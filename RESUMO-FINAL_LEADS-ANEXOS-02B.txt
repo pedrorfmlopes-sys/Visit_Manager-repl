@@ -1,0 +1,342 @@
+================================================================================
+RESUMO FINAL: FASE LEADS-ANEXOS-02B - POST Endpoint Upload Anexos
+================================================================================
+
+Data: 27 Novembro 2025 - 22:00
+Status: ✅ COMPLETO | 3 EDITS + Workflow: RUNNING
+
+================================================================================
+OBJETIVO
+================================================================================
+
+Criar um endpoint POST para fazer upload de ficheiros para anexos Odoo de leads,
+usando a função OdooClient.createLeadAttachment já criada em 02A.
+
+================================================================================
+IMPLEMENTACAO
+================================================================================
+
+FICHEIRO: server/routes/crmLeads.ts
+
+EDIT 1: Import createLeadAttachment (linha 13)
+------
+import { createLeadFromVmLead, updateLeadFromVmLead, listLeadAttachments, 
+         createLeadAttachment, type OdooLeadAttachment } from "../integrations/odooClient";
+
+EDIT 2: Mover multer config para topo (linhas 20-21)
+------
+// Multer configuration for file uploads (used by attachment and audio routes)
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+
+(Removida linha antiga que estava na linha 746)
+
+EDIT 3: Adicionar rota POST /:id/odoo/attachments (linhas 643-746)
+------
+router.post("/:id/odoo/attachments", isAuthenticated, upload.single("file"), async (req, res) => {
+  // Implementação completa
+});
+
+================================================================================
+ROTA IMPLEMENTADA
+================================================================================
+
+Endpoint: POST /api/crm/leads/:id/odoo/attachments
+
+Middleware: 
+  - isAuthenticated
+  - upload.single("file") (multer)
+
+Assinatura:
+  router.post(
+    "/:id/odoo/attachments", 
+    isAuthenticated, 
+    upload.single("file"), 
+    async (req, res) => { ... }
+  )
+
+================================================================================
+FLUXO DA ROTA
+================================================================================
+
+1. AUTENTICAÇÃO E VALIDAÇÃO DE LEAD
+   ✓ getUserContext(req) → empresaId
+   ✓ assertLeadsEnabled(empresaId)
+   ✓ const id = req.params.id
+   ✓ console.log inicio
+
+2. CARREGAR LEAD DA BD
+   ✓ db.query.leads.findFirst({
+       where: and(eq(leads.id, id), eq(leads.empresaId, empresaId)),
+       columns: { id, odooLeadId }
+     })
+   ✓ Se não encontrado: 404 "Lead não encontrado"
+
+3. VALIDAR SYNC COM ODOO
+   ✓ if (!lead.odooLeadId):
+       400 "Este lead ainda não está sincronizado com o Odoo."
+
+4. VALIDAR FICHEIRO
+   ✓ if (!req.file):
+       400 "Nenhum ficheiro enviado."
+
+5. VALIDAR TAMANHO
+   ✓ MAX_FILE_SIZE = 10 * 1024 * 1024 (10 MB)
+   ✓ if (buffer.length > MAX_FILE_SIZE):
+       400 "Ficheiro demasiado grande (máx. 10 MB)."
+
+6. OBTER DADOS DO FICHEIRO
+   ✓ const file = req.file
+   ✓ const buffer = file.buffer
+   ✓ const fileName = file.originalname
+   ✓ const mimetype = file.mimetype || null
+
+7. LOG DOS DADOS
+   ✓ console.log "[CRM Leads] Upload file details" com
+     { leadId, fileName, size, mimetype }
+
+8. CHAMAR ODOOCLIENT
+   ✓ const attachmentId = await createLeadAttachment({
+       empresaId,
+       odooLeadId: lead.odooLeadId,
+       fileName,
+       mimetype,
+       buffer,
+     })
+
+9. LOG DE SUCESSO
+   ✓ console.log "[CRM Leads] POST /:id/odoo/attachments success" com
+     { leadId, odooLeadId, attachmentId }
+
+10. RESPONDER
+    ✓ res.json({
+        success: true,
+        attachmentId,
+      })
+
+================================================================================
+TRATAMENTO DE ERROS
+================================================================================
+
+Estrutura: try/catch externo
+
+Erros Específicos:
+  ✓ LEADS_NOT_ENABLED → 200 com flag notEnabled
+  ✓ Outros → 500 com mensagem genérica
+
+Logging de Erro:
+  console.error "[CRM Leads] Erro ao fazer upload de anexo para Odoo" com:
+    - leadId: req.params.id
+    - fileName: req.file?.originalname
+    - empresaId: do contexto
+    - error: error?.message
+
+Resposta Erro:
+  {
+    success: false,
+    message: "Erro ao enviar anexo para o Odoo. Tenta novamente mais tarde."
+  }
+
+================================================================================
+MIDDLEWARE MULTER
+================================================================================
+
+Localização: Linha 21 (topo de registerCrmLeadsRoutes)
+
+Configuração:
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 25 * 1024 * 1024 }
+  })
+
+Características:
+  ✓ Memory storage: arquivo em RAM (não em disco)
+  ✓ Limit global: 25 MB (multer validation)
+  ✓ Validação de upload: upload.single("file")
+  ✓ Reutilizado por: POST /api/crm/leads/:id/odoo/attachments
+  ✓ Reutilizado por: POST /api/ai/leads/transcribe (já existia)
+  ✓ Reutilizado por: POST /api/ai/leads/summarize (se houver)
+
+Limite de Ficheiro (aplicação):
+  ✓ MAX_FILE_SIZE = 10 * 1024 * 1024 (10 MB)
+  ✓ Validação dupla:
+    1. Multer valida (25 MB global)
+    2. Aplicação valida (10 MB para Odoo)
+
+Fluxo Multer:
+  1. Recebe multipart/form-data
+  2. Processa single file com fieldName "file"
+  3. Carrega em buffer na memória
+  4. Passa req.file ao handler
+
+Dados Disponíveis em req.file:
+  - buffer: Buffer (conteúdo binário)
+  - originalname: string (nome original)
+  - fieldname: string ("file")
+  - mimetype: string (content-type)
+  - size: number (tamanho em bytes)
+  - encoding: string
+
+================================================================================
+DADOS DE TESTE
+================================================================================
+
+Request Exemplo (curl):
+  curl -X POST http://localhost:5000/api/crm/leads/{id}/odoo/attachments \
+    -F "file=@/path/to/document.pdf" \
+    -H "Cookie: replit_auth=..."
+
+Request Exemplo (fetch JS):
+  const formData = new FormData();
+  formData.append("file", fileInput.files[0]);
+
+  const resp = await fetch(
+    `/api/crm/leads/${leadId}/odoo/attachments`,
+    {
+      method: "POST",
+      body: formData,
+      credentials: "include"
+    }
+  );
+  const json = await resp.json();
+  console.log(json); // { success: true, attachmentId: 456 }
+
+Respostas Esperadas:
+
+Sucesso (200):
+  {
+    "success": true,
+    "attachmentId": 456
+  }
+
+Erro: Lead não encontrado (404):
+  {
+    "success": false,
+    "message": "Lead não encontrado"
+  }
+
+Erro: Não sincronizado (400):
+  {
+    "success": false,
+    "message": "Este lead ainda não está sincronizado com o Odoo."
+  }
+
+Erro: Sem ficheiro (400):
+  {
+    "success": false,
+    "message": "Nenhum ficheiro enviado."
+  }
+
+Erro: Ficheiro grande (400):
+  {
+    "success": false,
+    "message": "Ficheiro demasiado grande (máx. 10 MB)."
+  }
+
+Erro: Servidor (500):
+  {
+    "success": false,
+    "message": "Erro ao enviar anexo para o Odoo. Tenta novamente mais tarde."
+  }
+
+================================================================================
+VALIDACOES IMPLEMENTADAS
+================================================================================
+
+✓ Autenticação: isAuthenticated middleware
+✓ RBAC: empresaId filtra leads do utilizador
+✓ Lead existe: 404 se não encontrado
+✓ Lead sincronizado: 400 se !odooLeadId
+✓ Ficheiro fornecido: 400 se !req.file
+✓ Tamanho ficheiro: 400 se > 10 MB
+✓ Multer parse: automatic via upload.single("file")
+✓ Data isolation: empresaId used in query
+✓ Logging: início + upload details + sucesso + erro
+✓ Error handling: try/catch com casos específicos
+
+================================================================================
+PADROES SEGUIDOS
+================================================================================
+
+✓ Mesmo padrão que GET /:id/odoo/attachments
+✓ Mesmo estilo de erro que POST / (criar lead)
+✓ Mesmo logging que outras rotas
+✓ Mesmo try/catch + console.error
+✓ Mesmo LEADS_NOT_ENABLED handling
+✓ Multer reutilizado das rotas AI
+✓ Buffer handling seguro (memoryStorage)
+✓ File size validation dupla (multer + app)
+
+================================================================================
+COMPILACAO E QUALIDADE
+================================================================================
+
+✅ TypeScript: Compila
+✅ Imports: createLeadAttachment adicionado
+✅ Multer: Configurado corretamente
+✅ Rotas: POST antes de AI routes
+✅ Logging: Completo em todos os pontos
+✅ Validação: Todos os casos cobertos
+✅ Error handling: Robusto
+✅ Data isolation: RBAC aplicado
+✅ Workflow: ✅ RUNNING
+
+Nota: Há LSP diagnostics (27) mas são de origem anterior (import statements etc).
+
+================================================================================
+LIMIITES E NOTAS
+================================================================================
+
+Limite de ficheiro: 10 MB (Odoo attachment)
+Multer global limit: 25 MB
+Storage: Memory (não em disco)
+Fieldname: "file" (hardcoded no middleware)
+Validação: Dupla (multer + aplicação)
+Cache: Sem invalidação (frontend responsável)
+
+================================================================================
+INTEGRACAO COM FRONTEND
+================================================================================
+
+Próxima Fase (02C): Frontend Upload UI
+
+No AdminLeadDetailPage.tsx:
+  1. Renderizar input[type="file"] ou modal
+  2. Ao submeter:
+     - Criar FormData com file
+     - POST /api/crm/leads/:id/odoo/attachments
+     - On success:
+       * Toast de sucesso
+       * Invalidar ["lead-odoo-attachments", leadId]
+       * Re-render OdooAttachmentsSection
+  3. Loading state durante upload
+  4. Error handling com toast
+
+================================================================================
+STATUS FINAL
+================================================================================
+
+✅ FASE LEADS-ANEXOS-02B: COMPLETO
+
+Endpoint POST implementado!
+- Middleware: upload.single("file")
+- Auth: isAuthenticated
+- RBAC: empresaId filtering
+- Validação: Ficheiro + tamanho + sync status
+- Logging: Completo
+- Error handling: Robusto
+
+Ficheiros:
+  ✅ server/routes/crmLeads.ts (3 EDITS)
+  ✅ Multer movida para topo
+  ✅ Rota POST criada
+  ✅ Workflow: RUNNING
+
+Pronto para próxima fase!
+  FASE 02C: Frontend Upload UI (AdminLeadDetailPage.tsx)
+
+Sistema de upload de anexos Odoo:
+✅ Backend function: createLeadAttachment (02A) ✓
+✅ Backend endpoint: POST /api/crm/leads/:id/odoo/attachments (02B) ✓
+⏳ Frontend UI: Modal/form com file input (02C - próxima)
+
+================================================================================

@@ -1,0 +1,115 @@
+FASE LEADS-ANEXOS-02B – POST /api/crm/leads/:id/odoo/attachments (upload)
+
+Objetivo:
+Criar um endpoint no backend para fazer upload de um ficheiro para um lead no Odoo,
+usando a função OdooClient.createLeadAttachment já criada na fase 02A.
+
+Ficheiros principais:
+- server/routes/crmLeads.ts
+- (se necessário) middleware de upload (multer) partilhado
+
+Tarefas:
+
+1) Middleware de upload
+   - Verifica se já existe algum setup de multer no projeto.
+   - Se não existir, cria no próprio ficheiro crmLeads.ts (ou num pequeno helper dedicado)
+     um multer com memoryStorage, por ex.:
+
+       import multer from "multer";
+       const upload = multer({ storage: multer.memoryStorage() });
+
+   - Vamos usar `upload.single("file")` para este endpoint.
+
+2) Nova rota POST
+
+   Em server/routes/crmLeads.ts, adicionar:
+
+   router.post(
+     "/:id/odoo/attachments",
+     isAuthenticated,
+     upload.single("file"),
+     async (req, res) => {
+       // implementação
+     }
+   );
+
+3) Lógica da rota
+
+   Dentro dessa rota:
+
+   - Obter contexto da empresa (empresaId, userId, etc.) com o mesmo helper
+     já usado nas outras rotas de leads.
+
+   - Carregar o lead da BD (Drizzle) filtrando por:
+       id = req.params.id
+       empresaId = empresaId do contexto
+     → Se não existir:
+         return res.status(404).json({ success: false, message: "Lead não encontrado" });
+
+   - Verificar se lead.odooLeadId existe:
+     → Se não existir:
+         return res.status(400).json({
+           success: false,
+           message: "Este lead ainda não está sincronizado com o Odoo.",
+         });
+
+   - Verificar se veio ficheiro em req.file:
+     → Se não existir:
+         return res.status(400).json({
+           success: false,
+           message: "Nenhum ficheiro enviado.",
+         });
+
+   - Obter dados do ficheiro:
+       const file = req.file;
+       const buffer = file.buffer;
+       const fileName = file.originalname;
+       const mimetype = file.mimetype || null;
+
+   - (Opcional simples) Validar tamanho máximo (ex.: 10 MB):
+       if (buffer.length > 10 * 1024 * 1024) {
+         return res.status(400).json({
+           success: false,
+           message: "Ficheiro demasiado grande (máx. 10 MB).",
+         });
+       }
+
+   - Chamar OdooClient.createLeadAttachment:
+
+       const attachmentId = await createLeadAttachment({
+         empresaId,
+         odooLeadId: lead.odooLeadId,
+         fileName,
+         mimetype,
+         buffer,
+       });
+
+   - Responder:
+
+       return res.json({
+         success: true,
+         attachmentId,
+       });
+
+4) Tratamento de erros
+
+   - Envolver a lógica em try/catch.
+   - Em erro, fazer log com prefixo tipo:
+       "[CRM LEADS] Erro ao fazer upload de anexo para Odoo"
+       incluindo { leadId, empresaId, fileName, error }
+   - Responder:
+       res.status(500).json({
+         success: false,
+         message: "Erro ao enviar anexo para o Odoo. Tenta novamente mais tarde.",
+       });
+
+5) Garantias
+
+   - A rota deve seguir o mesmo padrão de autenticação e RBAC das restantes rotas de leads.
+   - Não alterar o endpoint GET /api/crm/leads/:id/odoo/attachments já existente.
+   - Garantir que o ficheiro compila (npm run build) e que as outras rotas continuam a funcionar.
+
+No relatório desta fase, descreve:
+- Qual o middleware de upload usado.
+- Assinatura exata da rota POST.
+- Qualquer limite de tamanho que tenhas aplicado.
