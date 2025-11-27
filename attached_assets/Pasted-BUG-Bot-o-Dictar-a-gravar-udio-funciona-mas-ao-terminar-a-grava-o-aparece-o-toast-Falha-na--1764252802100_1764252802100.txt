@@ -1,0 +1,77 @@
+BUG: Botão "Dictar" a gravar áudio funciona, mas ao terminar a gravação aparece o toast:
+"Falha na transcrição
+Failed to transcribe audio: require is not defined"
+
+Contexto:
+- A FASE-LEADS-IA-01 criou o endpoint POST /api/crm/leads/ai/transcribe reutilizando transcribeAudio() em server/openai.ts. (ver RELATORIO_FASE-LEADS-IA-01)
+- A FASE-LEADS-IA-02 adicionou gravação direta via MediaRecorder no frontend e continua a chamar o MESMO endpoint /api/crm/leads/ai/transcribe. (ver RELATORIO_FASE-LEADS-IA-02-GRAVACAO-DIRETA)
+- No frontend, o erro vem da resposta JSON: `{ success: false, message: "Failed to transcribe audio: require is not defined" }` (a mensagem é mostrada no toast).
+
+Conclusão: o erro "require is not defined" está a acontecer no BACKEND, dentro do handler do POST /api/crm/leads/ai/transcribe ou da função transcribeAudio() em server/openai.ts, e está a ser propagado na mensagem de erro.
+
+Quero que TRATES DISTO INTEGRALMENTE DO TEU LADO, sem depender de testes manuais meus.
+
+Tarefas:
+
+1) Localizar o ponto exacto do erro:
+   - Abre server/routes/crmLeads.ts e encontra o handler de:
+     POST /api/crm/leads/ai/transcribe
+   - Vê como está a chamar transcribeAudio() em server/openai.ts.
+   - Abre server/openai.ts e encontra a função transcribeAudio() reutilizada aqui.
+   - Procura por `require(` neste ficheiro e em qualquer módulo que transcribeAudio() use (ex.: fs, path, openai, etc).
+
+2) Corrigir uso de `require` em ambiente ESM:
+   - O projeto está a correr com tsx + TypeScript em modo ESM, por isso `require` não existe por defeito.
+   - Se houver algo do género:
+       const fs = require("fs");
+       const OpenAI = require("openai");
+     substitui por imports ESM:
+       import fs from "fs";
+       import OpenAI from "openai";
+   - Se por algum motivo precisares MESMO de require, usa `import { createRequire } from "module"; const require = createRequire(import.meta.url);`, mas preferir imports normais.
+   - Garante que NENHUM código em server/openai.ts, nem em helpers usados por transcribeAudio, depende de `require` global.
+
+3) Garantir que transcribeAudio só é usado no backend:
+   - Confirma que server/openai.ts NÃO está a ser importado em nenhum ficheiro de frontend/React.
+   - transcribeAudio deve ser usado apenas nos handlers Express (server/routes/...).
+   - Se houver algum import cruzado que faça bundlers tentarem correr este código no browser, corrige essa arquitetura (separa helpers por camada).
+
+4) Robusteza do handler /api/crm/leads/ai/transcribe:
+   - No handler do POST:
+     - Mantém try/catch à volta da chamada de transcribeAudio(filePath, mimeType).
+     - Em caso de erro, loga para o servidor algo como:
+       `[CRM Leads AI] Transcription error:`, error
+     - Mas na resposta JSON devolve uma mensagem AMIGÁVEL, não o erro técnico cru:
+       `{ success: false, message: "Failed to transcribe audio" }`
+     - NÃO devolvas literalmente "require is not defined" para o cliente.
+   - Garante também que:
+     - Se o ficheiro não existir ou o buffer vier vazio, devolves 400 com mensagem clara em vez de 500.
+
+5) Criar um pequeno teste automatizado só do teu lado:
+   - Cria um script de teste (ex.: scripts/testTranscribeLeadAudio.ts) ou um teste com supertest que:
+     - Cria um pequeno ficheiro de áudio dummy (pode ser um webm/wav curto em /tests/assets, ou usa um buffer mínimo aceitável).
+     - Faz POST para /api/crm/leads/ai/transcribe com multipart/form-data ("file").
+     - Loga a resposta.
+     - Verifica programaticamente:
+       - Que NÃO rebenta com "require is not defined".
+       - Que em caso de sucesso vem `{ success: true, text: "..." }`.
+       - Se não conseguires usar áudio real, pelo menos garante que a pipeline corre até à chamada de transcribeAudio e que qualquer erro nesse ponto é apanhado e devolvido como mensagem amigável.
+
+6) Garantir que o botão "IA" (summarize) continua a funcionar:
+   - Verifica rapidamente o POST /api/crm/leads/ai/summarize:
+     - Continua a usar getOpenAIClient() em server/openai.ts.
+     - Não é afectado pelas alterações.
+   - Idealmente, corre um teste rápido de summarize para garantir que não partiste nada.
+
+7) Documentar:
+   - Atualiza ou cria um relatório curto, por exemplo:
+     RELATORIO_FASE-LEADS-IA-03-FIX-TRANSCRIBE.txt
+   - Inclui:
+     - Qual era o problema real (“uso de require em ambiente ESM no openai.ts”, etc.).
+     - Em que ficheiros mexeste (server/openai.ts, server/routes/crmLeads.ts, scripts de teste).
+     - Como confirmaste, via script/teste, que o erro "require is not defined" desapareceu.
+
+Restrições:
+- NÃO mexer no frontend (AdminLeadDetailPage.tsx) nesta tarefa; assume que já está correcto (FASE-LEADS-IA-02).
+- NÃO mexer nas features de Odoo, leads_marcas ou anexos.
+- Foco absoluto: corrigir o erro de backend "require is not defined" na transcrição de áudio de leads, até ficar funcional de ponta a ponta.

@@ -1,5 +1,7 @@
 import express from "express";
 import { and, eq } from "drizzle-orm";
+import fs from "fs";
+import path from "path";
 import { db } from "../db";
 import { leads, leadsContactos, insertLeadSchema, contactos, leadsMarcas } from "../../shared/schema";
 import { isAuthenticated } from "../replitAuth";
@@ -573,32 +575,52 @@ export function registerCrmLeadsRoutes(app: express.Express) {
       await assertLeadsEnabled(empresaId);
 
       if (!req.file) {
-        return res.status(400).json({ success: false, message: "No audio file provided" });
+        console.error("[CRM Leads AI] No file provided in request");
+        return res.status(400).json({ success: false, message: "Nenhum ficheiro de áudio fornecido." });
       }
 
       // Save file to temp location for transcription
-      const fs = require("fs");
-      const path = require("path");
       const tmpDir = "/tmp";
       const tmpFile = path.join(tmpDir, `audio_${Date.now()}.webm`);
       
-      await fs.promises.writeFile(tmpFile, req.file.buffer);
-
       try {
+        // Write buffer to file
+        await fs.promises.writeFile(tmpFile, req.file.buffer);
+        console.log("[CRM Leads AI] Temp file created", { tmpFile, size: req.file.buffer.length });
+
+        // Transcribe audio
         const result = await transcribeAudio(tmpFile);
+        
+        // Clean up temp file
         await fs.promises.unlink(tmpFile).catch(() => {});
         
         console.log("[CRM Leads AI] Transcription success", { empresaId, textLength: result.text.length });
         return res.json({ success: true, text: result.text });
-      } catch (transcribeError) {
+      } catch (transcribeError: any) {
+        // Clean up temp file on error
         await fs.promises.unlink(tmpFile).catch(() => {});
-        throw transcribeError;
+        
+        // Log detailed error server-side
+        console.error("[CRM Leads AI] Transcription error details:", {
+          error: transcribeError?.message || String(transcribeError),
+          stack: transcribeError?.stack,
+          tmpFile,
+        });
+        
+        // Return friendly error to client (not technical details)
+        return res.status(500).json({ 
+          success: false, 
+          message: "Falha ao transcrever áudio. Por favor, tenta novamente." 
+        });
       }
     } catch (error: any) {
-      console.error("[CRM Leads AI] Transcription error:", error);
+      console.error("[CRM Leads AI] Transcription handler error:", {
+        error: error?.message || String(error),
+        stack: error?.stack,
+      });
       return res.status(500).json({ 
         success: false, 
-        message: "Failed to transcribe audio: " + (error?.message || "Unknown error") 
+        message: "Falha ao processar áudio. Por favor, tenta novamente." 
       });
     }
   });
