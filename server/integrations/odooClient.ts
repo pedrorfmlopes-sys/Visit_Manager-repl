@@ -388,6 +388,75 @@ export async function listLeadAttachments(params: {
 }
 
 /**
+ * Cria um anexo (ir.attachment) para uma lead (crm.lead) no Odoo
+ */
+export async function createLeadAttachment(params: {
+  empresaId: string;
+  odooLeadId: string | number;
+  fileName: string;
+  mimetype: string | null;
+  buffer: Buffer;
+}): Promise<number> {
+  const { empresaId, odooLeadId, fileName, mimetype, buffer } = params;
+  
+  const conn = await getOdooConnectionForEmpresa(empresaId);
+  const uid = await authenticateOdoo(conn);
+  
+  // Validar e converter odooLeadId para inteiro
+  const leadIdInt = typeof odooLeadId === "string" ? parseInt(odooLeadId, 10) : odooLeadId;
+  if (isNaN(leadIdInt) || leadIdInt <= 0) {
+    throw new Error("Invalid odooLeadId for attachment upload");
+  }
+  
+  // Converter buffer para base64
+  const datas = buffer.toString("base64");
+  
+  // Preparar payload para ir.attachment.create
+  const payload: Record<string, any> = {
+    name: fileName,
+    res_model: "crm.lead",
+    res_id: leadIdInt,
+    type: "binary",
+    datas: datas,
+  };
+  
+  // Adicionar mimetype apenas se existir (não enviar null)
+  if (mimetype) {
+    payload.mimetype = mimetype;
+  }
+  
+  console.log(`[Odoo] Creating attachment for lead ${leadIdInt}: ${fileName}`);
+  
+  try {
+    const result = await callOdooJsonRpc<number>(conn, {
+      method: "call",
+      params: {
+        service: "object",
+        method: "execute_kw",
+        args: [
+          conn.dbName,
+          uid,
+          conn.apiKey,
+          "ir.attachment",
+          "create",
+          [payload],
+        ],
+      },
+    });
+    
+    console.log(`[Odoo] Attachment created successfully. ID: ${result}`);
+    return result;
+  } catch (error: any) {
+    console.error("[Odoo] Error creating attachment:", {
+      message: error?.message,
+      leadId: leadIdInt,
+      fileName,
+    });
+    throw error;
+  }
+}
+
+/**
  * Cria uma lead (crm.lead) no Odoo
  */
 export async function createOdooLead(

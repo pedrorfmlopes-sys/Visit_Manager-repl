@@ -1,0 +1,96 @@
+FASE LEADS-ANEXOS-02A – OdooClient: criar função para criar anexos em crm.lead
+
+Objetivo desta fase
+Adicionar ao OdooClient uma função para criar anexos em crm.lead no Odoo, reutilizando a mesma infraestrutura que já usamos em listLeadAttachments. Esta função ainda não expõe endpoint HTTP nem mexe no frontend – é só a camada de integração com o Odoo.
+
+Instruções para o Agent (cola isto lá):
+
+Quero adicionar suporte para upload de anexos de leads para o Odoo (crm.lead), reutilizando a mesma infra da função listLeadAttachments.
+
+FASE LEADS-ANEXOS-02A (OdooClient – createLeadAttachment)
+
+Ficheiro alvo
+
+server/integrations/odooClient.ts
+
+Objetivo
+Criar uma função exportada que permita criar um anexo em crm.lead no Odoo, recebendo:
+
+empresaId: string (UUID da empresa na nossa BD)
+
+odooLeadId: string | number (id do lead no Odoo)
+
+fileName: string
+
+mimetype: string | null
+
+buffer: Buffer (conteúdo do ficheiro)
+
+A função deve:
+
+Obter a ligação ao Odoo exatamente da mesma forma que a função listLeadAttachments faz (mesmos helpers/utilitários para autenticação e callOdooJsonRpc).
+
+Garantir que odooLeadId é convertido para inteiro válido:
+
+const leadIdInt = typeof odooLeadId === "string" ? parseInt(odooLeadId, 10) : odooLeadId;
+
+Se for NaN ou <= 0, deve lançar um erro claro, por exemplo:
+"Invalid odooLeadId for attachment upload".
+
+Converter o buffer em base64:
+
+const datas = buffer.toString("base64");
+
+Chamar o modelo ir.attachment, método create, via JSON-RPC, com um único registo com estes campos:
+
+name: fileName
+
+res_model: "crm.lead"
+
+res_id: leadIdInt
+
+type: "binary"
+
+datas: string base64 gerada acima
+
+mimetype: apenas se existir, não enviar null
+
+Devolver o id numérico criado pelo Odoo:
+
+A função deve devolver um number (id do novo attachment).
+
+Padrão a seguir
+
+Usa exatamente o mesmo padrão de callOdooJsonRpc já usado nas funções relacionadas com leads (por exemplo em listLeadAttachments):
+
+Mesma forma de construir o conn/contexto.
+
+Mesmo tipo de tratamento de erros (try/catch, logs).
+
+Nome sugerido da função:
+export async function createLeadAttachment(...)
+(se já houver convenção semelhante, adapta mas exporta a função).
+
+Não alterar a assinatura nem o comportamento de listLeadAttachments nem de outras funções já existentes.
+
+Não tocar nas integrações de visitas, tarefas ou noutras áreas.
+
+Validação / Teste (feito por ti, Agent)
+
+Garante que o ficheiro compila.
+
+Opcional (se couber no escopo desta fase): cria um pequeno script de teste em scripts/testCreateLeadAttachment.ts que:
+
+Recebe parâmetros de ambiente ou hardcoded (empresaId + odooLeadId de teste + pequeno buffer fake).
+
+Invoca createLeadAttachment e faz console.log do id retornado (ou do erro).
+
+No relatório final desta fase, explica:
+
+Qual a função criada (assinatura).
+
+Como é usada internamente (modelo, método, campos).
+
+Se criaste algum script de teste e como o correr.
+
+Mantém esta fase focada só no OdooClient (sem endpoints HTTP, sem alterações de frontend). Os endpoints e UI de upload vêm nas próximas fases.
