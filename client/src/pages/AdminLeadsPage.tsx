@@ -132,6 +132,7 @@ export default function AdminLeadsPage() {
                         key={lead.id}
                         className="border-b hover:bg-muted cursor-pointer"
                         data-testid={`row-lead-${lead.id}`}
+                        onClick={() => navigate(`/admin/leads/${lead.id}`)}
                       >
                         <td className="py-2 pr-2">{lead.titulo}</td>
                         <td className="py-2 pr-2">
