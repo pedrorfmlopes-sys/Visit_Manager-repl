@@ -130,10 +130,28 @@ export function useAudioTranscription(opts?: { endpoint?: string }) {
 
     try {
       setIsTranscribing(true);
-      console.log('[useAudioTranscription] Transcribing recorded audio...');
+      const blob = audioBlobRef.current;
+      
+      // FASE-AUDIO-CORE-06: Log blob details before transcription
+      console.log('[useAudioTranscription] Transcribing recorded audio...', {
+        blobSize: blob.size,
+        blobType: blob.type,
+        isValid: blob.size > 0 && blob.type.startsWith('audio/'),
+      });
+
+      // Convert Blob to File with proper mimetype
+      const file = new File([blob], `gravacao-${Date.now()}.webm`, { 
+        type: blob.type || 'audio/webm' 
+      });
+
+      console.log('[useAudioTranscription] Sending file to endpoint...', {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+      });
 
       const formData = new FormData();
-      formData.append('file', audioBlobRef.current);
+      formData.append('file', file);
 
       const response = await fetch(endpoint, {
         method: 'POST',
