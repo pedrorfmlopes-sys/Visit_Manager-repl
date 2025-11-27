@@ -5,6 +5,7 @@ import { leads, insertLeadSchema } from "../../shared/schema";
 import { isAuthenticated } from "../replitAuth";
 import { getUserContext } from "../authContext";
 import { assertLeadsEnabled } from "../integrations/crmLeads";
+import { createLeadFromVmLead, updateLeadFromVmLead } from "../integrations/odooClient";
 
 export function registerCrmLeadsRoutes(app: express.Express) {
   const router = express.Router();
@@ -264,6 +265,113 @@ export function registerCrmLeadsRoutes(app: express.Express) {
 
       console.error("[CRM Leads] PATCH /:id error:", error);
       return res.status(500).json({ success: false, message: "Erro ao atualizar lead." });
+    }
+  });
+
+  // POST /api/crm/leads/:id/odoo/sync - Sincronizar lead com Odoo
+  router.post("/:id/odoo/sync", isAuthenticated, async (req, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      await assertLeadsEnabled(empresaId);
+
+      const leadId = req.params.id;
+
+      // Carregar lead com entidade e contacto
+      const lead = await db.query.leads.findFirst({
+        where: and(eq(leads.id, leadId), eq(leads.empresaId, empresaId)),
+        with: {
+          entidade: true,
+          contacto: true,
+        },
+      });
+
+      if (!lead) {
+        return res.status(404).json({ success: false, message: "Lead não encontrado." });
+      }
+
+      // Validar que lead tem entidade e contacto
+      if (!lead.entidade || !lead.contacto) {
+        return res.status(400).json({
+          success: false,
+          message: "Este lead não tem entidade ou contacto associados suficientes para sincronizar com o Odoo.",
+        });
+      }
+
+      // Validar que entidade tem odooPartnerId
+      if (!lead.entidade.odooPartnerId) {
+        return res.status(400).json({
+          success: false,
+          message: "Esta entidade não está ligada ao Odoo. Liga primeiro a entidade a um parceiro no Odoo.",
+        });
+      }
+
+      let odooLeadId: number | undefined;
+      let created = false;
+
+      try {
+        if (!lead.odooLeadId) {
+          // Criar novo lead no Odoo
+          odooLeadId = await createLeadFromVmLead({
+            vmLead: lead,
+            entidade: lead.entidade,
+            contacto: lead.contacto,
+            empresaId,
+          });
+          created = true;
+
+          // Atualizar lead com odooLeadId
+          await db
+            .update(leads)
+            .set({ odooLeadId: String(odooLeadId) })
+            .where(eq(leads.id, leadId));
+
+          console.log(`[CRM Leads] Lead ${leadId} criado no Odoo com ID ${odooLeadId}`);
+        } else {
+          // Atualizar lead existente no Odoo
+          const odooId = Number(lead.odooLeadId);
+          await updateLeadFromVmLead({
+            odooLeadId: odooId,
+            vmLead: lead,
+            entidade: lead.entidade,
+            contacto: lead.contacto,
+            empresaId,
+          });
+
+          odooLeadId = odooId;
+          console.log(`[CRM Leads] Lead ${leadId} actualizado no Odoo com ID ${odooId}`);
+        }
+      } catch (odooError: any) {
+        console.error("[CRM Leads] Erro ao sincronizar com Odoo:", {
+          leadId,
+          message: odooError?.message,
+        });
+
+        return res.status(500).json({
+          success: false,
+          message: "Erro ao sincronizar com o Odoo. Tenta novamente ou verifica a configuração Odoo.",
+          details: odooError?.message || "Unknown error",
+        });
+      }
+
+      return res.json({
+        success: true,
+        created,
+        odooLeadId: String(odooLeadId),
+      });
+    } catch (error: any) {
+      if (error?.code === "LEADS_NOT_ENABLED") {
+        return res.status(200).json({
+          success: false,
+          notEnabled: true,
+          message: "Módulo de Leads não está ativo para esta empresa.",
+        });
+      }
+
+      console.error("[CRM Leads] POST /:id/odoo/sync error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Erro ao sincronizar lead com Odoo.",
+      });
     }
   });
 

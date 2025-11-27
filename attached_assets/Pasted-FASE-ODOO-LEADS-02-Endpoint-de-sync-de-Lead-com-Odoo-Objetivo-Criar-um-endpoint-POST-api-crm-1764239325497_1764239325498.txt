@@ -1,0 +1,37 @@
+FASE ODOO-LEADS-02 – Endpoint de sync de Lead com Odoo
+
+Objetivo:
+Criar um endpoint POST /api/crm/leads/:id/odoo/sync que sincroniza um lead interno com o Odoo usando o OdooClient criado na fase anterior.
+
+Tarefas:
+1) Criar ficheiro de rotas específico ou adicionar ao módulo de leads existente (ex.: server/routes/crmLeadsOdoo.ts), registando a rota:
+   - POST /api/crm/leads/:id/odoo/sync
+
+2) Implementar a lógica do handler:
+   - Obter user context com getUserContext(req) e extrair empresaId.
+   - Validar que o módulo de leads está ativo para a empresa (reutilizar o helper/validação já usado nas outras rotas de /api/crm/leads).
+   - Carregar o lead pelo id e empresaId (usar o schema/tabela leads existente).
+   - Carregar também a entidade e o contacto associados ao lead:
+     - Se não houver entidade ou contacto, devolver 400 com JSON:
+       { success: false, message: "Este lead não tem entidade ou contacto associados suficientes para sincronizar com o Odoo." }
+   - Verificar se a entidade tem odooPartnerId definido:
+     - Se não tiver, devolver 400 com JSON:
+       { success: false, message: "Esta entidade não está ligada ao Odoo. Liga primeiro a entidade a um parceiro no Odoo." }
+
+3) Interação com o OdooClient:
+   - Se lead.odooLeadId estiver vazio:
+     - Chamar OdooClient.createLeadFromVmLead({ empresaId, vmLead: lead, entidade, contacto }).
+     - Atualizar a tabela leads definindo odooLeadId para o ID devolvido (converter para string se necessário).
+     - Responder com:
+       { success: true, created: true, odooLeadId: "<id>" }
+   - Se lead.odooLeadId já tiver valor:
+     - Chamar OdooClient.updateLeadFromVmLead({ empresaId, odooLeadId: lead.odooLeadId, vmLead: lead, entidade, contacto }).
+     - Responder com:
+       { success: true, created: false, odooLeadId: lead.odooLeadId }
+
+4) Tratamento de erros:
+   - Se o OdooClient lançar erro (por ex. problema na configuração, comunicação, etc.):
+     - Apanhar o erro e devolver 500 com JSON do estilo:
+       { success: false, message: "Erro ao sincronizar com o Odoo. Tenta novamente ou verifica a configuração Odoo.", details: <mensagem técnica curta> }
+
+Não alterar ainda o frontend, apenas criar esta rota e garantir que funciona corretamente e respeita o RBAC e o crmLeadsEnabled.
