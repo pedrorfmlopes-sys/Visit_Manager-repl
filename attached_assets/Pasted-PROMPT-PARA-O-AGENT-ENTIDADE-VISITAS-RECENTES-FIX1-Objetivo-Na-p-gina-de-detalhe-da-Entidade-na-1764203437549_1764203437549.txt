@@ -1,0 +1,102 @@
+PROMPT PARA O AGENT – ENTIDADE-VISITAS-RECENTES-FIX1
+
+Objetivo:
+Na página de detalhe da Entidade, na secção “Visitas recentes”, os cards não devem mostrar “Entidade desconhecida”.
+Cada card deve mostrar corretamente o nome da entidade.
+
+1) Garantir que a API de “visitas recentes da entidade” traz a entidade
+
+Ficheiro a editar (provável): server/storage.ts
+(ou onde estiver a função que fornece as “visitas recentes” para uma entidade.)
+
+Procura no ficheiro por algo como:
+
+visitasRecentes
+
+"Visitas recentes"
+
+ou pela rota que alimenta a entidade: GET /api/entidades/:id (ou semelhante) e vê que função de storage é usada para trazer as visitas.
+
+Na função que busca as visitas recentes de uma entidade, garante que a query inclui a relação entidade:
+
+Exemplo (ajusta à função real):
+
+const visitas = await db.query.visitas.findMany({
+  where: /* filtro por empresaId + entidadeId */,
+  orderBy: (v, { desc }) => desc(v.dataVisita),
+  limit: 5,
+  with: {
+    entidade: true,        // ← garantir isto
+    // ...outras relations que já existirem (contacto, user, etc.)
+  },
+});
+
+
+Se with: { entidade: ... } não estiver definido ou estiver false, adiciona/ativa para que cada visita traga visita.entidade?.nome.
+
+Não alteres a lógica de filtros/limites; só garante que entidade vem carregada.
+
+2) Ajustar o card de “visitas recentes” na Entidade
+
+Ficheiro a editar (frontend):
+O componente que desenha a secção “Visitas recentes” no detalhe da entidade, algo como:
+
+client/src/pages/entidades/EntidadeDetailPage.tsx
+
+ou client/src/components/entidades/EntidadeVisitasRecentes.tsx
+
+Procura pela secção com o título “Visitas recentes” e pela renderização dos cards.
+
+No render do nome da entidade dentro do card, atualmente deve haver algo do género:
+
+const nomeEntidade =
+  visita.entidade?.nome ?? "Entidade desconhecida";
+
+
+Ou diretamente no JSX:
+
+{visita.entidade?.nome ?? "Entidade desconhecida"}
+
+
+Substitui o fallback para usar o nome da entidade atual, se ele estiver disponível no componente.
+
+Exemplo (assumindo que o componente recebe entidade como prop ou tem entidade.nome carregado):
+
+const nomeEntidade =
+  visita.entidade?.nome ??
+  entidade?.nome ??
+  "Entidade desconhecida";
+
+
+E no JSX:
+
+<span className="font-medium">
+  {nomeEntidade}
+</span>
+
+
+Regra:
+
+Se a visita trouxer visita.entidade.nome, usa isso.
+
+Senão, usa entidade.nome (a entidade atual do detalhe).
+
+Só em último caso mostra “Entidade desconhecida”.
+
+Não mexas noutros textos do card.
+
+3) Testes
+
+npm run dev
+
+No browser:
+
+Abre o detalhe de uma Entidade que tenha “Visitas recentes”.
+
+Confirma que:
+
+Cada card mostra o nome correto da entidade (normalmente é a mesma entidade em que estás),
+
+Não aparece mais “Entidade desconhecida” nesses cards.
+
+Verifica também que a lista global de Visitas continua a mostrar corretamente o nome das entidades.
