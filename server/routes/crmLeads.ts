@@ -44,6 +44,14 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         orderBy: (l, { desc }) => desc(l.createdAt),
       });
 
+      console.log("[CRM Leads] GET /api/crm/leads", {
+        empresaId,
+        entidadeId,
+        contactoId,
+        visitaId,
+        count: rows.length,
+      });
+
       return res.json({ leads: rows });
     } catch (error: any) {
       if (error?.code === "LEADS_NOT_ENABLED") {
@@ -167,6 +175,8 @@ export function registerCrmLeadsRoutes(app: express.Express) {
           responsavelUserId: responsavelUserId ?? null,
         })
         .returning();
+
+      console.log("[CRM Leads] POST created lead", created);
 
       return res.status(201).json({ success: true, lead: created });
     } catch (error: any) {

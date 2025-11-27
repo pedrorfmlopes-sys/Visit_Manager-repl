@@ -1,0 +1,186 @@
+PROMPT PARA O AGENT – CRM-LEADS-DEBUG-LIST-STEP1
+
+Objetivo:
+Perceber porque é que:
+
+/admin/leads mostra 0 leads,
+
+as secções “Leads desta entidade” e “Leads deste contacto” também mostram “sem leads associados”,
+mesmo depois de já terem sido criados leads a partir de visitas.
+
+Fazer debug mínimo e cirúrgico em 3 pontos: BD → API → UI.
+
+1) Confirmar se existem leads na BD
+
+Cria um pequeno script temporário em server/scripts/debugLeads.ts (ou usa um ficheiro existente de debug) com algo deste género:
+
+import { db } from "../db";
+import { leads } from "../../shared/schema";
+
+async function main() {
+  const allLeads = await db.select().from(leads);
+  console.log("TOTAL LEADS:", allLeads.length);
+  console.dir(allLeads, { depth: 3 });
+}
+
+main()
+  .then(() => {
+    console.log("Done.");
+    process.exit(0);
+  })
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+
+
+Adiciona um script no package.json (temporário):
+
+"scripts": {
+  "debug:leads": "tsx server/scripts/debugLeads.ts",
+  ...
+}
+
+
+Corre na shell:
+
+npm run debug:leads
+
+
+Verifica o output:
+
+Se TOTAL LEADS for 0 → não há qualquer lead na tabela (vamos depois confirmar se o POST está a criar bem).
+
+Se TOTAL LEADS > 0 → passa ao passo 2.
+
+2) Debug da rota GET /api/crm/leads
+
+Ficheiro: server/routes/crmLeads.ts
+
+Na rota GET /api/crm/leads (a lista), adiciona logs antes de devolver a resposta, sem mudar a lógica de negócio:
+
+router.get("/", requireAuth, async (req, res) => {
+  try {
+    const { empresaId } = await getUserContext(req);
+    await assertLeadsEnabled(empresaId);
+
+    const entidadeId =
+      typeof req.query.entidadeId === "string" ? req.query.entidadeId : undefined;
+    const contactoId =
+      typeof req.query.contactoId === "string" ? req.query.contactoId : undefined;
+    const visitaId =
+      typeof req.query.visitaId === "string" ? req.query.visitaId : undefined;
+
+    let whereClause: any = eq(leads.empresaId, empresaId);
+
+    if (entidadeId) {
+      whereClause = and(whereClause, eq(leads.entidadeId, entidadeId));
+    }
+    if (contactoId) {
+      whereClause = and(whereClause, eq(leads.contactoId, contactoId));
+    }
+    if (visitaId) {
+      whereClause = and(whereClause, eq(leads.visitaId, visitaId));
+    }
+
+    const rows = await db.query.leads.findMany({
+      where: whereClause,
+      orderBy: (l, { desc }) => desc(l.createdAt),
+    });
+
+    console.log("[CRM Leads] GET /api/crm/leads", {
+      empresaId,
+      entidadeId,
+      contactoId,
+      visitaId,
+      count: rows.length,
+    });
+
+    return res.json({ leads: rows });
+  } catch (error: any) {
+    ...
+  }
+});
+
+
+Corre:
+
+npm run dev
+
+
+No browser, faz:
+
+Abre /admin/leads → vê a consola do servidor:
+
+O log [CRM Leads] GET /api/crm/leads deve mostrar count (esperado >0 se a BD tiver leads da empresa).
+
+Abre uma Entidade com leads esperados → a secção “Leads desta entidade” vai chamar /api/crm/leads?entidadeId=...; verifica no log:
+
+entidadeId e count.
+
+Abre um Contacto com leads esperados → idem com contactoId.
+
+O que queremos ver:
+
+Se a BD tem leads, mas os logs mostram sempre count: 0, há problema no filtro:
+
+ou leads.empresaId está a null/errado,
+
+ou os entidadeId/contactoId gravados nos leads não batem com os IDs usados no UI.
+
+3) Confirmar se o POST está a gravar empresaId, entidadeId e contactoId
+
+Ficheiro: server/routes/crmLeads.ts (rota POST /api/crm/leads)
+
+Verifica a implementação atual do POST /api/crm/leads e garante que:
+
+está a usar empresaId de getUserContext(req) e não do body:
+
+const { empresaId, userId } = await getUserContext(req);
+...
+const inserted = await db
+  .insert(leads)
+  .values({
+    empresaId,
+    entidadeId: body.entidadeId,
+    contactoId: body.contactoId,
+    visitaId: body.visitaId ?? null,
+    ...
+  })
+  .returning();
+
+
+Adiciona um pequeno console.log logo após o insert:
+
+console.log("[CRM Leads] POST created lead", inserted[0]);
+
+
+No frontend, cria um novo lead a partir de:
+
+uma visita (botão “Adicionar lead”),
+
+com entidade/contacto definidos.
+
+Vê no log do servidor o objeto do lead criado:
+
+Confirma se empresaId, entidadeId, contactoId e visitaId têm valores corretos (ids reais da tua empresa/entidade/contacto).
+
+4) O que fazer com o resultado
+
+Depois de correres estes 3 blocos:
+
+Se TOTAL LEADS = 0 → o problema é que ainda não há leads gravados; o próximo passo é corrigir o POST para gravar, e testar criar 1 lead e voltar a correr debug:leads.
+
+Se há leads na BD mas:
+
+empresaId está null ou diferente da empresa de login → precisamos ajustar o POST para usar empresaId do contexto e, se quiseres, um script rápido para atualizar os leads já criados.
+
+entidadeId/contactoId não batem certo → ajustamos a criação a partir da Visita.
+
+Diz-me depois:
+
+o TOTAL LEADS do script,
+
+e um exemplo de log [CRM Leads] GET /api/crm/leads (empresaId + count),
+
+que eu preparo o próximo passo (correção do POST ou do filtro) bem focado.
