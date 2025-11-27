@@ -319,7 +319,7 @@ export default function VisitaDetail() {
       return;
     }
 
-    const returnTo = `/admin/visitas/${visita.id}`;
+    const returnTo = `/visitas/${visita.id}`;
     const url = `/admin/leads/new?visitaId=${visita.id}&entidadeId=${visita.entidadeId}&contactoId=${contactoIdFromVisita}&returnTo=${encodeURIComponent(returnTo)}`;
     setLocation(url);
   };

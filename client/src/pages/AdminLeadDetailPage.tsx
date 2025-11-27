@@ -159,7 +159,7 @@ export default function AdminLeadDetailPage() {
           size="icon"
           onClick={() => {
             const target = visitaIdFromQuery
-              ? `/admin/visitas/${visitaIdFromQuery}`
+              ? `/visitas/${visitaIdFromQuery}`
               : "/admin/leads";
 
             console.log("[AdminLeadDetail] header back target:", {
@@ -402,7 +402,7 @@ function LeadDetailForm({
 
         // BUG-FIX: Navigate based on visitaId priority (if created from visita)
         const target = visitaId
-          ? `/admin/visitas/${visitaId}`
+          ? `/visitas/${visitaId}`
           : `/admin/leads/${createdId}`;
 
         console.log("[AdminLeadDetail] handleSave target:", {
@@ -780,7 +780,7 @@ function LeadDetailForm({
             variant="outline"
             onClick={() => {
               const target = visitaId
-                ? `/admin/visitas/${visitaId}`
+                ? `/visitas/${visitaId}`
                 : "/admin/leads";
 
               console.log("[AdminLeadDetail] cancel target:", {

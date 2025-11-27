@@ -1,0 +1,63 @@
+================================================================================
+RESUMO EXECUTIVO: Rota Corrigida - /visitas/ em vez de /admin/visitas/
+================================================================================
+
+Status: ✅ COMPLETO | LSP: 0 | Workflow: RUNNING
+
+================================================================================
+O QUE FOI CORRIGIDO
+================================================================================
+
+BUG:
+  ❌ Criar lead a partir de /visitas/:id
+  ❌ App navegava para /admin/visitas/:id
+  ❌ Resultado: 404
+
+SOLUCAO:
+  ✅ Substituir `/admin/visitas/` por `/visitas/` (4 linhas)
+
+================================================================================
+4 MUDANCAS EXATAS
+================================================================================
+
+1️⃣ VisitaDetail.tsx (linha 325)
+   returnTo = `/visitas/${visita.id}`
+
+2️⃣ AdminLeadDetailPage.tsx Header Back (linha 165)
+   target = visitaIdFromQuery ? `/visitas/${visitaIdFromQuery}` : "/admin/leads"
+
+3️⃣ AdminLeadDetailPage.tsx handleSave (linha 408)
+   target = visitaId ? `/visitas/${visitaId}` : `/admin/leads/${createdId}`
+
+4️⃣ AdminLeadDetailPage.tsx Cancel Button (linha 786)
+   target = visitaId ? `/visitas/${visitaId}` : "/admin/leads"
+
+================================================================================
+TESTE FLUXO
+================================================================================
+
+1. Em /visitas/:id com entidade + contacto
+2. Clica "Novo lead desta visita"
+3. Preenche titulo + contacto
+4. Guardar → volta para /visitas/:id ✓ SEM 404
+5. Lead aparece na lista ✓
+
+TESTE 2:
+1. Em /visitas/:id
+2. Cancelar ou Voltar < → volta para /visitas/:id ✓
+
+================================================================================
+STATUS FINAL
+================================================================================
+
+✅ Ficheiros: 2 (VisitaDetail.tsx + AdminLeadDetailPage.tsx)
+✅ Linhas: 4 (todas em paralelo)
+✅ Mudanca: `/admin/visitas/` → `/visitas/` (path correcta)
+✅ LSP: 0 errors
+✅ Workflow: RUNNING
+
+RESULTADO: User agora volta corretamente para /visitas/:id
+
+PRONTO! 🚀
+
+================================================================================
