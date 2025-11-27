@@ -1,0 +1,90 @@
+PROMPT PARA O AGENT – CONTACTO-VISITAS-CARDS-FIX
+
+Objetivo:
+Na página de detalhe do Contacto, na secção das visitas associadas a esse contacto, os cards não devem mostrar "Entidade desconhecida".
+Cada card deve mostrar o nome da entidade onde a visita ocorreu (e um fallback limpo se, por algum motivo, não houver entidade).
+
+⚠️ Importante: isto é só para os cards de visitas no CONTACTO.
+Não mexer na lógica que já foi mudada para “Visitas recentes” da ENTIDADE.
+
+1) Backend – garantir que as visitas do contacto trazem a entidade
+
+Abre server/storage.ts (ou o ficheiro onde são carregados os detalhes do contacto).
+
+Procura a função que alimenta o endpoint de detalhe do contacto, algo como getContactoById ou a query usada em GET /api/contactos/:id.
+
+Garante que, na relação que traz as visitas deste contacto (ex.: visitas ou visitasDoContacto), a query inclui também a entidade:
+
+Exemplo (ajusta à função real):
+
+const contacto = await db.query.contactos.findFirst({
+  where: /* ... */,
+  with: {
+    // ...
+    visitas: {
+      with: {
+        entidade: true, // ← garantir isto
+        // outros with já existentes (user, etc.)
+      },
+    },
+  },
+});
+
+
+Se já estiver with: { entidade: true }, deixa como está – não alteres mais nada neste passo.
+
+2) Frontend – ajustar o texto dos cards de visitas no Contacto
+
+Abre o ficheiro da página de detalhe do contacto, algo como:
+
+client/src/pages/contactos/ContactoDetailPage.tsx
+
+
+ou componente equivalente onde aparece o título “Visitas” / “Visitas deste contacto”.
+
+Encontra o map que renderiza os cards das visitas deste contacto.
+Lá dentro deve haver algo tipo:
+
+{visita.entidade?.nome ?? "Entidade desconhecida"}
+
+
+ou uma variável nomeEntidade que cai nesse fallback.
+
+Ajusta o fallback para algo mais neutro e baseado no que sabemos:
+
+const nomeEntidade =
+  visita.entidade?.nome ?? "Sem entidade associada";
+
+
+E no JSX:
+
+<span className="text-xs text-muted-foreground">
+  {nomeEntidade}
+</span>
+
+
+Regra:
+
+Se visita.entidade.nome existir → usa esse nome.
+
+Se não houver entidade por algum motivo → “Sem entidade associada”.
+
+Nunca mostrar “Entidade desconhecida” aqui.
+
+Não alteres mais nada no card (data, ícones, clique para abrir visita, etc.).
+
+3) Testar
+
+npm run dev
+
+No browser:
+
+Vai à página de um Contacto que tenha visitas associadas.
+
+Na secção de visitas, verifica que:
+
+Quando a visita está ligada a uma entidade → aparece o nome correto da entidade.
+
+Em casos raros sem entidade → aparece “Sem entidade associada”.
+
+Deixou de aparecer “Entidade desconhecida”.
