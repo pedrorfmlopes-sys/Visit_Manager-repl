@@ -1,0 +1,334 @@
+================================================================================
+RELATORIO: FASE-LEADS-UI-03 - Navegacao para Lead Detail apos criacao
+================================================================================
+
+Data: 27 Novembro 2025
+Status: ✅ IMPLEMENTADO - Navegacao automatica para /admin/leads/:id
+Objetivo: Apos criar lead a partir da visita, ir automaticamente para detalhe completo
+
+================================================================================
+1. IMPLEMENTACAO
+================================================================================
+
+Ficheiro modificado:
+- client/src/pages/VisitaDetail.tsx
+
+Localizacao:
+- Funcao: handleCreateLeadFromVisita (linhas 297-375)
+- Secao: Apos POST /api/crm/leads bem-sucedido
+
+Mudanca:
+- LINHA 369-372 (novo):
+  // FASE LEADS-UI-03: Navigate to lead detail page after creation
+  if (json?.lead?.id) {
+    setLocation(`/admin/leads/${json.lead.id}`);
+  }
+
+Pattern usado:
+- Hook: useLocation() ja importado (linha 3)
+- Extrai: [, setLocation] = useLocation()
+- Navega: setLocation(`/admin/leads/${json.lead.id}`)
+
+Contexto:
+- Toast ja existe: "Lead criado" (linhas 350-353)
+- Modal ja fecha: setLeadDialogOpen(false) (linha 355)
+- Forma limpa: setLeadForm reset (linhas 356-361)
+- Invalida cache: queryClient.invalidateQueries (linhas 365-367)
+- NOVO: Navega para detalhe (linhas 369-372)
+
+================================================================================
+2. FLUXO USER (Teste Manual)
+================================================================================
+
+PASSO 1: Abrir visita com entidade e contacto
+- Ir para /visitas/[id]
+- Verificar que visita tem:
+  - entidadeId preenchido
+  - pelo menos 1 contacto (contactoId ou contactosPresentes)
+
+PASSO 2: Clique "Novo lead desta visita"
+- Modal abre
+- Preencher:
+  - Titulo (obrigatorio)
+  - Marcas (opcional)
+  - Estado (default "novo")
+  - Valor Previsto (opcional)
+
+PASSO 3: Clique "Criar lead"
+- POST /api/crm/leads (body json)
+- Resposta: { success: true, lead: { id: "xxx-yyy", ... } }
+- Toast: "Lead criado"
+- Modal fecha
+- NOVO: Browser navega para /admin/leads/xxx-yyy
+
+PASSO 4: Pagina /admin/leads/[id] carrega
+- Card de contexto (Entidade/Contacto/Visita)
+- Card de edicao (titulo, descricao, marcas, estado, valor, moeda)
+- Todos os campos preenchidos
+- Botoes: Guardar, Eliminar, etc.
+
+RESULTADO:
+✅ User nao precisa clicar em nada extra
+✅ Lead detail page abre automaticamente
+✅ Formulario completo juntamente
+✅ Tudo visivel e editavel
+
+================================================================================
+3. RESPOSTA DO BACKEND (Verificacao)
+================================================================================
+
+POST /api/crm/leads - response:
+
+{
+  "success": true,
+  "lead": {
+    "id": "uuid-string",
+    "titulo": "Lead Title",
+    "descricao": null,
+    "estado": "novo",
+    "valorPrevisto": 1000,
+    "moeda": "EUR",
+    "entidadeId": "xxx",
+    "contactoId": "yyy",
+    "visitaId": "zzz",
+    "marcasIds": ["m1", "m2"],
+    "marcas": [...],
+    "createdAt": "2025-11-27T...",
+    ...
+  }
+}
+
+Estrutura confirmada:
+✓ json.lead (objeto)
+✓ json.lead.id (uuid string)
+✓ Navegacao segura: setLocation(`/admin/leads/${json.lead.id}`)
+
+================================================================================
+4. CODIGO FINAL (VisitaDetail.tsx 369-372)
+================================================================================
+
+// FASE LEADS-UI-03: Navigate to lead detail page after creation
+if (json?.lead?.id) {
+  setLocation(`/admin/leads/${json.lead.id}`);
+}
+
+Logica:
+1. Apos POST sucesso (json.success === true)
+2. Toast mostrando sucesso
+3. Modal fecha
+4. Cache invalida (refrescar lista)
+5. CHECK: json?.lead?.id existe?
+6. Se SIM: navega para /admin/leads/{id}
+7. Se NAO: nenhuma navegacao (erro raro)
+
+Seguranca:
+✓ Apenas navega se json?.lead?.id existir
+✓ Nao navega em caso de erro (catch block trata)
+✓ setLocation ja testado noutras paginas
+✓ Pattern consistente com codigo existing
+
+================================================================================
+5. REGRAS MANTIDAS
+================================================================================
+
+✓ Comportamento erro nao alterado
+  - Erro: toast "Erro ao criar lead"
+  - SEM navegacao
+  - Modal NAO fecha
+  - Query invalida apenas para leads
+  
+✓ Contrato API nao alterado
+  - POST /api/crm/leads comportamento identico
+  - Response esperado: { success: true, lead: {...} }
+  
+✓ Pattern navegacao consistente
+  - deleteVisitaMutation usa setLocation (linha 129)
+  - handleCreateLeadFromVisita agora usa setLocation (linha 371)
+  - Mesmo hook, mesma funcao
+  - Padroes unificados
+
+✓ Nada mexido em:
+  - Modal criacao
+  - Form validation
+  - Dados enviados
+  - Backend endpoint
+  - Cache invalidation
+
+================================================================================
+6. TESTE LOCAL (DevTools)
+================================================================================
+
+Browser Console:
+1. Abrir DevTools (F12)
+2. Ir para /admin/visitas/[id]
+3. Clicar "Novo lead desta visita"
+4. Preencher formulario
+5. Clicar "Criar lead"
+
+Esperado:
+- Console: XHR POST /api/crm/leads
+- Response: { success: true, lead: { id: "...", ... } }
+- Toast: "Lead criado"
+- Modal fecha
+- URL muda: /admin/visitas/[id] → /admin/leads/[newId]
+- Lead detail page carrega
+
+Network tab:
+- POST /api/crm/leads 200 OK
+- GET /api/crm/leads?leadId=[newId] (se modal loaded)
+
+Se alguma coisa falha:
+1. Verificar console.error (catch block log)
+2. Verificar Network tab (response json)
+3. Verificar json?.lead?.id print (existe?)
+
+================================================================================
+7. DIFERENCA: ANTES vs DEPOIS
+================================================================================
+
+ANTES (sem FASE LEADS-UI-03):
+❌ User clica "Novo lead desta visita"
+❌ Preenche formulario
+❌ Clica "Criar lead"
+❌ Modal fecha, toast mostra sucesso
+❌ BUT: User ainda em /admin/visitas/[id]
+❌ User precisa clicar em "Leads desta visita" card
+❌ Depois clicar no lead novo na lista
+❌ Lead detail page finalmente carrega
+❌ 3 cliques extra + manual navigation
+
+DEPOIS (com FASE LEADS-UI-03):
+✅ User clica "Novo lead desta visita"
+✅ Preenche formulario
+✅ Clica "Criar lead"
+✅ Modal fecha, toast mostra sucesso
+✅ NOVO: Browser navega automaticamente para /admin/leads/[newId]
+✅ Lead detail page carrega IMEDIATAMENTE
+✅ Formulario completo visivel
+✅ User pode editar logo
+✅ 0 cliques extra + automatic navigation
+
+BENEFICIO:
+- UX melhorada (navegacao automatica)
+- Menos cliques (user flow otimizado)
+- Consistente com padroes da app
+- Seguro (apenas se json.lead.id existir)
+
+================================================================================
+8. VERIFICACAO FINAL
+================================================================================
+
+Ficheiros verificados:
+✓ VisitaDetail.tsx linhas 369-372 (novo)
+✓ VisitaDetail.tsx linhas 350-367 (contexto)
+✓ useLocation importado linha 54 (✓ ja existe)
+✓ setLocation pattern line 129 (✓ ja existe)
+✓ POST /api/crm/leads response { lead: { id: ... } } (✓ confirmado)
+
+Validacao:
+✓ if (json?.lead?.id) - safe check
+✓ setLocation(`/admin/leads/${json.lead.id}`) - same pattern
+✓ Apos toast - timing correto
+✓ Apos modal close - ordem correta
+✓ Apos cache invalidate - dado fresco
+
+Estado Código:
+✓ Compilação: sem erros
+✓ Tipos: json?.lead?.id checked (safe)
+✓ Padrão: setLocation ja usado (consistent)
+✓ Timing: apos todo o cleanup (seguro)
+
+================================================================================
+9. CONCLUSAO
+================================================================================
+
+TAREFA COMPLETA: FASE-LEADS-UI-03
+✅ Implementado: Navegacao para lead detail apos criacao
+✅ Ficheiro: VisitaDetail.tsx (funcao handleCreateLeadFromVisita)
+✅ Pattern: Consistent com existing code
+✅ Seguranca: Safe checks (json?.lead?.id)
+✅ UX: Automatico (sem cliques extra)
+
+COMPORTAMENTO:
+- Criar lead a partir visita
+- Modal fecha
+- Toast sucesso
+- Navega para /admin/leads/:id
+- Lead detail page carrega
+- User pode editar
+
+TESTES:
+- Abrir /admin/visitas/[id]
+- Clicker "Novo lead desta visita"
+- Preencher e submeter
+- Verificar: URL muda para /admin/leads/[newId]
+- Verificar: Formulario completo carrega
+
+================================================================================
+STATUS FINAL
+================================================================================
+
+✅ FASE LEADS-UI-03 PRONTA PARA TESTE
+✅ Codigo compilado e running
+✅ Workflow restarted e operational
+✅ Pronto para manual testing
+
+PROXIMO PASSO:
+Testar em /admin/visitas/[id]:
+1. "Novo lead desta visita"
+2. Preencher e criar
+3. Verificar navegacao automatica
+
+================================================================================
+FIM - FASE-LEADS-UI-03 CONCLUIDA
+================================================================================
+
+Versao: 1.0 - Navegacao inicial
+Data: 27 Novembro 2025
+Status: PRONTO PARA TESTE
+
+IMPLEMENTACAO:
+✓ Post-creation navigation
+✓ Safe ID check
+✓ Consistent patterns
+✓ Zero breaking changes
+
+TESTA AGORA E REPORTA!
+
+================================================================================
+
+================================================================================
+10. CONFIRMACAO BACKEND (POST Response)
+================================================================================
+
+server/routes/crmLeads.ts linhas 314:
+  return res.status(201).json({ success: true, lead: created });
+
+Estrutura response:
+  {
+    success: true,
+    lead: {
+      id: "uuid-string",  ← EXISTE! Criado linha 266-281
+      titulo: "...",
+      entidadeId: "...",
+      contactoId: "...",
+      visitaId: "...",
+      marcasIds: [...],
+      estado: "novo",
+      valorPrevisto: 1000,
+      moeda: "EUR",
+      createdAt: "2025-11-27T...",
+      ...
+    }
+  }
+
+Validacao:
+  ✓ .returning() em INSERT (linha 281)
+  ✓ created.id acessível
+  ✓ json?.lead?.id safe para navegar
+
+CONCLUSAO:
+  Frontend: if (json?.lead?.id) { setLocation(...) } ← CORRETO
+  Backend: POST retorna lead com id ← CONFIRMADO
+
+================================================================================

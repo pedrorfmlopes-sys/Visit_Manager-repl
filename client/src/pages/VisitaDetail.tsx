@@ -362,6 +362,11 @@ export default function VisitaDetail() {
       await queryClient.invalidateQueries({
         queryKey: ["/api/crm/leads", { visitaId: visita.id }],
       });
+
+      // FASE LEADS-UI-03: Navigate to lead detail page after creation
+      if (json?.lead?.id) {
+        setLocation(`/admin/leads/${json.lead.id}`);
+      }
     } catch (error: any) {
       console.error("[CRM Leads] erro ao criar lead:", error);
       toast({

@@ -1,0 +1,58 @@
+FASE LEADS-UI-03 – Abrir formulário completo do lead após criação a partir da visita
+
+Objetivo:
+Quando o utilizador está em /admin/visitas/:id e clica "Novo lead desta visita":
+- Mantemos o modal rápido para criar o lead (como já existe).
+- MAS, após o POST /api/crm/leads ser bem-sucedido, navegamos automaticamente
+  para o detalhe completo desse lead em /admin/leads/:id.
+
+Detalhes:
+
+1) Ficheiro a alterar
+- client/src/pages/VisitaDetail.tsx
+
+2) Função alvo
+- Localizar a função que trata o submit do modal:
+  handleCreateLeadFromVisita (ou nome equivalente).
+- Esta função já faz:
+  - cálculo do contactoIdFromVisita
+  - POST /api/crm/leads
+  - toast de sucesso/erro
+  - invalidation das queries para refrescar a lista de "Leads desta visita"
+  - fechar o modal
+
+3) Alteração necessária
+- No sucesso do POST, o backend devolve o lead criado:
+  { success: true, lead: { id, ... } }
+- Depois de mostrar o toast e antes/depois de fechar o modal, adicionar navegação
+  para o detalhe do lead, usando o mesmo padrão de navegação que o resto da app
+  usa para ir para /admin/leads/:id.
+
+Pseudo-código:
+
+const { navigate } = useLocation(); // ou hook equivalente já usado noutras páginas
+
+...
+
+if (data?.success && data.lead?.id) {
+  // já existe: toast, invalidate, fechar modal, etc.
+
+  navigate(`/admin/leads/${data.lead.id}`);
+}
+
+4) Regras:
+- Não alterar o comportamento actual em caso de erro (mantém toast e não navega).
+- Não mexer no contrato da API /api/crm/leads.
+- Reutilizar exactamente o mesmo esquema de navegação já usado noutros sítios
+  para ir para /admin/leads/:id (ex.: na lista global de leads ou em ContactoDetail).
+
+5) Testes manuais:
+- Abrir uma visita com entidade e contacto válidos.
+- Clicar "Novo lead desta visita", preencher campos e clicar "Criar lead".
+- Esperado:
+  - POST /api/crm/leads OK.
+  - Modal fecha.
+  - Browser navega automaticamente para /admin/leads/:novoId.
+  - Formulário completo do lead aparece com:
+    - Card de contexto (Entidade/Contacto/Visita)
+    - Card de edição (título, descrição, marcas, estado, valor, moeda, etc.)
