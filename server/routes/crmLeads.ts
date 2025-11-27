@@ -6,6 +6,8 @@ import { isAuthenticated } from "../replitAuth";
 import { getUserContext } from "../authContext";
 import { assertLeadsEnabled } from "../integrations/crmLeads";
 import { createLeadFromVmLead, updateLeadFromVmLead } from "../integrations/odooClient";
+import { transcribeAudio, getOpenAIClient } from "../openai";
+import multer from "multer";
 
 export function registerCrmLeadsRoutes(app: express.Express) {
   const router = express.Router();
@@ -557,6 +559,107 @@ export function registerCrmLeadsRoutes(app: express.Express) {
       return res.status(500).json({
         success: false,
         message: "Erro ao sincronizar lead com Odoo.",
+      });
+    }
+  });
+
+  // FASE-LEADS-IA-01: AI endpoints for lead context enrichment
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+
+  // POST /api/ai/leads/transcribe - Transcribe audio to text
+  router.post("/ai/transcribe", isAuthenticated, upload.single("file"), async (req, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      await assertLeadsEnabled(empresaId);
+
+      if (!req.file) {
+        return res.status(400).json({ success: false, message: "No audio file provided" });
+      }
+
+      // Save file to temp location for transcription
+      const fs = require("fs");
+      const path = require("path");
+      const tmpDir = "/tmp";
+      const tmpFile = path.join(tmpDir, `audio_${Date.now()}.webm`);
+      
+      await fs.promises.writeFile(tmpFile, req.file.buffer);
+
+      try {
+        const result = await transcribeAudio(tmpFile);
+        await fs.promises.unlink(tmpFile).catch(() => {});
+        
+        console.log("[CRM Leads AI] Transcription success", { empresaId, textLength: result.text.length });
+        return res.json({ success: true, text: result.text });
+      } catch (transcribeError) {
+        await fs.promises.unlink(tmpFile).catch(() => {});
+        throw transcribeError;
+      }
+    } catch (error: any) {
+      console.error("[CRM Leads AI] Transcription error:", error);
+      return res.status(500).json({ 
+        success: false, 
+        message: "Failed to transcribe audio: " + (error?.message || "Unknown error") 
+      });
+    }
+  });
+
+  // POST /api/ai/leads/summarize - Improve/summarize lead description text
+  router.post("/ai/summarize", isAuthenticated, async (req, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      await assertLeadsEnabled(empresaId);
+
+      const { text, titulo } = req.body;
+
+      if (!text || typeof text !== "string" || text.trim().length === 0) {
+        return res.status(400).json({ success: false, message: "Text is required and cannot be empty" });
+      }
+
+      try {
+        const client = getOpenAIClient();
+        
+        const prompt = `Analisa este contexto de lead de vendas e cria uma descrição profissional e estruturada em português.
+
+**Título do Lead:** ${titulo || "Sem título"}
+
+**Texto Original:**
+${text}
+
+Por favor, melhora e estrutura este texto, tornando-o mais profissional e claro. Mantém os pontos-chave mas apresenta de forma mais polida.
+Responde apenas com o texto melhorado, sem explicações adicionais.`;
+
+        const response = await client.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content: "Você é um especialista em escrita comercial e resumos de vendas. Responde sempre em português de Portugal."
+            },
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 500,
+        });
+
+        const improvedText = response.choices[0].message.content || text;
+        
+        console.log("[CRM Leads AI] Summarize success", { empresaId, originalLength: text.length, improvedLength: improvedText.length });
+        return res.json({ success: true, text: improvedText });
+      } catch (aiError: any) {
+        console.error("[CRM Leads AI] OpenAI error:", aiError);
+        return res.status(500).json({ 
+          success: false, 
+          message: "Failed to process text with AI: " + (aiError?.message || "Unknown error") 
+        });
+      }
+    } catch (error: any) {
+      console.error("[CRM Leads AI] Summarize error:", error);
+      return res.status(500).json({ 
+        success: false, 
+        message: "Failed to summarize text: " + (error?.message || "Unknown error") 
       });
     }
   });

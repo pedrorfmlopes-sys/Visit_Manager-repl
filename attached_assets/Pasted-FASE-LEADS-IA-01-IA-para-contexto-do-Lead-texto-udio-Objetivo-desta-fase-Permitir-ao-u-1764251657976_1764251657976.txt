@@ -1,0 +1,92 @@
+FASE LEADS-IA-01 – IA para contexto do Lead (texto + áudio)
+
+Objetivo desta fase:
+- Permitir ao utilizador descrever o contexto do lead com ajuda da IA:
+  - Por escrita direta (texto normal).
+  - Por áudio (gravação na app → transcrição via IA → texto).
+- Tudo focado no campo "descrição" / "contexto" do lead.
+- TU fazes os testes (sem depender de testes manuais do utilizador).
+
+Contexto técnico:
+- Já existe infra de IA na app para visitas/notas (OpenAI/DeepSeek, possivelmente transcrição de áudio).
+- Leads já têm campo de descrição (string) que é mostrado e editado no formulário de lead (criação/edição).
+- Formulário de lead já está funcional (inclui marcasIds, contactos, etc.).
+
+Tarefas BACKEND (reutilizar o máximo possível):
+
+1) Reutilizar ou expor endpoints de IA já existentes:
+   - Verifica se já existe endpoint de transcrição de áudio (ex.: /api/ai/transcribe, /api/notes/transcribe ou similar).
+   - Verifica se existe algum endpoint de "resumo/melhoria" de texto (para visitas/notas).
+   - Se existirem, reusa-os diretamente para os leads (não dupliques lógica).
+   - Se NÃO existirem, cria endpoints mínimos para leads:
+     a) POST /api/ai/leads/transcribe
+        - Recebe ficheiro áudio (multipart/form-data, campo "file").
+        - Usa o mesmo serviço de IA configurado na app (Whisper/OpenAI/DeepSeek) para transcrever.
+        - Responde: { success: true, text: "texto transcrito..." } ou { success: false, message, details }.
+     b) (Opcional mas desejável) POST /api/ai/leads/summarize
+        - Recebe: { rawText: string, titulo?: string, marcas?: string[] }
+        - Usa o LLM para devolver texto mais estruturado/limpo.
+        - Responde: { success: true, text: "texto melhorado..." }.
+
+2) Garantir:
+   - Respeitar limites de tamanho de áudio e texto; se forem ultrapassados, devolver erro amigável.
+   - Fazer logs claros em caso de erro (sem stack trace bruto na resposta).
+   - Não mexer em nada de Odoo nem leads_marcas nesta fase.
+
+3) Criar testes automatizados simples:
+   - Um teste/unidade ou script que:
+     - Chame o endpoint de transcrição com um ficheiro áudio pequeno de teste (pode ser um blob dummy ou ficheiro curto em /tests/assets).
+     - Verifique que a resposta tem success: true e text não vazio (ou, se for dummy, que pelo menos não rebenta).
+   - Um teste para summarize (se criado) que:
+     - Envie um texto simples.
+     - Verifique que devolve success: true e text com algum conteúdo.
+
+Tarefas FRONTEND (Lead Form – criação e edição):
+
+4) Atualizar o formulário de Lead (criar/editar):
+   - Identificar o campo de texto usado para a descrição/contexto do lead (textarea).
+   - Adicionar dois botões pequenos junto ao label ou na barra superior do textarea:
+     a) Botão "🎙 Dictar" (áudio → texto):
+        - Ao clicar:
+          - Abre fluxo de captura de áudio do browser/telemóvel.
+          - Quando o utilizador termina, envia o blob para o endpoint de transcrição (preferir o de leads, se criado).
+          - Em sucesso:
+            - Inserir o texto transcrito no textarea de descrição:
+              - Se o campo estiver vazio, colocar o texto.
+              - Se já tiver texto, podes acrescentar com uma separação (ex.: "\n\n" + transcrição).
+          - Em erro:
+            - Mostrar toast com mensagem curta ("Falha na transcrição de áudio. Tenta novamente.").
+        - Desenhar o botão de forma compacta (ícone + texto curto), pensando em mobile.
+
+     b) Botão "✨ IA" (melhorar texto opcional):
+        - Ao clicar:
+          - Pega no conteúdo atual do textarea de descrição.
+          - Se estiver vazio, pode mostrar um toast a dizer "Não há texto para melhorar".
+          - Se tiver texto, chama o endpoint /api/ai/leads/summarize (ou equivalente) com o texto atual e, opcionalmente, titulo/marcas.
+          - Em sucesso:
+            - Substituir o texto do textarea pelo texto sugerido pela IA.
+          - Em erro:
+            - Mostrar toast com mensagem amigável.
+
+5) UX mobile:
+   - Os dois botões devem ser pequenos e não partir o layout do formulário em ecrãs pequenos:
+     - Podem estar em linha, à direita do label do campo "Descrição" ou numa barra pequena acima do textarea.
+   - Mostrar estado de loading:
+     - Enquanto a transcrição/summarização está a decorrer, desativar o botão correspondente e indicar "A transcrever..." / "A gerar...".
+
+6) Testes (feitos por TI, não pelo utilizador):
+   - Criar um lead de teste (em desenvolvimento) e:
+     - Usar o botão "✨ IA" com um texto simples → garantir que o campo descrição é atualizado.
+     - Simular (ou testar, se possível no navegador em dev) a transcrição:
+       - Verificar no console/logs que o pedido ao endpoint de transcrição é feito e que a resposta é aplicada no campo descrição.
+   - Se precisares de usar mocks para o áudio em ambiente de teste, usa-os; o importante é garantir que o fluxo não rebenta e atualiza o textarea.
+
+7) Relatório:
+   - No final, cria/atualiza um relatório breve (ex.: RELATORIO_FASE-LEADS-IA-01.txt) explicando:
+     - Que endpoints foram criados/reutilizados.
+     - Como o formulário de lead foi alterado (ficheiros principais).
+     - Como testaste o fluxo de IA (texto/áudio) e o resultado.
+
+IMPORTANTE:
+- Não mexer em anexos Odoo, nem em multi-CRM, nem em leads_marcas nesta fase.
+- Focar apenas em IA para o campo de descrição do lead (texto + áudio).

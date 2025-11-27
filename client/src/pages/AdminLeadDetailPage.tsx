@@ -6,10 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink, Mic, Wand2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Marca } from "@shared/schema";
@@ -121,6 +121,9 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [marcasSearch, setMarcasSearch] = useState("");
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const [transcribing, setTranscribing] = useState(false);
+  const [summarizing, setSummarizing] = useState(false);
 
   const { data: marcas = [] } = useQuery<Marca[]>({
     queryKey: ["/api/marcas", "onlyAtivas"],
@@ -143,6 +146,94 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
   });
 
   const [saving, setSaving] = useState(false);
+
+  // Handle audio transcription
+  const handleTranscribeAudio = async (file: File) => {
+    try {
+      setTranscribing(true);
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/crm/leads/ai/transcribe", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Failed to transcribe audio");
+      }
+
+      // Append transcribed text to description
+      const newDescription = form.descricao
+        ? form.descricao + "\n\n[Áudio transcritto]\n" + data.text
+        : data.text;
+
+      setForm((f) => ({ ...f, descricao: newDescription }));
+      toast({
+        title: "Áudio transcrito",
+        description: "Texto adicionado à descrição do lead.",
+      });
+    } catch (error: any) {
+      console.error("[Lead AI] Transcription error:", error);
+      toast({
+        title: "Falha na transcrição",
+        description: error?.message || "Não foi possível transcrever o áudio.",
+        variant: "destructive",
+      });
+    } finally {
+      setTranscribing(false);
+      if (audioInputRef.current) audioInputRef.current.value = "";
+    }
+  };
+
+  // Handle text summarization
+  const handleSummarizeText = async () => {
+    if (!form.descricao.trim()) {
+      toast({
+        title: "Sem texto",
+        description: "Não há texto para melhorar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setSummarizing(true);
+      const response = await fetch("/api/crm/leads/ai/summarize", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: form.descricao,
+          titulo: form.titulo,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Failed to summarize text");
+      }
+
+      setForm((f) => ({ ...f, descricao: data.text }));
+      toast({
+        title: "Texto melhorado",
+        description: "Descrição foi atualizada com a versão melhorada da IA.",
+      });
+    } catch (error: any) {
+      console.error("[Lead AI] Summarize error:", error);
+      toast({
+        title: "Falha ao melhorar texto",
+        description: error?.message || "Não foi possível melhorar o texto.",
+        variant: "destructive",
+      });
+    } finally {
+      setSummarizing(false);
+    }
+  };
 
   const handleChange =
     (field: keyof typeof form) =>
@@ -328,7 +419,44 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="lead-descricao">Descrição</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="lead-descricao">Descrição</Label>
+              <div className="flex gap-1">
+                <input
+                  ref={audioInputRef}
+                  type="file"
+                  accept="audio/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleTranscribeAudio(file);
+                  }}
+                  className="hidden"
+                  data-testid="input-lead-audio-upload"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => audioInputRef.current?.click()}
+                  disabled={transcribing}
+                  data-testid="button-lead-dictate"
+                >
+                  <Mic className="h-4 w-4 mr-1" />
+                  {transcribing ? "A transcrever..." : "Dictar"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleSummarizeText}
+                  disabled={summarizing || !form.descricao.trim()}
+                  data-testid="button-lead-enhance"
+                >
+                  <Wand2 className="h-4 w-4 mr-1" />
+                  {summarizing ? "A gerar..." : "IA"}
+                </Button>
+              </div>
+            </div>
             <Textarea
               id="lead-descricao"
               value={form.descricao}
