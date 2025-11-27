@@ -1,0 +1,79 @@
+FASE LEADS-EXT-02 – Multi-marcas por Lead (ligação ao catálogo)
+
+Contexto:
+- A tabela leads tem atualmente um campo string "marca".
+- Já existe um catálogo de marcas/representações usado noutras partes da app (ex.: visitas).
+- Queremos que um lead possa ter 1..N marcas ligadas ao catálogo, mantendo o campo texto marca apenas como resumo/compatibilidade.
+
+Objetivo:
+- Permitir associar várias marcas da app a cada lead (multi-select), tanto na criação como na edição.
+- Expor essas marcas na API e mostrá-las na UI (listas + detalhe).
+
+Tarefas BACKEND:
+
+1) Criar tabela de junção `leads_marcas` via Drizzle:
+   - Campos:
+     - id (uuid, pk, default gen_random_uuid())
+     - leadId (uuid, FK → leads.id, ON DELETE CASCADE)
+     - marcaId (uuid, FK → <tabela de marcas/representações>, ON DELETE RESTRICT)
+     - createdAt (timestamp, default now())
+   - Atualizar shared/schema.ts com:
+     - leadsMarcas table
+     - relations adequadas entre leads e marcas.
+
+2) Atualizar GET /api/crm/leads e GET /api/crm/leads/:id:
+   - Em ambos, incluir um array `marcas` em cada lead.
+   - Estrutura sugerida:
+     - { id: string; nome: string; sigla?: string; logoUrl?: string }
+   - Usa o mesmo tipo/estrutura de marcas que já é usado na criação de Visitas (para ser consistente).
+   - Garantir que isto respeita empresaId e não provoca N+1 exagerado (usar relations do Drizzle).
+
+3) Atualizar POST /api/crm/leads e PATCH /api/crm/leads/:id:
+   - Aceitar novo campo opcional `marcasIds?: string[]` no body.
+   - Na criação/edição:
+     - Limpar registos anteriores em leads_marcas para aquele lead.
+     - Se marcasIds existir e tiver valores:
+       - Inserir 1 registo em leads_marcas por cada marcaId.
+     - Atualizar ainda o campo texto leads.marca:
+       - Se marcasIds tiver valores:
+         - Buscar nomes das marcas correspondentes e guardar em marca algo como "Ritmonio, Bette".
+       - Se marcasIds vier vazio ou undefined:
+         - Manter o comportamento atual (campo marca pode continuar a ser usado como texto simples, se já existir).
+
+4) Sincronização com Odoo (sem grande refactor nesta fase):
+   - Em create/update de lead para Odoo (OdooClient.createLeadFromVmLead / updateLeadFromVmLead):
+     - Se o lead tiver marcas (array), gerar uma string com os nomes (ex.: "Ritmonio, Bette") e:
+       - Incluir essa string na description (por ex., prefixo "Marcas: ...") OU
+       - Preencher o campo texto marca do lead antes de chamar o OdooClient.
+   - Não é necessário mexer em campos custom de Odoo nesta fase, apenas enriquecer o texto.
+
+Tarefas FRONTEND:
+
+5) Formulário de Lead (criação e edição):
+   - No modal "Novo lead desta visita" e na página de detalhe /admin/leads/:id:
+     - Substituir o input texto simples de marca por um multi-select de marcas:
+       - Reutilizar o componente que já é usado para selecionar marcas/representações nas Visitas.
+       - O valor submetido deve ser `marcasIds: string[]`.
+   - UX mobile:
+       - Mostrar as marcas como chips/badges pequenos.
+       - Se houver muitas marcas, mostrar apenas 2–3 e um indicativo "+N".
+
+6) Listas de leads:
+   - Em /admin/leads e nas secções "Leads desta visita/entidade/contacto":
+     - Mostrar 1–2 badges de marcas por lead (sigla ou nome curto), para não poluir o card.
+     - Se o array de marcas estiver vazio, não mostrar nada (sem labels vazias).
+
+7) Compatibilidade:
+   - Garantir que:
+     - Leads antigos, que só têm o campo texto marca, continuam a aparecer (sem crash).
+     - Se um lead antigo for editado e escolher marcas no multi-select:
+       - Essas marcas passam a ser guardadas em leads_marcas.
+       - O campo texto marca é sincronizado com os nomes escolhidos.
+
+Checklist final:
+- [ ] DB: tabela leads_marcas criada e migrada (não esquecer npm run db:push).
+- [ ] GET /api/crm/leads e /:id devolvem marcas[].
+- [ ] POST/PATCH aceitam marcasIds e atualizam leads_marcas + campo marca.
+- [ ] Form de lead usa multi-select de marcas (mobile-friendly).
+- [ ] Listas mostram badges de marcas de forma compacta.
+- [ ] Sincronização com Odoo continua a funcionar, agora com descrição/summary enriquecida com marcas.
