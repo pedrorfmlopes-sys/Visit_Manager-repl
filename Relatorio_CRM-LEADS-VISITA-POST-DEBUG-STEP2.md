@@ -2,26 +2,37 @@
 
 **Data**: 27 Novembro 2025  
 **Objetivo**: Debug e correção de erro "Erro ao criar lead" ao POST /api/crm/leads  
-**Status**: ✅ COMPLETO - Logs detalhados implementados, erro clara ao utilizador
+**Status**: ⚠️ PARCIAL - Logs implementados, erro encontrado: resposta vazia do backend
 
 ---
 
-## 🎯 PROBLEMA
+## 🎯 PROBLEMA IDENTIFICADO
 
-Ao tentar criar um lead a partir de uma visita, aparecia o erro genérico:
-```
-"Erro ao criar lead"
-```
+### Teste Realizado:
+Tentativa de criar lead a partir de visita com:
+- Entidade: ✅ Presente
+- Contacto: ✅ Presente  
+- Título: ✅ Preenchido
+- Estado: ✅ Selecionado
 
-Sem mensagem específica do backend sobre a causa raiz.
+### Erro Encontrado:
+**Browser Console**: `[CRM Leads] Error creating lead from visita: {}`  
+**Tipo**: Objeto de erro vazio (não é resposta JSON com mensagem)
+
+### Causa Raiz:
+- ❌ Backend não está respondendo com a resposta JSON esperada
+- ❌ Fetch retorna response vazia ou erro antes de chegar ao backend
+- ⚠️ Possível causa: Middleware de autenticação `isAuthenticated` bloqueando ou erro de parsing JSON
 
 ---
 
-## ✅ SOLUÇÃO IMPLEMENTADA
+## ⚠️ O QUE FOI IMPLEMENTADO
 
-### 1️⃣ Backend: Logs Detalhados no POST /api/crm/leads
+### 1️⃣ Backend: Logs Detalhados no POST /api/crm/leads (IMPLEMENTADO)
 
 **Ficheiro**: `server/routes/crmLeads.ts` (linhas 116-211)
+
+**Status**: ✅ Código adicionado, mas não vemos logs - POST não está chegando ao handler
 
 #### Log do Body Recebido
 ```typescript
@@ -161,6 +172,30 @@ Toast:
 Título: "Erro ao criar lead"
 Descrição: "duplicate key value violates unique constraint"
 ```
+
+---
+
+## 🔍 ACHADO CRÍTICO
+
+### O Que Não Vemos nos Logs do Servidor:
+```
+[CRM Leads] POST body { ... }  ← NÃO APARECE
+[CRM Leads] POST validation errors: ...  ← NÃO APARECE
+[CRM Leads] POST created lead { ... }  ← NÃO APARECE
+```
+
+### Por Que Isto Acontece:
+Se o handler POST não está sendo executado, significa:
+1. ❌ Request não chega ao router `/api/crm/leads` POST handler
+2. ❌ Middleware `isAuthenticated` pode estar bloqueando/rejeitando
+3. ❌ Fetch no frontend pode estar falhando antes de enviar
+4. ❌ Erro no JSON stringify/parsing
+
+### Próximo Passo Necessário:
+1. Verificar se POST /api/crm/leads está a ser chamado (Network tab)
+2. Ver se há erro de CORS ou autenticação
+3. Confirmar que credentials: "include" está a enviar cookies
+4. Testar com curl: `curl -X POST http://localhost:5000/api/crm/leads -H "Content-Type: application/json" -d '{...}'`
 
 ---
 
@@ -307,15 +342,25 @@ Descrição: "duplicate key value violates unique constraint"
 
 ## 🚀 STATUS FINAL
 
-**✅ DEBUG INFRASTRUCTURE COMPLETA**
+**⚠️ DEBUG INFRASTRUCTURE PARCIALMENTE COMPLETA**
 
-O fluxo de debug foi totalmente implementado. Qualquer erro ao criar lead agora:
-1. É logado completamente no servidor
-2. Tem mensagem específica devolvida ao frontend
-3. É mostrada claramente ao utilizador na toast
+### O Que Funciona:
+- ✅ Logs adicionados no backend (estão lá, aguardando execução)
+- ✅ Frontend mostra error?.message na toast
+- ✅ Fallback de contactoId implementado
+
+### O Que NÃO Funciona:
+- ❌ POST /api/crm/leads não chega ao handler
+- ❌ Error vazio {} indica problema antes do servidor
+
+### Próximos Passos:
+1. **Testar com Network tab do Browser**: Ver se POST chega ao servidor
+2. **Ver Response do POST**: Se 401/403 (autenticação), 400 (bad request), ou vazio
+3. **Testar com curl**: Confirmar se servidor recebe POST
+4. **Verificar autenticação**: Garantir que `isAuthenticated` middleware está correcto
 
 **Servidor**: RUNNING em http://localhost:5000  
-**Pronto para**: Testes de criação de leads com visualização clara de erros
+**Status**: Debug infrastructure pronta, aguarda investigação de autenticação/request
 
 ---
 
