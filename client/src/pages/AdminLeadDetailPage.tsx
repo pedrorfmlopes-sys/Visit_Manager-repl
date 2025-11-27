@@ -158,7 +158,16 @@ export default function AdminLeadDetailPage() {
           variant="ghost"
           size="icon"
           onClick={() => {
-            const target = isCreateMode && returnTo ? returnTo : "/admin/leads";
+            const target = visitaIdFromQuery
+              ? `/admin/visitas/${visitaIdFromQuery}`
+              : "/admin/leads";
+
+            console.log("[AdminLeadDetail] header back target:", {
+              visitaIdFromQuery,
+              returnTo,
+              target,
+            });
+
             setLocation(target);
           }}
           data-testid="button-voltar-leads"
@@ -391,14 +400,19 @@ function LeadDetailForm({
           visitaId && queryClient.invalidateQueries({ queryKey: ["/api/crm/leads", { visitaId }] }),
         ]);
 
-        // BUG-FIX: Navigate to returnTo (now decoded) if provided, otherwise fallback
-        if (returnTo) {
-          navigate(returnTo);
-        } else if (visitaId) {
-          navigate(`/admin/visitas/${visitaId}`);
-        } else {
-          navigate(`/admin/leads/${createdId}`);
-        }
+        // BUG-FIX: Navigate based on visitaId priority (if created from visita)
+        const target = visitaId
+          ? `/admin/visitas/${visitaId}`
+          : `/admin/leads/${createdId}`;
+
+        console.log("[AdminLeadDetail] handleSave target:", {
+          visitaId,
+          returnTo,
+          createdId,
+          target,
+        });
+
+        navigate(target);
       } else {
         // Edit mode - stay on page and invalidate queries
         await Promise.all([
@@ -765,7 +779,16 @@ function LeadDetailForm({
           <Button
             variant="outline"
             onClick={() => {
-              const target = isCreateMode && returnTo ? returnTo : "/admin/leads";
+              const target = visitaId
+                ? `/admin/visitas/${visitaId}`
+                : "/admin/leads";
+
+              console.log("[AdminLeadDetail] cancel target:", {
+                visitaId,
+                returnTo,
+                target,
+              });
+
               navigate(target);
             }}
             data-testid="button-cancelar-lead"

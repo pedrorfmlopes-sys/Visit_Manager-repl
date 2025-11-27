@@ -1,0 +1,104 @@
+Quero corrigir em definitivo a navegação depois de criar/cancelar um lead.
+
+Objetivo funcional:
+- Se o formulário de lead foi aberto a partir de uma visita (ou seja, a URL tem `visitaId` nos query params), então:
+  - Depois de **Guardar** o lead novo → voltar SEMPRE para `/admin/visitas/:visitaId`
+  - Ao carregar em **Cancelar** ou no botão **Voltar \<** no header → voltar SEMPRE para `/admin/visitas/:visitaId`
+- Se NÃO houver `visitaId` nos query params:
+  - Depois de **Guardar** em `/admin/leads/new` → navegar para `/admin/leads/:id` do lead criado
+  - Em **Cancelar** → ir para `/admin/leads`
+  - Em **Voltar \<** → ir para `/admin/leads`
+
+Implementação técnica:
+
+1) Ficheiro: `client/src/pages/AdminLeadDetailPage.tsx`
+
+   - Garante que já existem estas variáveis no topo do componente:
+     ```ts
+     const [location, setLocation] = useLocation();
+     const searchParams = new URLSearchParams(location.split("?")[1] || "");
+     const visitaId = searchParams.get("visitaId");
+     const rawReturnTo = searchParams.get("returnTo");
+     const returnTo = rawReturnTo ? decodeURIComponent(rawReturnTo) : null;
+     const isCreateMode = id === "new";
+     ```
+
+2) Atualizar o handler de **Guardar** (onde é feito o POST / PATCH, na função `handleSave`):
+
+   - No ramo de `POST` (create mode), substituir o bloco de navegação atual por:
+
+     ```ts
+     // depois de receber o createdId do backend
+     const target =
+       visitaId
+         ? `/admin/visitas/${visitaId}`
+         : `/admin/leads/${createdId}`;
+
+     console.log("[AdminLeadDetail] handleSave target:", {
+       visitaId,
+       returnTo,
+       createdId,
+       target,
+     });
+
+     navigate(target);
+     ```
+
+   - Não usar mais `returnTo` aqui. A prioridade é:
+     - 1º: se veio de visita → `/admin/visitas/:visitaId`
+     - 2º: senão → `/admin/leads/:createdId`
+
+3) Atualizar o botão **Voltar \<** no header:
+
+   - Procurar o local onde é renderizado o botão de voltar (linha ~160, conforme relatórios anteriores).
+   - Substituir o `onClick` por:
+
+     ```tsx
+     onClick={() => {
+       const target = visitaId
+         ? `/admin/visitas/${visitaId}`
+         : "/admin/leads";
+
+       console.log("[AdminLeadDetail] header back target:", {
+         visitaId,
+         returnTo,
+         target,
+       });
+
+       setLocation(target);
+     }}
+     ```
+
+4) Atualizar o botão **Cancelar** no footer do formulário:
+
+   - No `<Button variant="outline" ...>` de Cancelar, trocar o `onClick` por:
+
+     ```tsx
+     onClick={() => {
+       const target = visitaId
+         ? `/admin/visitas/${visitaId}`
+         : "/admin/leads";
+
+       console.log("[AdminLeadDetail] cancel target:", {
+         visitaId,
+         returnTo,
+         target,
+       });
+
+       navigate(target);
+     }}
+     ```
+
+5) Garantir que não ficou nenhum `navigate(returnTo)` nem `setLocation(returnTo)` em
+   `AdminLeadDetailPage.tsx`. A navegação deve usar apenas `visitaId` (quando existir) ou as rotas de leads.
+
+6) No final:
+   - Corre `npm run dev`
+   - Testar exatamente este fluxo:
+     1. Ir a `/admin/visitas/:id` com entidade + contacto.
+     2. Clicar “Novo lead desta visita”.
+     3. Preencher título + contacto.
+     4. Guardar.
+        - Esperado: voltar para `/admin/visitas/:id`, sem 404, e ver o lead na lista da visita.
+     5. Repetir o teste mas agora clicar **Cancelar** em vez de Guardar.
+        - Esperado: voltar para `/admin/visitas/:id`, sem 404.
