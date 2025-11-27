@@ -470,6 +470,11 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
                 </Button>
               </div>
             </div>
+            {audio.isRecording && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                A gravar há {audio.recordingSeconds}s
+              </p>
+            )}
             <Textarea
               id="lead-descricao"
               value={form.descricao}

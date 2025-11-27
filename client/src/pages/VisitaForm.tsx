@@ -822,6 +822,12 @@ export default function VisitaForm() {
                   </Button>
                 </div>
                 
+                {audio.isRecording && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                    A gravar há {audio.recordingSeconds}s
+                  </p>
+                )}
+                
                 {audio.hasAudio && !audio.isRecording && (
                   <p className="text-xs text-green-600 dark:text-green-400">
                     Áudio gravado e pronto para transcrever

@@ -1,0 +1,209 @@
+================================================================================
+RELATORIO: FASE-AUDIO-CORE-05-UI - Timer Visual na UI
+================================================================================
+
+Data: 27 Novembro 2025
+Status: ✅ COMPLETO
+Objetivo: Mostrar timer visual "A gravar há Xs" enquanto isRecording === true
+
+================================================================================
+1. MUDANÇAS IMPLEMENTADAS
+================================================================================
+
+✓ VisitaForm.tsx - Ditar Anotações
+  Localização: Pós-botões de áudio (CardContent)
+  Conteúdo: <p>A gravar há {audio.recordingSeconds}s</p>
+  Condição: audio.isRecording === true
+  Styling: text-amber-600 dark:text-amber-400 font-medium (aviso visual)
+  
+  Lógica:
+  - Quando user clica "Gravar" → isRecording vira true
+  - Timer renderiza: "A gravar há 0s"
+  - A cada segundo: "A gravar há 1s", "A gravar há 2s", etc.
+  - Quando user clica "Parar" → isRecording vira false
+  - Timer desaparece
+  - Mensagem "Áudio gravado e pronto para transcrever" aparece
+
+✓ AdminLeadDetailPage.tsx - Descrição do Lead
+  Localização: Pré-Textarea (espaço reservado antes do input)
+  Conteúdo: <p>A gravar há {audio.recordingSeconds}s</p>
+  Condição: audio.isRecording === true
+  Styling: text-amber-600 dark:text-amber-400 font-medium (aviso visual)
+  
+  Lógica:
+  - Idêntica à VisitaForm
+  - Timer renderiza enquanto grava
+  - Desaparece quando pára
+
+================================================================================
+2. CORES E STYLING
+================================================================================
+
+Cor escolhida: AMBER (amarelo/laranja)
+- text-amber-600 (light mode)
+- dark:text-amber-400 (dark mode)
+- Font: font-medium (ligeiramente mais destacado)
+
+Justificação:
+- GREEN é usado para "Áudio gravado pronto" (estado final)
+- AMBER usado para "A gravar" (estado transitório/em curso)
+- Diferencia claramente os dois estados
+- Ambos visíveis em light e dark mode
+
+================================================================================
+3. COMPORTAMENTO UX
+================================================================================
+
+Fluxo ANTES:
+1. Clica "Gravar"
+2. Botão fica vermelho
+3. ???
+4. Clica "Parar"
+
+Fluxo DEPOIS:
+1. Clica "Gravar"
+2. Botão fica vermelho
+3. Timer aparece: "A gravar há 0s" → "A gravar há 1s" → "A gravar há 2s" ...
+4. User vê tempo decorrido em tempo real
+5. Clica "Parar"
+6. Timer desaparece
+7. Mensagem verde: "Áudio gravado e pronto para transcrever"
+
+Benefício: User sabe CLARAMENTE que está a gravar e há quanto tempo
+
+================================================================================
+4. DADOS TÉCNICOS
+================================================================================
+
+Hook já fornecia:
+- audio.recordingSeconds: number (0, 1, 2, 3, ...)
+- audio.isRecording: boolean
+- recordingSeconds resetado a 0 quando stopRecording() chamado
+
+Componentes:
+- VisitaForm: Renderiza conditional "A gravar há Xs"
+- AdminLeadDetailPage: Renderiza conditional "A gravar há Xs"
+
+Não foi necessário:
+✓ Alterar hook (já expunha tudo)
+✓ Alterar backend
+✓ Alterar estado dos componentes
+✓ Alterar handlers
+
+================================================================================
+5. FICHEIROS MODIFICADOS
+================================================================================
+
+1. client/src/pages/VisitaForm.tsx
+   - Linhas: +5 (conditional render do timer)
+   - Adicionado ANTES de "Áudio gravado pronto" message
+
+2. client/src/pages/AdminLeadDetailPage.tsx
+   - Linhas: +4 (conditional render do timer)
+   - Adicionado ANTES de Textarea input
+
+================================================================================
+6. TESTES RECOMENDADOS
+================================================================================
+
+VISITAS:
+1. Abrir /visitas/nova
+2. Clicar "Gravar"
+   ✓ Botão fica vermelho (destructive variant)
+   ✓ Aparece "A gravar há 0s"
+   ✓ Incrementa cada segundo: 1s, 2s, 3s...
+3. Clicar "Parar"
+   ✓ Botão volta normal
+   ✓ Timer desaparece
+   ✓ Aparece "Áudio gravado e pronto para transcrever" (verde)
+
+LEADS:
+1. Abrir /admin/leads/[id]
+2. Clicar "Dictar"
+   ✓ Botão fica vermelho
+   ✓ Aparece "A gravar há 0s"
+   ✓ Incrementa: 1s, 2s, 3s...
+3. Clicar "Parar"
+   ✓ Botão volta normal
+   ✓ Timer desaparece
+   ✓ Mensagem de sucesso (verde) aparece
+
+DARK MODE:
+- Cores amber visíveis em ambos light/dark?
+- Contraste adequado?
+
+================================================================================
+7. NOTAS TÉCNICAS
+================================================================================
+
+Por que AMBER em vez de outra cor?
+- RED: Conflito com "Parar" button (destructive)
+- GREEN: Reservado para "Áudio gravado" (estado final, pronto)
+- BLUE: Muito suave para timer ativo
+- AMBER: Perfeito - indica ação em curso, temporário
+
+Por que colocado ANTES de "Áudio gravado"?
+- Ambos são condicionais:
+  - isRecording === true → "A gravar há Xs"
+  - hasAudio && !isRecording === true → "Áudio gravado pronto"
+- Nunca aparecem simultaneamente
+- Ordem clara: ativo (AMBER) → concluído (GREEN)
+
+================================================================================
+8. INTEGRAÇÃO COM FASE-AUDIO-CORE-04
+================================================================================
+
+FASE-04 entregou:
+✓ Hook com recordingSeconds
+✓ Error handling em handlers
+✓ Endpoint correto
+
+FASE-05 adiciona:
+✓ UI visual do timer
+✓ User feedback visual durante gravação
+
+Combinação:
+✓ Fase-04: Lógica + dados
+✓ Fase-05: Visualização
+
+================================================================================
+STATUS FINAL
+================================================================================
+
+✅ Timer visual em VisitaForm
+✅ Timer visual em AdminLeadDetailPage
+✅ Cores diferenciadas (amber p/ ativo, green p/ pronto)
+✅ Comportamento UX claro
+✅ Dark mode suportado
+✅ Zero alterações ao hook
+✅ Zero alterações ao backend
+
+PRÓXIMA FASE:
+- Testar em navegador
+- Verificar cores em dark mode
+- Confirmar incremento de segundos
+
+STATUS: 🟢 PRONTO PARA TESTE
+
+================================================================================
+FIM - FASE-AUDIO-CORE-05 COMPLETA
+================================================================================
+
+Versao: 1.0 - Timer Visual UI
+Data: 27 Novembro 2025
+Objetivo: ✅ Mostrar timer "A gravar há Xs" durante gravação
+Status: PRONTO
+
+Features:
+✓ Timer real-time: 0s → 1s → 2s ...
+✓ Cores diferenciadas (amber p/ ativo)
+✓ Ambos módulos (Visitas + Leads)
+✓ Dark mode support
+✓ Mensagem desaparece quando para
+
+USABILIDADE:
+- User VIRA que está a gravar
+- User VÊ o tempo decorrido
+- User CLARAMENTE entende o estado
+
+================================================================================
