@@ -1,0 +1,109 @@
+Quero que arrumes DEFINITIVAMENTE o sistema de áudio + transcrição, criando um módulo verdadeiramente reutilizável e alinhando VISITAS e LEADS com esse módulo.
+
+O que eu quero em termos de arquitetura:
+
+1) FRONTEND – Hook único useAudioTranscription
+   - Ficheiro: client/src/hooks/useAudioTranscription.ts
+   - O hook deve ter esta interface:
+
+     export function useAudioTranscription(opts?: { endpoint?: string }) {
+       return {
+         isRecording: boolean;
+         isTranscribing: boolean;
+         hasAudio: boolean;
+         startRecording: () => void;
+         stopRecording: () => void;
+         transcribe: () => Promise<string>;            // usa o áudio gravado (MediaRecorder)
+         selectFileAndTranscribe: () => Promise<string>; // fluxo de escolher ficheiro
+       };
+     }
+
+   - Internamente:
+     - Implementar toda a lógica de MediaRecorder/getUserMedia.
+     - Guardar o Blob gravado.
+     - Chamar SEMPRE o mesmo endpoint backend de transcrição (por defeito: "/api/ai/transcribe-audio").
+     - Nunca ter código específico de Visita ou Lead aqui.
+
+2) BACKEND – Endpoint único de transcrição
+   - Criar (ou usar, se já existir) endpoint:
+
+     POST /api/ai/transcribe-audio
+
+   - Este endpoint deve:
+     - Aceitar multipart/form-data com campo "file".
+     - Usar transcribeAudio() de server/openai.ts (função já existente, usada nas visitas).
+     - Devolver SEMPRE JSON:
+       - Sucesso: { success: true, text: "..." }
+       - Erro: { success: false, message: "..." }
+
+   - Não quero endpoints diferentes para visitas e leads. Se existirem endpoints antigos como /api/crm/leads/ai/transcribe ou /api/visitas/ai/transcribe, eles podem simplesmente fazer proxy interno para este endpoint comum ou ser removidos se já não forem usados.
+
+3) VISITAS – Usar apenas o hook
+   - No componente VisitaForm (client/src/pages/VisitaForm.tsx):
+     - Importar e usar useAudioTranscription.
+     - Garantir que as variáveis de JSX (isRecording, etc.) vêm do hook:
+
+       const {
+         isRecording,
+         isTranscribing,
+         hasAudio,
+         startRecording,
+         stopRecording,
+         transcribe,
+         selectFileAndTranscribe,
+       } = useAudioTranscription();
+
+     - Botão “Dictar”:
+       - Usa isRecording / startRecording / stopRecording.
+     - Botão “Transcrever áudio”:
+       - Só ativo se hasAudio === true.
+       - Ao clicar:
+         - chama transcribe()
+         - em sucesso, acrescenta o texto ao campo notas/descrição da visita.
+     - Botão “Ficheiro”:
+       - Usa selectFileAndTranscribe() para transcrever a partir de um ficheiro escolhido.
+
+     - CORRIGIR o erro atual "isRecording is not defined" garantindo que todo o JSX usa o hook, e não variáveis soltas.
+
+4) LEADS – Usar o mesmo hook e o mesmo endpoint
+   - No AdminLeadDetailPage.tsx (formulário de edição de lead):
+     - Importar e usar useAudioTranscription com o MESMO endpoint (não quero pipeline diferente).
+
+       const audio = useAudioTranscription(); // ou useAudioTranscription({ endpoint: "/api/ai/transcribe-audio" });
+
+     - Botão “Dictar” → igual ao das visitas.
+     - Botão “Transcrever áudio”:
+       - Chama audio.transcribe(), recebe texto e acrescenta ao campo "descricao" do lead.
+     - Botão “Ficheiro” → usa audio.selectFileAndTranscribe().
+     - O botão “IA” (summarize) deve continuar a funcionar como está.
+
+   - O importante é:
+     - LEADS já não usam um endpoint próprio /ai/transcribe que devolve HTML ou estruturas estranhas.
+     - Apenas usam o endpoint JSON comum "/api/ai/transcribe-audio".
+
+5) Erros de JSON tipo "<!DOCTYPE..." nos leads
+   - Garante que o hook useAudioTranscription:
+     - verifica res.ok,
+     - se não for JSON, lê res.text() e gera uma Error decente,
+     - mas o endpoint backend comum NUNCA deve devolver HTML. Se a rota não existir, cria-a; se estiver a rebentar, corrige-a.
+
+6) Testes (feitos por ti):
+   - VISITAS:
+     - Criar/editar visita → gravar áudio → transcrever → texto aparece nas notas.
+   - LEADS:
+     - Editar lead → gravar áudio → transcrever → texto aparece na descrição.
+   - Upload de ficheiro deve funcionar em ambos.
+   - Não deve haver mais erros:
+     - "isRecording is not defined"
+     - "Unexpected token '<', '<!DOCTYPE' is not valid JSON"
+
+7) Relatório
+   - Criar um relatório curto, ex.: RELATORIO_FASE-IA-AUDIO-MODULO-UNICO.txt
+   - Explicar:
+     - Onde está o hook partilhado.
+     - Qual o endpoint comum usado.
+     - Como VISITAS e LEADS usam esse módulo agora.
+
+NÃO mexer:
+- Em Odoo, marcas, anexos, nem noutros módulos.
+- Em lógica de summarize (botão IA). Só áudio + transcrição.
