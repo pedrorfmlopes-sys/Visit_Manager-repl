@@ -1,0 +1,58 @@
+Tenho um bug de navegação após criar ou cancelar um lead.
+
+Reprodução:
+1) Vou a /admin/visitas/:visitaId (visita com entidade + contacto).
+2) Clico em "Novo lead desta visita" → abre /admin/leads/new com:
+   visitaId, entidadeId, contactoId e returnTo=%2Fadmin%2Fvisitas%2F...
+3) Preencho o formulário e clico "Guardar alterações" (ou clico "Cancelar").
+4) Resultado: aparece o toast "Lead criado. Novo lead foi criado.", mas a
+   navegação vai para uma página interna "404 Page Not Found".
+
+Quero que corrijas a lógica do returnTo:
+
+1. Em client/src/pages/VisitaDetail.tsx
+   - Mantém a construção da URL com:
+       returnTo = encodeURIComponent(`/admin/visitas/${visita.id}`);
+   - Garante apenas que o parâmetro chama-se mesmo "returnTo".
+
+2. Em client/src/pages/AdminLeadDetailPage.tsx
+   - Ao ler a query string, faz algo deste género:
+
+       const [location, navigate] = useLocation();
+       const search = useSearch();
+       const params = new URLSearchParams(search);
+       const rawReturnTo = params.get("returnTo");
+       const returnTo = rawReturnTo ? decodeURIComponent(rawReturnTo) : null;
+
+   - Usa sempre esta variável `returnTo` normalizada:
+       * no botão de voltar do header ("< Voltar"),
+       * no botão "Cancelar",
+       * e no pós-sucesso do handleSave (create mode).
+
+     Exemplo de fallback no handleSave (create mode):
+
+       if (isCreateMode) {
+         // depois do POST bem-sucedido
+         navigate(
+           returnTo ||
+           (visitaIdFromQuery ? `/admin/visitas/${visitaIdFromQuery}` : `/admin/leads/${created.id}`)
+         );
+       }
+
+3. Garante que não há nenhum sítio a fazer `navigate` com a string
+   codificada (tipo "%2Fadmin%2Fvisitas%2F..."). Se houver, passa sempre
+   por decodeURIComponent primeiro.
+
+4. Testes a fazer:
+   - Criar lead a partir de uma visita:
+       /admin/visitas/:id → "Novo lead desta visita" → guardar
+       → deve voltar para /admin/visitas/:id sem 404 e o novo lead deve
+         aparecer no card "Leads desta visita".
+   - Clicar "Cancelar" em /admin/leads/new vindo de uma visita:
+       → deve voltar para a mesma visita (sem 404).
+   - Aceder diretamente a /admin/leads/new (sem returnTo):
+       → Guardar deve ir para /admin/leads/:id
+       → Cancelar/Voltar deve ir para /admin/leads (lista geral).
+
+Por favor faz a correção, valida estes 3 cenários e deixa um pequeno relatório
+com os ficheiros e linhas alterados.

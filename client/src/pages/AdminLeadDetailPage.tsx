@@ -53,7 +53,8 @@ export default function AdminLeadDetailPage() {
   const visitaIdFromQuery = searchParams.get("visitaId");
   const entidadeId = searchParams.get("entidadeId");
   const contactoIdFromQuery = searchParams.get("contactoId");
-  const returnTo = searchParams.get("returnTo");
+  const rawReturnTo = searchParams.get("returnTo");
+  const returnTo = rawReturnTo ? decodeURIComponent(rawReturnTo) : null;
   const isCreateMode = id === "new";
   const hasContext = isCreateMode && !!entidadeId && !!contactoIdFromQuery;
 
@@ -156,7 +157,10 @@ export default function AdminLeadDetailPage() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setLocation(isCreateMode && returnTo ? returnTo : "/admin/leads")}
+          onClick={() => {
+            const target = isCreateMode && returnTo ? returnTo : "/admin/leads";
+            setLocation(target);
+          }}
           data-testid="button-voltar-leads"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -387,9 +391,11 @@ function LeadDetailForm({
           visitaId && queryClient.invalidateQueries({ queryKey: ["/api/crm/leads", { visitaId }] }),
         ]);
 
-        // Navigate to returnTo if provided, otherwise to the created lead
+        // BUG-FIX: Navigate to returnTo (now decoded) if provided, otherwise fallback
         if (returnTo) {
           navigate(returnTo);
+        } else if (visitaId) {
+          navigate(`/admin/visitas/${visitaId}`);
         } else {
           navigate(`/admin/leads/${createdId}`);
         }
@@ -758,7 +764,10 @@ function LeadDetailForm({
         <CardFooter className="flex justify-between">
           <Button
             variant="outline"
-            onClick={() => navigate("/admin/leads")}
+            onClick={() => {
+              const target = isCreateMode && returnTo ? returnTo : "/admin/leads";
+              navigate(target);
+            }}
             data-testid="button-cancelar-lead"
           >
             Cancelar
