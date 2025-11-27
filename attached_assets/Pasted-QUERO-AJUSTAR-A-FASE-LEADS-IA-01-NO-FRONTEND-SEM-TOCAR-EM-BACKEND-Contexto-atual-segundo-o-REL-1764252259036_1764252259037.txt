@@ -1,0 +1,128 @@
+QUERO AJUSTAR A FASE LEADS-IA-01 NO FRONTEND, SEM TOCAR EM BACKEND.
+
+Contexto atual (segundo o RELATORIO_FASE-LEADS-IA-01):
+- Já existem endpoints:
+  - POST /api/crm/leads/ai/transcribe (multipart com "file")
+  - POST /api/crm/leads/ai/summarize (JSON)
+- No frontend (client/src/pages/AdminLeadDetailPage.tsx):
+  - Há um botão "Dictar" (ícone Mic) que:
+    - Abre um input type="file" escondido (input-lead-audio-upload)
+    - O utilizador escolhe um ficheiro de áudio (mp3, wav, webm, etc.)
+    - handleTranscribeAudio envia esse ficheiro para /api/crm/leads/ai/transcribe
+    - O texto transcrito é acrescentado ao campo descrição
+  - Há um botão "IA" (ícone Wand2) para melhorar texto.
+- Ou seja, hoje o fluxo é: "Dictar" = escolher ficheiro de áudio. (Ver RELATORIO_FASE-LEADS-IA-01)
+  (Não existe ainda gravação direta de áudio no browser.)
+
+O que EU quero agora:
+
+1) Manter a opção de upload de ficheiro (file picker) COMO EXTRA.
+2) Adicionar **gravação direta de áudio** a partir do microfone do browser/telemóvel:
+   - Carregar no botão de micro → começa a gravar (usando MediaRecorder / getUserMedia).
+   - Carregar novamente → pára, envia o áudio gravado para /api/crm/leads/ai/transcribe.
+   - O texto transcrito continua a ser acrescentado à descrição como já fazes hoje.
+   - UX simples e mobile-friendly.
+
+Quero que faças isto em PASSOS PEQUENOS, apenas no ficheiro AdminLeadDetailPage.tsx, sem mexer no backend.
+
+Tarefas concretas (Frontend, LeadDetailForm):
+
+1) Refatorar handleTranscribeAudio para suportar um Blob diretamente
+   - Atualmente, handleTranscribeAudio recebe o ficheiro vindo do input file.
+   - Cria uma função auxiliar, por exemplo `async function transcribeBlob(blob: Blob)`, que:
+     - Cria um FormData
+     - Faz fetch POST para /api/crm/leads/ai/transcribe (como já fazes hoje)
+     - Em sucesso: acrescenta o texto transcrito ao campo descrição e mostra toast
+     - Em erro: mostra toast e limpa estados de loading
+   - Ajustar o handler atual do input file para usar esta função:
+     - Ao selecionar ficheiro: chamar transcribeBlob(file).
+
+2) Adicionar estado e refs para gravação direta via MediaRecorder:
+   - Adicionar:
+     - `const [isRecording, setIsRecording] = useState(false);`
+     - `const mediaRecorderRef = useRef<MediaRecorder | null>(null);`
+     - `const mediaStreamRef = useRef<MediaStream | null>(null);`
+   - Criar uma função `startRecording()` que:
+     - Verifica se `navigator.mediaDevices && navigator.mediaDevices.getUserMedia` existem.
+     - Tenta `getUserMedia({ audio: true })`.
+     - Cria um `MediaRecorder(stream)`:
+       - Guarda o stream em `mediaStreamRef.current`.
+       - Guarda o mediaRecorder em `mediaRecorderRef.current`.
+       - Acumula chunks num array local.
+       - No evento `ondataavailable`, push para o array.
+       - No evento `onstop`, cria:
+         - `const blob = new Blob(chunks, { type: "audio/webm" });`
+         - Chama `transcribeBlob(blob)`.
+         - Pára todas as tracks: `mediaStreamRef.current?.getTracks().forEach(t => t.stop());`
+         - Limpa refs e estado (`setIsRecording(false)`).
+     - Se `getUserMedia` falhar:
+       - Faz fallback: abre o input file atual (como hoje), para não quebrar a funcionalidade.
+       - Mostra toast suave a dizer que não foi possível aceder ao micro.
+
+   - Criar uma função `stopRecording()` que:
+     - Chama `mediaRecorderRef.current?.stop();`
+     - O resto é tratado pelo handler `onstop`.
+
+3) Alterar o comportamento do botão "Dictar":
+   - Hoje:
+     - Clica → dispara click no input file (file picker).
+   - Novo comportamento:
+     - Se **NÃO** estiver a gravar (`!isRecording`):
+       - Tentar `startRecording()`.
+     - Se **já** estiver a gravar (`isRecording === true`):
+       - Chamar `stopRecording()`.
+   - Label/estado do botão:
+     - Quando não está a gravar:
+       - Texto: "Dictar"
+       - Ícone Mic normal
+     - Quando está a gravar:
+       - Texto: "A gravar..."
+       - Ícone Mic com variação visual (por ex. cor diferente) ou mesmo ícone Mic mas pode ficar com variant="destructive" ou similar.
+     - Durante a transcrição (loading) podes reutilizar o estado `transcribing` que já tens:
+       - Se estiver a transcrever, desabilitar o botão e mostrar "A transcrever...".
+
+4) Manter a opção de upload de ficheiro como alternativa:
+   - O input hidden `input-lead-audio-upload` deve continuar a existir, para quem quiser carregar ficheiro manualmente.
+   - Adicionar um pequeno botão secundário ao lado do "Dictar", por exemplo um ícone de Upload ou texto "Ficheiro":
+     - Clicar nesse botão → faz o comportamento antigo: `audioInputRef.current?.click()`.
+     - Este botão deve ser visualmente discreto (size="icon" ou "sm"), para não poluir o layout em mobile.
+   - Assim ficas com:
+     - Botão principal "Dictar" = gravar/parar.
+     - Botão pequeno extra "Upload" = abre file picker (comportamento anterior).
+     - Botão "IA" = melhorar texto (já implementado, não mexer).
+
+5) UX e estados:
+   - Garantir que não há conflito entre `isRecording` e `transcribing`:
+     - Não permitir começar nova gravação enquanto está a decorrer uma transcrição (podes desabilitar o botão se transcribing === true).
+   - Se o utilizador navegar para fora da página enquanto está a gravar:
+     - Tenta parar o MediaRecorder no unmount (useEffect cleanup), para não deixar o micro aberto:
+       - `useEffect(() => () => { mediaRecorderRef.current?.stop(); mediaStreamRef.current?.getTracks().forEach(t => t.stop()); }, []);`
+
+6) Testes (feitos por ti, agent):
+   - Teste 1 (em browser de desenvolvimento):
+     - Abrir /admin/leads/:id.
+     - Clicar "Dictar":
+       - Verificar que solicita permissão ao micro.
+       - Falar alguns segundos.
+       - Clicar novamente "A gravar..." para parar.
+       - Verificar no console que foi feito POST para /api/crm/leads/ai/transcribe.
+       - Verificar que o texto transcrito foi adicionado à descrição.
+   - Teste 2 – Fallback:
+     - Forçar falha em getUserMedia (ex.: simular ambiente sem mediaDevices).
+     - Clicar "Dictar":
+       - Confirmar que, em vez de quebrar, abre o file picker (input-lead-audio-upload).
+   - Teste 3 – Upload:
+       - Clicar no botão secundário "Upload" e escolher um ficheiro de áudio.
+       - Confirmar que o fluxo antigo continua a funcionar (texto transcrito + toast).
+
+7) Atualizar o relatório:
+   - Atualizar o RELATORIO_FASE-LEADS-IA-01 ou criar RELATORIO_FASE-LEADS-IA-02-GRAVACAO-DIRETA.txt explicando:
+     - Que agora "Dictar" faz gravação direta via MediaRecorder.
+     - Que o upload de ficheiro foi mantido num botão secundário.
+     - Fluxos de uso atualizados (Dictar = gravar, Upload = ficheiro).
+     - Limitações (browser precisa suportar getUserMedia/MediaRecorder, etc.).
+
+IMPORTANTE:
+- NÃO tocar nos endpoints /api/crm/leads/ai/transcribe e /api/crm/leads/ai/summarize (backend).
+- NÃO mexer em Odoo, anexos, nem marcas.
+- Focar apenas em AdminLeadDetailPage.tsx e UX de áudio.

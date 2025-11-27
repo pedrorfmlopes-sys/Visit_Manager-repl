@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { ArrowLeft, ExternalLink, Mic, Wand2 } from "lucide-react";
@@ -124,6 +124,12 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
   const audioInputRef = useRef<HTMLInputElement>(null);
   const [transcribing, setTranscribing] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
+  
+  // FASE-LEADS-IA-02: Direct audio recording via MediaRecorder
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const { data: marcas = [] } = useQuery<Marca[]>({
     queryKey: ["/api/marcas", "onlyAtivas"],
@@ -147,12 +153,24 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
 
   const [saving, setSaving] = useState(false);
 
-  // Handle audio transcription
-  const handleTranscribeAudio = async (file: File) => {
+  // Cleanup on unmount: stop recording and close media stream
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && isRecording) {
+        mediaRecorderRef.current.stop();
+      }
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [isRecording]);
+
+  // FASE-LEADS-IA-02: Auxiliary function to transcribe audio from blob
+  const transcribeBlob = async (blob: Blob) => {
     try {
       setTranscribing(true);
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", blob);
 
       const response = await fetch("/api/crm/leads/ai/transcribe", {
         method: "POST",
@@ -168,7 +186,7 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
 
       // Append transcribed text to description
       const newDescription = form.descricao
-        ? form.descricao + "\n\n[Áudio transcritto]\n" + data.text
+        ? form.descricao + "\n\n[Áudio transcrito]\n" + data.text
         : data.text;
 
       setForm((f) => ({ ...f, descricao: newDescription }));
@@ -185,8 +203,105 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
       });
     } finally {
       setTranscribing(false);
-      if (audioInputRef.current) audioInputRef.current.value = "";
     }
+  };
+
+  // FASE-LEADS-IA-02: Start direct audio recording
+  const startRecording = async () => {
+    try {
+      console.log("[Lead AI] Starting recording...");
+      
+      // Check if browser supports getUserMedia
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.warn("[Lead AI] MediaRecorder not supported, falling back to file picker");
+        toast({
+          title: "Micro não disponível",
+          description: "Utilizando seletor de ficheiro em alternativa.",
+          variant: "default",
+        });
+        audioInputRef.current?.click();
+        return;
+      }
+
+      // Request microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+
+      // Create MediaRecorder
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      // Accumulate audio chunks
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      // Handle stop event
+      mediaRecorder.onstop = async () => {
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        audioChunksRef.current = [];
+        
+        // Stop all tracks
+        if (mediaStreamRef.current) {
+          mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+          mediaStreamRef.current = null;
+        }
+
+        // Transcribe the blob
+        await transcribeBlob(blob);
+      };
+
+      // Handle error
+      mediaRecorder.onerror = (event: any) => {
+        console.error("[Lead AI] MediaRecorder error:", event.error);
+        toast({
+          title: "Erro na gravação",
+          description: "Não foi possível gravar áudio.",
+          variant: "destructive",
+        });
+        setIsRecording(false);
+      };
+
+      // Start recording
+      mediaRecorder.start();
+      setIsRecording(true);
+      console.log("[Lead AI] Recording started");
+    } catch (error: any) {
+      console.error("[Lead AI] Error starting recording:", error);
+      
+      // Fallback to file picker if getUserMedia fails
+      if (error?.name === "NotAllowedError") {
+        toast({
+          title: "Permissão negada",
+          description: "Verifica as permissões do browser para o micro.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Micro não disponível",
+          description: "Utilizando seletor de ficheiro em alternativa.",
+        });
+        audioInputRef.current?.click();
+      }
+    }
+  };
+
+  // FASE-LEADS-IA-02: Stop direct audio recording
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      console.log("[Lead AI] Stopping recording...");
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  // Handle audio transcription from file upload
+  const handleTranscribeAudio = async (file: File) => {
+    await transcribeBlob(file);
+    if (audioInputRef.current) audioInputRef.current.value = "";
   };
 
   // Handle text summarization
@@ -436,13 +551,24 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
                 <Button
                   type="button"
                   size="sm"
-                  variant="outline"
-                  onClick={() => audioInputRef.current?.click()}
+                  variant={isRecording ? "destructive" : "outline"}
+                  onClick={() => (isRecording ? stopRecording() : startRecording())}
                   disabled={transcribing}
                   data-testid="button-lead-dictate"
                 >
                   <Mic className="h-4 w-4 mr-1" />
-                  {transcribing ? "A transcrever..." : "Dictar"}
+                  {transcribing ? "A transcrever..." : isRecording ? "A gravar..." : "Dictar"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => audioInputRef.current?.click()}
+                  disabled={transcribing || isRecording}
+                  data-testid="button-lead-upload-file"
+                  title="Upload de ficheiro de áudio"
+                >
+                  Ficheiro
                 </Button>
                 <Button
                   type="button"
@@ -575,7 +701,7 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
         <CardFooter className="flex justify-between">
           <Button
             variant="outline"
-            onClick={() => setLocation("/admin/leads")}
+            onClick={() => navigate("/admin/leads")}
             data-testid="button-cancelar-lead"
           >
             Cancelar
