@@ -76,25 +76,53 @@ export function registerCrmLeadsRoutes(app: express.Express) {
 
       const id = req.params.id;
 
-      const lead = await db.query.leads.findFirst({
-        where: and(eq(leads.id, id), eq(leads.empresaId, empresaId)),
-        with: {
-          entidade: true,
-          contacto: true,
-          visita: true,
-          contactosAssociados: {
-            with: {
-              contacto: true,
+      console.log("[CRM Leads] GET /:id", { id, empresaId });
+
+      // First, try loading with contactosAssociados
+      let lead: any = null;
+      let contactosAssociados: any[] = [];
+
+      try {
+        lead = await db.query.leads.findFirst({
+          where: and(eq(leads.id, id), eq(leads.empresaId, empresaId)),
+          with: {
+            entidade: true,
+            contacto: true,
+            visita: true,
+            contactosAssociados: {
+              with: {
+                contacto: true,
+              },
             },
           },
-        },
-      });
+        });
+
+        if (lead && lead.contactosAssociados) {
+          contactosAssociados = lead.contactosAssociados.map((lc: any) => lc.contacto) ?? [];
+        }
+      } catch (innerError: any) {
+        // If leads_contactos doesn't exist yet, load without it
+        if (innerError?.code === "42P01" || innerError?.message?.includes("leads_contactos")) {
+          console.warn("[CRM Leads] Table leads_contactos doesn't exist, loading without contactosAssociados");
+          lead = await db.query.leads.findFirst({
+            where: and(eq(leads.id, id), eq(leads.empresaId, empresaId)),
+            with: {
+              entidade: true,
+              contacto: true,
+              visita: true,
+            },
+          });
+          contactosAssociados = [];
+        } else {
+          throw innerError;
+        }
+      }
 
       if (!lead) {
         return res.status(404).json({ success: false, message: "Lead não encontrado." });
       }
 
-      const contactosAssociados = lead.contactosAssociados?.map(lc => lc.contacto) ?? [];
+      console.log("[CRM Leads] GET /:id success", { leadId: id, contactosCount: contactosAssociados.length });
 
       return res.json({
         lead: {
@@ -114,8 +142,19 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         });
       }
 
-      console.error("[CRM Leads] GET /:id error:", error);
-      return res.status(500).json({ success: false, message: "Erro ao obter lead." });
+      console.error("[CRM Leads] GET /:id error:", {
+        leadId: req.params.id,
+        empresaId: (await getUserContext(req).catch(() => null))?.empresaId,
+        message: error?.message,
+        code: error?.code,
+        detail: error?.detail,
+      });
+
+      return res.status(500).json({
+        success: false,
+        message: "Erro ao obter lead.",
+        details: error?.message || "Erro desconhecido",
+      });
     }
   });
 
