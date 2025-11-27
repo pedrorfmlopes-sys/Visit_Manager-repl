@@ -1,0 +1,184 @@
+PROMPT PARA O AGENT – CRM-LEADS-DETAIL-CONTEXTO-STEP2
+
+Objetivo:
+Na página /admin/leads/:id:
+
+Mostrar claramente:
+
+Entidade associada (nome + link),
+
+Contacto associado (nome + link),
+
+Visita associada (data + link, se existir),
+
+Em vez de só termos entidadeId, contactoId, visitaId “escondidos”.
+
+1) Backend – enriquecer GET /api/crm/leads/:id com contexto
+
+Ficheiro: server/routes/crmLeads.ts
+
+Na rota GET /api/crm/leads/:id, em vez de usar só db.query.leads.findFirst, passa a usar with para trazer entidade, contacto e visita (ou faz join equivalente conforme o schema atual):
+
+Exemplo (ajustar aos nomes reais das relations em shared/schema.ts):
+
+const lead = await db.query.leads.findFirst({
+  where: and(eq(leads.id, id), eq(leads.empresaId, empresaId)),
+  with: {
+    entidade: true,
+    contacto: true,
+    visita: true,
+  },
+});
+
+
+Na resposta, devolve também esses campos no JSON, por exemplo:
+
+if (!lead) {
+  return res
+    .status(404)
+    .json({ success: false, message: "Lead não encontrado." });
+}
+
+return res.json({
+  lead: {
+    ...lead,
+    entidadeNome: lead.entidade?.nome ?? null,
+    contactoNome: lead.contacto?.nome ?? null,
+    visitaData: lead.visita?.dataVisita ?? null,
+  },
+});
+
+
+Mantém a estrutura original e adiciona estes campos; não removas nada do que já está a ser devolvido.
+
+2) Frontend – mostrar contexto no topo do detalhe do lead
+
+Ficheiro: client/src/pages/AdminLeadDetailPage.tsx
+
+Atualiza o tipo Lead usado no frontend para incluir os novos campos opcionais:
+
+type Lead = {
+  id: string;
+  titulo: string;
+  descricao: string | null;
+  marca: string | null;
+  estado: string;
+  valorPrevisto: string | null;
+  moeda: string | null;
+  entidadeId: string;
+  contactoId: string;
+  visitaId: string | null;
+  odooLeadId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  entidadeNome?: string | null;
+  contactoNome?: string | null;
+  visitaData?: string | null;
+};
+
+
+No componente LeadDetailForm, logo antes do card principal do formulário, adiciona um card de contexto simples:
+
+<Card className="mb-4" data-testid="card-lead-contexto">
+  <CardHeader>
+    <CardTitle className="text-sm">Contexto do lead</CardTitle>
+    <CardDescription className="text-xs">
+      Entidade, contacto e visita associados a este lead.
+    </CardDescription>
+  </CardHeader>
+  <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+    <div className="space-y-0.5">
+      <div className="text-xs text-muted-foreground">Entidade</div>
+      {lead.entidadeNome ? (
+        <button
+          type="button"
+          className="underline-offset-2 hover:underline text-left"
+          onClick={() => navigate(`/admin/entidades/${lead.entidadeId}`)}
+          data-testid="link-lead-entidade"
+        >
+          {lead.entidadeNome}
+        </button>
+      ) : (
+        <span className="text-xs text-muted-foreground">
+          Sem entidade associada
+        </span>
+      )}
+    </div>
+
+    <div className="space-y-0.5">
+      <div className="text-xs text-muted-foreground">Contacto</div>
+      {lead.contactoNome ? (
+        <button
+          type="button"
+          className="underline-offset-2 hover:underline text-left"
+          onClick={() => navigate(`/admin/contactos/${lead.contactoId}`)}
+          data-testid="link-lead-contacto"
+        >
+          {lead.contactoNome}
+        </button>
+      ) : (
+        <span className="text-xs text-muted-foreground">
+          Sem contacto associado
+        </span>
+      )}
+    </div>
+
+    <div className="space-y-0.5">
+      <div className="text-xs text-muted-foreground">Visita</div>
+      {lead.visitaId && lead.visitaData ? (
+        <button
+          type="button"
+          className="underline-offset-2 hover:underline text-left"
+          onClick={() => navigate(`/admin/visitas/${lead.visitaId}`)}
+          data-testid="link-lead-visita"
+        >
+          {new Date(lead.visitaData).toLocaleDateString()}
+        </button>
+      ) : lead.visitaId ? (
+        <button
+          type="button"
+          className="underline-offset-2 hover:underline text-left"
+          onClick={() => navigate(`/admin/visitas/${lead.visitaId}`)}
+          data-testid="link-lead-visita"
+        >
+          Ver visita
+        </button>
+      ) : (
+        <span className="text-xs text-muted-foreground">
+          Sem visita associada
+        </span>
+      )}
+    </div>
+  </CardContent>
+</Card>
+
+
+Para isto, o componente precisa de navigate de wouter:
+
+import { useLocation } from "wouter";
+const [_, navigate] = useLocation();
+
+
+Mantém o card de formulário que já existe exatamente como está; este card de contexto fica por cima.
+
+3) Testes
+
+npm run dev
+
+No browser:
+
+Vai a /admin/leads → clica num lead ligado a uma visita.
+
+Na página do lead:
+
+Vês o card “Contexto do lead” com:
+
+Entidade → nome + clique abre /admin/entidades/:id.
+
+Contacto → nome + clique abre /admin/contactos/:id.
+
+Visita → data + clique abre /admin/visitas/:id.
+
+Abre um lead que não tenha visita → deve mostrar “Sem visita associada”.
+
+Confirma que o formulário de edição continua a funcionar normalmente (guardar alterações nos campos do lead).

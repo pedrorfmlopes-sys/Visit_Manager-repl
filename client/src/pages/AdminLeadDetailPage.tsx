@@ -25,6 +25,9 @@ type Lead = {
   odooLeadId: string | null;
   createdAt: string;
   updatedAt: string;
+  entidadeNome?: string | null;
+  contactoNome?: string | null;
+  visitaData?: string | null;
 };
 
 type LeadResponse =
@@ -97,7 +100,7 @@ export default function AdminLeadDetailPage() {
 
 function LeadDetailForm({ lead }: { lead: Lead }) {
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const [, navigate] = useLocation();
 
   const [form, setForm] = useState({
     titulo: lead.titulo,
@@ -168,6 +171,79 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
 
   return (
     <div className="space-y-4">
+      <Card className="mb-4" data-testid="card-lead-contexto">
+        <CardHeader>
+          <CardTitle className="text-sm">Contexto do lead</CardTitle>
+          <CardDescription className="text-xs">
+            Entidade, contacto e visita associados a este lead.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+          <div className="space-y-0.5">
+            <div className="text-xs text-muted-foreground">Entidade</div>
+            {lead.entidadeNome ? (
+              <button
+                type="button"
+                className="underline-offset-2 hover:underline text-left"
+                onClick={() => navigate(`/admin/entidades/${lead.entidadeId}`)}
+                data-testid="link-lead-entidade"
+              >
+                {lead.entidadeNome}
+              </button>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                Sem entidade associada
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-0.5">
+            <div className="text-xs text-muted-foreground">Contacto</div>
+            {lead.contactoNome ? (
+              <button
+                type="button"
+                className="underline-offset-2 hover:underline text-left"
+                onClick={() => navigate(`/admin/contactos/${lead.contactoId}`)}
+                data-testid="link-lead-contacto"
+              >
+                {lead.contactoNome}
+              </button>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                Sem contacto associado
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-0.5">
+            <div className="text-xs text-muted-foreground">Visita</div>
+            {lead.visitaId && lead.visitaData ? (
+              <button
+                type="button"
+                className="underline-offset-2 hover:underline text-left"
+                onClick={() => navigate(`/admin/visitas/${lead.visitaId}`)}
+                data-testid="link-lead-visita"
+              >
+                {new Date(lead.visitaData).toLocaleDateString()}
+              </button>
+            ) : lead.visitaId ? (
+              <button
+                type="button"
+                className="underline-offset-2 hover:underline text-left"
+                onClick={() => navigate(`/admin/visitas/${lead.visitaId}`)}
+                data-testid="link-lead-visita"
+              >
+                Ver visita
+              </button>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                Sem visita associada
+              </span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Editar Lead</CardTitle>

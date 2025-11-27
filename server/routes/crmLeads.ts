@@ -59,7 +59,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
     }
   });
 
-  // GET /api/crm/leads/:id - Get specific lead
+  // GET /api/crm/leads/:id - Get specific lead with context (entidade, contacto, visita)
   router.get("/:id", isAuthenticated, async (req, res) => {
     try {
       const { empresaId } = await getUserContext(req);
@@ -69,13 +69,25 @@ export function registerCrmLeadsRoutes(app: express.Express) {
 
       const lead = await db.query.leads.findFirst({
         where: and(eq(leads.id, id), eq(leads.empresaId, empresaId)),
+        with: {
+          entidade: true,
+          contacto: true,
+          visita: true,
+        },
       });
 
       if (!lead) {
         return res.status(404).json({ success: false, message: "Lead não encontrado." });
       }
 
-      return res.json({ lead });
+      return res.json({
+        lead: {
+          ...lead,
+          entidadeNome: lead.entidade?.nome ?? null,
+          contactoNome: lead.contacto?.nome ?? null,
+          visitaData: lead.visita?.dataVisita ?? null,
+        },
+      });
     } catch (error: any) {
       if (error?.code === "LEADS_NOT_ENABLED") {
         return res.status(200).json({
