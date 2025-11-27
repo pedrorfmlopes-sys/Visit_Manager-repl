@@ -306,7 +306,7 @@ export default function VisitaDetail() {
 
     // FASE-LEADS-NEW-03: Get contactoId from visita context
     const contactoIdFromVisita: string | null =
-      visita?.contactoId ||
+      visita?.contacto?.id ||
       (Array.isArray(visita?.contactosPresentes) && visita.contactosPresentes[0]?.id) ||
       null;
 
