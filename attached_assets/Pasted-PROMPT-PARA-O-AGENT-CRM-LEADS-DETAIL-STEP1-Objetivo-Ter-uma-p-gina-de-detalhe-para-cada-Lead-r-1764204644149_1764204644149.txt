@@ -1,0 +1,379 @@
+PROMPT PARA O AGENT – CRM-LEADS-DETAIL-STEP1
+
+Objetivo:
+Ter uma página de detalhe para cada Lead:
+
+rota /admin/leads/:id,
+
+carregar os dados via GET /api/crm/leads/:id,
+
+permitir editar campos principais e guardar via PATCH /api/crm/leads/:id,
+
+tornar as linhas da lista de leads clicáveis.
+
+1) Backend – confirmar GET /api/crm/leads/:id
+
+Ficheiro: server/routes/crmLeads.ts
+
+Garante que existe esta rota (ou cria se não existir):
+
+router.get("/:id", requireAuth, async (req, res) => {
+  try {
+    const { empresaId } = await getUserContext(req);
+    await assertLeadsEnabled(empresaId);
+
+    const id = req.params.id;
+
+    const lead = await db.query.leads.findFirst({
+      where: and(eq(leads.id, id), eq(leads.empresaId, empresaId)),
+    });
+
+    if (!lead) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Lead não encontrado." });
+    }
+
+    return res.json({ lead });
+  } catch (error: any) {
+    if (error?.code === "LEADS_NOT_ENABLED") {
+      return res.status(200).json({
+        success: false,
+        notEnabled: true,
+        message: "Módulo de Leads não está ativo para esta empresa.",
+      });
+    }
+
+    console.error("[CRM Leads] GET /:id error:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Erro ao obter lead." });
+  }
+});
+
+
+Não mexer nas outras rotas de leads.
+
+2) Frontend – nova página /admin/leads/:id
+
+Novo ficheiro (ou equivalente):
+client/src/pages/AdminLeadDetailPage.tsx
+
+Cria um componente que:
+
+lê o id da rota (/admin/leads/:id),
+
+faz GET /api/crm/leads/:id,
+
+mostra estados de loading/erro/notEnabled,
+
+renderiza um formulário simples para edição.
+
+Exemplo base (ajustar imports ao teu projeto):
+
+import { useRoute } from "wouter";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useState } from "react";
+import { toast } from "@/components/ui/use-toast";
+
+type Lead = {
+  id: string;
+  titulo: string;
+  descricao: string | null;
+  marca: string | null;
+  estado: string;
+  valorPrevisto: string | null;
+  moeda: string | null;
+  entidadeId: string;
+  contactoId: string;
+  visitaId: string | null;
+  odooLeadId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type LeadResponse =
+  | { lead: Lead }
+  | { success: false; notEnabled?: boolean; message?: string };
+
+export default function AdminLeadDetailPage() {
+  const [match, params] = useRoute("/admin/leads/:id");
+  const id = params?.id as string | undefined;
+
+  const { data, isLoading, isError } = useQuery<LeadResponse>({
+    queryKey: ["/api/crm/leads", id],
+    enabled: !!id,
+    queryFn: async () => {
+      const resp = await fetch(`/api/crm/leads/${id}`, {
+        credentials: "include",
+      });
+      return resp.json();
+    },
+  });
+
+  if (!id) {
+    return (
+      <p className="p-4 text-sm text-muted-foreground">
+        ID de lead inválido.
+      </p>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <p className="p-4 text-sm text-muted-foreground">
+        A carregar lead...
+      </p>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <p className="p-4 text-sm text-destructive">
+        Erro ao carregar lead. Tenta recarregar a página.
+      </p>
+    );
+  }
+
+  if ("success" in data && data.notEnabled) {
+    return (
+      <p className="p-4 text-sm text-amber-600">
+        Módulo de Leads CRM está desativado para esta empresa.
+      </p>
+    );
+  }
+
+  const lead = (data as { lead: Lead }).lead;
+  return <LeadDetailForm lead={lead} />;
+}
+
+function LeadDetailForm({ lead }: { lead: Lead }) {
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState({
+    titulo: lead.titulo,
+    descricao: lead.descricao ?? "",
+    marca: lead.marca ?? "",
+    estado: lead.estado ?? "novo",
+    valorPrevisto: lead.valorPrevisto ?? "",
+    moeda: lead.moeda ?? "EUR",
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleChange =
+    (field: keyof typeof form) =>
+    (
+      e:
+        | React.ChangeEvent<HTMLInputElement>
+        | React.ChangeEvent<HTMLTextAreaElement>
+        | React.ChangeEvent<HTMLSelectElement>
+    ) => {
+      setForm((f) => ({ ...f, [field]: e.target.value }));
+    };
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+
+      const body: any = {
+        titulo: form.titulo.trim(),
+        descricao: form.descricao.trim() || null,
+        marca: form.marca.trim() || null,
+        estado: form.estado || "novo",
+        valorPrevisto: form.valorPrevisto
+          ? Number(form.valorPrevisto)
+          : null,
+        moeda: form.moeda || "EUR",
+      };
+
+      const resp = await fetch(`/api/crm/leads/${lead.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+
+      const json = await resp.json();
+      if (!resp.ok || json.success === false) {
+        throw new Error(json.message || `HTTP ${resp.status}`);
+      }
+
+      toast?.({
+        title: "Lead atualizado",
+        description: "Os dados do lead foram guardados.",
+      });
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/leads"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["/api/crm/leads", lead.id],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["/api/crm/leads", { visitaId: lead.visitaId }],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["/api/crm/leads", { entidadeId: lead.entidadeId }],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["/api/crm/leads", { contactoId: lead.contactoId }],
+        }),
+      ]);
+    } catch (error: any) {
+      console.error("[CRM Leads] PATCH lead error:", error);
+      toast?.({
+        title: "Erro ao atualizar lead",
+        description:
+          error?.message || "Não foi possível guardar as alterações.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Lead</CardTitle>
+          <CardDescription>
+            Edita os dados principais deste lead.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1">
+            <Label htmlFor="lead-titulo">Título</Label>
+            <Input
+              id="lead-titulo"
+              value={form.titulo}
+              onChange={handleChange("titulo")}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="lead-descricao">Descrição</Label>
+            <Textarea
+              id="lead-descricao"
+              value={form.descricao}
+              onChange={handleChange("descricao")}
+              rows={3}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="lead-marca">Marca</Label>
+              <Input
+                id="lead-marca"
+                value={form.marca}
+                onChange={handleChange("marca")}
+                placeholder="Ex.: Ritmonio, Revestech..."
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="lead-estado">Estado</Label>
+              <select
+                id="lead-estado"
+                className="border rounded px-2 py-1 text-sm w-full bg-background"
+                value={form.estado}
+                onChange={handleChange("estado")}
+              >
+                <option value="novo">Novo</option>
+                <option value="em_analise">Em análise</option>
+                <option value="proposta_enviada">Proposta enviada</option>
+                <option value="ganho">Ganho</option>
+                <option value="perdido">Perdido</option>
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="lead-valor">Valor previsto</Label>
+              <Input
+                id="lead-valor"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.valorPrevisto}
+                onChange={handleChange("valorPrevisto")}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="lead-moeda">Moeda</Label>
+            <Input
+              id="lead-moeda"
+              value={form.moeda}
+              onChange={handleChange("moeda")}
+            />
+          </div>
+        </CardContent>
+        <CardFooter className="flex justify-end">
+          <Button
+            onClick={handleSave}
+            disabled={saving || !form.titulo.trim()}
+          >
+            {saving ? "A guardar..." : "Guardar alterações"}
+          </Button>
+        </CardFooter>
+      </Card>
+    </div>
+  );
+}
+
+3) Rota /admin/leads/:id no router
+
+Ficheiro: onde defines as rotas do frontend (por ex. client/src/main.tsx ou AppRoutes.tsx).
+
+Importa a nova página:
+
+import AdminLeadDetailPage from "@/pages/AdminLeadDetailPage";
+
+
+Adiciona a rota:
+
+<Route path="/admin/leads/:id" component={AdminLeadDetailPage} />
+
+
+(usa o mesmo padrão que as outras rotas /admin/...)
+
+4) Tornar as linhas da lista de Leads clicáveis
+
+Ficheiro: client/src/pages/AdminLeadsPage.tsx
+
+Importar e usar o router (wouter):
+
+import { useLocation } from "wouter";
+const [_, setLocation] = useLocation();
+
+
+Na table onde fazes data.leads.map, torna cada <tr> clicável:
+
+<tr
+  key={lead.id}
+  className="border-b hover:bg-muted cursor-pointer"
+  onClick={() => setLocation(`/admin/leads/${lead.id}`)}
+>
+  ...
+</tr>
+
+5) Testes
+
+npm run dev
+
+Ir a /admin/leads → clicar num lead:
+
+deve abrir /admin/leads/:id com o formulário.
+
+Alterar título/estado/valor → “Guardar alterações”:
+
+sem erros,
+
+lista /admin/leads mostra os valores atualizados,
+
+boards em Visita / Entidade / Contacto atualizam depois de refresh (ou após o invalidateQueries).
