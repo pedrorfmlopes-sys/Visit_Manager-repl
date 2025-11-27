@@ -55,7 +55,7 @@ export default function AdminLeadDetailPage() {
   const contactoIdFromQuery = searchParams.get("contactoId");
   const returnTo = searchParams.get("returnTo");
   const isCreateMode = id === "new";
-  const hasContext = isCreateMode && entidadeId && contactoIdFromQuery;
+  const hasContext = isCreateMode && !!entidadeId && !!contactoIdFromQuery;
 
   // FASE-LEADS-CONTEXTO-02: Fetch visita data for context display
   const { data: visitaData } = useQuery<VisitaWithRelations>({
@@ -93,7 +93,7 @@ export default function AdminLeadDetailPage() {
     );
   }
 
-  if (!isCreateMode && "success" in data && data.notEnabled) {
+  if (!isCreateMode && data && "success" in data && data.notEnabled) {
     return (
       <p className="p-4 text-sm text-amber-600">
         Módulo de Leads CRM está desativado para esta empresa.
@@ -173,14 +173,14 @@ export default function AdminLeadDetailPage() {
               Erro: Esta visita não tem contexto suficiente para criar um lead (entidade ou contacto ausentes).
             </div>
           )}
-          {(isCreateMode && hasContext) || !isCreateMode ? (
+          {((isCreateMode && hasContext) || !isCreateMode) ? (
             <LeadDetailForm 
               lead={lead} 
               isCreateMode={isCreateMode} 
-              visitaId={visitaIdFromQuery} 
-              returnTo={returnTo}
-              entidadeId={entidadeId}
-              contactoId={contactoIdFromQuery}
+              visitaId={visitaIdFromQuery || null} 
+              returnTo={returnTo || null}
+              entidadeId={entidadeId || null}
+              contactoId={contactoIdFromQuery || null}
               hasContext={hasContext}
               contactosDisponiveis={contactosDisponiveis}
             />
