@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Empresa, User, Marca } from "@shared/schema";
 import { Upload, Building2, Bell, Zap, Lightbulb, MapPin, Calendar, PlugZap, Code, Mail, Map, Cloud, Webhook, Settings2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AdminEntidadeTipos from "@/pages/AdminEntidadeTipos";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminMarcas from "@/pages/AdminMarcas";
@@ -69,7 +69,7 @@ export default function AdminEmpresa() {
   const [savingLeads, setSavingLeads] = useState(false);
 
   // Update leadsEnabled state when empresa data changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (empresa?.crmLeadsEnabled !== undefined) {
       setLeadsEnabled(empresa.crmLeadsEnabled);
     }
