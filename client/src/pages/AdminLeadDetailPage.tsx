@@ -471,7 +471,7 @@ function LeadDetailForm({
                 <button
                   type="button"
                   className="underline-offset-2 hover:underline text-left"
-                  onClick={() => navigate(`/contactos/${lead.contactoId}?returnTo=${encodeURIComponent(`/admin/leads/${lead.id}`)}`)}
+                  onClick={() => navigate(`/contactos/${lead.contactoId}/detalhes?returnTo=${encodeURIComponent(`/admin/leads/${lead.id}`)}`)}
                   data-testid="link-lead-contacto"
                 >
                   {lead.contactoNome}
@@ -519,7 +519,7 @@ function LeadDetailForm({
                   <button
                     key={c.id}
                     type="button"
-                    onClick={() => navigate(`/contactos/${c.id}?returnTo=${encodeURIComponent(`/admin/leads/${lead.id}`)}`)}
+                    onClick={() => navigate(`/contactos/${c.id}/detalhes?returnTo=${encodeURIComponent(`/admin/leads/${lead.id}`)}`)}
                     className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-secondary text-secondary-foreground hover:underline"
                     data-testid={`chip-contacto-${c.id}`}
                   >
