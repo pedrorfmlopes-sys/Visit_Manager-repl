@@ -720,6 +720,7 @@ export const insertLeadSchema = createInsertSchema(leads).omit({
   responsavelUserId: z.string().optional().nullable(),
   odooLeadId: z.string().optional().nullable(),
   contactosIds: z.array(z.string().uuid()).optional(),
+  marcasIds: z.array(z.string().uuid()).optional(),
 });
 
 export type InsertLead = z.infer<typeof insertLeadSchema>;

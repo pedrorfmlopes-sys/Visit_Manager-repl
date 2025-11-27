@@ -211,6 +211,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         moeda,
         responsavelUserId,
         contactosIds,
+        marcasIds,
       } = body;
 
       // Validate required fields
@@ -234,6 +235,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         moeda: moeda ?? "EUR",
         responsavelUserId: responsavelUserId ?? null,
         contactosIds: contactosIds ?? undefined,
+        marcasIds: marcasIds ?? undefined,
       });
 
       if (!validation.success) {
@@ -245,6 +247,18 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         });
       }
 
+      // Determine final marca value based on marcasIds
+      let finalMarca = marca ?? null;
+      if (marcasIds && marcasIds.length > 0) {
+        // Fetch marca names from database
+        const marcasData = await db.query.marcas.findMany({
+          where: (m, { inArray }) => inArray(m.id, marcasIds),
+        });
+        if (marcasData.length > 0) {
+          finalMarca = marcasData.map((m) => m.nome).join(", ");
+        }
+      }
+
       const [created] = await db
         .insert(leads)
         .values({
@@ -254,7 +268,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
           visitaId: visitaId ?? null,
           titulo,
           descricao: descricao ?? null,
-          marca: marca ?? null,
+          marca: finalMarca,
           estado: estado ?? "novo",
           valorPrevisto: valorPrevisto ?? null,
           moeda: moeda ?? "EUR",
@@ -280,7 +294,18 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         });
       }
 
-      console.log("[CRM Leads] POST created lead", created);
+      // Handle marcasIds if provided
+      if (marcasIds && marcasIds.length > 0) {
+        const uniqueMarcaIds = Array.from(new Set(marcasIds));
+        for (const mId of uniqueMarcaIds) {
+          await db.insert(leadsMarcas).values({
+            leadId: created.id,
+            marcaId: mId,
+          });
+        }
+      }
+
+      console.log("[CRM Leads] POST created lead", { id: created.id, marcasCount: marcasIds?.length ?? 0 });
 
       return res.status(201).json({ success: true, lead: created });
     } catch (error: any) {
@@ -323,6 +348,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         responsavelUserId,
         odooLeadId,
         contactosIds,
+        marcasIds,
       } = req.body;
 
       const updateData: any = {};
@@ -338,10 +364,21 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         updateData.odooLeadId = odooLeadId;
       }
 
+      // Handle marcasIds to update marca field
+      if (marcasIds !== undefined && marcasIds.length > 0) {
+        const marcasData = await db.query.marcas.findMany({
+          where: (m, { inArray }) => inArray(m.id, marcasIds),
+        });
+        if (marcasData.length > 0) {
+          updateData.marca = marcasData.map((m) => m.nome).join(", ");
+        }
+      }
+
       const hasUpdateData = Object.keys(updateData).length > 0;
       const hasContactosIds = contactosIds !== undefined;
+      const hasMarcasIds = marcasIds !== undefined;
 
-      if (!hasUpdateData && !hasContactosIds) {
+      if (!hasUpdateData && !hasContactosIds && !hasMarcasIds) {
         return res.status(400).json({ success: false, message: "Nenhum campo para atualizar." });
       }
 
@@ -376,6 +413,31 @@ export function registerCrmLeadsRoutes(app: express.Express) {
           });
         }
       }
+
+      // Handle marcasIds if provided
+      if (hasMarcasIds && marcasIds.length > 0) {
+        const uniqueMarcaIds = Array.from(new Set(marcasIds));
+        await db.delete(leadsMarcas).where(eq(leadsMarcas.leadId, id));
+        for (const mId of uniqueMarcaIds) {
+          await db.insert(leadsMarcas).values({
+            leadId: id,
+            marcaId: mId,
+          });
+        }
+      }
+
+      // Refetch updated lead if we modified it
+      if (hasUpdateData) {
+        // Lead was already updated above
+      } else if (hasContactosIds || hasMarcasIds) {
+        // Relations changed, need to refetch
+        const result = await db.query.leads.findFirst({
+          where: and(eq(leads.id, id), eq(leads.empresaId, empresaId)),
+        });
+        updated = result;
+      }
+
+      console.log("[CRM Leads] PATCH updated lead", { id, marcasCount: marcasIds?.length ?? 0 });
 
       return res.json({ success: true, lead: updated });
     } catch (error: any) {

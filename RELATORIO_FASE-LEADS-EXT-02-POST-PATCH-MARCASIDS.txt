@@ -1,0 +1,423 @@
+================================================================================
+RELATORIO TECNICO: FASE LEADS-EXT-02 - POST/PATCH COM GRAVACAO MARCASIDS
+================================================================================
+
+Data: 27 Novembro 2025
+Projeto: Commercial Visits Management PWA - Lead Brands (Write Support)
+Status: COMPLETO - POST/PATCH com suporte a marcasIds
+Escopo: Backend endpoints POST/PATCH com gravacao em leads_marcas
+
+================================================================================
+1. OBJETIVO CUMPRIDO
+================================================================================
+
+Permitir que POST /api/crm/leads e PATCH /api/crm/leads/:id aceitem 
+marcasIds: string[] e mantenham leads_marcas em sync.
+
+Tarefas Completadas:
+  1) Schema: adicionar marcasIds?: string[] ao insertLeadSchema
+  2) POST: aceitar marcasIds, criar records em leads_marcas
+  3) PATCH: aceitar marcasIds, delete/recreate em leads_marcas
+  4) Campo marca: atualizar com nomes das marcas concatenados
+  5) Compatibilidade: sem marcasIds, tudo funciona igual
+
+================================================================================
+2. MUDANCAS IMPLEMENTADAS
+================================================================================
+
+2.1 FICHEIRO: shared/schema.ts
+---
+
+Schema de Validacao (linha 726)
+
+ANTES (linha 725):
+  contactosIds: z.array(z.string().uuid()).optional(),
+
+DEPOIS (linhas 725-726):
+  contactosIds: z.array(z.string().uuid()).optional(),
+  marcasIds: z.array(z.string().uuid()).optional(),
+
+Adicionado: marcasIds?: string[] ao schema
+
+2.2 FICHEIRO: server/routes/crmLeads.ts
+---
+
+A) POST /api/crm/leads - Criacao com marcasIds
+
+1. Destructuring (linhas 205-217)
+
+ANTES:
+  const {
+    entidadeId, contactoId, visitaId, titulo, descricao, marca,
+    estado, valorPrevisto, moeda, responsavelUserId, contactosIds,
+  } = body;
+
+DEPOIS:
+  const {
+    entidadeId, contactoId, visitaId, titulo, descricao, marca,
+    estado, valorPrevisto, moeda, responsavelUserId, contactosIds,
+    marcasIds,  // NOVO
+  } = body;
+
+2. Validacao Schema (linhas 229-241)
+
+ANTES:
+  contactosIds: contactosIds ?? undefined,
+
+DEPOIS:
+  contactosIds: contactosIds ?? undefined,
+  marcasIds: marcasIds ?? undefined,  // NOVO
+
+3. Processar marcasIds para campo marca (linhas 253-263)
+
+NOVO - Bloco inteiro:
+  // Determine final marca value based on marcasIds
+  let finalMarca = marca ?? null;
+  if (marcasIds && marcasIds.length > 0) {
+    // Fetch marca names from database
+    const marcasData = await db.query.marcas.findMany({
+      where: (m, { inArray }) => inArray(m.id, marcasIds),
+    });
+    if (marcasData.length > 0) {
+      finalMarca = marcasData.map((m) => m.nome).join(", ");
+    }
+  }
+
+Logica:
+  - Se marcasIds vem vazio ou undefined: finalMarca = marca (parametro original)
+  - Se marcasIds vem preenchido:
+    * Buscar nomes das marcas da BD
+    * Concatenar com ", " (ex: "Ritmonio, Bette")
+    * Guardar em finalMarca
+
+4. Usar finalMarca ao criar lead (linha 274)
+
+ANTES:
+  marca: marca ?? null,
+
+DEPOIS:
+  marca: finalMarca,
+
+5. Inserir em leads_marcas (linhas 300-309)
+
+NOVO - Bloco inteiro:
+  // Handle marcasIds if provided
+  if (marcasIds && marcasIds.length > 0) {
+    const uniqueMarcaIds = Array.from(new Set(marcasIds));
+    for (const mId of uniqueMarcaIds) {
+      await db.insert(leadsMarcas).values({
+        leadId: created.id,
+        marcaId: mId,
+      });
+    }
+  }
+
+Logica:
+  - Se marcasIds vem, eliminar duplicatas
+  - Inserir 1 record em leads_marcas por cada marcaId
+  - Vincular ao lead criado
+
+6. Log atualizado (linha 311)
+
+ANTES:
+  console.log("[CRM Leads] POST created lead", created);
+
+DEPOIS:
+  console.log("[CRM Leads] POST created lead", { id: created.id, marcasCount: marcasIds?.length ?? 0 });
+
+B) PATCH /api/crm/leads/:id - Edicao com marcasIds
+
+1. Destructuring (linhas 344-355)
+
+ADICIONAR:
+  marcasIds,  // NOVO
+
+2. Processar marcasIds para atualizar campo marca (linhas 370-378)
+
+NOVO - Bloco inteiro:
+  // Handle marcasIds to update marca field
+  if (marcasIds !== undefined && marcasIds.length > 0) {
+    const marcasData = await db.query.marcas.findMany({
+      where: (m, { inArray }) => inArray(m.id, marcasIds),
+    });
+    if (marcasData.length > 0) {
+      updateData.marca = marcasData.map((m) => m.nome).join(", ");
+    }
+  }
+
+Logica: mesmo que POST (buscar nomes, concatenar)
+
+3. Validacao de campos para atualizar (linhas 380-386)
+
+ANTES:
+  const hasUpdateData = Object.keys(updateData).length > 0;
+  const hasContactosIds = contactosIds !== undefined;
+  if (!hasUpdateData && !hasContactosIds) {
+    return res.status(400).json(...);
+  }
+
+DEPOIS:
+  const hasUpdateData = Object.keys(updateData).length > 0;
+  const hasContactosIds = contactosIds !== undefined;
+  const hasMarcasIds = marcasIds !== undefined;  // NOVO
+  if (!hasUpdateData && !hasContactosIds && !hasMarcasIds) {
+    return res.status(400).json(...);
+  }
+
+Logica: permite atualizar se tem marcasIds mesmo sem outros campos
+
+4. Gravar em leads_marcas (linhas 420-430)
+
+NOVO - Bloco inteiro:
+  // Handle marcasIds if provided
+  if (hasMarcasIds && marcasIds.length > 0) {
+    const uniqueMarcaIds = Array.from(new Set(marcasIds));
+    await db.delete(leadsMarcas).where(eq(leadsMarcas.leadId, id));
+    for (const mId of uniqueMarcaIds) {
+      await db.insert(leadsMarcas).values({
+        leadId: id,
+        marcaId: mId,
+      });
+    }
+  }
+
+Logica:
+  - Se hasMarcasIds e tem valores:
+    * Delete de todas as marcas antigas para este lead
+    * Inserir as novas com base em marcasIds
+  - Se NAO vier marcasIds: nao muda nada
+
+5. Refetch do lead (linhas 432-441)
+
+NOVO - Bloco inteiro:
+  // Refetch updated lead if we modified it
+  if (hasUpdateData) {
+    // Lead was already updated above
+  } else if (hasContactosIds || hasMarcasIds) {
+    // Relations changed, need to refetch
+    const result = await db.query.leads.findFirst(...);
+    updated = result;
+  }
+
+Logica: se so mudou relacoes (sem updateData), refetch o lead
+
+6. Log atualizado (linha 443)
+
+ADICIONAR:
+  console.log("[CRM Leads] PATCH updated lead", { id, marcasCount: marcasIds?.length ?? 0 });
+
+2.3 RESUMO MUDANCAS
+
+Ficheiros: 2
+  - shared/schema.ts: 1 linha adicionada (marcasIds)
+  - server/routes/crmLeads.ts: ~80 linhas adicionadas
+
+POST /api/crm/leads:
+  + Extrair marcasIds do body
+  + Buscar nomes das marcas
+  + Atualizar campo marca com nomes concatenados
+  + Inserir em leads_marcas
+  + Log atualizado
+
+PATCH /api/crm/leads/:id:
+  + Extrair marcasIds do body
+  + Buscar nomes das marcas
+  + Atualizar campo marca com nomes concatenados
+  + Delete/recreate em leads_marcas
+  + Refetch se necessario
+  + Log atualizado
+
+================================================================================
+3. FLUXO DE DADOS
+================================================================================
+
+EXEMPLO 1: POST /api/crm/leads com marcasIds
+
+Request Body:
+  {
+    "entidadeId": "ent-1",
+    "contactoId": "con-1",
+    "titulo": "Oportunidade A",
+    "marcasIds": ["marca-1", "marca-2"]  // NOVO
+  }
+
+Backend Processamento:
+  1. Validar schema (marcasIds: string[])
+  2. Buscar marcas: SELECT * FROM marcas WHERE id IN ('marca-1', 'marca-2')
+     Resultado: [{ id: 'marca-1', nome: 'Ritmonio' }, { id: 'marca-2', nome: 'Bette' }]
+  3. finalMarca = "Ritmonio, Bette"
+  4. INSERT lead { marca: "Ritmonio, Bette", ... }
+  5. INSERT leads_marcas { leadId: 'lead-1', marcaId: 'marca-1' }
+  6. INSERT leads_marcas { leadId: 'lead-1', marcaId: 'marca-2' }
+
+Response:
+  {
+    "success": true,
+    "lead": {
+      "id": "lead-1",
+      "marca": "Ritmonio, Bette",
+      ...
+    }
+  }
+
+Logs:
+  [CRM Leads] POST created lead { id: 'lead-1', marcasCount: 2 }
+
+EXEMPLO 2: PATCH /api/crm/leads/:id com novo marcasIds
+
+Request Body:
+  PATCH /api/crm/leads/lead-1
+  {
+    "marcasIds": ["marca-2", "marca-3"]  // Mudou de 1,2 para 2,3
+  }
+
+Backend Processamento:
+  1. Validar que marcasIds e definido
+  2. Buscar marcas: SELECT * FROM marcas WHERE id IN ('marca-2', 'marca-3')
+     Resultado: [{ nome: 'Bette' }, { nome: 'Kora' }]
+  3. updateData.marca = "Bette, Kora"
+  4. UPDATE leads SET marca = "Bette, Kora" WHERE id = 'lead-1'
+  5. DELETE FROM leads_marcas WHERE lead_id = 'lead-1'
+  6. INSERT leads_marcas { leadId: 'lead-1', marcaId: 'marca-2' }
+  7. INSERT leads_marcas { leadId: 'lead-1', marcaId: 'marca-3' }
+  8. REFETCH lead
+  9. RETURN lead atualizado
+
+Logs:
+  [CRM Leads] PATCH updated lead { id: 'lead-1', marcasCount: 2 }
+
+EXEMPLO 3: POST sem marcasIds (comportamento legado)
+
+Request Body:
+  {
+    "entidadeId": "ent-1",
+    "contactoId": "con-1",
+    "titulo": "Oportunidade B",
+    "marca": "Ritmonio"  // campo texto, sem marcasIds
+  }
+
+Backend Processamento:
+  1. marcasIds e undefined
+  2. finalMarca = "Ritmonio" (parametro original)
+  3. INSERT lead { marca: "Ritmonio", ... }
+  4. NÃO inserir em leads_marcas
+  5. Response com lead.marca = "Ritmonio"
+
+Comportamento: IDENTICO AO ANTERIOR (sem breaking changes)
+
+================================================================================
+4. CASOS DE USO
+================================================================================
+
+CASO 1: Criar lead com multiplas marcas
+  POST /api/crm/leads { marcasIds: ['m1', 'm2', 'm3'] }
+  -> marca = "Marca1, Marca2, Marca3"
+  -> 3 records em leads_marcas
+  -> GET /api/crm/leads/:id mostra marcas: [{ id, nome }, ...]
+
+CASO 2: Editar lead - mudar marcas
+  PATCH /api/crm/leads/:id { marcasIds: ['m4'] }
+  -> marca = "Marca4"
+  -> Apagar antigos em leads_marcas
+  -> Inserir novo
+
+CASO 3: Cliente antigo sem marcasIds
+  POST /api/crm/leads { marca: "Ritmonio" }
+  -> marca = "Ritmonio"
+  -> Sem leads_marcas
+  -> Funciona igual ao anterior
+
+CASO 4: Editar outros campos E marcasIds
+  PATCH /api/crm/leads/:id { titulo: "...", marcasIds: ['m1'] }
+  -> UPDATE leads (titulo + marca)
+  -> DELETE/INSERT em leads_marcas
+  -> REFETCH lead
+  -> Return atualizado
+
+================================================================================
+5. TESTES E VALIDACAO
+================================================================================
+
+5.1 TypeScript Compilation
+  OK npm run build sem erros
+  OK Tipos corretos para marcasIds
+  OK Relacoes Drizzle OK
+
+5.2 Servidor
+  OK npm run dev rodando em http://localhost:5000
+  OK Sem erros de runtime
+  OK Endpoints GET continuam funcionais
+
+5.3 Compatibilidade
+  - POST sem marcasIds funciona igual antes
+  - PATCH sem marcasIds nao mexe em leads_marcas
+  - Leads antigos (sem marcas) continuam funcionais
+  - Campo marca (texto) preservado
+
+5.4 Manual Testing (Recomendado)
+  [ ] POST /api/crm/leads com marcasIds
+      Expectativa: lead criado, campo marca preenchido, leads_marcas com records
+  [ ] GET /api/crm/leads/:id apos POST
+      Expectativa: marcas[] populated
+  [ ] PATCH lead mudando marcasIds
+      Expectativa: DELETE antigas, INSERT novas
+  [ ] GET apos PATCH
+      Expectativa: marcas[] atualizado
+  [ ] POST sem marcasIds (compatibilidade)
+      Expectativa: campo marca mantido, sem leads_marcas
+
+================================================================================
+6. IMPACTO E BREAKING CHANGES
+================================================================================
+
+BREAKING CHANGES: NENHUM
+
+Compatibilidade:
+  - Clientes antigos que nao enviam marcasIds continuam funcionando
+  - Campo marca (texto) continua igual
+  - GET endpoints continuam devolvendo marcas[] (ja implementado antes)
+  - Leads antigos (sem marcas) funcionam normalmente
+
+Novos clientes podem:
+  - Enviar marcasIds em POST/PATCH
+  - Receber marcas[] em GET
+  - Sistema faz sync automatico entre campo marca e leads_marcas
+
+================================================================================
+7. CONCLUSAO
+================================================================================
+
+STATUS: COMPLETO - POST/PATCH COM GRAVACAO MARCASIDS
+
+Implementado com sucesso:
+  OK POST /api/crm/leads aceita marcasIds
+  OK PATCH /api/crm/leads/:id aceita marcasIds
+  OK Campo marca atualizado com nomes concatenados
+  OK leads_marcas em sync (create, delete, update)
+  OK Compatibilidade total com dados antigos
+  OK Duplicatas eliminadas (Set)
+  OK TypeScript validation OK
+  OK Servidor rodando
+
+Proximas fases:
+  - Frontend multi-select para marcas (POST/PATCH forms)
+  - Enriquecer Odoo sync com marcas
+  - Filtros por marca em listas
+
+O sistema backend agora:
+  * Aceita e grava marcasIds em POST/PATCH
+  * Mantem leads_marcas em sync
+  * Atualiza campo marca com nomes concatenados
+  * Compativel com clientes legados
+  * Pronto para frontend multi-select
+
+SISTEMA BACKEND COMPLETO PARA MULTIPLAS MARCAS POR LEAD.
+
+================================================================================
+FIM DO RELATORIO
+================================================================================
+
+Versao: 1.0
+Data: 27 Novembro 2025
+Escopo: POST/PATCH com gravacao de marcasIds
+Status: PRONTO PARA FRONTEND
