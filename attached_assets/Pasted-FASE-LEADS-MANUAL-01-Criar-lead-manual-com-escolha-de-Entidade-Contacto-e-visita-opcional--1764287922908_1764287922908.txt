@@ -1,0 +1,144 @@
+FASE-LEADS-MANUAL-01 – Criar lead “manual” com escolha de Entidade + Contacto (e visita opcional)
+
+Problema atual:
+- Em /admin/leads, o botão "Novo lead" já abre /admin/leads/new.
+- Mas o formulário de "Novo lead" foi pensado para o caso de vir de uma visita:
+  - contexto vem preenchido pela visita (entidade, contacto, visita),
+  - o campo "Contacto *" abaixo da descrição usa os contactos dessa visita.
+- Quando venho diretamente de /admin/leads (sem visita):
+  - "Contexto do lead" aparece vazio,
+  - não consigo escolher entidade nem contacto,
+  - ao gravar dá erro "Contexto incompleto: entidade ausente".
+
+Objetivo:
+- Manter o fluxo atual "visita → novo lead" exatamente como está.
+- Adicionar um modo de criação "manual" quando abrimos /admin/leads/new sem visita:
+  - Permitir escolher Entidade (obrigatório),
+  - Permitir escolher Contacto principal dessa entidade (obrigatório, por agora),
+  - Permitir escolher Visita (opcional) se o utilizador quiser associar uma.
+- No fim, o POST /api/crm/leads deve receber entidadeId/contactoId (e visitaId se existir),
+  e o lead tem de ser criado com sucesso.
+
+Ficheiros principais (ajusta aos nomes reais se forem ligeiramente diferentes):
+- client/src/pages/AdminLeadDetailPage.tsx
+  (onde está o "Novo lead", o card "Contexto do lead" e o formulário de edição)
+- Eventuais componentes de contexto/entidade/contacto reutilizados pelo VisitaForm.
+
+Tarefas:
+
+1) Detetar modos de criação
+   - Em AdminLeadDetailPage (ou componente equivalente), já existe:
+     - id === "new" → create mode.
+     - Query params: visitaId, entidadeId, contactoId, returnTo, etc.
+   - Introduzir um booleano:
+     - const isCreateMode = id === "new";
+     - const isCreateFromVisit = isCreateMode && !!visitaIdFromSearchParam;
+   - isCreateFromVisit = true → comportamento atual (não mexer).
+   - isCreateFromVisit = false → novo modo "lead manual".
+
+2) UI do cartão "Contexto do lead" no modo manual
+   - No card "Contexto do lead", quando isCreateFromVisit = false:
+     - Mostrar uma nota (já existe um aviso amarelo, pode ser mantido/ajustado).
+     - Em vez de mostrar "Sem entidade associada" estático, adicionar 3 campos:
+
+       a) Entidade *
+          - Select obrigatório.
+          - Reutilizar a mesma lógica de carregamento de entidades usada no VisitaForm
+            (ex.: endpoint /api/entidades com pesquisa, etc.).
+          - Guardar o valor selecionado em estado do formulário, ex. form.entidadeId.
+
+       b) Contacto principal *
+          - Dependente da entidade escolhida.
+          - Reutilizar a mesma lógica de "selecionar contacto" usada noutros ecrãs
+            (VisitaForm ou ContactoDetail), mas em modo single-select.
+          - Carregar contactos da entidade selecionada.
+          - Guardar em form.contactoId.
+          - Por agora este campo deve ser obrigatório, porque no backend o contactoId
+            ainda é NOT NULL (não alteres isso nesta fase).
+
+       c) Visita (opcional)
+          - Campo opcional.
+          - Se existir já algum helper/hook para listar visitas de uma entidade,
+            reutilizar.
+          - Caso contrário, pode ser uma dropdown simples com visitas recentes
+            dessa entidade (ou TODO, mas deixar o campo preparado).
+          - Guardar em form.visitaId (pode ser null).
+
+3) Campo "Contacto *" abaixo da descrição
+   - Hoje, esse campo "Contacto *" (abaixo da descrição do lead) é baseado em
+     "contactos da visita".
+   - Ajustar a renderização:
+     - Se isCreateFromVisit = true (fluxo visita → lead):
+       - manter esse campo exatamente como está.
+     - Se isCreateFromVisit = false (lead manual):
+       - NÃO renderizar esse campo, porque o contacto será escolhido
+         no card de contexto (b) acima.
+
+4) Lógica de gravação (handleSave / submit)
+   - No create mode (id === "new"):
+
+     a) Se isCreateFromVisit = true:
+        - Manter exatamente o comportamento atual:
+          - utiliza entidadeId/contactoId/visitaId vindos da visita/contexto.
+
+     b) Se isCreateFromVisit = false (lead manual):
+        - Ler entidadeId, contactoId e visitaId do novo estado do formulário.
+        - Validar no frontend:
+          - Se NÃO houver entidadeId → mostrar toast/erro:
+            "Tens de associar uma entidade ao lead."
+          - Enquanto contactoId for obrigatório no backend:
+            - Se NÃO houver contactoId → toast:
+              "Tens de associar um contacto principal ao lead."
+        - Só prosseguir para o POST se estas validações passarem.
+        - Incluir no body do POST /api/crm/leads:
+          {
+            titulo,
+            descricao,
+            estado,
+            valorPrevisto,
+            entidadeId: form.entidadeId,
+            contactoId: form.contactoId,
+            visitaId: form.visitaId ?? null,
+            marcasIds: [...],
+            // restante payload que já existia
+          }
+
+   - Navegação pós-gravação:
+     - Se houver returnTo na query → continuar a usar (já existe).
+     - Caso contrário (lead manual criado a partir da lista) → fallback para /admin/leads.
+
+5) Testes manuais a garantir
+
+   Cenário A – Criar lead a partir da lista (manual):
+   - Abrir /admin/leads.
+   - Clicar "Novo lead".
+   - Confirmar que:
+     - Card "Contexto do lead" mostra campos para escolher Entidade e Contacto (e Visita opcional).
+   - Escolher:
+     - uma entidade,
+     - um contacto dessa entidade,
+     - (opcionalmente) uma visita.
+   - Preencher título e restantes campos.
+   - Gravar.
+   - Esperado:
+     - Lead criado com sucesso.
+     - Volta para /admin/leads (ou returnTo definido).
+     - O novo lead aparece na lista.
+
+   Cenário B – Criar lead a partir de visita (regressão):
+   - Abrir uma visita com entidade/contacto.
+   - Clicar "Novo lead desta visita".
+   - Confirmar que:
+     - Card "Contexto do lead" está preenchido e readonly, como antes.
+     - Campo "Contacto *" abaixo da descrição continua a aparecer como antes.
+   - Gravar lead.
+   - Esperado:
+     - Lead criado com sucesso.
+     - Volta à visita.
+     - O novo lead aparece no quadro de leads da visita.
+
+Restrições:
+- Não alterar validações de backend (contactoId continua obrigatório nesta fase).
+- Não mexer na integração com Odoo nem nos anexos nem no áudio.
+- Evitar duplicação de lógica de carregamento de entidades/contactos/visitas:
+  reutilizar os mesmos hooks/queries utilizados em VisitaForm sempre que possível.
