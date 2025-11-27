@@ -293,10 +293,35 @@ export default function VisitaDetail() {
     },
   });
 
-  // FASE-LEADS-NEW-01: Navigate to lead creation form (replaces modal)
+  // FASE-LEADS-NEW-03: Navigate to lead creation form with context (entidadeId + contactoId)
   const handleNovoLeadVisita = () => {
-    if (!visita?.id) return;
-    setLocation(`/admin/leads/new?visitaId=${visita.id}&returnTo=/admin/visitas/${visita.id}`);
+    if (!visita?.id || !visita.entidadeId) {
+      toast({
+        title: "Erro",
+        description: "Esta visita não tem contexto suficiente para criar um lead. Garante que está associada a uma entidade e pelo menos a um contacto.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // FASE-LEADS-NEW-03: Get contactoId from visita context
+    const contactoIdFromVisita: string | null =
+      visita?.contactoId ||
+      (Array.isArray(visita?.contactosPresentes) && visita.contactosPresentes[0]?.id) ||
+      null;
+
+    if (!contactoIdFromVisita) {
+      toast({
+        title: "Erro",
+        description: "Esta visita não tem contexto suficiente para criar um lead. Garante que está associada a uma entidade e pelo menos a um contacto.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const returnTo = `/admin/visitas/${visita.id}`;
+    const url = `/admin/leads/new?visitaId=${visita.id}&entidadeId=${visita.entidadeId}&contactoId=${contactoIdFromVisita}&returnTo=${encodeURIComponent(returnTo)}`;
+    setLocation(url);
   };
 
   // FASE CRM-LEADS-VISITA-STEP1: Create CRM lead from visita (COMENTADO - usar FASE-LEADS-NEW-01)

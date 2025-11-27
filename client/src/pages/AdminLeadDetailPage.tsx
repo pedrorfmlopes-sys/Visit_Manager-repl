@@ -54,11 +54,14 @@ export default function AdminLeadDetailPage() {
   const { toast } = useToast();
   const search = useSearch();
 
-  // FASE-LEADS-NEW-02: Parse query params for create mode
+  // FASE-LEADS-NEW-03: Parse query params for create mode (with context)
   const searchParams = new URLSearchParams(search);
   const visitaId = searchParams.get("visitaId");
+  const entidadeId = searchParams.get("entidadeId");
+  const contactoId = searchParams.get("contactoId");
   const returnTo = searchParams.get("returnTo");
   const isCreateMode = id === "new";
+  const hasContext = isCreateMode && entidadeId && contactoId;
 
   const { data, isLoading, isError } = useQuery<LeadResponse>({
     queryKey: ["/api/crm/leads", id],
@@ -98,7 +101,7 @@ export default function AdminLeadDetailPage() {
     );
   }
 
-  // FASE-LEADS-NEW-02: Create empty lead for new mode
+  // FASE-LEADS-NEW-03: Create empty lead for new mode (with context from query)
   const lead = isCreateMode 
     ? {
         id: "new",
@@ -108,8 +111,8 @@ export default function AdminLeadDetailPage() {
         estado: "novo",
         valorPrevisto: null,
         moeda: "EUR",
-        entidadeId: "",
-        contactoId: "",
+        entidadeId: entidadeId || "",
+        contactoId: contactoId || "",
         visitaId: visitaId || null,
         odooLeadId: null,
         createdAt: "",
@@ -140,7 +143,22 @@ export default function AdminLeadDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
-          <LeadDetailForm lead={lead} isCreateMode={isCreateMode} visitaId={visitaId} returnTo={returnTo} />
+          {isCreateMode && !hasContext && (
+            <div className="p-4 bg-destructive/10 border border-destructive rounded text-sm text-destructive">
+              Erro: Esta visita não tem contexto suficiente para criar um lead (entidade ou contacto ausentes).
+            </div>
+          )}
+          {(isCreateMode && hasContext) || !isCreateMode ? (
+            <LeadDetailForm 
+              lead={lead} 
+              isCreateMode={isCreateMode} 
+              visitaId={visitaId} 
+              returnTo={returnTo}
+              entidadeId={entidadeId}
+              contactoId={contactoId}
+              hasContext={hasContext}
+            />
+          ) : null}
         </div>
         {!isCreateMode && (
           <div>
@@ -157,11 +175,17 @@ function LeadDetailForm({
   isCreateMode = false, 
   visitaId = null,
   returnTo = null,
+  entidadeId = null,
+  contactoId = null,
+  hasContext = false,
 }: { 
   lead: Lead; 
   isCreateMode?: boolean;
   visitaId?: string | null;
   returnTo?: string | null;
+  entidadeId?: string | null;
+  contactoId?: string | null;
+  hasContext?: boolean;
 }) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -290,11 +314,14 @@ function LeadDetailForm({
         moeda: form.moeda || "EUR",
       };
 
-      // FASE-LEADS-NEW-02: POST for create mode, PATCH for edit mode
+      // FASE-LEADS-NEW-03: POST for create mode, PATCH for edit mode (with context)
       if (isCreateMode) {
+        if (!entidadeId || !contactoId) {
+          throw new Error("Contexto incompleto: entidade ou contacto ausentes");
+        }
         body.visitaId = visitaId || null;
-        // For create mode, we'll need entidadeId and contactoId from the visita context
-        // These should be provided or inferred from visitaId
+        body.entidadeId = entidadeId;
+        body.contactoId = contactoId;
       }
 
       const method = isCreateMode ? "POST" : "PATCH";

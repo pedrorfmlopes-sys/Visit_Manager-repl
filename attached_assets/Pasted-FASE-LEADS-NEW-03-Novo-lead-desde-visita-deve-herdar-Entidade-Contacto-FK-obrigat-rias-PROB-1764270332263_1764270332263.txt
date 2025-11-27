@@ -1,0 +1,157 @@
+FASE LEADS-NEW-03 – Novo lead desde visita deve herdar Entidade + Contacto (FK obrigatórias)
+
+PROBLEMA ATUAL
+- Quando estou em /admin/visitas/:visitaId e clico em "Novo lead desta visita":
+  → navego para /admin/leads/new?visitaId=...&returnTo=/admin/visitas/...
+- O formulário de "Novo lead" abre, mas NÃO está a assumir a entidade nem o contacto.
+- Ao gravar, o POST /api/crm/leads falha porque a BD exige entidadeId e contactoId válidos
+  (FK obrigatórias na tabela de leads).
+
+ANTES (modal antigo)
+- No fluxo antigo do modal pequeno em VisitaDetail.tsx, já existia a lógica de contexto:
+  - entidadeId = visita.entidadeId
+  - contactoIdFromVisita:
+    - primeiro tenta visita.contactoId
+    - se não houver, usa o primeiro contacto da lista contactos da visita
+  - Se não houvesse entidade ou contacto, mostrava mensagem tipo:
+    "Esta visita não tem contexto suficiente para criar um lead..."
+
+AGORA (novo fluxo com /admin/leads/new)
+- Ao clicar no botão, apenas enviamos visitaId e returnTo.
+- Falta enviar entidadeId e contactoId, e o formulário de "Novo lead" não os está a usar.
+
+OBJETIVO
+Garantir que, quando criamos um lead a partir de uma visita:
+1) A navegação para /admin/leads/new inclui visitaId + entidadeId + contactoId + returnTo.
+2) O formulário de "Novo lead" lê estes valores da query string e os inclui no POST /api/crm/leads.
+3) Se faltar entidadeId ou contactoId, NÃO deve tentar gravar e deve mostrar uma mensagem amigável.
+
+TAREFAS
+
+1) VISITADETAIL – Passar entidadeId + contactoId na navegação
+
+Ficheiro:
+- client/src/pages/VisitaDetail.tsx
+
+Passos:
+
+a) Reutilizar a lógica antiga que já existia para contexto do lead (do modal antigo):
+   - entidadeId = visita.entidadeId (ou equivalente)
+   - contactoIdFromVisita:
+     - primeiro tenta o contacto principal da visita (visita.contactoId)
+     - se não existir, usar o primeiro contacto da lista de contactos associados à visita
+   - Se não houver entidade ou contacto válidos:
+     - NÃO navegar para /admin/leads/new
+     - Mostrar o mesmo toast/mensagem de antes:
+       "Esta visita não tem contexto suficiente para criar um lead. Garante que está associada a uma entidade e pelo menos a um contacto."
+
+b) No handler do botão "Novo lead desta visita":
+   - Em vez de apenas:
+       setLocation(`/admin/leads/new?visitaId=${visita.id}&returnTo=/admin/visitas/${visita.id}`);
+   - Passar também entidadeId e contactoIdFromVisita, por ex.:
+
+       const visitaId = visita.id;
+       const entidadeId = ...; // calculado como acima
+       const contactoIdFromVisita = ...; // calculado como acima
+
+       const returnTo = `/admin/visitas/${visitaId}`;
+
+       setLocation(
+         `/admin/leads/new` +
+         `?visitaId=${visitaId}` +
+         `&entidadeId=${entidadeId}` +
+         `&contactoId=${contactoIdFromVisita}` +
+         `&returnTo=${encodeURIComponent(returnTo)}`
+       );
+
+2) ADMIN LEAD DETAIL – Usar entidadeId + contactoId no modo "new"
+
+Ficheiro:
+- Página do formulário completo de lead (ex.: client/src/pages/AdminLeadDetailPage.tsx).
+
+Comportamento atual:
+- Já existe suporte para id === "new" (modo criação) e leitura de visitaId/returnTo da query.
+- Mas ainda não usamos entidadeId/contactoId e o POST falha.
+
+Passos:
+
+a) Ler mais parâmetros da query string:
+
+   const [searchParams] = useSearchParams();
+   const visitaIdFromQuery = searchParams.get("visitaId");
+   const entidadeIdFromQuery = searchParams.get("entidadeId");
+   const contactoIdFromQuery = searchParams.get("contactoId");
+   const returnTo = searchParams.get("returnTo");
+
+   const isCreateMode = id === "new";
+
+b) Em isCreateMode:
+   - Guardar visitaIdFromQuery, entidadeIdFromQuery e contactoIdFromQuery num state
+     ou numa estrutura de "contexto" do formulário.
+   - Se faltar entidadeIdFromQuery OU contactoIdFromQuery:
+     - Desativar o botão "Criar lead" OU impedir o submit.
+     - Mostrar uma mensagem clara ao utilizador, por ex.:
+       "Não foi possível criar o lead porque esta visita não está associada a uma entidade e contacto válidos."
+
+c) No handler de submit em modo criar (POST /api/crm/leads):
+   - Incluir no body do POST:
+     - visitaId: visitaIdFromQuery (se existir)
+     - entidadeId: entidadeIdFromQuery
+     - contactoId: contactoIdFromQuery
+     - + todos os outros campos do formulário (titulo, descricao, estado, valorPrevisto, moeda, marcasIds, etc.).
+
+   - Exemplo (pseudo-código, adaptar à estrutura já existente):
+
+       const payload = {
+         titulo,
+         descricao,
+         estado,
+         valorPrevisto,
+         moeda,
+         marcasIds,
+         visitaId: visitaIdFromQuery,
+         entidadeId: entidadeIdFromQuery,
+         contactoId: contactoIdFromQuery,
+       };
+
+       const response = await fetch("/api/crm/leads", { method: "POST", body: JSON.stringify(payload), ... });
+
+   - Em sucesso:
+     - Ler o createdId da resposta (json.lead.id).
+     - Se houver `returnTo`:
+         navigate(returnTo);
+       Senão:
+         navigate(`/admin/leads/${createdId}`);
+
+   - Opcional (nice to have):
+     - Invalidate de queries relacionadas com a visita:
+       queryClient.invalidateQueries(["visita", visitaIdFromQuery]);
+       queryClient.invalidateQueries(["visitaLeads", visitaIdFromQuery]);
+
+3) Testes manuais
+
+Fluxo A – através da visita:
+- Abrir /admin/visitas/:visitaId (com entidade e contacto válidos).
+- Clicar "Novo lead desta visita".
+  → Confirmar que a URL é algo como:
+    /admin/leads/new?visitaId=...&entidadeId=...&contactoId=...&returnTo=/admin/visitas/...
+- Preencher o formulário completo de "Novo lead" e gravar.
+  → Esperado:
+    - POST /api/crm/leads com visitaId, entidadeId e contactoId.
+    - Resposta 201/200 com lead.id.
+    - Navegar de volta para /admin/visitas/:visitaId (returnTo).
+    - O quadro "Leads desta visita" mostra o novo lead.
+
+Fluxo B – caso falte contexto:
+- Criar uma visita sem entidade ou sem contacto.
+- Clicar "Novo lead desta visita".
+  → Esperado:
+    - NÃO navegar para /admin/leads/new.
+    - Ver o toast/mensagem "Esta visita não tem contexto suficiente para criar um lead..."
+
+DOCUMENTAÇÃO
+- Criar RELATORIO_FASE-LEADS-NEW-03-CONTEXTO-ENTIDADE-CONTACTO.txt
+  com:
+  - Como ficou a navegação em VisitaDetail.tsx (query string completa).
+  - Como AdminLeadDetailPage lê visitaId/entidadeId/contactoId e os usa no POST.
+  - Resultado dos testes A e B.
