@@ -2,6 +2,7 @@ import { ChevronRight, Mail, Phone, Building2, Briefcase, UserCheck } from "luci
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { ContactoWithRelations } from "@shared/schema";
+import OdooLogo from "@/assets/crm/odoo.svg";
 
 interface ContactoCardProps {
   contacto: ContactoWithRelations;
@@ -67,7 +68,24 @@ export function ContactoCard({ contacto, onClick }: ContactoCardProps) {
           </div>
         </div>
         
-        <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <img
+            src={OdooLogo}
+            alt="Odoo CRM"
+            className={
+              contacto.odooPartnerId
+                ? "h-5 w-auto"
+                : "h-5 w-auto opacity-30 grayscale"
+            }
+            title={
+              contacto.odooPartnerId
+                ? "Ligado ao Odoo CRM"
+                : "CRM desligado"
+            }
+            data-testid={`img-odoo-contacto-${contacto.id}`}
+          />
+          <ChevronRight className="h-5 w-5 text-muted-foreground" />
+        </div>
       </div>
     </Card>
   );

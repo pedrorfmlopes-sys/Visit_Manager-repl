@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import type { EntidadeWithRelations } from "@shared/schema";
+import OdooLogo from "@/assets/crm/odoo.svg";
 
 interface EntidadeCardProps {
   entidade: EntidadeWithRelations;
@@ -99,7 +100,24 @@ export function EntidadeCard({ entidade, onClick, showSyncStatus = false }: Enti
           </div>
         </div>
         
-        <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <img
+            src={OdooLogo}
+            alt="Odoo CRM"
+            className={
+              entidade.odooPartnerId
+                ? "h-5 w-auto"
+                : "h-5 w-auto opacity-30 grayscale"
+            }
+            title={
+              entidade.odooPartnerId
+                ? "Ligado ao Odoo CRM"
+                : "CRM desligado"
+            }
+            data-testid={`img-odoo-entidade-${entidade.id}`}
+          />
+          <ChevronRight className="h-5 w-5 text-muted-foreground" />
+        </div>
       </div>
     </Card>
   );

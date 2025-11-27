@@ -1,0 +1,119 @@
+PROMPT PARA O AGENT – CRM-UI-ICONS-STEP2 (logo CRM no card da lista)
+
+Objetivo:
+No card da lista de Entidades (e, se existir equivalente, de Contactos):
+
+Mostrar o logo do Odoo no canto direito, junto à seta.
+
+Quando a entidade/contacto está ligada ao Odoo → logo a cores.
+
+Quando não está ligada → mesmo logo, mas em modo “desligado” (cinzento / opacidade baixa).
+
+1) Entidades – card da lista
+
+Ficheiro a editar (ou equivalente):
+
+Procura o componente que renderiza o card da entidade mostrado na screenshot, algo como:
+
+client/src/components/entidades/EntidadeListItem.tsx
+
+ou client/src/pages/entidades/EntidadesList.tsx
+
+Podes localizar pelo texto "Parceiro Comercial" que aparece na screenshot, e a estrutura do card.
+
+1.1 Importar o logo
+
+No topo do ficheiro do card da entidade, importa o logo do Odoo (o mesmo usado em OdooCrmBlock):
+
+import OdooLogo from "@/assets/crm/odoo.svg";
+
+
+(ajusta o caminho se necessário, mas mantém igual ao já usado nas Definições / CRMs).
+
+1.2 Adicionar o ícone no canto direito do card
+
+No JSX atual do card, no canto direito deve existir algo como um <ChevronRight /> ou similar sozinho.
+
+Exemplo aproximado do layout:
+
+<div className="flex items-center justify-between">
+  {/* lado esquerdo: nome, chip "Parceiro Comercial", contacto, telefone, email */}
+  <div> ... </div>
+
+  {/* lado direito: ícone seta */}
+  <ChevronRight className="..." />
+</div>
+
+
+Substitui a parte do lado direito por um div com o logo + seta:
+
+<div className="flex items-center gap-3">
+  <img
+    src={OdooLogo}
+    alt="Odoo CRM"
+    className={
+      entidade.odooPartnerId
+        ? "h-5 w-auto"
+        : "h-5 w-auto opacity-30 grayscale"
+    }
+    title={
+      entidade.odooPartnerId
+        ? "Ligado ao Odoo CRM"
+        : "CRM desligado"
+    }
+  />
+  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+</div>
+
+
+Notas importantes:
+
+Usa o campo que já existe no modelo da entidade para indicar a ligação ao Odoo.
+
+Se não for entidade.odooPartnerId, usa o campo real (ex.: entidade.odooPartnerRef, etc.).
+
+Quando esse campo for “truthy” → logo normal.
+
+Quando for falsy/undefined → logo com opacity-30 grayscale para dar o efeito “desligado”.
+
+Não alteres o resto da estrutura do card (nome, chip “Parceiro Comercial”, etc.).
+
+2) Contactos – card da lista (se existir)
+
+Se houver um componente semelhante para a lista de contactos (cartão horizontal com nome, telefone, email e seta à direita):
+
+Importa também o OdooLogo no ficheiro do card de contacto.
+
+Usa a mesma lógica do ponto 1.2, mas com o campo de ligação ao Odoo do contacto:
+
+className={
+  contacto.odooPartnerId
+    ? "h-5 w-auto"
+    : "h-5 w-auto opacity-30 grayscale"
+}
+title={
+  contacto.odooPartnerId
+    ? "Ligado ao Odoo CRM"
+    : "CRM desligado"
+}
+
+
+(ajusta o nome do campo para o que estiver realmente a ser usado no modelo de Contacto).
+
+3) Testes
+
+npm run dev
+
+No browser:
+
+Abre a lista de Entidades:
+
+Entidades ligadas ao Odoo → logo Odoo a cores no canto direito, junto à seta.
+
+Entidades sem ligação → mesmo logo, mas cinzento/opaco (efeito desligado).
+
+Se tiveres lista de Contactos:
+
+Idem para contactos ligados vs não ligados.
+
+Não é preciso mexer em mais nada neste passo (nem visitas, nem leads).
