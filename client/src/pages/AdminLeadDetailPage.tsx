@@ -452,7 +452,7 @@ function LeadDetailForm({
                 <button
                   type="button"
                   className="underline-offset-2 hover:underline text-left"
-                  onClick={() => navigate(`/admin/entidades/${lead.entidadeId}`)}
+                  onClick={() => navigate(`/entidades/${lead.entidadeId}`)}
                   data-testid="link-lead-entidade"
                 >
                   {lead.entidadeNome}
@@ -470,7 +470,7 @@ function LeadDetailForm({
                 <button
                   type="button"
                   className="underline-offset-2 hover:underline text-left"
-                  onClick={() => navigate(`/admin/contactos/${lead.contactoId}`)}
+                  onClick={() => navigate(`/contactos/${lead.contactoId}`)}
                   data-testid="link-lead-contacto"
                 >
                   {lead.contactoNome}
@@ -488,7 +488,7 @@ function LeadDetailForm({
                 <button
                   type="button"
                   className="underline-offset-2 hover:underline text-left"
-                  onClick={() => navigate(`/admin/visitas/${lead.visitaId}`)}
+                  onClick={() => navigate(`/visitas/${lead.visitaId}`)}
                   data-testid="link-lead-visita"
                 >
                   {new Date(lead.visitaData).toLocaleDateString()}
@@ -497,7 +497,7 @@ function LeadDetailForm({
                 <button
                   type="button"
                   className="underline-offset-2 hover:underline text-left"
-                  onClick={() => navigate(`/admin/visitas/${lead.visitaId}`)}
+                  onClick={() => navigate(`/visitas/${lead.visitaId}`)}
                   data-testid="link-lead-visita"
                 >
                   Ver visita
@@ -518,7 +518,7 @@ function LeadDetailForm({
                   <button
                     key={c.id}
                     type="button"
-                    onClick={() => navigate(`/admin/contactos/${c.id}`)}
+                    onClick={() => navigate(`/contactos/${c.id}`)}
                     className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-secondary text-secondary-foreground hover:underline"
                     data-testid={`chip-contacto-${c.id}`}
                   >

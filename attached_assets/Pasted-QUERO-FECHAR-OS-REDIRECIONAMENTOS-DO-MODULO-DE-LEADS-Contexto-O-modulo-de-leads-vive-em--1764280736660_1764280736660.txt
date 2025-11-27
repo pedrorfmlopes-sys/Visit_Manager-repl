@@ -1,0 +1,82 @@
+QUERO FECHAR OS REDIRECIONAMENTOS DO MODULO DE LEADS
+
+Contexto:
+- O modulo de leads vive em:
+  - /admin/leads      (lista)
+  - /admin/leads/:id  (detalhe do lead)
+- As rotas reais da app para o resto são:
+  - /visitas/:id
+  - /entidades/:id
+  - /contactos/:id
+- Quando estou em /admin/leads/:id e clico em Entidade / Contacto / "Ver visita",
+  nao pode usar prefixo /admin nessas rotas, senão dá 404.
+
+Objetivo:
+- Manter /admin/leads e /admin/leads/:id como estão.
+- Garantir que TODOS os links dentro do detalhe de lead apontam para:
+  - /visitas/:id
+  - /entidades/:id
+  - /contactos/:id
+  (sem /admin à frente).
+
+Tarefas:
+
+1) Ficheiro principal: client/src/pages/AdminLeadDetailPage.tsx
+
+   - Procurar no ficheiro todas as ocorrencias de strings:
+     "/admin/visitas", "/admin/entidades", "/admin/contactos"
+
+   - Em especial, rever o "Contexto do lead":
+     - Link/acao para entidade:
+       ANTES (exemplo):
+         setLocation(`/admin/entidades/${lead.entidadeId}`)
+       DEPOIS:
+         setLocation(`/entidades/${lead.entidadeId}`)
+
+     - Link/acao para contacto:
+       ANTES:
+         setLocation(`/admin/contactos/${lead.contactoId}`)
+       DEPOIS:
+         setLocation(`/contactos/${lead.contactoId}`)
+
+     - Link/acao "Ver visita":
+       ANTES:
+         setLocation(`/admin/visitas/${lead.visitaId}`)
+       DEPOIS:
+         setLocation(`/visitas/${lead.visitaId}`)
+
+   - Garante que estas mudancas afetam tanto:
+     - o card "Contexto do lead",
+     - como qualquer chip/lista de “outros contactos” clicáveis, se existirem.
+
+2) Search global no frontend:
+   - Procurar por "/admin/visitas" e "/admin/entidades" e "/admin/contactos".
+   - Só devem ficar com /admin:
+     - /admin/leads
+     - /admin/leads/:id
+     - /admin/empresa, /admin/marcas, etc. (backoffice).
+   - Em tudo o que for navegação a partir de leads para visitas/entidades/contactos,
+     usar SEMPRE as rotas sem /admin.
+
+3) Testes manuais:
+
+   TESTE 1 – A partir da lista de leads:
+     - Ir a /admin/leads
+     - Abrir um lead com entidade + visita + contacto
+     - No card "Contexto do lead":
+       - Clicar no nome da Entidade → deve ir para /entidades/:id (sem 404)
+       - Clicar em "Ver visita" → deve ir para /visitas/:id (sem 404)
+       - Se houver contacto clicável, deve ir para /contactos/:id (sem 404)
+
+   TESTE 2 – A partir de uma visita:
+     - Ir a /visitas/:visitaId
+     - Abrir um lead dessa visita
+     - Repetir os cliques de Entidade/Visita/Contacto:
+       tudo deve navegar para /entidades, /visitas, /contactos (SEM /admin).
+
+4) Criar um pequeno relatorio:
+   - Ficheiro: RESUMO-FINAL_LEADS-REDIRECIONAMENTOS.txt
+   - Listar:
+     - linhas e ficheiros alterados,
+     - rotas antigas vs novas,
+     - resultado dos TESTES 1 e 2.
