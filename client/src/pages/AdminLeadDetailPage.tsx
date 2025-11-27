@@ -12,6 +12,7 @@ import { queryClient } from "@/lib/queryClient";
 import { ArrowLeft, ExternalLink, Mic, Wand2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useAudioTranscription } from "@/hooks/useAudioTranscription";
 import type { Marca } from "@shared/schema";
 
 type Contacto = {
@@ -122,14 +123,27 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
   const [, navigate] = useLocation();
   const [marcasSearch, setMarcasSearch] = useState("");
   const audioInputRef = useRef<HTMLInputElement>(null);
-  const [transcribing, setTranscribing] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
   
-  // FASE-LEADS-IA-02: Direct audio recording via MediaRecorder
-  const [isRecording, setIsRecording] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  // FASE IA-AUDIO-03: Use unified audio transcription hook (same as Visitas)
+  const audio = useAudioTranscription({
+    transcriptionEndpoint: '/api/visitas/ai/transcribe', // Use SAME endpoint as Visitas
+    onTranscriptionComplete: (text) => {
+      // Append transcribed text to descricao field
+      const currentDescricao = form.descricao || "";
+      const updatedDescricao = currentDescricao 
+        ? currentDescricao + "\n\n[Áudio transcrito]\n" + text
+        : text;
+      setForm((f) => ({ ...f, descricao: updatedDescricao }));
+      toast({
+        title: "Áudio transcrito",
+        description: "Texto adicionado à descrição do lead.",
+      });
+    },
+    onError: (error) => {
+      console.error("[AdminLeadDetailPage] Audio transcription error:", error);
+    }
+  });
 
   const { data: marcas = [] } = useQuery<Marca[]>({
     queryKey: ["/api/marcas", "onlyAtivas"],
@@ -153,155 +167,14 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
 
   const [saving, setSaving] = useState(false);
 
-  // Cleanup on unmount: stop recording and close media stream
-  useEffect(() => {
-    return () => {
-      if (mediaRecorderRef.current && isRecording) {
-        mediaRecorderRef.current.stop();
-      }
-      if (mediaStreamRef.current) {
-        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, [isRecording]);
-
-  // FASE-LEADS-IA-02: Auxiliary function to transcribe audio from blob
-  const transcribeBlob = async (blob: Blob) => {
-    try {
-      setTranscribing(true);
-      const formData = new FormData();
-      formData.append("file", blob);
-
-      const response = await fetch("/api/crm/leads/ai/transcribe", {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || "Failed to transcribe audio");
-      }
-
-      // Append transcribed text to description
-      const newDescription = form.descricao
-        ? form.descricao + "\n\n[Áudio transcrito]\n" + data.text
-        : data.text;
-
-      setForm((f) => ({ ...f, descricao: newDescription }));
-      toast({
-        title: "Áudio transcrito",
-        description: "Texto adicionado à descrição do lead.",
-      });
-    } catch (error: any) {
-      console.error("[Lead AI] Transcription error:", error);
-      toast({
-        title: "Falha na transcrição",
-        description: error?.message || "Não foi possível transcrever o áudio.",
-        variant: "destructive",
-      });
-    } finally {
-      setTranscribing(false);
-    }
-  };
-
-  // FASE-LEADS-IA-02: Start direct audio recording
-  const startRecording = async () => {
-    try {
-      console.log("[Lead AI] Starting recording...");
-      
-      // Check if browser supports getUserMedia
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        console.warn("[Lead AI] MediaRecorder not supported, falling back to file picker");
-        toast({
-          title: "Micro não disponível",
-          description: "Utilizando seletor de ficheiro em alternativa.",
-          variant: "default",
-        });
-        audioInputRef.current?.click();
-        return;
-      }
-
-      // Request microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaStreamRef.current = stream;
-
-      // Create MediaRecorder
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-
-      // Accumulate audio chunks
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      // Handle stop event
-      mediaRecorder.onstop = async () => {
-        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        audioChunksRef.current = [];
-        
-        // Stop all tracks
-        if (mediaStreamRef.current) {
-          mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-          mediaStreamRef.current = null;
-        }
-
-        // Transcribe the blob
-        await transcribeBlob(blob);
-      };
-
-      // Handle error
-      mediaRecorder.onerror = (event: any) => {
-        console.error("[Lead AI] MediaRecorder error:", event.error);
-        toast({
-          title: "Erro na gravação",
-          description: "Não foi possível gravar áudio.",
-          variant: "destructive",
-        });
-        setIsRecording(false);
-      };
-
-      // Start recording
-      mediaRecorder.start();
-      setIsRecording(true);
-      console.log("[Lead AI] Recording started");
-    } catch (error: any) {
-      console.error("[Lead AI] Error starting recording:", error);
-      
-      // Fallback to file picker if getUserMedia fails
-      if (error?.name === "NotAllowedError") {
-        toast({
-          title: "Permissão negada",
-          description: "Verifica as permissões do browser para o micro.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Micro não disponível",
-          description: "Utilizando seletor de ficheiro em alternativa.",
-        });
-        audioInputRef.current?.click();
-      }
-    }
-  };
-
-  // FASE-LEADS-IA-02: Stop direct audio recording
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      console.log("[Lead AI] Stopping recording...");
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
-  };
-
-  // Handle audio transcription from file upload
+  // Handle audio transcription from file upload (via hook)
   const handleTranscribeAudio = async (file: File) => {
-    await transcribeBlob(file);
-    if (audioInputRef.current) audioInputRef.current.value = "";
+    try {
+      await audio.transcribe(file);
+      if (audioInputRef.current) audioInputRef.current.value = "";
+    } catch (error) {
+      // Error already handled by hook
+    }
   };
 
   // Handle text summarization
@@ -551,20 +424,39 @@ function LeadDetailForm({ lead }: { lead: Lead }) {
                 <Button
                   type="button"
                   size="sm"
-                  variant={isRecording ? "destructive" : "outline"}
-                  onClick={() => (isRecording ? stopRecording() : startRecording())}
-                  disabled={transcribing}
+                  variant={audio.isRecording ? "destructive" : "outline"}
+                  onClick={() => (audio.isRecording ? audio.stopRecording() : audio.startRecording())}
+                  disabled={!audio.supportsRecording}
                   data-testid="button-lead-dictate"
                 >
                   <Mic className="h-4 w-4 mr-1" />
-                  {transcribing ? "A transcrever..." : isRecording ? "A gravar..." : "Dictar"}
+                  {audio.isRecording ? `A gravar... (${audio.recordingTime}s)` : "Dictar"}
                 </Button>
+                
+                {audio.hasAudio && !audio.isRecording && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        await audio.transcribe();
+                      } catch (error) {
+                        // Error already handled by hook
+                      }
+                    }}
+                    disabled={audio.isTranscribing}
+                    data-testid="button-lead-transcribe-audio"
+                  >
+                    {audio.isTranscribing ? "A transcrever..." : "Transcrever áudio"}
+                  </Button>
+                )}
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
                   onClick={() => audioInputRef.current?.click()}
-                  disabled={transcribing || isRecording}
+                  disabled={audio.isTranscribing || audio.isRecording}
                   data-testid="button-lead-upload-file"
                   title="Upload de ficheiro de áudio"
                 >

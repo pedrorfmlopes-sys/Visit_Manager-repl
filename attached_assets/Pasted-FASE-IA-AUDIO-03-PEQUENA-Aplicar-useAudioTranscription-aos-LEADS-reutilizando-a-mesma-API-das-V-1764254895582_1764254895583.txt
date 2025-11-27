@@ -1,0 +1,45 @@
+FASE IA-AUDIO-03 (PEQUENA) – Aplicar useAudioTranscription aos LEADS, reutilizando a mesma API das VISITAS
+
+Objetivo:
+- Na página de edição de LEAD (AdminLeadDetailPage.tsx), usar o MESMO hook useAudioTranscription que já funciona nas VISITAS.
+- Deixar de ter um pipeline de transcrição “especial” para leads.
+- Passar a chamar a MESMA rota backend que as visitas usam para transcrição.
+
+Tarefas:
+
+1) Importar e usar useAudioTranscription em AdminLeadDetailPage.tsx:
+   - Integrar o hook no form do lead (onde está o campo Descrição).
+   - Ligar:
+     - Botão “Gravar/Parar” ao isRecording/startRecording/stopRecording do hook.
+     - Botão “Transcrever áudio”:
+       - só ativo se hasAudio === true
+       - ao clicar, chama transcribe()
+       - em sucesso, acrescenta o texto ao campo descrição do lead
+       - em erro, mostra toast.
+
+2) Endpoint backend:
+   - Em vez de usar um endpoint específico de leads como /api/crm/leads/ai/transcribe:
+     - chamar o MESMO endpoint genérico usado pelas VISITAS (ex.: /api/ai/transcribe-audio ou equivalente).
+   - Se for preciso, cria um alias simples no backend (sem lógica nova):
+     - /api/crm/leads/ai/transcribe → apenas faz proxy para o endpoint genérico que já funciona.
+   - O importante é: a lógica de transcrição usada pelos leads ser exactamente a mesma que já está validada nas visitas.
+
+3) Limpeza:
+   - Remover código duplicado/antigo em AdminLeadDetailPage.tsx relacionado com MediaRecorder/transcribeBlob que já não for necessário, garantindo que agora só depende de useAudioTranscription.
+
+4) Testes (tu):
+   - Em dev:
+     - Abrir edição de lead.
+     - Gravar áudio → “Transcrever áudio”.
+     - Confirmar que o request vai ao mesmo endpoint que as VISITAS usam.
+     - Confirmar que o texto aparece na descrição.
+
+5) Atualizar relatório (RELATORIO_FASE-IA-AUDIO-03-LEADS.txt):
+   - Explicar:
+     - que AdminLeadDetailPage.tsx passou a usar o hook comum
+     - que endpoint de transcrição é usado pelos leads
+     - que a UX de leads e visitas é agora consistente.
+
+NÃO FAZER:
+- Não mexer em Odoo, marcas nem anexos.
+- Não mexer no summarize (botão “IA”, texto → melhorar).
