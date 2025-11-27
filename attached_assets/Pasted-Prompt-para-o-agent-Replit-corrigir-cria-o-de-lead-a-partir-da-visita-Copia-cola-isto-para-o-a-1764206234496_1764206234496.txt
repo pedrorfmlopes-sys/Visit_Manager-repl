@@ -1,0 +1,115 @@
+Prompt para o agent (Replit) – corrigir criação de lead a partir da visita
+
+Copia/cola isto para o agent:
+
+FASE CRM-LEADS-VISITA-FIX-CONTEXTO
+
+Objetivo:
+Corrigir o erro "Contexto de visita incompleto" ao criar um lead a partir de uma visita, usando um contacto da visita como fallback quando `visita.contactoId` estiver vazio.
+
+Ficheiro a editar:
+- client/src/pages/VisitaDetail.tsx
+
+Tarefas:
+
+1) Ajustar validação de contexto em handleCreateLeadFromVisita
+
+- Localiza a função:
+  `const handleCreateLeadFromVisita = async () => { ... }`
+
+- Substitui o início da função pela lógica seguinte:
+
+```ts
+const handleCreateLeadFromVisita = async () => {
+  // Determinar contactoId da visita:
+  // 1º tenta visita.contactoId
+  // 2º se vazio, tenta o primeiro contacto da lista de contactos da visita (se existir)
+  const contactoIdFromVisita =
+    visita?.contactoId ||
+    (Array.isArray((visita as any)?.contactos) && (visita as any).contactos[0]?.id) ||
+    null;
+
+  if (!visita?.id || !visita.entidadeId || !contactoIdFromVisita) {
+    toast({
+      title: "Erro",
+      description:
+        "Esta visita não tem contexto suficiente para criar um lead. Garante que está associada a uma entidade e pelo menos a um contacto.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+
+Usar o contactoId calculado no payload
+
+Ainda dentro de handleCreateLeadFromVisita, onde constróis o body para o POST, altera:
+
+const body = {
+  entidadeId: visita.entidadeId,
+  contactoId: visita.contactoId,
+  visitaId: visita.id,
+  ...
+};
+
+
+para:
+
+const body = {
+  entidadeId: visita.entidadeId,
+  contactoId: contactoIdFromVisita!,
+  visitaId: visita.id,
+  ...
+};
+
+
+Mantém o resto do body exatamente igual.
+
+Garantir que não há TypeScript errors
+
+Se o TypeScript se queixar de tipos em contactoIdFromVisita, podes tipar a variável assim:
+
+const contactoIdFromVisita: string | null =
+  visita?.contactoId ||
+  (Array.isArray((visita as any)?.contactos) && (visita as any).contactos[0]?.id) ||
+  null;
+
+
+Testes manuais
+
+npm run dev
+
+No browser:
+
+Abre uma entidade que tenha pelo menos um contacto.
+
+Cria uma visita associada a essa entidade e inclui pelo menos um contacto na visita.
+
+Abre o detalhe da visita.
+
+Na secção "Leads desta visita", clica “Adicionar lead”.
+
+Preenche Título, Marca, Estado e Valor (opcional).
+
+Clica “Criar lead”.
+
+Verifica:
+
+No Network, o POST /api/crm/leads devolve 201 e lead criado.
+
+O card de "Leads desta visita" passa a listar o novo lead.
+
+Em /admin/leads o lead também aparece.
+
+Em Entidade e Contacto, os cards de leads também mostram esse lead.
+
+NÃO alteres nada relacionado com Odoo nesta fase.
+Só queremos garantir que a criação de leads internos a partir da visita funciona sem o erro de "Contexto de visita incompleto".
+
+
+---
+
+Sobre a aba **Marcas**: neste momento é mesmo campo de texto livre. Depois de isto estar a criar leads sem erros, o próximo passo pode ser:
+
+- Ligar esse campo à tabela de **marcas/representadas** da app e ter um dropdown com autocomplete.
+
+Quando o agent acabar esta correção, testa como acima. Se continuar a dar luta, manda-me o print da Network do POST `/api/crm/leads` e seguimos a partir daí.

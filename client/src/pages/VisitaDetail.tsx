@@ -279,10 +279,19 @@ export default function VisitaDetail() {
 
   // FASE CRM-LEADS-VISITA-STEP1: Create CRM lead from visita
   const handleCreateLeadFromVisita = async () => {
-    if (!visita?.id || !visita.entidadeId || !visita.contactoId) {
+    // Determinar contactoId da visita:
+    // 1º tenta visita.contactoId
+    // 2º se vazio, tenta o primeiro contacto da lista de contactos da visita (se existir)
+    const contactoIdFromVisita: string | null =
+      visita?.contactoId ||
+      (Array.isArray((visita as any)?.contactos) && (visita as any).contactos[0]?.id) ||
+      null;
+
+    if (!visita?.id || !visita.entidadeId || !contactoIdFromVisita) {
       toast({
         title: "Erro",
-        description: "Contexto de visita incompleto.",
+        description:
+          "Esta visita não tem contexto suficiente para criar um lead. Garante que está associada a uma entidade e pelo menos a um contacto.",
         variant: "destructive",
       });
       return;
@@ -293,7 +302,7 @@ export default function VisitaDetail() {
 
       const body = {
         entidadeId: visita.entidadeId,
-        contactoId: visita.contactoId,
+        contactoId: contactoIdFromVisita!,
         visitaId: visita.id,
         titulo: leadForm.titulo.trim(),
         descricao: null,
