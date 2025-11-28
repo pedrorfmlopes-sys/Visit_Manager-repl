@@ -53,6 +53,13 @@ This Progressive Web Application (PWA) is designed to streamline commercial visi
 - ✅ Backend: ORDER BY with orderBy/orderDir support
 - ✅ Query re-executes on any param change → data updates
 
+### FASE-LEADS-FILTROS-03: In-Memory Filtering & Sorting (Complete)
+- ✅ Frontend in-memory filtering on allLeads (q, estado, entidadeId, contactoId, hasOdoo)
+- ✅ Frontend in-memory sorting (createdAt, titulo, valorPrevisto with asc/desc)
+- ✅ Redundant security layer with backend filtering
+- ✅ Dynamic result count and differentiated messaging
+- ✅ Table renders sortedLeads with all filters/sorting applied
+
 ### RBAC Refactoring (In Progress)
 - ✅ **ENTIDADES-RBAC-STEP1**: Centralized `buildEntidadeAccessWhere` helper + `ListEntidadesParams` object
 - ✅ **CONTACTOS-RBAC-STEP1**: Applied same pattern - `buildContactoAccessWhere` helper + `ListContactosParams` object

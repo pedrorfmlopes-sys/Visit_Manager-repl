@@ -1,0 +1,136 @@
+Prompt para o agent (copia & cola tal e qual)
+
+FASE LEADS-FILTROS-03 – Aplicar filtros e ordenação em memória na lista de Leads
+
+Contexto:
+
+A página /admin/leads já lê q, estado, entidadeId, contactoId, hasOdoo, orderBy, orderDir da URL e já constrói a query /api/crm/leads?....
+
+No entanto, no ambiente do utilizador, os filtros e ordenação ainda não estão a surtir efeito visível na tabela.
+
+Objetivo desta fase:
+
+Garantir que, independentemente do backend, os filtros e ordenação são aplicados em memória sobre data.leads antes de renderizar a tabela.
+
+Manter a chamada ao backend como está (não remover filtros do backend), mas acrescentar uma camada de segurança no frontend.
+
+Tarefas concretas (no ficheiro AdminLeadsPage.tsx):
+
+Depois do useQuery que vai buscar os leads, criar uma variável base:
+
+const allLeads = data?.leads ?? [];
+
+
+Criar uma função ou bloco que derive filteredLeads a partir de allLeads, aplicando os filtros atuais:
+
+Pesquisa q (case-insensitive) deve procurar em:
+
+título do lead
+
+descrição/resumo (se existir)
+
+nome da entidade associada
+
+nome do contacto associado
+
+Filtro estado: se estado não for vazio nem "all", manter apenas leads com lead.estado === estado.
+
+Filtro entidadeId: se definido e não "all", manter apenas leads com lead.entidadeId === entidadeId.
+
+Filtro contactoId: se definido e não "all", manter apenas leads com lead.contactoId === contactoId.
+
+Filtro hasOdoo:
+
+se hasOdoo === "with", manter apenas leads com algum identificador/sync de Odoo presente;
+
+se hasOdoo === "without", manter apenas leads sem esse identificador;
+
+se vazio ou "all", não filtrar por isto.
+
+Algo do género:
+
+const normalizedQuery = q.trim().toLowerCase();
+
+const filteredLeads = allLeads.filter((lead) => {
+  if (normalizedQuery) {
+    const haystack = [
+      lead.titulo,
+      lead.descricao,
+      lead.entidade?.nome,
+      lead.contacto?.nome,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    if (!haystack.includes(normalizedQuery)) return false;
+  }
+
+  if (estado && estado !== "all" && lead.estado !== estado) return false;
+  if (entidadeId && entidadeId !== "all" && lead.entidadeId !== entidadeId) return false;
+  if (contactoId && contactoId !== "all" && lead.contactoId !== contactoId) return false;
+
+  if (hasOdoo && hasOdoo !== "all") {
+    const hasOdooId = !!lead.odooId; // ajustar ao campo real de sync Odoo
+    if (hasOdoo === "with" && !hasOdooId) return false;
+    if (hasOdoo === "without" && hasOdooId) return false;
+  }
+
+  return true;
+});
+
+
+Nota importante: Ajusta os nomes dos campos (titulo, descricao, odooId, etc.) para os nomes reais do modelo de lead.
+
+Criar sortedLeads a partir de filteredLeads, aplicando orderBy / orderDir:
+
+Suportar pelo menos:
+
+orderBy === "createdAt" → ordenar por data de criação
+
+orderBy === "titulo" → ordenar pelo título (A–Z / Z–A)
+
+orderBy === "valorPrevisto" → ordenar pelo valor previsto (numérico asc/desc)
+
+orderDir pode ser "asc" ou "desc".
+
+Exemplo:
+
+const sortedLeads = [...filteredLeads].sort((a, b) => {
+  const dir = orderDir === "asc" ? 1 : -1;
+
+  if (orderBy === "titulo") {
+    return a.titulo.localeCompare(b.titulo) * dir;
+  }
+
+  if (orderBy === "valorPrevisto") {
+    const av = a.valorPrevisto ?? 0;
+    const bv = b.valorPrevisto ?? 0;
+    return (av - bv) * dir;
+  }
+
+  // default: createdAt
+  const ad = new Date(a.createdAt).getTime();
+  const bd = new Date(b.createdAt).getTime();
+  return (ad - bd) * dir;
+});
+
+
+Garantir que a tabela/renderização da lista de leads usa sortedLeads (ou filteredLeads se não criares a variável sorted) em vez de data.leads diretamente.
+
+Exemplo:
+
+{sortedLeads.map((lead) => (
+  // render linha
+))}
+
+
+Não remover a lógica já existente de envio de parâmetros para /api/crm/leads; apenas acrescentar esta camada de filtragem/ordenação em memória.
+
+No final, mostra:
+
+O trecho de código onde defines allLeads, filteredLeads e sortedLeads.
+
+O JSX da tabela a usar sortedLeads.
+
+Uma nota rápida a confirmar que testaste: pesquisa, mudança de estado, entidade, contacto, hasOdoo e ordenação.

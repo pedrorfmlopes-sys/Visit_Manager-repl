@@ -114,6 +114,67 @@ export default function AdminLeadsPage() {
     },
   });
 
+  // FASE-LEADS-FILTROS-03: In-memory filtering and sorting
+  const allLeads = data && "leads" in data ? data.leads : [];
+
+  const filteredLeads = allLeads.filter((lead) => {
+    const normalizedQuery = q.trim().toLowerCase();
+    
+    // Search filter: q in titulo, descricao, entidade.nome, contacto.nome
+    if (normalizedQuery) {
+      const haystack = [
+        lead.titulo,
+        lead.descricao,
+        lead.entidade?.nome,
+        lead.contacto?.nome,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      if (!haystack.includes(normalizedQuery)) return false;
+    }
+
+    // Estado filter
+    if (estado && estado !== "all" && lead.estado !== estado) return false;
+
+    // EntidadeId filter
+    if (entidadeId && entidadeId !== "all" && lead.entidadeId !== entidadeId)
+      return false;
+
+    // ContactoId filter
+    if (contactoId && contactoId !== "all" && lead.contactoId !== contactoId)
+      return false;
+
+    // Odoo sync status filter
+    if (hasOdoo && hasOdoo !== "all") {
+      const hasOdooId = !!lead.odooLeadId; // Using actual field name from schema
+      if (hasOdoo === "true" && !hasOdooId) return false;
+      if (hasOdoo === "false" && hasOdooId) return false;
+    }
+
+    return true;
+  });
+
+  const sortedLeads = [...filteredLeads].sort((a, b) => {
+    const dir = orderDir === "asc" ? 1 : -1;
+
+    if (orderBy === "titulo") {
+      return a.titulo.localeCompare(b.titulo) * dir;
+    }
+
+    if (orderBy === "valorPrevisto") {
+      const av = a.valorPrevisto ? parseFloat(a.valorPrevisto) : 0;
+      const bv = b.valorPrevisto ? parseFloat(b.valorPrevisto) : 0;
+      return (av - bv) * dir;
+    }
+
+    // default: createdAt
+    const ad = new Date(a.createdAt).getTime();
+    const bd = new Date(b.createdAt).getTime();
+    return (ad - bd) * dir;
+  });
+
   // Reset all filters
   const resetFilters = useCallback(() => {
     navigate("");
@@ -316,20 +377,24 @@ export default function AdminLeadsPage() {
             </CardContent>
           </Card>
 
-          {/* FASE-LEADS-FILTROS-02: Leads list */}
+          {/* FASE-LEADS-FILTROS-03: Leads list using sortedLeads */}
           <Card data-testid="card-leads-list">
             <CardHeader>
               <CardTitle>Leads</CardTitle>
               <CardDescription>
-                {data.leads.length === 0
-                  ? "Ainda não existem leads registados."
-                  : "Leads criados nesta empresa."}
+                {sortedLeads.length === 0
+                  ? allLeads.length === 0
+                    ? "Ainda não existem leads registados."
+                    : "Nenhum lead corresponde aos filtros."
+                  : `${sortedLeads.length} lead${sortedLeads.length !== 1 ? "s" : ""} encontrado${sortedLeads.length !== 1 ? "s" : ""}.`}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {data.leads.length === 0 ? (
+              {sortedLeads.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  Nenhum lead encontrado.
+                  {allLeads.length === 0
+                    ? "Nenhum lead encontrado."
+                    : "Nenhum lead corresponde aos filtros aplicados."}
                 </p>
               ) : (
                 <div className="overflow-x-auto">
@@ -344,7 +409,7 @@ export default function AdminLeadsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {data.leads.map((lead) => (
+                      {sortedLeads.map((lead) => (
                         <tr
                           key={lead.id}
                           className="border-b hover:bg-muted cursor-pointer"
