@@ -32,6 +32,9 @@ This Progressive Web Application (PWA) is designed to streamline commercial visi
 ### SS-02: Generic SearchSelect Component (Complete)
 - ✅ **FASE-SS-02**: Generic async search component with debounce 300ms, clear selection, loading/empty states, TypeScript types
 
+### SS-03: CRM-Specific SearchSelect Wrappers (Complete)
+- ✅ **FASE-SS-03**: 3 wrapper components (Entidade/Contacto/Visita) with endpoint integration and optional entidadeId filtering
+
 ### RBAC Refactoring (In Progress)
 - ✅ **ENTIDADES-RBAC-STEP1**: Centralized `buildEntidadeAccessWhere` helper + `ListEntidadesParams` object
 - ✅ **CONTACTOS-RBAC-STEP1**: Applied same pattern - `buildContactoAccessWhere` helper + `ListContactosParams` object

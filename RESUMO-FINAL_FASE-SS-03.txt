@@ -1,0 +1,315 @@
+================================================================================
+RESUMO FINAL: FASE SS-03 – Wrappers Entidade/Contacto/Visita
+================================================================================
+
+Data: 28 Novembro 2025 - 02:15
+Status: ✅ COMPLETO | Build: PASSED | Workflow: RUNNING
+
+================================================================================
+OBJETIVO ALCANÇADO
+================================================================================
+
+3 componentes wrapper específicos criados:
+✅ <EntidadeSearchSelect /> - búsqueda de entidades
+✅ <ContactoSearchSelect /> - búsqueda de contactos (com filtro entidade)
+✅ <VisitaSearchSelect /> - búsqueda de visitas (com filtro entidade)
+
+Localização: client/src/components/crm/SearchSelects.tsx
+
+Características:
+✅ Props padronizadas em cada componente
+✅ Tipos TypeScript importados de @shared/schema
+✅ Integração automática com endpoints SS-01
+✅ Filtros entidadeId para Contacto/Visita
+✅ Error handling silencioso
+✅ Data-testid em todos elementos
+
+================================================================================
+COMPONENTES CRIADOS
+================================================================================
+
+1. EntidadeSearchSelect
+   Props:
+     - value: string | null
+     - onChange: (value: string | null) => void
+     - label?: string (padrão: "Entidade")
+     - placeholder?: string (padrão: "Pesquisar entidade...")
+     - disabled?: boolean
+
+   Endpoint: /api/crm/entidades/search?q=...
+   Resposta: EntidadeSearchResult[]
+
+2. ContactoSearchSelect
+   Props:
+     - value: string | null
+     - onChange: (value: string | null) => void
+     - entidadeId?: string (opcional, para filtrar por entidade)
+     - label?: string (padrão: "Contacto")
+     - placeholder?: string (padrão: "Pesquisar contacto...")
+     - disabled?: boolean
+
+   Endpoint: /api/crm/contactos/search?q=...&entidadeId=... (se fornecido)
+   Resposta: ContactoSearchResult[]
+
+3. VisitaSearchSelect
+   Props:
+     - value: string | null
+     - onChange: (value: string | null) => void
+     - entidadeId?: string (opcional, para filtrar por entidade)
+     - label?: string (padrão: "Visita")
+     - placeholder?: string (padrão: "Pesquisar visita...")
+     - disabled?: boolean
+
+   Endpoint: /api/crm/visitas/search?q=...&entidadeId=... (se fornecido)
+   Resposta: VisitaSearchResult[]
+
+================================================================================
+EXEMPLOS DE USO
+================================================================================
+
+Exemplo 1: Básico - SearchSelect de Entidade
+
+```typescript
+import { EntidadeSearchSelect } from "@/components/crm/SearchSelects";
+
+export function MyForm() {
+  const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
+
+  return (
+    <form>
+      <EntidadeSearchSelect
+        value={selectedEntity}
+        onChange={setSelectedEntity}
+        label="Entidade"
+        placeholder="Pesquisar entidade..."
+      />
+    </form>
+  );
+}
+```
+
+Exemplo 2: Contacto com filtro por Entidade
+
+```typescript
+import { EntidadeSearchSelect, ContactoSearchSelect } from "@/components/crm/SearchSelects";
+
+export function LeadForm() {
+  const [entidade, setEntidade] = useState<string | null>(null);
+  const [contacto, setContacto] = useState<string | null>(null);
+
+  return (
+    <form>
+      <EntidadeSearchSelect
+        value={entidade}
+        onChange={setEntidade}
+      />
+
+      <ContactoSearchSelect
+        value={contacto}
+        onChange={setContacto}
+        entidadeId={entidade || undefined}
+        disabled={!entidade} // Ativa só se entidade selecionada
+      />
+    </form>
+  );
+}
+```
+
+Exemplo 3: Todos os 3 wrappers juntos
+
+```typescript
+import {
+  EntidadeSearchSelect,
+  ContactoSearchSelect,
+  VisitaSearchSelect
+} from "@/components/crm/SearchSelects";
+
+export function CRMSelector() {
+  const [entidade, setEntidade] = useState<string | null>(null);
+  const [contacto, setContacto] = useState<string | null>(null);
+  const [visita, setVisita] = useState<string | null>(null);
+
+  return (
+    <div className="space-y-4">
+      <EntidadeSearchSelect
+        value={entidade}
+        onChange={setEntidade}
+      />
+
+      <ContactoSearchSelect
+        value={contacto}
+        onChange={setContacto}
+        entidadeId={entidade || undefined}
+      />
+
+      <VisitaSearchSelect
+        value={visita}
+        onChange={setVisita}
+        entidadeId={entidade || undefined}
+      />
+
+      <div className="p-4 bg-muted rounded text-sm">
+        Seleções: E={entidade} C={contacto} V={visita}
+      </div>
+    </div>
+  );
+}
+```
+
+================================================================================
+FUNCIONALIDADES DETALHADAS
+================================================================================
+
+✅ Integração Automática:
+   - Cada wrapper chama seu endpoint específico
+   - Credentials incluídas (authenticated requests)
+   - Respostas tipadas com tipos SS-01
+
+✅ Filtro entidadeId:
+   - ContactoSearchSelect: busca contactos da entidade específica
+   - VisitaSearchSelect: busca visitas da entidade específica
+   - Filtro opcional: se não fornecido, busca global
+
+✅ Error Handling:
+   - Try/catch silencioso
+   - Console.error para debug
+   - Retorna [] se erro
+
+✅ Props Customizáveis:
+   - label: título do campo
+   - placeholder: texto no input
+   - disabled: desabilita o campo
+   - value/onChange: estado externo
+
+✅ Data-testid:
+   - "entidade-search-select"
+   - "contacto-search-select"
+   - "visita-search-select"
+
+================================================================================
+ARQUITETURA
+================================================================================
+
+Hierarquia de Componentes:
+  EntidadeSearchSelect
+  ├── SearchSelect (genérico)
+  │   ├── Input
+  │   ├── Card (dropdown)
+  │   └── Button (opções)
+  └── useDebounce (hook existente)
+
+  ContactoSearchSelect
+  ├── SearchSelect (genérico)
+  └── fetch /api/crm/contactos/search
+
+  VisitaSearchSelect
+  ├── SearchSelect (genérico)
+  └── fetch /api/crm/visitas/search
+
+Fluxo:
+  1. User digita → debounce 300ms
+  2. Wrapper chama endpoint (com entidadeId se fornecido)
+  3. Endpoint retorna 20 results max
+  4. SearchSelect mostra dropdown
+  5. User clica → onChange chamado
+
+================================================================================
+CASOS DE USO
+================================================================================
+
+1. Formulário de Criação de Lead:
+   - EntidadeSearchSelect para selecionar entidade
+   - ContactoSearchSelect para selecionar contacto (filtrado por entidade)
+
+2. Filtro de Visitas:
+   - EntidadeSearchSelect para filtrar visitas por entidade
+   - VisitaSearchSelect para buscar visita específica
+
+3. Seletor em Diálogo:
+   - ContactoSearchSelect em diálogo de "Adicionar Contacto a Visita"
+   - Todos 3 em workflow multi-passo
+
+4. Dashboard:
+   - Dropdowns de filtro usam estes wrappers
+
+================================================================================
+ESTADO DO PROJETO
+================================================================================
+
+✅ Build: npm run build PASSED
+✅ Workflow: RUNNING
+✅ Componentes: 3 wrappers criados
+✅ Tipos: Importados de @shared/schema
+✅ Endpoints: Integrados com SS-01
+✅ Error Handling: Implementado
+✅ Data-testid: Em todos componentes
+
+================================================================================
+FICHEIROS MODIFICADOS/CRIADOS
+================================================================================
+
+1. client/src/components/crm/SearchSelects.tsx (CRIADO)
+   - 167 linhas
+   - 3 componentes wrappers
+   - Totalmente funcional
+   - Pronto para uso
+
+================================================================================
+INTEGRAÇÃO EM PROJETOS EXISTENTES
+================================================================================
+
+Para usar em /admin/leads ou outros:
+
+```typescript
+import { EntidadeSearchSelect, ContactoSearchSelect } from "@/components/crm/SearchSelects";
+
+// Em formulário de Lead
+<EntidadeSearchSelect value={entidade} onChange={setEntidade} />
+<ContactoSearchSelect value={contacto} onChange={setContacto} entidadeId={entidade} />
+```
+
+✅ Sem quebras de compatibilidade
+✅ Pronto para integração imediata
+✅ Tipagem completa
+
+================================================================================
+TESTES MANUAIS
+================================================================================
+
+1. EntidadeSearchSelect:
+   - Digitar 1+ caractere
+   - Esperar 300ms
+   - Ver dropdown com entidades
+   - Clicar em opção
+   - Verificar onChange chamado
+
+2. ContactoSearchSelect sem filtro:
+   - Digitar contacto
+   - Ver todos contactos
+
+3. ContactoSearchSelect com filtro:
+   - Selecionar entidade
+   - Ver contactos SÓ dessa entidade
+   - entidadeId added to URL
+
+4. VisitaSearchSelect:
+   - Similar ao ContactoSearchSelect
+   - Dropdown mostra data + entidade
+
+================================================================================
+STATUS FINAL
+================================================================================
+
+✅ FASE SS-03: COMPLETO
+
+Ficheiros: 1 criado (SearchSelects.tsx)
+Componentes: 3 wrappers
+Linhas: 167
+Build: ✅ PASSED
+Workflow: ✅ RUNNING
+Tipagem: ✅ TypeScript
+Pronto para: Integração em Leads/Visitas/Filters
+
+Próxima fase: FASE LEADS-CLEAN-04 ou FASE SS-FORMS (forms integration)
+
+================================================================================
