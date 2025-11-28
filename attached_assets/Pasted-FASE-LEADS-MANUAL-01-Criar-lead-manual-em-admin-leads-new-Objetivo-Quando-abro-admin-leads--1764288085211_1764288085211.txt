@@ -1,0 +1,85 @@
+FASE-LEADS-MANUAL-01 – Criar lead manual em /admin/leads/new
+
+Objetivo:
+Quando abro /admin/leads/new diretamente (sem visita), quero conseguir:
+- escolher Entidade (obrigatório),
+- escolher Contacto principal dessa entidade (obrigatório nesta fase),
+- escolher Visita (opcional),
+e gravar o lead com sucesso.
+O fluxo "novo lead a partir de visita" NÃO deve ser alterado.
+
+Ficheiro principal:
+- client/src/pages/AdminLeadDetailPage.tsx (ou equivalente)
+
+1) Detetar dois modos
+- const isCreateMode = id === "new";
+- ler visitaId dos search params.
+- const isCreateFromVisit = isCreateMode && !!visitaId;
+- Se isCreateFromVisit = true → manter comportamento atual.
+- Se isCreateFromVisit = false → modo “lead manual”.
+
+2) Contexto do lead no modo manual
+Quando isCreateMode && !isCreateFromVisit:
+- No card “Contexto do lead”, adicionar 3 campos de formulário:
+
+  a) Entidade *
+     - Select de entidades reutilizando o mesmo hook/endpoint do VisitaForm.
+     - Guardar em formState.entidadeId.
+
+  b) Contacto principal *
+     - Após escolher entidade, carregar contactos dessa entidade
+       (reutilizar lógica do VisitaForm, mas single-select).
+     - Guardar em formState.contactoId.
+
+  c) Visita (opcional)
+     - Opcional: dropdown com visitas dessa entidade (ou placeholder TODO).
+     - Guardar em formState.visitaId (pode ser null).
+
+3) Campo “Contacto *” abaixo da descrição
+- Se isCreateFromVisit = true → manter tal como está (contactos da visita).
+- Se isCreateFromVisit = false → NÃO renderizar esse campo, porque o contacto
+  já é escolhido no card de contexto (ponto 2b).
+
+4) Handle de guardar (create mode)
+No submit/handleSave, quando id === "new":
+
+- Se isCreateFromVisit = true:
+  - NÃO mexer na lógica atual.
+
+- Se isCreateFromVisit = false (lead manual):
+  - Ler entidadeId/contactoId/visitaId do novo estado (ponto 2).
+  - Validar no frontend:
+    - se não houver entidadeId → mostrar erro/toast
+      "Tens de associar uma entidade ao lead."
+    - se não houver contactoId → mostrar erro/toast
+      "Tens de associar um contacto principal ao lead."
+  - Se ok, fazer POST /api/crm/leads com algo como:
+    {
+      titulo,
+      descricao,
+      estado,
+      valorPrevisto,
+      entidadeId,
+      contactoId,
+      visitaId: visitaId ?? null,
+      marcasIds,
+      ...
+    }
+  - Navegação após criar:
+    - se existir returnTo nos search params → usar.
+    - senão → ir para /admin/leads.
+
+5) Testes rápidos
+
+A) /admin/leads → "Novo lead"
+   - Abre /admin/leads/new.
+   - Escolher entidade, contacto, (opcional) visita.
+   - Gravar → deve criar lead e voltar à lista de leads.
+
+B) Visita → "Novo lead desta visita"
+   - Fluxo atual deve continuar igual:
+     - contexto preenchido pela visita,
+     - campo “Contacto *” abaixo da descrição visível,
+     - ao gravar volta à visita e o lead aparece na secção de leads.
+
+Não alterar backend, Odoo, anexos nem áudio nesta fase.

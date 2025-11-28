@@ -14,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAudioTranscription } from "@/hooks/useAudioTranscription";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { Marca, VisitaWithRelations, Contacto } from "@shared/schema";
+import type { Marca, VisitaWithRelations, Contacto, Entidade } from "@shared/schema";
 
 type OdooLeadAttachment = {
   id: number;
@@ -66,11 +66,25 @@ export default function AdminLeadDetailPage() {
   const returnTo = rawReturnTo ? decodeURIComponent(rawReturnTo) : null;
   const isCreateMode = id === "new";
   const hasContext = isCreateMode && !!entidadeId && !!contactoIdFromQuery;
+  
+  // FASE-LEADS-MANUAL-01: Detect two creation modes
+  const isCreateFromVisit = isCreateMode && !!visitaIdFromQuery;
 
   // FASE-LEADS-CONTEXTO-02: Fetch visita data for context display
   const { data: visitaData } = useQuery<VisitaWithRelations>({
     queryKey: ["/api/visitas", visitaIdFromQuery],
     enabled: isCreateMode && !!visitaIdFromQuery,
+  });
+
+  // FASE-LEADS-MANUAL-01: Load entidades and contactos for manual mode
+  const { data: entidades = [] } = useQuery<Entidade[]>({
+    queryKey: ["/api/entidades"],
+    enabled: isCreateMode && !isCreateFromVisit,
+  });
+
+  const { data: contactos = [] } = useQuery<Contacto[]>({
+    queryKey: ["/api/contactos"],
+    enabled: isCreateMode && !isCreateFromVisit,
   });
 
   const { data, isLoading, isError } = useQuery<LeadResponse>({
@@ -190,7 +204,7 @@ export default function AdminLeadDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
-          {isCreateMode && !hasContext && (
+          {isCreateMode && !hasContext && isCreateFromVisit && (
             <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded text-sm text-amber-800 dark:text-amber-200 mb-4">
               Nota: Para pre-preencher contexto, abra este formulário a partir de uma visita existente.
             </div>
@@ -199,12 +213,15 @@ export default function AdminLeadDetailPage() {
             <LeadDetailForm 
               lead={lead} 
               isCreateMode={isCreateMode} 
+              isCreateFromVisit={isCreateFromVisit}
               visitaId={visitaIdFromQuery || null} 
               returnTo={returnTo || null}
               entidadeId={entidadeId || null}
               contactoId={contactoIdFromQuery || null}
               hasContext={hasContext}
               contactosDisponiveis={contactosDisponiveis}
+              entidades={entidades}
+              contactos={contactos}
             />
           ) : null}
         </div>
@@ -221,22 +238,28 @@ export default function AdminLeadDetailPage() {
 
 function LeadDetailForm({ 
   lead, 
-  isCreateMode = false, 
+  isCreateMode = false,
+  isCreateFromVisit = false,
   visitaId = null,
   returnTo = null,
   entidadeId = null,
   contactoId = null,
   hasContext = false,
   contactosDisponiveis = [],
+  entidades = [],
+  contactos = [],
 }: { 
   lead: Lead; 
   isCreateMode?: boolean;
+  isCreateFromVisit?: boolean;
   visitaId?: string | null;
   returnTo?: string | null;
   entidadeId?: string | null;
   contactoId?: string | null;
   hasContext?: boolean;
   contactosDisponiveis?: Array<{ id: string; nome: string; origem: string }>;
+  entidades?: Entidade[];
+  contactos?: Contacto[];
 }) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -265,8 +288,11 @@ function LeadDetailForm({
     estado: lead.estado ?? "novo",
     valorPrevisto: lead.valorPrevisto ?? "",
     moeda: lead.moeda ?? "EUR",
-    // FASE-LEADS-CONTEXTO-02: Contacto selection for create mode
+    // FASE-LEADS-CONTEXTO-02: Contacto selection for create mode (from visita)
     contactoId: isCreateMode ? (contactoId || "") : (lead.contactoId || ""),
+    // FASE-LEADS-MANUAL-01: For manual mode (from list)
+    entidadeId: isCreateMode && !isCreateFromVisit ? "" : (lead.entidadeId || ""),
+    visitaId: isCreateMode && !isCreateFromVisit ? null : (lead.visitaId || null),
   });
 
   const [saving, setSaving] = useState(false);
@@ -367,18 +393,31 @@ function LeadDetailForm({
         moeda: form.moeda || "EUR",
       };
 
-      // FASE-LEADS-CONTEXTO-02: POST for create mode (read contactoId from form)
+      // FASE-LEADS-CONTEXTO-02 & FASE-LEADS-MANUAL-01: POST for create mode
       if (isCreateMode) {
-        if (!entidadeId) {
-          throw new Error("Contexto incompleto: entidade ausente");
+        // From visit mode (existing behavior)
+        if (isCreateFromVisit) {
+          if (!entidadeId) {
+            throw new Error("Contexto incompleto: entidade ausente");
+          }
+          if (!form.contactoId) {
+            throw new Error("Neste momento é obrigatório associar um contacto ao lead.");
+          }
+          body.visitaId = visitaId || null;
+          body.entidadeId = entidadeId;
+          body.contactoId = form.contactoId;
+        } else {
+          // Manual mode (new: from list)
+          if (!form.entidadeId) {
+            throw new Error("Tens de associar uma entidade ao lead.");
+          }
+          if (!form.contactoId) {
+            throw new Error("Tens de associar um contacto principal ao lead.");
+          }
+          body.entidadeId = form.entidadeId;
+          body.contactoId = form.contactoId;
+          body.visitaId = form.visitaId || null;
         }
-        // FASE-LEADS-CONTEXTO-02: Validate contactoId selection
-        if (!form.contactoId) {
-          throw new Error("Neste momento é obrigatório associar um contacto ao lead.");
-        }
-        body.visitaId = visitaId || null;
-        body.entidadeId = entidadeId;
-        body.contactoId = form.contactoId; // Read from form state
       }
 
       const method = isCreateMode ? "POST" : "PATCH";
@@ -461,6 +500,71 @@ function LeadDetailForm({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
+          {/* FASE-LEADS-MANUAL-01: In manual mode, show selects for choosing entity/contacto/visita */}
+          {isCreateMode && !isCreateFromVisit && (
+            <div className="space-y-3 pb-3 border-b">
+              <div className="space-y-1">
+                <Label htmlFor="lead-manual-entidade">Entidade *</Label>
+                <Select
+                  value={form.entidadeId}
+                  onValueChange={(value) => setForm((f) => ({ ...f, entidadeId: value, contactoId: "" }))}
+                >
+                  <SelectTrigger id="lead-manual-entidade" data-testid="select-lead-manual-entidade">
+                    <SelectValue placeholder="Seleciona uma entidade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {entidades.length === 0 ? (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">Nenhuma entidade</div>
+                    ) : (
+                      entidades.map((ent) => (
+                        <SelectItem key={ent.id} value={ent.id}>
+                          {ent.nome}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {form.entidadeId && (
+                <>
+                  <div className="space-y-1">
+                    <Label htmlFor="lead-manual-contacto">Contacto principal *</Label>
+                    <Select
+                      value={form.contactoId}
+                      onValueChange={(value) => setForm((f) => ({ ...f, contactoId: value }))}
+                    >
+                      <SelectTrigger id="lead-manual-contacto" data-testid="select-lead-manual-contacto">
+                        <SelectValue placeholder="Seleciona um contacto" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {contactos.filter((c) => c.entidadeId === form.entidadeId).length === 0 ? (
+                          <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                            Nenhum contacto nesta entidade
+                          </div>
+                        ) : (
+                          contactos
+                            .filter((c) => c.entidadeId === form.entidadeId)
+                            .map((c) => (
+                              <SelectItem key={c.id} value={c.id}>
+                                {c.nome}
+                              </SelectItem>
+                            ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="lead-manual-visita">Visita (opcional)</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Pode associar uma visita mais tarde se necessário.
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="space-y-0.5">
               <div className="text-xs text-muted-foreground">Entidade</div>
@@ -652,8 +756,8 @@ function LeadDetailForm({
             />
           </div>
 
-          {/* FASE-LEADS-CONTEXTO-02: Contacto selection field in create mode */}
-          {isCreateMode && (
+          {/* FASE-LEADS-CONTEXTO-02: Contacto selection field only in create from visit mode */}
+          {isCreateMode && isCreateFromVisit && (
             <div className="space-y-1">
               <Label htmlFor="lead-contacto">Contacto *</Label>
               <Select
