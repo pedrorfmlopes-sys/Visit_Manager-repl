@@ -1,4 +1,4 @@
-import * as React from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,42 @@ export default function AdminLeadsPage() {
   const orderBy = searchParams.get("orderBy") || "createdAt";
   const orderDir = searchParams.get("orderDir") || "desc";
 
+  // FASE-LEADS-FILTROS-01: Local state for search debounce
+  const [localSearch, setLocalSearch] = useState(q);
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  // Sync local search with URL search param
+  useEffect(() => {
+    setLocalSearch(q);
+  }, [q]);
+
+  // FASE-LEADS-FILTROS-02: Helper to update URL with new params
+  const updateParams = useCallback((updates: Record<string, string>) => {
+    const newParams = new URLSearchParams(location.split("?")[1] || "");
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value) {
+        newParams.set(key, value);
+      } else {
+        newParams.delete(key);
+      }
+    });
+    const newSearch = newParams.toString();
+    navigate(newSearch ? `?${newSearch}` : "");
+  }, [location, navigate]);
+
+  // Debounced search handler
+  const handleSearchChange = useCallback((value: string) => {
+    setLocalSearch(value);
+    
+    if (searchTimeout) clearTimeout(searchTimeout);
+    
+    const timeout = setTimeout(() => {
+      updateParams({ q: value });
+    }, 300);
+    
+    setSearchTimeout(timeout);
+  }, [searchTimeout, updateParams]);
+
   // Fetch entidades and contactos for select dropdowns
   const { data: entidadesData } = useQuery({
     queryKey: ["/api/entidades"],
@@ -78,24 +114,10 @@ export default function AdminLeadsPage() {
     },
   });
 
-  // FASE-LEADS-FILTROS-02: Helper to update URL with new params
-  const updateParams = (updates: Record<string, string>) => {
-    const newParams = new URLSearchParams(location.split("?")[1] || "");
-    Object.entries(updates).forEach(([key, value]) => {
-      if (value) {
-        newParams.set(key, value);
-      } else {
-        newParams.delete(key);
-      }
-    });
-    const newSearch = newParams.toString();
-    navigate(newSearch ? `?${newSearch}` : "");
-  };
-
   // Reset all filters
-  const resetFilters = () => {
+  const resetFilters = useCallback(() => {
     navigate("");
-  };
+  }, [navigate]);
 
   const leadsDisabled =
     data &&
@@ -181,8 +203,8 @@ export default function AdminLeadsPage() {
                     <label className="text-xs text-muted-foreground">Pesquisar</label>
                     <Input
                       placeholder="Título, descrição..."
-                      value={q}
-                      onChange={(e) => updateParams({ q: e.target.value })}
+                      value={localSearch}
+                      onChange={(e) => handleSearchChange(e.target.value)}
                       data-testid="input-lead-search"
                     />
                   </div>

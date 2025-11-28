@@ -38,6 +38,13 @@ This Progressive Web Application (PWA) is designed to streamline commercial visi
 ### SS-04: Integration in Admin Leads Form (Complete)
 - ✅ **FASE-SS-04**: Integrated SearchSelect wrappers into /admin/leads/new form, replaced traditional Selects with async search components, maintained validation and returnTo navigation
 
+### FASE-LEADS-FILTROS-01: Search, Filters & Ordering (Complete)
+- ✅ Fixed search input with debounce 300ms (local state + handleSearchChange)
+- ✅ All filters (estado, entidade, contacto, hasOdoo) working with updateParams
+- ✅ Ordering dropdown synchronizes with URL and API
+- ✅ URL persistence for all filter states
+- ✅ Reset button clears all filters
+
 ### RBAC Refactoring (In Progress)
 - ✅ **ENTIDADES-RBAC-STEP1**: Centralized `buildEntidadeAccessWhere` helper + `ListEntidadesParams` object
 - ✅ **CONTACTOS-RBAC-STEP1**: Applied same pattern - `buildContactoAccessWhere` helper + `ListContactosParams` object

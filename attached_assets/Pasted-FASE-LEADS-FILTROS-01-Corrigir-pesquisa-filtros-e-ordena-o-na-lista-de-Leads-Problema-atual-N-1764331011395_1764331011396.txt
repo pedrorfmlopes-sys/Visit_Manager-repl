@@ -1,0 +1,95 @@
+FASE LEADS-FILTROS-01 – Corrigir pesquisa, filtros e ordenação na lista de Leads
+
+Problema atual:
+
+Na página de listagem de Leads (/admin/leads):
+
+O campo de pesquisa aparece, mas não deixa escrever texto ou o texto não fica visível.
+
+Os filtros (dropdowns / selects) aparecem e abrem as opções, mas não filtram nem ordenam a lista.
+
+Objetivo:
+
+Garantir que:
+
+O campo de pesquisa é editável e atualiza o estado corretamente.
+
+Alterar pesquisa e filtros refaz a query de leads ou aplica filtro em memória (conforme arquitetura atual).
+
+A ordenação (clique nos cabeçalhos das colunas) muda realmente a ordem dos leads apresentados.
+
+Tarefas:
+
+Encontrar o componente da lista de Leads
+
+Procura o componente responsável por /admin/leads (ex.: AdminLeadsPage, AdminLeadListPage ou similar).
+
+Identifica:
+
+O input de pesquisa de texto
+
+Os filtros (estado, origem, entidade, contacto, sincronização Odoo, etc., conforme existir)
+
+Qualquer lógica de ordenar (cliques nos cabeçalhos da tabela).
+
+Corrigir o campo de pesquisa
+
+Garante que o input tem:
+
+value={search} (ou nome equivalente)
+
+onChange={(e) => setSearch(e.target.value)} ou equivalente.
+
+Confirma que o input não está dentro de um componente que bloqueie eventos (por exemplo, dentro de um <Button> ou com pointer-events: none).
+
+Se o input estiver “controlado” mas o valor nunca é atualizado, corrige a ligação ao estado.
+
+Ligar pesquisa e filtros ao fetch dos leads
+
+Se estiver a usar useQuery (@tanstack/react-query):
+
+Inclui search e os filtros relevantes no queryKey e/ou nos parâmetros da função de fetch, por exemplo:
+
+const { data: leads } = useQuery({
+  queryKey: ["leads", { search, estado, origem, entidadeId, contactoId, sortField, sortDirection }],
+  queryFn: () => fetchLeads({ search, estado, origem, entidadeId, contactoId, sortField, sortDirection }),
+});
+
+
+Garante que fetchLeads envia estes valores para o backend (query string) ou aplica o filtro/ordenção em memória nos resultados.
+
+Se o filtro for apenas em memória:
+
+Certifica-te que a função que calcula filteredLeads usa efetivamente search e todos os filtros.
+
+Ligar ordenação aos dados
+
+Identifica onde o sort é tratado (ex.: ao clicar no cabeçalho de uma coluna).
+
+Garante que, ao clicar, atualiza sortField e sortDirection.
+
+Usa esses valores para:
+
+ou chamar o backend com ?sortField=...&sortDirection=...
+
+ou ordenar o array de leads em memória antes de renderizar.
+
+Testes manuais rápidos (para ti)
+
+Escreve nos comentários o que testaste:
+
+“Consigo escrever no campo de pesquisa e ver o texto.”
+
+“Ao alterar pesquisa, a lista é filtrada.”
+
+“Filtros de estado/origem/entidade/… alteram a lista.”
+
+“Ordenação por coluna muda realmente a ordem dos leads.”
+
+No final, mostra:
+
+O(s) ficheiro(s) onde fizeste alterações.
+
+O diff das partes relevantes (especialmente: input de pesquisa, estados de filtro, uso no useQuery ou função de filtragem, lógica de ordenação).
+
+Um resumo curto do comportamento final após estas correções.
