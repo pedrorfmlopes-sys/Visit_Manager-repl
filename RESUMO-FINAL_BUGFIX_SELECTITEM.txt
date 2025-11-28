@@ -1,0 +1,218 @@
+================================================================================
+RESUMO FINAL: BUGFIX SelectItem value="" – COMPLETO
+================================================================================
+
+Data: 28 Novembro 2025
+Status: ✅ CORRIGIDO | Build: PASSED | Workflow: RUNNING | Sem erros
+
+================================================================================
+PROBLEMA IDENTIFICADO
+================================================================================
+
+Error em browser console:
+"A <Select.Item /> must have a value prop that is not an empty string. 
+This is because the Select value can be set to an empty string to clear the 
+selection and show the placeholder."
+
+Causa:
+- AdminLeadsPage.tsx tinha 3 SelectItems com value="" (string vazia)
+- Estado: <SelectItem value="">Todos</SelectItem>
+- Entidade: <SelectItem value="">Todas</SelectItem>
+- Contacto: <SelectItem value="">Todos</SelectItem>
+
+Radix UI Select constraint:
+- Não permite value="" porque "" é usado para "clear selection"
+- Conflito de semântica: "" tem significado especial no Select
+
+================================================================================
+SOLUCAO IMPLEMENTADA
+================================================================================
+
+Padrão: "all" para representar "mostrar tudo"
+
+1) Substituir value="" por value="all" em SelectItems:
+   ✅ Estado: value="all" → "Todos"
+   ✅ Entidade: value="all" → "Todas"
+   ✅ Contacto: value="all" → "Todos"
+
+2) Atualizar handlers (onValueChange):
+   ✅ Estado:
+      value={estado || "all"} 
+      onValueChange={(value) => updateParams({ estado: value === "all" ? "" : value })}
+   
+   ✅ Entidade:
+      value={entidadeId || "all"}
+      onValueChange={(value) => updateParams({ entidadeId: value === "all" ? "" : value })}
+   
+   ✅ Contacto:
+      value={contactoId || "all"}
+      onValueChange={(value) => updateParams({ contactoId: value === "all" ? "" : value })}
+
+3) Lógica:
+   - User seleciona "Todos" → Select value = "all"
+   - Handler detecta "all" → converte para "" antes de updateParams
+   - updateParams("") → remove query param da URL (ternary em updateParams)
+   - Estado interno: "" (sem filtro)
+   - Select renderiza: "all" (placeholder "Todos os estados")
+
+================================================================================
+MUDANCAS NO FICHEIRO
+================================================================================
+
+File: client/src/pages/AdminLeadsPage.tsx
+
+3 edits paralelos (2 minutos):
+
+Edit 1: Estado + Entidade (linhas 193-225)
+  - Linha 195: value={estado || "all"} + onValueChange handler com ternary
+  - Linha 200: value="all" (em vez de "")
+  - Linha 211: value={entidadeId || "all"} + onValueChange handler com ternary
+  - Linha 216: value="all" (em vez de "")
+
+Edit 2: Contacto (linhas 230-245)
+  - Linha 232: value={contactoId || "all"} + onValueChange handler com ternary
+  - Linha 237: value="all" (em vez de "")
+
+Sem mudanças em:
+  - Ordenar (já usava valores válidos como "createdAt-desc")
+  - Button "Só com Odoo" (não é Select)
+  - Input Search (não é Select)
+  - Reset button
+  - Leads table
+
+================================================================================
+FLUXO DE TESTE
+================================================================================
+
+1. User abre /admin/leads
+   - Workflow serving on port 5000 ✓
+   - Browser carrega AdminLeadsPage.tsx ✓
+   - Sem erro "value="" ✓
+
+2. User abre dropdown Estado
+   - Seleciona "Novo"
+   - URL: ?estado=novo
+   - Query: GET /api/crm/leads?estado=novo&orderBy=createdAt&orderDir=desc
+
+3. User abre dropdown Estado novamente
+   - Seleciona "Todos"
+   - value="all" é passado
+   - Handler converte para ""
+   - updateParams({ estado: "" })
+   - "delete" key da URL
+   - URL: (limpo de ?estado=)
+   - Query: GET /api/crm/leads?orderBy=createdAt&orderDir=desc
+
+4. Mesmo padrão para Entidade e Contacto
+
+================================================================================
+BUILD E WORKFLOW STATUS
+================================================================================
+
+✅ npm run build: PASSED (25.03s)
+   - A PostCSS warning (não crítica)
+   - Sem erros TypeScript
+   - Sem erros de compilação
+
+✅ Workflow: RUNNING
+   - Express serving on port 5000
+   - Logs limpos (sem erro SelectItem)
+   - Browser console: conectado, sem errors
+
+✅ Logs verificados:
+   - Workflow logs: normal, sem crashes
+   - Browser console: [vite] connected, sem SelectItem error
+   - No console error stack traces relacionados
+
+================================================================================
+BACKWARDS COMPATIBILITY
+================================================================================
+
+✅ 100% backwards compatible
+
+Usuários que já têm filtros na URL (ex: ?estado=novo):
+  - Continuam a funcionar
+  - "" ainda significa "sem filtro"
+  - "all" é apenas interno no Select
+
+API backend:
+  - Sem mudanças
+  - Continua a receber q, estado, entidadeId, contactoId, hasOdoo
+  - Quando "" é removido da URL, query param não é enviado (expected)
+
+Outras páginas:
+  - Sem mudanças
+  - AdminLeadDetailPage.tsx: não afetada
+  - Outras páginas: não afetadas
+
+================================================================================
+GARANTIAS DE QUALIDADE
+================================================================================
+
+✅ SelectItem "all" validation:
+   - value="all" é válido string (não vazio)
+   - Radix UI aceita sem erro
+   - Placeholder funciona ("Todos os estados")
+
+✅ Ternary logic (value === "all" ? "" : value):
+   - "all" → "" (limpa query param)
+   - "novo" → "novo" (passa valor)
+   - Qualquer outro → passa valor
+
+✅ State management:
+   - estado || "all" garante que Select sempre tem valor
+   - Mesmo quando URL não tem query param
+   - Placeholder renderiza quando "" não está na URL
+
+✅ URL sync:
+   - ?estado=novo → Select mostra "Novo"
+   - (sem ?estado) → Select mostra "Todos" (placeholder com value="all")
+
+================================================================================
+TEST IDs
+================================================================================
+
+Sem mudanças em test IDs:
+✅ input-lead-search
+✅ select-lead-estado
+✅ select-lead-entidade
+✅ select-lead-contacto
+✅ toggle-lead-odoo
+✅ select-lead-orderby
+✅ button-reset-filters
+
+Funcionam exatamente igual.
+
+================================================================================
+RESOLUCAO RAPIDA
+================================================================================
+
+Turno 1: FASE-LEADS-FILTROS-02 (frontend filtros)
+Turno 2: Relatório final + commit
+Turno 3: Error "value="" identificado + comunicado
+Turno 4: BUGFIX - substituir value="" por value="all" + handlers
+         - 2 edits paralelos (Estado+Entidade, Contacto)
+         - Build PASSED
+         - Workflow RUNNING
+         - Browser: SEM ERRO ✅
+
+Total: 4 turnos | 1 bug corrigido | Sistema pronto
+
+================================================================================
+STATUS FINAL
+================================================================================
+
+✅ BUGFIX SELECTITEM: COMPLETO
+
+Ficheiro: client/src/pages/AdminLeadsPage.tsx
+Edits: 2 paralelos
+Padrão: value="all" em vez de value=""
+Handlers: Ternary logic para converter "all" → ""
+Build: ✅ PASSED
+Workflow: ✅ RUNNING
+Browser: ✅ SEM ERRO SelectItem
+Compatibilidade: ✅ 100% backwards-compatible
+
+Pronto para uso! 🚀
+
+================================================================================

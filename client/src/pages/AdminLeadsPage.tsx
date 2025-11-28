@@ -189,12 +189,12 @@ export default function AdminLeadsPage() {
                   
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">Estado</label>
-                    <Select value={estado} onValueChange={(value) => updateParams({ estado: value })}>
+                    <Select value={estado || "all"} onValueChange={(value) => updateParams({ estado: value === "all" ? "" : value })}>
                       <SelectTrigger data-testid="select-lead-estado">
                         <SelectValue placeholder="Todos os estados" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos</SelectItem>
+                        <SelectItem value="all">Todos</SelectItem>
                         <SelectItem value="novo">Novo</SelectItem>
                         <SelectItem value="em_curso">Em curso</SelectItem>
                         <SelectItem value="ganhou">Ganhou</SelectItem>
@@ -205,12 +205,12 @@ export default function AdminLeadsPage() {
 
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">Entidade</label>
-                    <Select value={entidadeId} onValueChange={(value) => updateParams({ entidadeId: value })}>
+                    <Select value={entidadeId || "all"} onValueChange={(value) => updateParams({ entidadeId: value === "all" ? "" : value })}>
                       <SelectTrigger data-testid="select-lead-entidade">
                         <SelectValue placeholder="Todas as entidades" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todas</SelectItem>
+                        <SelectItem value="all">Todas</SelectItem>
                         {Array.isArray(entidadesData) &&
                           entidadesData.map((ent: any) => (
                             <SelectItem key={ent.id} value={ent.id}>
@@ -226,12 +226,12 @@ export default function AdminLeadsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">Contacto</label>
-                    <Select value={contactoId} onValueChange={(value) => updateParams({ contactoId: value })}>
+                    <Select value={contactoId || "all"} onValueChange={(value) => updateParams({ contactoId: value === "all" ? "" : value })}>
                       <SelectTrigger data-testid="select-lead-contacto">
                         <SelectValue placeholder="Todos os contactos" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos</SelectItem>
+                        <SelectItem value="all">Todos</SelectItem>
                         {Array.isArray(contactosData) &&
                           contactosData.map((cont: any) => (
                             <SelectItem key={cont.id} value={cont.id}>
