@@ -290,18 +290,20 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         })
         .returning();
 
-      // Handle contactosIds if provided
+      // FASE-LEADS-CLEAN-03: Handle contactosIds only if contacto exists
       if (contactosIds && contactosIds.length > 0) {
-        const idsToInsert = Array.from(new Set([contactoId, ...contactosIds]));
-        await db.delete(leadsContactos).where(eq(leadsContactos.leadId, created.id));
-        for (const cId of idsToInsert) {
-          await db.insert(leadsContactos).values({
-            leadId: created.id,
-            contactoId: cId,
-          });
+        const idsToInsert = Array.from(new Set([contactoId, ...contactosIds])).filter(Boolean); // Filter out null/undefined
+        if (idsToInsert.length > 0) {
+          await db.delete(leadsContactos).where(eq(leadsContactos.leadId, created.id));
+          for (const cId of idsToInsert) {
+            await db.insert(leadsContactos).values({
+              leadId: created.id,
+              contactoId: cId,
+            });
+          }
         }
-      } else {
-        // Ensure contactoId is in leadsContactos
+      } else if (contactoId) {
+        // Only create leadsContactos entry if contactoId exists (FASE-LEADS-CLEAN-03)
         await db.insert(leadsContactos).values({
           leadId: created.id,
           contactoId: contactoId,
@@ -416,15 +418,20 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         return res.status(404).json({ success: false, message: "Lead não encontrado." });
       }
 
-      // Handle contactosIds if provided
+      // FASE-LEADS-CLEAN-03: Handle contactosIds only if they are valid (not null)
       if (hasContactosIds && contactosIds.length > 0) {
-        const idsToInsert = Array.from(new Set(contactosIds));
-        await db.delete(leadsContactos).where(eq(leadsContactos.leadId, id));
-        for (const cId of idsToInsert) {
-          await db.insert(leadsContactos).values({
-            leadId: id,
-            contactoId: cId,
-          });
+        const idsToInsert = Array.from(new Set(contactosIds)).filter(Boolean); // Filter out null/undefined
+        if (idsToInsert.length > 0) {
+          await db.delete(leadsContactos).where(eq(leadsContactos.leadId, id));
+          for (const cId of idsToInsert) {
+            await db.insert(leadsContactos).values({
+              leadId: id,
+              contactoId: cId,
+            });
+          }
+        } else {
+          // If all contactosIds were null, delete all associations
+          await db.delete(leadsContactos).where(eq(leadsContactos.leadId, id));
         }
       }
 

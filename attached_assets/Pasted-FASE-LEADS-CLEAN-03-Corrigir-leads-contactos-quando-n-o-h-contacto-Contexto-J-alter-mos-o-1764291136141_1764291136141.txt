@@ -1,0 +1,61 @@
+FASE LEADS-CLEAN-03 – Corrigir leads_contactos quando não há contacto
+
+Contexto:
+- Já alterámos o backend para aceitar leads com:
+  - só entidadeId,
+  - só contactoId,
+  - ou ambos.
+- A tabela `leads` já permite contactoId NULL e entidadeId NULL.
+- Mas ao criar um lead com entidade mas SEM contacto, estou a receber:
+  - `null value in column "contacto_id" of relation "leads_contactos" violates not-null constraint`
+
+Isto significa que a lógica de criação do lead ainda está a tentar inserir sempre na tabela de junção `leads_contactos`, mesmo quando não existe contacto.
+
+Objetivo:
+- Garantir que só é criado registo em `leads_contactos` quando existir um contactoId válido.
+- Não mexer no schema de `leads_contactos` (contacto_id continua NOT NULL, como deve ser numa tabela de junção).
+- Manter o comportamento atual quando o lead tem contacto (apenas ajustar o caso sem contacto).
+
+Tarefas:
+
+1) Encontrar o código de criação do lead
+   - No backend CRM/Leads (provavelmente em algo como `crmLeadsStorage.ts` + rota `POST /api/crm/leads`), localizar:
+     - A parte onde, depois de inserir na tabela `leads`, se faz também o insert na tabela `leads_contactos`.
+   - Vai ser algo do género:
+     - `insert(leads)... returning id`
+     - `insert(leads_contactos)...` usando esse id e `contactoId` do body.
+
+2) Tornar o insert em leads_contactos condicional
+   - Após criar o lead, adicionar condição explícita:
+     - Se `contactoId` for truthy (não null, não undefined):
+       - Inserir na tabela `leads_contactos` como já é feito hoje.
+     - Se `contactoId` for null/undefined:
+       - NÃO inserir nada em `leads_contactos`.
+   - Exemplificativamente:
+     ```ts
+     const lead = await db.insert(leads).values(...).returning();
+     if (input.contactoId) {
+       await db.insert(leads_contactos).values({
+         leadId: lead.id,
+         contactoId: input.contactoId,
+         empresaId,
+       });
+     }
+     ```
+   - Garante que não há tentativa de inserir `contacto_id = null`.
+
+3) Garantias e testes
+   - Não alterar o schema de `leads_contactos`.
+   - Não alterar a lógica de atualização/patch de leads (apenas criação).
+   - Testar estes casos:
+     a) Criar lead MANUAL com:
+        - só entidadeId → deve gravar sem erro; tabela `leads_contactos` NÃO deve ter registos para esse lead.
+     b) Criar lead MANUAL com:
+        - só contactoId → continua a gravar; tabela `leads_contactos` deve ter um registo com o contacto.
+     c) Criar lead MANUAL com entidadeId + contactoId → continua igual, lead_contactos com esse contacto.
+     d) Criar lead A PARTIR DE VISITA (caso onde já vem contacto) → manter comportamento atual.
+
+4) No final
+   - No resumo, indicar:
+     - qual a função/ficheiro onde estava o insert em `leads_contactos`,
+     - qual a condição adicionada para só inserir quando há contactoId.

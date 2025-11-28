@@ -22,6 +22,7 @@ This Progressive Web Application (PWA) is designed to streamline commercial visi
 - ✅ **FASE-LEADS-ANEXOS-02**: Odoo attachments system (read + upload with 10MB validation)
 - ✅ **FASE-LEADS-CLEAN-01**: Backend permissive - entidadeId OR contactoId (at least one required)
 - ✅ **FASE-LEADS-CLEAN-02**: Frontend permissive - Entidade/Contacto both optional, at least one required
+- ✅ **FASE-LEADS-CLEAN-03**: Conditional leads_contactos insert - only when contactoId exists
 
 ### RBAC Refactoring (In Progress)
 - ✅ **ENTIDADES-RBAC-STEP1**: Centralized `buildEntidadeAccessWhere` helper + `ListEntidadesParams` object
