@@ -52,8 +52,10 @@ export default function AdminLeadsPage() {
   }, [q]);
 
   // FASE-LEADS-FILTROS-02: Helper to update URL with new params
+  // FASE-LEADS-FILTROS-04: Preserve current path (/admin/leads)
   const updateParams = useCallback((updates: Record<string, string>) => {
-    const newParams = new URLSearchParams(location.split("?")[1] || "");
+    const [currentPath, currentSearch] = location.split("?");
+    const newParams = new URLSearchParams(currentSearch || "");
     Object.entries(updates).forEach(([key, value]) => {
       if (value) {
         newParams.set(key, value);
@@ -62,7 +64,7 @@ export default function AdminLeadsPage() {
       }
     });
     const newSearch = newParams.toString();
-    navigate(newSearch ? `?${newSearch}` : "");
+    navigate(`${currentPath}${newSearch ? `?${newSearch}` : ""}`);
   }, [location, navigate]);
 
   // Debounced search handler
@@ -176,9 +178,11 @@ export default function AdminLeadsPage() {
   });
 
   // Reset all filters
+  // FASE-LEADS-FILTROS-04: Preserve current path, only clear query string
   const resetFilters = useCallback(() => {
-    navigate("");
-  }, [navigate]);
+    const [currentPath] = location.split("?");
+    navigate(currentPath);
+  }, [location, navigate]);
 
   const leadsDisabled =
     data &&

@@ -103,3 +103,9 @@ PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities in
 -   **date-fns**: For date manipulation.
 -   **chartjs-node-canvas**: For server-side chart rendering in PDF exports.
 -   **DOMPurify**: For XSS prevention in rich text content.
+### FASE-LEADS-FILTROS-04: Navigation Path Preservation (Complete)
+- ✅ **updateParams**: Now extracts and preserves currentPath (/admin/leads)
+- ✅ **resetFilters**: Clears only query string, keeps current path
+- ✅ URL now correctly shows /admin/leads?filters instead of /?filters
+- ✅ URL persistence works (bookmarks, sharing, reload)
+- ✅ Browser history navigation works correctly
