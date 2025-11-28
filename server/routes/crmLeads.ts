@@ -221,11 +221,18 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         marcasIds,
       } = body;
 
-      // Validate required fields
-      if (!entidadeId || !contactoId || !titulo) {
+      // FASE-LEADS-CLEAN-01: titulo + (entidadeId OR contactoId) required
+      if (!titulo) {
         return res.status(400).json({
           success: false,
-          message: "entidadeId, contactoId e titulo são obrigatórios.",
+          message: "Título é obrigatório.",
+        });
+      }
+      
+      if (!entidadeId && !contactoId) {
+        return res.status(400).json({
+          success: false,
+          message: "É obrigatório indicar pelo menos uma Entidade ou um Contacto.",
         });
       }
 

@@ -1,0 +1,56 @@
+FASE LEADS-CLEAN-01 – Backend: permitir entidade OU contacto (mas pelo menos um)
+
+Objetivo:
+Atualmente os leads exigem entidadeId E contactoId não nulos.
+Quero mudar a regra de negócio para:
+- Um lead pode ter:
+  - só entidadeId,
+  - só contactoId,
+  - ou ambos.
+- É obrigatório ter PELO MENOS UM destes dois campos preenchido.
+Primeiro ajustamos só o backend, o frontend ainda continua a enviar ambos.
+
+Ficheiros principais (ajusta aos nomes se forem ligeiramente diferentes):
+- shared/schema.ts      (tabela leads)
+- server/routes/crmLeads.ts  (ou serviço equivalente onde é feito o POST /api/crm/leads)
+
+Tarefas:
+
+1) Schema Drizzle – tabela leads
+   - Em shared/schema.ts, na definição da tabela leads:
+     - Tornar entidadeId e contactoId campos opcionais/nullable:
+       - remover .notNull() desses dois campos;
+       - garantir que os tipos TS passam a string | null.
+   - Não alterar as FKs (continuam a referenciar entidades/contactos).
+
+2) Validação do body no POST /api/crm/leads
+   - No handler de criação de leads (rota POST /api/crm/leads):
+     - Atualizar o schema de validação (Zod ou equivalente) para aceitar:
+       - entidadeId?: string | null
+       - contactoId?: string | null
+     - Depois do parse, aplicar esta regra:
+       - se !body.entidadeId && !body.contactoId:
+           return res.status(400).json({
+             success: false,
+             message: "É obrigatório indicar pelo menos uma Entidade ou um Contacto."
+           });
+       - Caso contrário, deixar seguir.
+   - Garantir que o PATCH/update também tolera entidadeId ou contactoId = null sem rebentar.
+
+3) Código que lê entidadeId/contactoId
+   - Rever rapidamente o código que lê lead.entidadeId e lead.contactoId no backend:
+     - usar optional chaining / checks onde for assumido que nunca são null.
+     - Exemplo: em filtros ou logs, tratar null de forma segura.
+
+4) Build e migração
+   - Garantir que:
+     - o schema compila (npm run build);
+     - as migrações/drizzle estão alinhadas (npm run db:push ou o comando equivalente que já usas para atualizar o schema).
+   - No relatório final, indicar:
+     - exatamente que campos foram alterados na tabela leads,
+     - onde está a nova validação “pelo menos um” no POST /api/crm/leads.
+
+Importante:
+- Não alterar nada na integração Odoo, anexos, áudio ou visitas.
+- Não mexer na lógica de negócio do frontend nesta fase (vou ajustar depois).
+- Nesta fase, o frontend ainda vai enviar entidadeId e contactoId juntos, por isso o backend fica apenas mais permissivo (não deve causar regressões).

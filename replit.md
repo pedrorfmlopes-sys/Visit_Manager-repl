@@ -9,7 +9,7 @@ This Progressive Web Application (PWA) is designed to streamline commercial visi
 - Follow prompts EXACTLY without adding extra features or "inventions"
 - Always use test IDs and comprehensive documentation
 
-## Recent Implementation (Nov 26, 2025)
+## Recent Implementation (Nov 27, 2025)
 
 ### CRM Leads Module (Complete)
 - ✅ Schema with 14 fields + 4 CRUD routes
@@ -18,6 +18,9 @@ This Progressive Web Application (PWA) is designed to streamline commercial visi
 - ✅ Branding: Odoo logo (SVG) in 5 locations with state indicators (colored vs grayscale)
 - ✅ Cache: Invalidates 5 query keys on update (list, detail, visita, entidade, contacto)
 - ✅ Feature toggle: crmLeadsEnabled flag in empresa settings
+- ✅ **FASE-LEADS-MANUAL-01**: Manual lead creation from /admin/leads with Entidade/Contacto selects
+- ✅ **FASE-LEADS-ANEXOS-02**: Odoo attachments system (read + upload with 10MB validation)
+- ✅ **FASE-LEADS-CLEAN-01**: Backend permissive - entidadeId OR contactoId (at least one required)
 
 ### RBAC Refactoring (In Progress)
 - ✅ **ENTIDADES-RBAC-STEP1**: Centralized `buildEntidadeAccessWhere` helper + `ListEntidadesParams` object

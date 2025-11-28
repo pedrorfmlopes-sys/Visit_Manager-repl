@@ -642,12 +642,12 @@ export const leads = pgTable("leads", {
     .notNull()
     .references(() => empresas.id, { onDelete: "cascade" }),
   
+  // FASE-LEADS-CLEAN-01: Make entidadeId optional (at least one of entidade/contacto required)
   entidadeId: varchar("entidade_id")
-    .notNull()
     .references(() => entidades.id, { onDelete: "cascade" }),
   
+  // FASE-LEADS-CLEAN-01: Make contactoId optional (at least one of entidade/contacto required)
   contactoId: varchar("contacto_id")
-    .notNull()
     .references(() => contactos.id, { onDelete: "cascade" }),
   
   visitaId: varchar("visita_id")
@@ -709,8 +709,9 @@ export const insertLeadSchema = createInsertSchema(leads).omit({
   updatedAt: true,
 }).extend({
   titulo: z.string().min(1, "Título obrigatório"),
-  entidadeId: z.string().uuid("ID entidade inválido"),
-  contactoId: z.string().uuid("ID contacto inválido"),
+  // FASE-LEADS-CLEAN-01: Both optional, but validated in backend (at least one required)
+  entidadeId: z.string().uuid("ID entidade inválido").optional().nullable(),
+  contactoId: z.string().uuid("ID contacto inválido").optional().nullable(),
   visitaId: z.string().uuid().optional().nullable(),
   descricao: z.string().optional().nullable(),
   marca: z.string().optional().nullable(),

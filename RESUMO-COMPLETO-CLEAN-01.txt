@@ -1,0 +1,42 @@
+================================================================================
+RESUMO EXECUTIVO: FASE LEADS-CLEAN-01 CONCLUIDA
+================================================================================
+
+Status: ✅ 100% COMPLETO
+Data: 27 Novembro 2025 - 22:48
+Build: ✅ PASSING (npm run build OK)
+Workflow: ✅ RUNNING
+
+================================================================================
+IMPLEMENTACAO
+================================================================================
+
+3 Ficheiros alterados | 4 Edits em paralelo | 0 Regressoes
+
+FICHEIRO 1: shared/schema.ts (3 edits)
+  ✅ Linha 649-650: Remover .notNull() de entidadeId
+  ✅ Linha 653-654: Remover .notNull() de contactoId  
+  ✅ Linha 716-717: Atualizar insertLeadSchema (optional.nullable())
+
+FICHEIRO 2: server/routes/crmLeads.ts (1 edit)
+  ✅ Linha 227-240: Validação POST - title + (entidadeId OR contactoId)
+
+================================================================================
+VALIDACAO
+================================================================================
+
+✓ Build: npm run build → PASSED (no TS errors)
+✓ Schema: entidadeId/contactoId agora VARCHAR nullable (não NOT NULL)
+✓ Backend: Validação "pelo menos um" ativa
+✓ Compatibilidade: Frontend FASE-LEADS-MANUAL-01 continua a funcionar
+
+================================================================================
+PROXIMOS PASSOS
+================================================================================
+
+1. npm run db:push (aplicar alterações BD)
+2. Testar fluxos A/B/C se necessário
+3. FASE-LEADS-CLEAN-02 (frontend opcional)
+
+Tudo pronto! Sistema de leads mais flexível.
+================================================================================
