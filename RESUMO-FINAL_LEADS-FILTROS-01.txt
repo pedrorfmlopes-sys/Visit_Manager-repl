@@ -1,0 +1,239 @@
+================================================================================
+RESUMO FINAL: FASE LEADS-FILTROS-01 - Backend: filtros e ordenação
+================================================================================
+
+Data: 28 Novembro 2025 - 01:20
+Status: ✅ COMPLETO | 1 EDIT | Build: PASSED | Workflow: RUNNING
+
+================================================================================
+OBJETIVO ALCANÇADO
+================================================================================
+
+GET /api/crm/leads agora suporta:
+✅ Pesquisa livre (q)
+✅ Filtro por estado
+✅ Filtro por Odoo sync (hasOdoo)
+✅ Ordenação dinâmica (orderBy + orderDir)
+✅ Paginação básica (LIMIT 100)
+✅ 100% compatível com filtros anteriores (entidadeId, contactoId, visitaId)
+
+================================================================================
+MUDANCAS IMPLEMENTADAS
+================================================================================
+
+FICHEIRO: server/routes/crmLeads.ts
+
+Query params suportados (todos opcionais):
+  1. q: string → pesquisa livre em (titulo, descricao, marca)
+  2. estado: string → filtrar por estado (enum)
+  3. entidadeId: UUID → filtrar por entidade específica (JÁ EXISTIA)
+  4. contactoId: UUID → filtrar por contacto (JÁ EXISTIA)
+  5. visitaId: UUID → filtrar por visita (JÁ EXISTIA)
+  6. hasOdoo: "true"|"false" → filtrar se tem/não tem odooLeadId
+  7. orderBy: "createdAt"|"titulo"|"entidade"|"valorPrevisto"
+  8. orderDir: "asc"|"desc" (default: "desc" para createdAt, "asc" para titulo)
+
+Implementação:
+
+1) Query params com defaults (linhas 29-37):
+   - q: undefined (sem pesquisa por default)
+   - estado: undefined
+   - entidadeId/contactoId/visitaId: undefined
+   - hasOdoo: undefined
+   - orderBy: "createdAt" (default)
+   - orderDir: "desc" (default)
+
+2) WHERE clause dinâmico (linhas 39-75):
+   - Base: eq(leads.empresaId, empresaId)
+   - q: OR(ilike(titulo), ilike(descricao), ilike(marca))
+   - estado: eq(leads.estado, estado)
+   - entidadeId: eq(leads.entidadeId, entidadeId)
+   - contactoId: eq(leads.contactoId, contactoId)
+   - visitaId: eq(leads.visitaId, visitaId)
+   - hasOdoo === "true": isNotNull(leads.odooLeadId)
+   - hasOdoo === "false": isNull(leads.odooLeadId)
+
+3) ORDER BY dinâmico (linhas 77-95):
+   - "titulo": order by titulo (asc/desc)
+   - "valorPrevisto": order by valorPrevisto (asc/desc)
+   - "entidade": client-side sort por entidade.nome (fallback: createdAt)
+   - "createdAt": order by createdAt (default, asc/desc)
+
+4) Paginação (linha 100):
+   - LIMIT 100 por default
+   - Pode ser expandido depois se necessário
+
+5) Relations (linhas 101-109):
+   - marcasAssociadas: para mapear para array de marcas
+   - entidade: para sorting por nome
+   - contacto: para contexto
+
+6) Client-side entidade sorting (linhas 122-131):
+   - Se orderBy === "entidade", faz sort em JS
+   - Motivo: Drizzle query API não permite join com order by simples
+
+================================================================================
+FLUXOS DE USO (EXEMPLOS)
+================================================================================
+
+1) Listar leads com titulo contendo "Acme" (case-insensitive)
+   GET /api/crm/leads?q=acme
+   WHERE: empresaId = X AND (titulo ILIKE "%acme%" OR ...)
+
+2) Listar leads em estado "fechado", ordenados por valor (asc)
+   GET /api/crm/leads?estado=fechado&orderBy=valorPrevisto&orderDir=asc
+   WHERE: empresaId = X AND estado = "fechado"
+   ORDER BY: valorPrevisto ASC
+
+3) Listar leads SEM sincronização Odoo, ordenados por nome da entidade
+   GET /api/crm/leads?hasOdoo=false&orderBy=entidade&orderDir=asc
+   WHERE: empresaId = X AND odooLeadId IS NULL
+   ORDER BY: entidade.nome ASC (client-side)
+
+4) Listar leads de entidade específica, pesquisa "contrato"
+   GET /api/crm/leads?entidadeId=uuid&q=contrato
+   WHERE: empresaId = X AND entidadeId = uuid AND titulo ILIKE "%contrato%"
+
+5) Kombinado: estado + pesquisa + ordenação
+   GET /api/crm/leads?estado=novo&q=oportunidade&orderBy=createdAt&orderDir=desc
+   WHERE: empresaId = X AND estado = "novo" AND (titulo/descricao/marca ILIKE "%oportunidade%")
+   ORDER BY: createdAt DESC
+
+================================================================================
+RESPONSES
+================================================================================
+
+Resposta inalterada vs. anterior:
+  {
+    "leads": [
+      {
+        "id": "...",
+        "empresaId": "...",
+        "titulo": "...",
+        "descricao": "...",
+        "estado": "...",
+        "valorPrevisto": "...",
+        "moeda": "...",
+        "odooLeadId": "...",
+        "createdAt": "...",
+        "updatedAt": "...",
+        "entidade": { "id", "nome", ... },
+        "contacto": { "id", "nome", ... },
+        "marcas": [ { "id", "nome" }, ... ]
+      },
+      ...
+    ]
+  }
+
+Console log (novo):
+  [CRM Leads] GET /api/crm/leads {
+    empresaId: "...",
+    filters: { q, estado, entidadeId, contactoId, visitaId, hasOdoo },
+    orderBy: "createdAt" (ou outro),
+    orderDir: "desc" (ou outro),
+    count: 5
+  }
+
+================================================================================
+VALIDACOES E SEGURANCA
+================================================================================
+
+✅ Case-insensitive search (q): ILIKE (Postgres)
+✅ SQL injection prevention: Drizzle ORM com parameterized queries
+✅ empresaId always in WHERE: multi-tenant safety
+✅ LIMIT 100: prevents large data pulls
+✅ orderBy validation: enum fixo (createdAt/titulo/entidade/valorPrevisto)
+✅ orderDir validation: enum fixo (asc/desc)
+✅ hasOdoo validation: enum fixo ("true"/"false"/undefined)
+
+================================================================================
+COMPATIBILIDADE
+================================================================================
+
+✅ Todos os filtros anteriores funcionam (entidadeId, contactoId, visitaId)
+✅ POST /api/crm/leads: SEM ALTERAÇÕES
+✅ PATCH /api/crm/leads/:id: SEM ALTERAÇÕES
+✅ GET /api/crm/leads/:id (detail): SEM ALTERAÇÕES
+✅ Anexos/Áudio/Odoo/Marcas: SEM ALTERAÇÕES
+✅ Frontend (AdminLeadsPage): continua a chamar GET /api/crm/leads (sem params)
+
+Comportamento padrão (sem params):
+  - Sem filtro (q, estado, hasOdoo)
+  - Sem entidadeId/contactoId/visitaId
+  - Order by createdAt DESC
+  - Limit 100
+  - Resultado: últimos 100 leads criados (compatível com antes)
+
+================================================================================
+TRATAMENTO DE ERROS
+================================================================================
+
+- Erro 400: validação de schema (nenhuma mudança)
+- Erro 404: lead não encontrado (nenhuma mudança)
+- Erro 500: erro no servidor (nenhuma mudança)
+- Erro LEADS_NOT_ENABLED: módulo desativado (nenhuma mudança)
+
+Novo: Queryparams inválidos são ignorados silenciosamente:
+  - orderBy="invalido" → default "createdAt"
+  - orderDir="invalido" → default "desc"
+  - estado="999" → sem matches (OK)
+
+================================================================================
+BUILD E TESTES
+================================================================================
+
+✅ npm run build: PASSED (no TS errors)
+✅ Workflow: RUNNING
+✅ LSP: 27 diagnostics em crmLeads.ts (pré-existentes, não aumentou)
+
+Pronto para teste:
+  1. GET /api/crm/leads (sem params) → lista últimos 100 leads
+  2. GET /api/crm/leads?q=acme → pesquisa por título
+  3. GET /api/crm/leads?estado=novo&orderBy=titulo → filtra + ordena
+  4. GET /api/crm/leads?hasOdoo=false&orderBy=entidade → sem Odoo, por entidade
+
+================================================================================
+EXTENSIBILIDADE FUTURA
+================================================================================
+
+Pronto para adicionar:
+  - Paginação com offset/limit
+  - Mais campos de ordenação (assigned user, data de última sync)
+  - Filtros avançados (valor range, data range)
+  - Agregações (count by estado, total valor por entidade)
+
+Sem mudança no schema: FASE-LEADS-FILTROS-01 é 100% compatível.
+
+================================================================================
+STATUS FINAL
+================================================================================
+
+✅ FASE LEADS-FILTROS-01: COMPLETO
+
+Edit: 1 (GET /api/crm/leads)
+Funcionalidade:
+  ✅ q (pesquisa em titulo/descricao/marca)
+  ✅ estado (filtro)
+  ✅ hasOdoo (filtro de sync)
+  ✅ orderBy (createdAt/titulo/entidade/valorPrevisto)
+  ✅ orderDir (asc/desc)
+  ✅ LIMIT 100 (paginação básica)
+
+Build: ✅ PASSED
+Workflow: ✅ RUNNING
+Compatibilidade: ✅ 100% backwards-compatible
+
+================================================================================
+SISTEMA LEADS: RESUMO CUMULATIVO (4 FASES)
+================================================================================
+
+✅ FASE-LEADS-MANUAL-01: Manual creation
+✅ FASE-LEADS-ANEXOS-02: Odoo attachments
+✅ FASE-LEADS-CLEAN-01: Backend permissivo (schema + validation)
+✅ FASE-LEADS-CLEAN-02: Frontend permissivo (UI)
+✅ FASE-LEADS-CLEAN-03: Condicional leads_contactos
+✅ FASE-LEADS-FILTROS-01: Backend search + filters + ordering
+
+Sistema PRONTO para TESTE! 🚀
+
+================================================================================

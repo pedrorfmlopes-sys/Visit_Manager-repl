@@ -17,26 +17,41 @@ export function registerCrmLeadsRoutes(app: express.Express) {
   // Multer configuration for file uploads (used by attachment and audio routes)
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
-  // GET /api/crm/leads - List all leads for empresa (with optional visitaId filter)
+  // GET /api/crm/leads - List all leads for empresa (with filters and ordering)
   router.get("/", isAuthenticated, async (req, res) => {
     try {
       const { empresaId } = await getUserContext(req);
       await assertLeadsEnabled(empresaId);
 
-      // FASE CRM-LEADS-VISITA-STEP1: Support visitaId query parameter for filtering
-      // FASE CRM-LEADS-ENT-CONTACTO-STEP1: Add entidadeId and contactoId filters
-      const entidadeId = typeof req.query.entidadeId === "string"
-        ? req.query.entidadeId
-        : undefined;
-      const contactoId = typeof req.query.contactoId === "string"
-        ? req.query.contactoId
-        : undefined;
-      const visitaId = typeof req.query.visitaId === "string"
-        ? req.query.visitaId
-        : undefined;
+      // FASE-LEADS-FILTROS-01: Parse query params with defaults
+      const q = typeof req.query.q === "string" ? req.query.q.toLowerCase().trim() : undefined;
+      const estado = typeof req.query.estado === "string" ? req.query.estado : undefined;
+      const entidadeId = typeof req.query.entidadeId === "string" ? req.query.entidadeId : undefined;
+      const contactoId = typeof req.query.contactoId === "string" ? req.query.contactoId : undefined;
+      const visitaId = typeof req.query.visitaId === "string" ? req.query.visitaId : undefined;
+      const hasOdoo = typeof req.query.hasOdoo === "string" ? req.query.hasOdoo : undefined;
+      const orderBy = typeof req.query.orderBy === "string" ? req.query.orderBy : "createdAt";
+      const orderDir = typeof req.query.orderDir === "string" ? req.query.orderDir : "desc";
 
+      // Build WHERE clause
       let whereClause: any = eq(leads.empresaId, empresaId);
 
+      // FASE-LEADS-FILTROS-01: Search (titulo + descricao, case-insensitive)
+      if (q) {
+        const { ilike, or } = await import("drizzle-orm");
+        whereClause = and(
+          whereClause,
+          or(
+            ilike(leads.titulo, `%${q}%`),
+            ilike(leads.descricao, `%${q}%`),
+            ilike(leads.marca, `%${q}%`)
+          )
+        );
+      }
+
+      if (estado) {
+        whereClause = and(whereClause, eq(leads.estado, estado));
+      }
       if (entidadeId) {
         whereClause = and(whereClause, eq(leads.entidadeId, entidadeId));
       }
@@ -47,15 +62,47 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         whereClause = and(whereClause, eq(leads.visitaId, visitaId));
       }
 
+      // FASE-LEADS-FILTROS-01: Filter by Odoo sync status
+      if (hasOdoo === "true") {
+        const { isNotNull } = await import("drizzle-orm");
+        whereClause = and(whereClause, isNotNull(leads.odooLeadId));
+      } else if (hasOdoo === "false") {
+        const { isNull } = await import("drizzle-orm");
+        whereClause = and(whereClause, isNull(leads.odooLeadId));
+      }
+
+      // Build ORDER BY (FASE-LEADS-FILTROS-01)
+      const orderByFn = (l: any, { asc, desc }: any) => {
+        const isAsc = orderDir === "asc";
+        const compareFn = isAsc ? asc : desc;
+        
+        switch (orderBy) {
+          case "titulo":
+            return compareFn(l.titulo);
+          case "valorPrevisto":
+            return compareFn(l.valorPrevisto);
+          case "entidade":
+            // For entidade ordering, we'll sort by createdAt as fallback
+            // (full join-based sorting would need raw query)
+            return compareFn(l.createdAt);
+          case "createdAt":
+          default:
+            return compareFn(l.createdAt);
+        }
+      };
+
       const rows = await db.query.leads.findMany({
         where: whereClause,
-        orderBy: (l, { desc }) => desc(l.createdAt),
+        orderBy: orderByFn,
+        limit: 100, // FASE-LEADS-FILTROS-01: Paginação básica
         with: {
           marcasAssociadas: {
             with: {
               marca: true,
             },
           },
+          entidade: true, // Include for potential client-side sorting by entidade name
+          contacto: true,
         },
       });
 
@@ -68,15 +115,27 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         })) ?? [],
       }));
 
+      // FASE-LEADS-FILTROS-01: Sort by entidade name if requested (client-side since DB join is complex)
+      let finalLeads = leadsWithMarcas;
+      if (orderBy === "entidade") {
+        finalLeads = leadsWithMarcas.sort((a, b) => {
+          const nameA = a.entidade?.nome || "";
+          const nameB = b.entidade?.nome || "";
+          return orderDir === "asc" 
+            ? nameA.localeCompare(nameB) 
+            : nameB.localeCompare(nameA);
+        });
+      }
+
       console.log("[CRM Leads] GET /api/crm/leads", {
         empresaId,
-        entidadeId,
-        contactoId,
-        visitaId,
-        count: leadsWithMarcas.length,
+        filters: { q, estado, entidadeId, contactoId, visitaId, hasOdoo },
+        orderBy,
+        orderDir,
+        count: finalLeads.length,
       });
 
-      return res.json({ leads: leadsWithMarcas });
+      return res.json({ leads: finalLeads });
     } catch (error: any) {
       if (error?.code === "LEADS_NOT_ENABLED") {
         return res.status(200).json({

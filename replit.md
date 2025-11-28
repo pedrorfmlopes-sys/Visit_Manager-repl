@@ -23,6 +23,7 @@ This Progressive Web Application (PWA) is designed to streamline commercial visi
 - ✅ **FASE-LEADS-CLEAN-01**: Backend permissive - entidadeId OR contactoId (at least one required)
 - ✅ **FASE-LEADS-CLEAN-02**: Frontend permissive - Entidade/Contacto both optional, at least one required
 - ✅ **FASE-LEADS-CLEAN-03**: Conditional leads_contactos insert - only when contactoId exists
+- ✅ **FASE-LEADS-FILTROS-01**: Backend search (q), filters (estado, hasOdoo), ordering (orderBy, orderDir), pagination (LIMIT 100)
 
 ### RBAC Refactoring (In Progress)
 - ✅ **ENTIDADES-RBAC-STEP1**: Centralized `buildEntidadeAccessWhere` helper + `ListEntidadesParams` object

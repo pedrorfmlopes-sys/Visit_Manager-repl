@@ -1,0 +1,46 @@
+FASE LEADS-FILTROS-01 – Backend: filtros e ordenação na listagem de leads
+
+Objetivo:
+Adicionar suporte a filtros e ordenação na rota GET /api/crm/leads, mantendo compatibilidade com o que já existe.
+
+Query params a suportar (todos opcionais):
+- q: string de pesquisa livre (título, notas, nome da entidade, nome do contacto)
+- estado: estado do lead (enum já existente)
+- entidadeId: filtrar por entidade específica
+- contactoId: filtrar por contacto específico
+- hasOdoo: "true" | "false" → se true: só leads com odooId preenchido; se false: só leads sem odooId
+- orderBy: "createdAt" | "titulo" | "entidade" | "valorPrevisto"
+- orderDir: "asc" | "desc" (default: desc para createdAt)
+
+Tarefas:
+
+1) Atualizar o handler GET /api/crm/leads
+   - Ler estes query params do request (com defaults sensatos).
+   - Construir a query Drizzle com:
+     - WHEREs opcionais:
+       - se q: aplicar ILIKE em campos relevantes (pelo menos título + notas; se for simples usar OR em 2–3 campos).
+       - se estado: filtrar por coluna estado.
+       - se entidadeId: filtrar por coluna entidadeId.
+       - se contactoId: filtrar por contactoId OU pela tabela de ligação leads_contactos (escolhe a abordagem que já estiver usada no código).
+       - se hasOdoo === "true": where odooId IS NOT NULL
+         se hasOdoo === "false": where odooId IS NULL
+     - ORDER BY:
+       - createdAt / titulo / valorPrevisto
+       - Para “entidade”: usar join com entidades para ordenar por nome da entidade (ou fallback).
+
+2) Paginação
+   - Manter a paginação existente (se já houver).
+   - Se não houver, pelo menos garantir um LIMIT (ex.: 50) para não rebentar com a lista.
+
+3) Resposta
+   - Não alterar o formato da resposta atual (array de leads + meta, se existir).
+   - Só enriquecer com os filtros aplicados na query.
+
+4) Garantias
+   - Não alterar POST/PATCH (criação/edição) de leads.
+   - Não mexer em anexos, Odoo, áudio ou visitas.
+   - npm run build no fim.
+
+No resumo final, indicar:
+- Que query params ficaram suportados.
+- Como está a ser aplicado o orderBy/orderDir.
