@@ -407,15 +407,12 @@ function LeadDetailForm({
           body.entidadeId = entidadeId;
           body.contactoId = form.contactoId;
         } else {
-          // Manual mode (new: from list)
-          if (!form.entidadeId) {
-            throw new Error("Tens de associar uma entidade ao lead.");
+          // Manual mode (new: from list) - FASE-LEADS-CLEAN-02: require at least one
+          if (!form.entidadeId && !form.contactoId) {
+            throw new Error("Tens de associar pelo menos uma Entidade ou um Contacto ao lead.");
           }
-          if (!form.contactoId) {
-            throw new Error("Tens de associar um contacto principal ao lead.");
-          }
-          body.entidadeId = form.entidadeId;
-          body.contactoId = form.contactoId;
+          body.entidadeId = form.entidadeId || null;
+          body.contactoId = form.contactoId || null;
           body.visitaId = form.visitaId || null;
         }
       }
@@ -504,15 +501,16 @@ function LeadDetailForm({
           {isCreateMode && !isCreateFromVisit && (
             <div className="space-y-3 pb-3 border-b">
               <div className="space-y-1">
-                <Label htmlFor="lead-manual-entidade">Entidade *</Label>
+                <Label htmlFor="lead-manual-entidade">Entidade (opcional)</Label>
                 <Select
                   value={form.entidadeId}
                   onValueChange={(value) => setForm((f) => ({ ...f, entidadeId: value, contactoId: "" }))}
                 >
                   <SelectTrigger id="lead-manual-entidade" data-testid="select-lead-manual-entidade">
-                    <SelectValue placeholder="Seleciona uma entidade" />
+                    <SelectValue placeholder="Seleciona uma entidade (ou deixa em branco)" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="">Sem entidade</SelectItem>
                     {entidades.length === 0 ? (
                       <div className="px-2 py-1.5 text-sm text-muted-foreground">Nenhuma entidade</div>
                     ) : (
@@ -526,43 +524,53 @@ function LeadDetailForm({
                 </Select>
               </div>
 
-              {form.entidadeId && (
-                <>
-                  <div className="space-y-1">
-                    <Label htmlFor="lead-manual-contacto">Contacto principal *</Label>
-                    <Select
-                      value={form.contactoId}
-                      onValueChange={(value) => setForm((f) => ({ ...f, contactoId: value }))}
-                    >
-                      <SelectTrigger id="lead-manual-contacto" data-testid="select-lead-manual-contacto">
-                        <SelectValue placeholder="Seleciona um contacto" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {contactos.filter((c) => c.entidadeId === form.entidadeId).length === 0 ? (
+              {/* FASE-LEADS-CLEAN-02: Contacto sempre visível no modo manual */}
+              <div className="space-y-1">
+                <Label htmlFor="lead-manual-contacto">Contacto (opcional)</Label>
+                <Select
+                  value={form.contactoId}
+                  onValueChange={(value) => setForm((f) => ({ ...f, contactoId: value }))}
+                >
+                  <SelectTrigger id="lead-manual-contacto" data-testid="select-lead-manual-contacto">
+                    <SelectValue placeholder="Seleciona um contacto (ou deixa em branco)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Sem contacto</SelectItem>
+                    {(() => {
+                      // FASE-LEADS-CLEAN-02: Filter contacts by entity if selected
+                      const contactosFiltrados = form.entidadeId
+                        ? contactos.filter((c) => c.entidadeId === form.entidadeId)
+                        : contactos;
+                      
+                      if (contactosFiltrados.length === 0) {
+                        return (
                           <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                            Nenhum contacto nesta entidade
+                            {form.entidadeId ? "Nenhum contacto nesta entidade" : "Nenhum contacto disponível"}
                           </div>
-                        ) : (
-                          contactos
-                            .filter((c) => c.entidadeId === form.entidadeId)
-                            .map((c) => (
-                              <SelectItem key={c.id} value={c.id}>
-                                {c.nome}
-                              </SelectItem>
-                            ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                        );
+                      }
+                      
+                      return contactosFiltrados.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.nome}
+                        </SelectItem>
+                      ));
+                    })()}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {form.entidadeId
+                    ? "Mostrando contactos desta entidade"
+                    : "Mostrando todos os contactos"}
+                </p>
+              </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="lead-manual-visita">Visita (opcional)</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Pode associar uma visita mais tarde se necessário.
-                    </p>
-                  </div>
-                </>
-              )}
+              <div className="space-y-1">
+                <Label htmlFor="lead-manual-visita">Visita (opcional)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Pode associar uma visita mais tarde se necessário.
+                </p>
+              </div>
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

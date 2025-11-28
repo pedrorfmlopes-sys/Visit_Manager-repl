@@ -1,0 +1,57 @@
+FASE LEADS-CLEAN-02 – Frontend: permitir Entidade OU Contacto no lead manual
+
+Contexto:
+- Backend já permite criar leads com:
+  - só entidadeId,
+  - só contactoId,
+  - ou ambos,
+  e rejeita apenas quando faltam os dois
+  ("É obrigatório indicar pelo menos uma Entidade ou um Contacto.").
+- Em AdminLeadDetailPage.tsx (modo manual /admin/leads/new sem visita)
+  o formulário ainda se comporta como se entidadeId E contactoId fossem obrigatórios.
+
+Objetivo:
+No modo MANUAL (isCreateMode && !isCreateFromVisit):
+1) Permitir gravar um lead com:
+   - só entidadeId,
+   - só contactoId,
+   - ou ambos.
+2) Continuar a impedir gravação se faltar ENTIDADE E CONTACTO (os dois vazios).
+3) Melhorar dropdown de contacto:
+   - Se tiver entidade selecionada → mostrar só contactos dessa entidade.
+   - Se NÃO tiver entidade selecionada → mostrar TODOS os contactos (com pesquisa).
+
+Tarefas (client/src/pages/AdminLeadDetailPage.tsx):
+
+1) Contacto sempre visível no modo manual
+   - No card "Contexto do lead", quando isCreateFromVisit === false:
+     - Garante que o select de "Contacto principal" é sempre renderizado
+       (mesmo quando form.entidadeId está vazio).
+     - Assume que já existe uma query que carrega todos os contactos (como no código atual).
+     - Define as opções assim:
+       const contactosFiltrados = form.entidadeId
+         ? todosContactos.filter(c => c.entidadeId === form.entidadeId)
+         : todosContactos;
+     - Usa contactosFiltrados na lista do select.
+
+2) Validação no handleSave (modo manual)
+   - No submit do lead em create mode (id === "new"):
+     - Mantém o fluxo "a partir de visita" (isCreateFromVisit === true) SEM alterações.
+     - Para o modo manual (isCreateFromVisit === false):
+       - Substituir a validação antiga que exigia entidadeId E contactoId por:
+         if (!form.entidadeId && !form.contactoId) {
+           toast.error(
+             "Tens de associar pelo menos uma Entidade ou um Contacto ao lead."
+           );
+           return;
+         }
+       - Se pelo menos um dos dois estiver preenchido, deixa seguir o POST /api/crm/leads.
+
+3) Garantias
+   - Não mexer em nada relacionado com Odoo, anexos ou áudio.
+   - Não alterar o comportamento do modo "criar lead a partir de visita".
+   - Garantir que o ficheiro compila (npm run build) e que não aparecem erros de hooks.
+
+No fim, faz um resumo rápido:
+- Onde foi alterada a validação,
+- Como ficou a lógica do dropdown de contactos no modo manual.
