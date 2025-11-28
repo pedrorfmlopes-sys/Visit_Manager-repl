@@ -1,0 +1,69 @@
+FASE SS-04 – Usar Entidade/Contacto/VisitaSearchSelect em /admin/leads/new
+
+Objetivo: Substituir os campos de seleção de Entidade, Contacto e Visita no formulário de criação de Lead pelos novos componentes SearchSelect:
+
+<EntidadeSearchSelect />
+
+<ContactoSearchSelect />
+
+<VisitaSearchSelect />
+
+Requisitos:
+
+Localizar o componente/página responsável pela rota /admin/leads/new (formulário de criação de Lead).
+
+Identificar os campos atuais usados para:
+
+selecionar Entidade
+
+selecionar Contacto
+
+selecionar Visita (se existir no formulário)
+
+Substituir esses campos pelos componentes:
+
+<EntidadeSearchSelect
+  value={entidadeId}
+  onChange={setEntidadeId}
+  label="Entidade"
+  placeholder="Pesquisar entidade..."
+/>
+
+<ContactoSearchSelect
+  value={contactoId}
+  onChange={setContactoId}
+  entidadeId={entidadeId || undefined}
+  label="Contacto"
+  placeholder="Pesquisar contacto..."
+/>
+
+<VisitaSearchSelect
+  value={visitaId}
+  onChange={setVisitaId}
+  entidadeId={entidadeId || undefined}
+  label="Visita"
+  placeholder="Pesquisar visita..."
+/>
+
+
+(ajusta os nomes dos estados entidadeId, contactoId, visitaId e setters para os que já existirem no componente, sem alterar a lógica do payload enviado para a API).
+
+Mantém as regras de validação atuais do formulário de Lead:
+
+continua a ser obrigatório ter pelo menos Entidade OU Contacto associados ao Lead;
+
+Visita continua opcional, se já for assim.
+
+Mantém toda a lógica de navegação returnTo / redirecionamento que já existe (por exemplo, quando o Lead é criado a partir de uma Visita e o utilizador volta para essa Visita). Não alteres essa parte, apenas garante que continua a funcionar com os novos campos.
+
+Não alteres a API backend de criação de leads; apenas garante que os ids corretos de entidadeId, contactoId e visitaId continuam a ser enviados no payload como antes.
+
+Se fizer sentido em termos de UX, podes deixar o ContactoSearchSelect e o VisitaSearchSelect desativados (disabled) enquanto não houver entidadeId selecionado, desde que isso não quebre nenhum fluxo existente.
+
+No final, mostra:
+
+O diff principal do ficheiro da página /admin/leads/new (ou componente equivalente)
+
+O JSX final dos campos de Entidade, Contacto e Visita com os novos componentes
+
+Confirmação de que o formulário continua a submeter corretamente e de que a validação (Entidade OU Contacto obrigatórios) se mantém.

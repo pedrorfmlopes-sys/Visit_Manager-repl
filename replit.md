@@ -35,6 +35,9 @@ This Progressive Web Application (PWA) is designed to streamline commercial visi
 ### SS-03: CRM-Specific SearchSelect Wrappers (Complete)
 - ✅ **FASE-SS-03**: 3 wrapper components (Entidade/Contacto/Visita) with endpoint integration and optional entidadeId filtering
 
+### SS-04: Integration in Admin Leads Form (Complete)
+- ✅ **FASE-SS-04**: Integrated SearchSelect wrappers into /admin/leads/new form, replaced traditional Selects with async search components, maintained validation and returnTo navigation
+
 ### RBAC Refactoring (In Progress)
 - ✅ **ENTIDADES-RBAC-STEP1**: Centralized `buildEntidadeAccessWhere` helper + `ListEntidadesParams` object
 - ✅ **CONTACTOS-RBAC-STEP1**: Applied same pattern - `buildContactoAccessWhere` helper + `ListContactosParams` object

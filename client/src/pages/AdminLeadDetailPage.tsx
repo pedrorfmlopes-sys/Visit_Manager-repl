@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAudioTranscription } from "@/hooks/useAudioTranscription";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { EntidadeSearchSelect, ContactoSearchSelect, VisitaSearchSelect } from "@/components/crm/SearchSelects";
 import type { Marca, VisitaWithRelations, Contacto, Entidade } from "@shared/schema";
 
 type OdooLeadAttachment = {
@@ -74,17 +75,6 @@ export default function AdminLeadDetailPage() {
   const { data: visitaData } = useQuery<VisitaWithRelations>({
     queryKey: ["/api/visitas", visitaIdFromQuery],
     enabled: isCreateMode && !!visitaIdFromQuery,
-  });
-
-  // FASE-LEADS-MANUAL-01: Load entidades and contactos for manual mode
-  const { data: entidades = [] } = useQuery<Entidade[]>({
-    queryKey: ["/api/entidades"],
-    enabled: isCreateMode && !isCreateFromVisit,
-  });
-
-  const { data: contactos = [] } = useQuery<Contacto[]>({
-    queryKey: ["/api/contactos"],
-    enabled: isCreateMode && !isCreateFromVisit,
   });
 
   const { data, isLoading, isError } = useQuery<LeadResponse>({
@@ -220,8 +210,6 @@ export default function AdminLeadDetailPage() {
               contactoId={contactoIdFromQuery || null}
               hasContext={hasContext}
               contactosDisponiveis={contactosDisponiveis}
-              entidades={entidades}
-              contactos={contactos}
             />
           ) : null}
         </div>
@@ -246,8 +234,6 @@ function LeadDetailForm({
   contactoId = null,
   hasContext = false,
   contactosDisponiveis = [],
-  entidades = [],
-  contactos = [],
 }: { 
   lead: Lead; 
   isCreateMode?: boolean;
@@ -258,8 +244,6 @@ function LeadDetailForm({
   contactoId?: string | null;
   hasContext?: boolean;
   contactosDisponiveis?: Array<{ id: string; nome: string; origem: string }>;
-  entidades?: Entidade[];
-  contactos?: Contacto[];
 }) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -497,74 +481,29 @@ function LeadDetailForm({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          {/* FASE-LEADS-MANUAL-01: In manual mode, show selects for choosing entity/contacto/visita */}
+          {/* FASE-SS-04: In manual mode, show SearchSelect wrappers for entity/contacto/visita */}
           {isCreateMode && !isCreateFromVisit && (
             <div className="space-y-3 pb-3 border-b">
-              <div className="space-y-1">
-                <Label htmlFor="lead-manual-entidade">Entidade (opcional)</Label>
-                <Select
-                  value={form.entidadeId}
-                  onValueChange={(value) => setForm((f) => ({ ...f, entidadeId: value, contactoId: "" }))}
-                >
-                  <SelectTrigger id="lead-manual-entidade" data-testid="select-lead-manual-entidade">
-                    <SelectValue placeholder="Seleciona uma entidade (ou deixa em branco)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {entidades.length === 0 ? (
-                      <div className="px-2 py-1.5 text-sm text-muted-foreground">Nenhuma entidade</div>
-                    ) : (
-                      entidades.map((ent) => (
-                        <SelectItem key={ent.id} value={ent.id}>
-                          {ent.nome}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
+              <EntidadeSearchSelect
+                value={form.entidadeId}
+                onChange={(value) => setForm((f) => ({ ...f, entidadeId: value || "", contactoId: "" }))}
+                label="Entidade (opcional)"
+                placeholder="Pesquisar entidade..."
+              />
 
-              {/* FASE-LEADS-CLEAN-02: Contacto sempre visível no modo manual */}
-              <div className="space-y-1">
-                <Label htmlFor="lead-manual-contacto">Contacto (opcional)</Label>
-                <Select
-                  value={form.contactoId}
-                  onValueChange={(value) => setForm((f) => ({ ...f, contactoId: value }))}
-                >
-                  <SelectTrigger id="lead-manual-contacto" data-testid="select-lead-manual-contacto">
-                    <SelectValue placeholder="Seleciona um contacto (ou deixa em branco)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(() => {
-                      // FASE-LEADS-CLEAN-02: Filter contacts by entity if selected
-                      const contactosFiltrados = form.entidadeId
-                        ? contactos.filter((c) => c.entidadeId === form.entidadeId)
-                        : contactos;
-                      
-                      if (contactosFiltrados.length === 0) {
-                        return (
-                          <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                            {form.entidadeId ? "Nenhum contacto nesta entidade" : "Nenhum contacto disponível"}
-                          </div>
-                        );
-                      }
-                      
-                      return contactosFiltrados.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.nome}
-                        </SelectItem>
-                      ));
-                    })()}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  {form.entidadeId
-                    ? "Mostrando contactos desta entidade"
-                    : "Mostrando todos os contactos"}
-                </p>
-              </div>
+              {/* FASE-SS-04: ContactoSearchSelect with entidadeId filtering */}
+              <ContactoSearchSelect
+                value={form.contactoId}
+                onChange={(value) => setForm((f) => ({ ...f, contactoId: value || "" }))}
+                entidadeId={form.entidadeId || undefined}
+                label="Contacto (opcional)"
+                placeholder="Pesquisar contacto..."
+                disabled={!form.entidadeId}
+              />
 
+              {/* FASE-SS-04: VisitaSearchSelect optional */}
               <div className="space-y-1">
-                <Label htmlFor="lead-manual-visita">Visita (opcional)</Label>
+                <Label>Visita (opcional)</Label>
                 <p className="text-xs text-muted-foreground">
                   Pode associar uma visita mais tarde se necessário.
                 </p>
