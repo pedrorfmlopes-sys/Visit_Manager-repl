@@ -29,6 +29,9 @@ This Progressive Web Application (PWA) is designed to streamline commercial visi
 ### SS-01: Lightweight Search Endpoints (Complete)
 - ✅ **FASE-SS-01**: 3 search endpoints (entidades, contactos, visitas) with max 20 results, RBAC respecting, TypeScript types
 
+### SS-02: Generic SearchSelect Component (Complete)
+- ✅ **FASE-SS-02**: Generic async search component with debounce 300ms, clear selection, loading/empty states, TypeScript types
+
 ### RBAC Refactoring (In Progress)
 - ✅ **ENTIDADES-RBAC-STEP1**: Centralized `buildEntidadeAccessWhere` helper + `ListEntidadesParams` object
 - ✅ **CONTACTOS-RBAC-STEP1**: Applied same pattern - `buildContactoAccessWhere` helper + `ListContactosParams` object
