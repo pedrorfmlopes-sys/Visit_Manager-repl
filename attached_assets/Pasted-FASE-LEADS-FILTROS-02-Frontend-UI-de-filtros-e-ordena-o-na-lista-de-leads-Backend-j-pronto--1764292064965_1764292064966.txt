@@ -1,0 +1,64 @@
+FASE LEADS-FILTROS-02 – Frontend: UI de filtros e ordenação na lista de leads
+
+Backend já pronto:
+GET /api/crm/leads suporta os seguintes query params (todos opcionais):
+- q: string → pesquisa livre em titulo/descricao/marca
+- estado: string → filtrar por estado
+- entidadeId: UUID
+- contactoId: UUID
+- visitaId: UUID
+- hasOdoo: "true" | "false"
+- orderBy: "createdAt" | "titulo" | "entidade" | "valorPrevisto"
+- orderDir: "asc" | "desc"
+(LIMIT 100 por defeito)
+
+Objetivo:
+Na página de listagem de leads (ex.: client/src/pages/AdminLeadsListPage.tsx ou equivalente):
+- Adicionar barra de filtros no topo
+- Ligar esses filtros à rota GET /api/crm/leads usando esses query params
+- Manter a tabela/lista de leads como está
+
+Tarefas:
+
+1) Barra de filtros
+   Adicionar, acima da lista:
+   - Input texto "Pesquisar" → atualiza q
+   - Select "Estado" → opções: Todos, Novo, Em curso, Ganhou, Perdido (usar enum existente)
+   - Select "Entidade" → por agora pode ser um select simples populado com /api/crm/entidades (ou endpoint já existente)
+   - Select "Contacto" → idem para contactos
+   - Checkbox/toggle "Só com Odoo" → quando ativo, hasOdoo="true"; quando desativo, remove hasOdoo (por agora não precisamos do false)
+   - Dropdown "Ordenar por":
+       - Mais recentes → orderBy=createdAt&orderDir=desc
+       - Mais antigos → orderBy=createdAt&orderDir=asc
+       - Título A-Z → orderBy=titulo&orderDir=asc
+       - Título Z-A → orderBy=titulo&orderDir=desc
+       - Valor ↑ → orderBy=valorPrevisto&orderDir=asc
+       - Valor ↓ → orderBy=valorPrevisto&orderDir=desc
+
+2) Ligação aos query params / router
+   - Ler os search params atuais da URL (router que a app já usa).
+   - Sempre que o utilizador muda um filtro, atualizar a URL (push/replace) com os novos parâmetros.
+   - A query (useQuery) que carrega os leads deve usar esses search params para:
+       - construir a queryKey,
+       - chamar GET /api/crm/leads com esses params.
+
+3) Estado inicial e reset
+   - Estado inicial sem filtros (URL sem query params).
+   - Botão "Limpar filtros" que:
+       - limpa q, estado, entidadeId, contactoId, visitaId, hasOdoo, orderBy, orderDir da URL,
+       - volta ao default (orderBy=createdAt, orderDir=desc do backend).
+
+4) UX / responsivo
+   - Em desktop: filtros em linha (podem quebrar em 2 linhas se necessário).
+   - Em mobile: aceitar que quebrem ou agrupar alguns em 2 colunas.
+   - Labels curtas: "Estado", "Entidade", "Contacto", "Ordenar", "Só com Odoo".
+
+5) Garantias
+   - Não alterar o formato de cada linha da lista de leads.
+   - Não mexer em criação/edição de leads, apenas na listagem.
+   - npm run build no fim.
+
+No resumo final, indicar:
+- Em que ficheiro foi implementada a barra de filtros.
+- Que filtros estão a ser passados para GET /api/crm/leads.
+- Como é feito o reset de filtros.

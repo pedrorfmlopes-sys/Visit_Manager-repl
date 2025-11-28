@@ -1,0 +1,262 @@
+================================================================================
+RESUMO FINAL: FASE LEADS-FILTROS-02 - Frontend UI de filtros e ordenação
+================================================================================
+
+Data: 28 Novembro 2025 - 01:40
+Status: ✅ COMPLETO | 1 WRITE | Build: PASSED | Workflow: RUNNING
+
+================================================================================
+OBJETIVO ALCANÇADO
+================================================================================
+
+AdminLeadsPage.tsx agora tem:
+✅ Barra de filtros ANTES da tabela de leads
+✅ Query params sincronizados com URL
+✅ Filtros dinâmicos (q, estado, entidadeId, contactoId, hasOdoo, orderBy, orderDir)
+✅ Botão "Limpar filtros"
+✅ Responsivo (desktop 3 colunas, mobile 1 coluna)
+✅ 100% compatível com backend (FASE-LEADS-FILTROS-01)
+
+================================================================================
+MUDANCAS IMPLEMENTADAS
+================================================================================
+
+FICHEIRO: client/src/pages/AdminLeadsPage.tsx
+
+1) Imports (linhas 1-9):
+   ✅ Input do shadcn
+   ✅ Select, SelectTrigger, SelectValue, SelectContent, SelectItem do shadcn
+
+2) State management (linhas 32-96):
+   - useLocation hook + URLSearchParams para ler query params
+   - Read params: q, estado, entidadeId, contactoId, hasOdoo, orderBy, orderDir
+   - useQuery para /api/entidades e /api/contactos (populate selects)
+   - Build apiParams como URLSearchParams
+   - useQuery para /api/crm/leads com params
+   - updateParams() helper para update URL
+   - resetFilters() para limpar tudo
+
+3) Barra de filtros (linhas 150-296):
+   ✅ Card com CardContent pt-6 (padding top)
+   ✅ 2 linhas grid:
+      - Linha 1: Search | Estado | Entidade
+      - Linha 2: Contacto | Só com Odoo | Ordenar por
+   ✅ Labels curtas em text-xs
+   ✅ Responsive: md:grid-cols-3 (desktop), grid-cols-1 (mobile)
+   ✅ Botão "Limpar filtros" condicional (só mostra se há filtros)
+   ✅ Test IDs em cada elemento
+
+4) Leads list (linhas 300-369):
+   ✅ Mantida EXATAMENTE igual
+   ✅ Sem mudanças na tabela/UI
+   ✅ Grid responsivo com Fragment wrapper
+
+================================================================================
+FILTROS IMPLEMENTADOS
+================================================================================
+
+1. Pesquisar (Input text)
+   - Placeholder: "Título, descrição..."
+   - onChange: updateParams({ q: value })
+   - Test ID: input-lead-search
+
+2. Estado (Select dropdown)
+   - Options: Todos, Novo, Em curso, Ganhou, Perdido
+   - onChange: updateParams({ estado: value })
+   - Test ID: select-lead-estado
+
+3. Entidade (Select dropdown)
+   - Options: Todas + list from /api/entidades
+   - onChange: updateParams({ entidadeId: value })
+   - Test ID: select-lead-entidade
+
+4. Contacto (Select dropdown)
+   - Options: Todos + list from /api/contactos
+   - onChange: updateParams({ contactoId: value })
+   - Test ID: select-lead-contacto
+
+5. Só com Odoo (Button toggle)
+   - Active variant: "default" when hasOdoo === "true"
+   - Inactive variant: "outline"
+   - onClick: toggles hasOdoo between "" and "true"
+   - Test ID: toggle-lead-odoo
+
+6. Ordenar por (Select dropdown)
+   - Options:
+     * Mais recentes → createdAt-desc
+     * Mais antigos → createdAt-asc
+     * Título A-Z → titulo-asc
+     * Título Z-A → titulo-desc
+     * Valor ↑ → valorPrevisto-asc
+     * Valor ↓ → valorPrevisto-desc
+   - onChange: split value, updateParams({ orderBy, orderDir })
+   - Test ID: select-lead-orderby
+
+================================================================================
+FLUXO DE INTERACAO
+================================================================================
+
+1. User abre /admin/leads (sem filtros)
+   - URL: /admin/leads
+   - Filtros: vazios (defaults)
+   - Query: GET /api/crm/leads?orderBy=createdAt&orderDir=desc
+   - Display: últimos 100 leads
+
+2. User digita "Acme" no search
+   - URL: /admin/leads?q=acme
+   - State: q = "acme"
+   - Query: GET /api/crm/leads?q=acme&orderBy=createdAt&orderDir=desc
+   - Auto-refetch leads com filtro
+
+3. User seleciona estado "Novo"
+   - URL: /admin/leads?q=acme&estado=novo
+   - State: q = "acme", estado = "novo"
+   - Query: GET /api/crm/leads?q=acme&estado=novo&...
+   - Auto-refetch com 2 filtros
+
+4. User clica "Limpar filtros"
+   - URL: /admin/leads (sem query params)
+   - State: todos revert para defaults
+   - Query: GET /api/crm/leads?orderBy=createdAt&orderDir=desc
+   - Back ao estado inicial
+
+5. User seleciona "Título A-Z"
+   - URL: /admin/leads?orderBy=titulo&orderDir=asc
+   - Query: GET /api/crm/leads?orderBy=titulo&orderDir=asc
+   - Leads mostrados ordenados por título A-Z
+
+================================================================================
+DETALHES TECNICOS
+================================================================================
+
+Query params na URL:
+  - Tipo: URLSearchParams (formato URL padrão)
+  - Encoding: automático (URL-safe)
+  - Exemplo: ?q=acme&estado=novo&orderBy=titulo&orderDir=asc
+
+Query Key para react-query:
+  - Key: ["/api/crm/leads", { q, estado, entidadeId, contactoId, hasOdoo, orderBy, orderDir }]
+  - Rationale: refetch sempre que um param muda (automático)
+  - Caching: React Query cache hit quando URL = Query Key
+
+API call:
+  - URL: GET /api/crm/leads?q=...&estado=...&orderBy=...
+  - Backend: Já implementado (FASE-LEADS-FILTROS-01)
+  - Response: { leads: [...] } (unchanged)
+
+Reset function:
+  - navigate("") limpa toda a search string
+  - React Query refetches com params vazios
+  - useLocation updates automaticamente
+
+================================================================================
+RESPONSIVIDADE
+================================================================================
+
+Desktop (md+):
+  - Linha 1: 3 colunas (Search 1/3, Estado 1/3, Entidade 1/3)
+  - Linha 2: 3 colunas (Contacto 1/3, Odoo 1/3, Ordenar 1/3)
+  - Botão reset: full width se presente
+
+Mobile (< md):
+  - Linha 1: 1 coluna (Search full width)
+  - Linha 2: 1 coluna (Estado full width)
+  - Linha 3: 1 coluna (Entidade full width)
+  - Linha 4: 1 coluna (Contacto full width)
+  - Linha 5: 1 coluna (Odoo full width)
+  - Linha 6: 1 coluna (Ordenar full width)
+  - Stack vertical, fácil de usar
+
+================================================================================
+BUILD E TESTES
+================================================================================
+
+✅ npm run build: PASSED (22.67s)
+✅ Workflow: RUNNING
+✅ LSP: 50 diagnostics (pré-existentes, não aumentaram)
+
+Pronto para teste manual:
+  1. Abrir /admin/leads → mostra tabela + barra de filtros
+  2. Digitar search → URL muda, leads filtram
+  3. Selecionar estado → URL muda, leads filtram
+  4. Clicar "Limpar filtros" → URL volta, leads reset
+  5. Selecionar ordenação → URL muda, leads reordenam
+
+================================================================================
+COMPATIBILIDADE
+================================================================================
+
+✅ Backend (FASE-LEADS-FILTROS-01): 100% compatible
+   - Todos os query params são suportados
+   - Response format: inalterado
+
+✅ POST/PATCH/DELETE leads: SEM ALTERAÇÕES
+   - Criação/edição/deleção de leads: funciona igual
+   - Apenas a listagem foi alterada
+
+✅ Outras páginas: SEM ALTERAÇÕES
+   - AdminLeadDetailPage.tsx: sem mudanças
+   - Outras páginas de leads: sem mudanças
+
+✅ Frontend patterns: Respeitados
+   - useLocation + wouter: for URL management
+   - useQuery + react-query: for data fetching
+   - shadcn components: Input, Select, Button
+
+================================================================================
+TEST IDs ADICIONADAS
+================================================================================
+
+✅ input-lead-search: input de pesquisa
+✅ select-lead-estado: dropdown estado
+✅ select-lead-entidade: dropdown entidade
+✅ select-lead-contacto: dropdown contacto
+✅ toggle-lead-odoo: button "Só com Odoo"
+✅ select-lead-orderby: dropdown ordenação
+✅ button-reset-filters: botão "Limpar filtros"
+✅ card-leads-filters: container da barra de filtros
+✅ card-leads-list: container da tabela (existia, mantido)
+
+================================================================================
+STATUS FINAL
+================================================================================
+
+✅ FASE LEADS-FILTROS-02: COMPLETO
+
+Ficheiro: client/src/pages/AdminLeadsPage.tsx
+Edits: 1 (WRITE total - reescrito inteiro para manter qualidade)
+Funcionalidade:
+  ✅ Pesquisa (q)
+  ✅ Filtro estado
+  ✅ Filtro entidade
+  ✅ Filtro contacto
+  ✅ Toggle Odoo (hasOdoo)
+  ✅ Ordenação (orderBy + orderDir)
+  ✅ Reset filtros
+  ✅ URL sync (query params)
+  ✅ Responsive design
+
+Build: ✅ PASSED
+Workflow: ✅ RUNNING
+Compatibilidade: ✅ 100% backwards-compatible
+
+================================================================================
+SISTEMA LEADS: RESUMO FINAL (5 FASES)
+================================================================================
+
+✅ FASE-LEADS-MANUAL-01: Manual creation (entidade/contacto/visita selects)
+✅ FASE-LEADS-ANEXOS-02: Odoo attachments (upload + read)
+✅ FASE-LEADS-CLEAN-01: Backend permissivo (schema nullable + validation OR)
+✅ FASE-LEADS-CLEAN-02: Frontend permissivo (UI flexible + validation "pelo menos um")
+✅ FASE-LEADS-CLEAN-03: Condicional leads_contactos (só inserir quando há contacto)
+✅ FASE-LEADS-FILTROS-01: Backend search + filters + ordering
+✅ FASE-LEADS-FILTROS-02: Frontend UI de filtros + URL sync
+
+Sistema PRONTO PARA USO! 🚀
+
+Próximas fases opcionais:
+  - FASE-LEADS-BULK: Ações em massa (delete, change status)
+  - FASE-LEADS-ODOO-SYNC: Sync bidirecional com Odoo
+  - FASE-LEADS-ANALYTICS: Dashboard com KPIs
+
+================================================================================

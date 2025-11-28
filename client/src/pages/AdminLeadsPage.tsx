@@ -4,6 +4,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { useLocation } from "wouter";
 import type { Marca } from "@shared/schema";
 
@@ -19,6 +21,8 @@ type Lead = {
   moeda: string | null;
   createdAt: string;
   marcas?: Marca[] | null;
+  entidade?: { id: string; nome: string } | null;
+  contacto?: { id: string; nome: string } | null;
 };
 
 type LeadsResponse =
@@ -26,16 +30,72 @@ type LeadsResponse =
   | { success: false; notEnabled?: boolean; message?: string };
 
 export default function AdminLeadsPage() {
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
+  const searchParams = new URLSearchParams(location.split("?")[1] || "");
+  
+  // FASE-LEADS-FILTROS-02: Read query params from URL
+  const q = searchParams.get("q") || "";
+  const estado = searchParams.get("estado") || "";
+  const entidadeId = searchParams.get("entidadeId") || "";
+  const contactoId = searchParams.get("contactoId") || "";
+  const hasOdoo = searchParams.get("hasOdoo") || "";
+  const orderBy = searchParams.get("orderBy") || "createdAt";
+  const orderDir = searchParams.get("orderDir") || "desc";
+
+  // Fetch entidades and contactos for select dropdowns
+  const { data: entidadesData } = useQuery({
+    queryKey: ["/api/entidades"],
+    queryFn: async () => {
+      const resp = await fetch("/api/entidades", { credentials: "include" });
+      return resp.json();
+    },
+  });
+
+  const { data: contactosData } = useQuery({
+    queryKey: ["/api/contactos"],
+    queryFn: async () => {
+      const resp = await fetch("/api/contactos", { credentials: "include" });
+      return resp.json();
+    },
+  });
+
+  // FASE-LEADS-FILTROS-02: Build query params for API
+  const apiParams = new URLSearchParams();
+  if (q) apiParams.append("q", q);
+  if (estado) apiParams.append("estado", estado);
+  if (entidadeId) apiParams.append("entidadeId", entidadeId);
+  if (contactoId) apiParams.append("contactoId", contactoId);
+  if (hasOdoo) apiParams.append("hasOdoo", hasOdoo);
+  apiParams.append("orderBy", orderBy);
+  apiParams.append("orderDir", orderDir);
 
   const { data, isLoading, isError } = useQuery<LeadsResponse>({
-    queryKey: ["/api/crm/leads"],
+    queryKey: ["/api/crm/leads", { q, estado, entidadeId, contactoId, hasOdoo, orderBy, orderDir }],
     queryFn: async () => {
-      const resp = await fetch("/api/crm/leads", { credentials: "include" });
+      const resp = await fetch(`/api/crm/leads?${apiParams.toString()}`, { credentials: "include" });
       const json = await resp.json();
       return json;
     },
   });
+
+  // FASE-LEADS-FILTROS-02: Helper to update URL with new params
+  const updateParams = (updates: Record<string, string>) => {
+    const newParams = new URLSearchParams(location.split("?")[1] || "");
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value) {
+        newParams.set(key, value);
+      } else {
+        newParams.delete(key);
+      }
+    });
+    const newSearch = newParams.toString();
+    navigate(newSearch ? `?${newSearch}` : "");
+  };
+
+  // Reset all filters
+  const resetFilters = () => {
+    navigate("");
+  };
 
   const leadsDisabled =
     data &&
@@ -110,78 +170,204 @@ export default function AdminLeadsPage() {
       )}
 
       {!isLoading && !isError && !leadsDisabled && data && "leads" in data && (
-        <Card data-testid="card-leads-list">
-          <CardHeader>
-            <CardTitle>Leads</CardTitle>
-            <CardDescription>
-              {data.leads.length === 0
-                ? "Ainda não existem leads registados."
-                : "Leads criados nesta empresa."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {data.leads.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Nenhum lead encontrado.
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-2 pr-2">Título</th>
-                      <th className="text-left py-2 pr-2">Marca</th>
-                      <th className="text-left py-2 pr-2">Estado</th>
-                      <th className="text-left py-2 pr-2">Valor</th>
-                      <th className="text-left py-2 pr-2">Criado em</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.leads.map((lead) => (
-                      <tr
-                        key={lead.id}
-                        className="border-b hover:bg-muted cursor-pointer"
-                        data-testid={`row-lead-${lead.id}`}
-                        onClick={() => navigate(`/admin/leads/${lead.id}`)}
-                      >
-                        <td className="py-2 pr-2">{lead.titulo}</td>
-                        <td className="py-2 pr-2">
-                          {lead.marcas && lead.marcas.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {lead.marcas.slice(0, 2).map((marca) => (
-                                <Badge key={marca.id} variant="secondary" className="text-xs" data-testid={`badge-lead-marca-${marca.id}`}>
-                                  {marca.nome}
-                                </Badge>
-                              ))}
-                              {lead.marcas.length > 2 && (
-                                <Badge variant="outline" className="text-xs" data-testid={`badge-lead-marcas-more-${lead.id}`}>
-                                  +{lead.marcas.length - 2}
-                                </Badge>
-                              )}
-                            </div>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                        <td className="py-2 pr-2 capitalize">
-                          {lead.estado}
-                        </td>
-                        <td className="py-2 pr-2">
-                          {lead.valorPrevisto
-                            ? `${lead.valorPrevisto} ${lead.moeda || "EUR"}`
-                            : "—"}
-                        </td>
-                        <td className="py-2 pr-2">
-                          {new Date(lead.createdAt).toLocaleDateString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+        <>
+          {/* FASE-LEADS-FILTROS-02: Filters bar */}
+          <Card data-testid="card-leads-filters">
+            <CardContent className="pt-6">
+              <div className="space-y-3">
+                {/* Row 1: Search + Estado + Entidade */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Pesquisar</label>
+                    <Input
+                      placeholder="Título, descrição..."
+                      value={q}
+                      onChange={(e) => updateParams({ q: e.target.value })}
+                      data-testid="input-lead-search"
+                    />
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Estado</label>
+                    <Select value={estado} onValueChange={(value) => updateParams({ estado: value })}>
+                      <SelectTrigger data-testid="select-lead-estado">
+                        <SelectValue placeholder="Todos os estados" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Todos</SelectItem>
+                        <SelectItem value="novo">Novo</SelectItem>
+                        <SelectItem value="em_curso">Em curso</SelectItem>
+                        <SelectItem value="ganhou">Ganhou</SelectItem>
+                        <SelectItem value="perdido">Perdido</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Entidade</label>
+                    <Select value={entidadeId} onValueChange={(value) => updateParams({ entidadeId: value })}>
+                      <SelectTrigger data-testid="select-lead-entidade">
+                        <SelectValue placeholder="Todas as entidades" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Todas</SelectItem>
+                        {Array.isArray(entidadesData) &&
+                          entidadesData.map((ent: any) => (
+                            <SelectItem key={ent.id} value={ent.id}>
+                              {ent.nome}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Row 2: Contacto + Só com Odoo + Ordenar */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Contacto</label>
+                    <Select value={contactoId} onValueChange={(value) => updateParams({ contactoId: value })}>
+                      <SelectTrigger data-testid="select-lead-contacto">
+                        <SelectValue placeholder="Todos os contactos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Todos</SelectItem>
+                        {Array.isArray(contactosData) &&
+                          contactosData.map((cont: any) => (
+                            <SelectItem key={cont.id} value={cont.id}>
+                              {cont.nome}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Filtro</label>
+                    <Button
+                      variant={hasOdoo === "true" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => updateParams({ hasOdoo: hasOdoo === "true" ? "" : "true" })}
+                      className="w-full"
+                      data-testid="toggle-lead-odoo"
+                    >
+                      {hasOdoo === "true" ? "✓ Com Odoo" : "Só com Odoo"}
+                    </Button>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Ordenar por</label>
+                    <Select
+                      value={`${orderBy}-${orderDir}`}
+                      onValueChange={(value) => {
+                        const [by, dir] = value.split("-");
+                        updateParams({ orderBy: by, orderDir: dir });
+                      }}
+                    >
+                      <SelectTrigger data-testid="select-lead-orderby">
+                        <SelectValue placeholder="Ordenação" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="createdAt-desc">Mais recentes</SelectItem>
+                        <SelectItem value="createdAt-asc">Mais antigos</SelectItem>
+                        <SelectItem value="titulo-asc">Título A-Z</SelectItem>
+                        <SelectItem value="titulo-desc">Título Z-A</SelectItem>
+                        <SelectItem value="valorPrevisto-asc">Valor ↑</SelectItem>
+                        <SelectItem value="valorPrevisto-desc">Valor ↓</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Reset button */}
+                {(q || estado || entidadeId || contactoId || hasOdoo) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={resetFilters}
+                    data-testid="button-reset-filters"
+                  >
+                    Limpar filtros
+                  </Button>
+                )}
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          {/* FASE-LEADS-FILTROS-02: Leads list */}
+          <Card data-testid="card-leads-list">
+            <CardHeader>
+              <CardTitle>Leads</CardTitle>
+              <CardDescription>
+                {data.leads.length === 0
+                  ? "Ainda não existem leads registados."
+                  : "Leads criados nesta empresa."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {data.leads.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhum lead encontrado.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 pr-2">Título</th>
+                        <th className="text-left py-2 pr-2">Marca</th>
+                        <th className="text-left py-2 pr-2">Estado</th>
+                        <th className="text-left py-2 pr-2">Valor</th>
+                        <th className="text-left py-2 pr-2">Criado em</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.leads.map((lead) => (
+                        <tr
+                          key={lead.id}
+                          className="border-b hover:bg-muted cursor-pointer"
+                          data-testid={`row-lead-${lead.id}`}
+                          onClick={() => navigate(`/admin/leads/${lead.id}`)}
+                        >
+                          <td className="py-2 pr-2">{lead.titulo}</td>
+                          <td className="py-2 pr-2">
+                            {lead.marcas && lead.marcas.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {lead.marcas.slice(0, 2).map((marca) => (
+                                  <Badge key={marca.id} variant="secondary" className="text-xs" data-testid={`badge-lead-marca-${marca.id}`}>
+                                    {marca.nome}
+                                  </Badge>
+                                ))}
+                                {lead.marcas.length > 2 && (
+                                  <Badge variant="outline" className="text-xs" data-testid={`badge-lead-marcas-more-${lead.id}`}>
+                                    +{lead.marcas.length - 2}
+                                  </Badge>
+                                )}
+                              </div>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                          <td className="py-2 pr-2 capitalize">
+                            {lead.estado}
+                          </td>
+                          <td className="py-2 pr-2">
+                            {lead.valorPrevisto
+                              ? `${lead.valorPrevisto} ${lead.moeda || "EUR"}`
+                              : "—"}
+                          </td>
+                          <td className="py-2 pr-2">
+                            {new Date(lead.createdAt).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
       )}
     </div>
   );
