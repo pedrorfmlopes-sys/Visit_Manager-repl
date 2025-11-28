@@ -510,7 +510,6 @@ function LeadDetailForm({
                     <SelectValue placeholder="Seleciona uma entidade (ou deixa em branco)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sem entidade</SelectItem>
                     {entidades.length === 0 ? (
                       <div className="px-2 py-1.5 text-sm text-muted-foreground">Nenhuma entidade</div>
                     ) : (
@@ -535,7 +534,6 @@ function LeadDetailForm({
                     <SelectValue placeholder="Seleciona um contacto (ou deixa em branco)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sem contacto</SelectItem>
                     {(() => {
                       // FASE-LEADS-CLEAN-02: Filter contacts by entity if selected
                       const contactosFiltrados = form.entidadeId
