@@ -12,6 +12,7 @@ import { setupMicrosoftRoutes } from "./routes/integrations/microsoft";
 import { setupGoogleRoutes } from "./routes/integrations/google";
 import { setupOdooRoutes } from "./routes/integrations/odoo";
 import { registerCrmLeadsRoutes } from "./routes/crmLeads";
+import type { EntidadeSearchResult, ContactoSearchResult, VisitaSearchResult } from "@shared/schema";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -3930,6 +3931,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating user settings:", error);
       res.status(500).json({ message: "Failed to update user settings" });
+    }
+  });
+
+  // ============================================
+  // FASE SS-01: Lightweight Search Endpoints
+  // ============================================
+
+  // GET /api/crm/entidades/search?q=...
+  app.get('/api/crm/entidades/search', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const q = (req.query.q as string || "").toLowerCase();
+      const entidades = await storage.getEntidades(empresaId, userId, userRole);
+      
+      const results: EntidadeSearchResult[] = entidades
+        .filter(e => e.nome.toLowerCase().includes(q))
+        .sort((a, b) => a.nome.localeCompare(b.nome))
+        .slice(0, 20)
+        .map(e => ({
+          id: e.id,
+          label: e.nome,
+          extraInfo: e.cidade || e.nif || undefined,
+          data: { cidade: e.cidade, nif: e.nif }
+        }));
+      
+      res.json(results);
+    } catch (error) {
+      console.error("Error searching entidades:", error);
+      res.status(500).json({ message: "Failed to search entidades" });
+    }
+  });
+
+  // GET /api/crm/contactos/search?q=...&entidadeId=...
+  app.get('/api/crm/contactos/search', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const q = (req.query.q as string || "").toLowerCase();
+      const entidadeId = req.query.entidadeId as string | undefined;
+      
+      const contactos = await storage.getContactos({ empresaId, entidadeId });
+      
+      const results: ContactoSearchResult[] = contactos
+        .filter(c => c.nome.toLowerCase().includes(q))
+        .sort((a, b) => a.nome.localeCompare(b.nome))
+        .slice(0, 20)
+        .map(c => ({
+          id: c.id,
+          label: c.nome,
+          extraInfo: c.entidade?.nome || c.email || undefined,
+          data: { entidadeNome: c.entidade?.nome, email: c.email }
+        }));
+      
+      res.json(results);
+    } catch (error) {
+      console.error("Error searching contactos:", error);
+      res.status(500).json({ message: "Failed to search contactos" });
+    }
+  });
+
+  // GET /api/crm/visitas/search?q=...&entidadeId=...
+  app.get('/api/crm/visitas/search', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
+      
+      const q = (req.query.q as string || "").toLowerCase();
+      const entidadeId = req.query.entidadeId as string | undefined;
+      
+      let visitas = await storage.getVisitas(empresaId, userId, userRole);
+      
+      if (entidadeId) {
+        visitas = visitas.filter(v => v.entidadeId === entidadeId);
+      }
+      
+      const results: VisitaSearchResult[] = visitas
+        .filter(v => {
+          const q_lower = q.toLowerCase();
+          return v.notas?.toLowerCase().includes(q_lower) || 
+                 v.entidade?.nome.toLowerCase().includes(q_lower);
+        })
+        .sort((a, b) => new Date(b.dataVisita).getTime() - new Date(a.dataVisita).getTime())
+        .slice(0, 20)
+        .map(v => ({
+          id: v.id,
+          label: `${format(new Date(v.dataVisita), 'yyyy-MM-dd', { locale: pt })} – ${v.entidade?.nome || 'N/A'}`,
+          extraInfo: v.entidade?.nome,
+          data: { entidadeNome: v.entidade?.nome, date: v.dataVisita }
+        }));
+      
+      res.json(results);
+    } catch (error) {
+      console.error("Error searching visitas:", error);
+      res.status(500).json({ message: "Failed to search visitas" });
     }
   });
 

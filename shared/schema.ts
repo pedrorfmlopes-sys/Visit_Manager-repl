@@ -17,6 +17,20 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // ============================================
+// FASE SS-01: Search Result Types
+// ============================================
+export type SearchResult<T = any> = {
+  id: string;
+  label: string;
+  extraInfo?: string | null;
+  data?: T;
+};
+
+export type EntidadeSearchResult = SearchResult<{ cidade?: string; nif?: string }>;
+export type ContactoSearchResult = SearchResult<{ entidadeNome?: string; email?: string }>;
+export type VisitaSearchResult = SearchResult<{ entidadeNome?: string; date?: string }>;
+
+// ============================================
 // ENUMS (must be defined before tables that use them)
 // ============================================
 

@@ -26,6 +26,9 @@ This Progressive Web Application (PWA) is designed to streamline commercial visi
 - ✅ **FASE-LEADS-FILTROS-01**: Backend search (q), filters (estado, hasOdoo), ordering (orderBy, orderDir), pagination (LIMIT 100)
 - ✅ **FASE-LEADS-FILTROS-02**: Frontend UI with filters bar, URL query params sync, responsive design
 
+### SS-01: Lightweight Search Endpoints (Complete)
+- ✅ **FASE-SS-01**: 3 search endpoints (entidades, contactos, visitas) with max 20 results, RBAC respecting, TypeScript types
+
 ### RBAC Refactoring (In Progress)
 - ✅ **ENTIDADES-RBAC-STEP1**: Centralized `buildEntidadeAccessWhere` helper + `ListEntidadesParams` object
 - ✅ **CONTACTOS-RBAC-STEP1**: Applied same pattern - `buildContactoAccessWhere` helper + `ListContactosParams` object
