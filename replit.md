@@ -45,6 +45,14 @@ This Progressive Web Application (PWA) is designed to streamline commercial visi
 - ✅ URL persistence for all filter states
 - ✅ Reset button clears all filters
 
+### FASE-LEADS-FILTROS-02: End-to-End Query Connection (Complete)
+- ✅ Frontend: URL params → React Query queryKey → API call
+- ✅ Input debounce 300ms → URL update (with immediate local feedback)
+- ✅ All filters (q, estado, entidadeId, contactoId, hasOdoo) in queryKey
+- ✅ Backend: GET /api/crm/leads implements filtering (titulo/descricao/marca search)
+- ✅ Backend: ORDER BY with orderBy/orderDir support
+- ✅ Query re-executes on any param change → data updates
+
 ### RBAC Refactoring (In Progress)
 - ✅ **ENTIDADES-RBAC-STEP1**: Centralized `buildEntidadeAccessWhere` helper + `ListEntidadesParams` object
 - ✅ **CONTACTOS-RBAC-STEP1**: Applied same pattern - `buildContactoAccessWhere` helper + `ListContactosParams` object

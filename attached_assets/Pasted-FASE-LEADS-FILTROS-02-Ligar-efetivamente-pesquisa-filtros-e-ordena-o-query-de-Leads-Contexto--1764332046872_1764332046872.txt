@@ -1,0 +1,163 @@
+FASE LEADS-FILTROS-02 – Ligar efetivamente pesquisa, filtros e ordenação à query de Leads
+
+Contexto:
+
+A página /admin/leads já tem:
+
+campo de pesquisa que agora aceita digitação
+
+filtros (Selects) e ordenação, com dropdowns a abrir
+
+Mas:
+
+escrever no campo não altera a lista
+
+escolher opções nos Selects não as deixa “presas” (não ficam selecionadas)
+
+a lista não é filtrada nem ordenada na prática.
+
+Objetivo desta fase:
+
+Garantir que os parâmetros na URL (q, estado, entidadeId, contactoId, hasOdoo, orderBy, orderDir)
+
+Estão sincronizados com
+
+os valores mostrados nos inputs/Selects
+
+o queryKey do React Query
+
+e com os parâmetros enviados no fetch para /api/crm/leads.
+
+Tarefas concretas:
+
+Abre client/src/pages/AdminLeadsPage.tsx e:
+
+Identifica como é que q, estado, entidadeId, contactoId, hasOdoo, orderBy, orderDir são:
+
+lidos da URL (ex.: via location + URLSearchParams)
+
+usados nos componentes de UI (Input, Selects, etc.)
+
+usados no useQuery / fetchLeads.
+
+Sincronização dos filtros com a URL
+
+Garante que para cada filtro:
+
+existe uma variável derivada da URL, ex.:
+
+const q = params.get("q") ?? "";
+
+const estado = params.get("estado") ?? "";
+
+const entidadeId = params.get("entidadeId") ?? "";
+
+const contactoId = params.get("contactoId") ?? "";
+
+const hasOdoo = params.get("hasOdoo") ?? "";
+
+const orderBy = params.get("orderBy") ?? "createdAt";
+
+const orderDir = params.get("orderDir") ?? "desc";
+
+e que estes valores são usados nos respetivos componentes:
+
+<Input
+  value={localSearch}
+  onChange={(e) => handleSearchChange(e.target.value)}
+/>
+
+<Select
+  value={estado}
+  onValueChange={(value) => updateParams({ estado: value })}
+>
+  ...
+</Select>
+
+<Select
+  value={orderBy}
+  onValueChange={(value) => updateParams({ orderBy: value })}
+>
+  ...
+</Select>
+
+
+Corrige qualquer caso em que o value de um Select não venha da variável correta ou esteja sempre undefined/"".
+
+Ligar os filtros à query do React Query
+
+Garante que o useQuery que vai buscar os leads tem algo do género:
+
+const { data: leads } = useQuery({
+  queryKey: ["/api/crm/leads", { q, estado, entidadeId, contactoId, hasOdoo, orderBy, orderDir }],
+  queryFn: () =>
+    fetchLeads({ q, estado, entidadeId, contactoId, hasOdoo, orderBy, orderDir }),
+});
+
+
+Se ainda não existir um fetchLeads com estes parâmetros, cria/ajusta:
+
+async function fetchLeads(params: {
+  q?: string;
+  estado?: string;
+  entidadeId?: string;
+  contactoId?: string;
+  hasOdoo?: string;
+  orderBy?: string;
+  orderDir?: "asc" | "desc";
+}) {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) search.set(key, String(value));
+  });
+  const res = await fetch(`/api/crm/leads?${search.toString()}`, {
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error("Erro ao carregar leads");
+  return res.json();
+}
+
+
+Confirma que os parâmetros enviados no fetch usam exatamente os nomes que o backend espera.
+
+Verificação rápida no backend
+
+Confirma no código do backend (rota /api/crm/leads) que os parâmetros q, estado, entidadeId, contactoId, hasOdoo, orderBy, orderDir estão a ser lidos e aplicados na query (filters + ORDER BY).
+
+Se algum não estiver a ser usado, implementa a filtragem/ordenação de acordo com a intenção descrita na FASE LEADS-FILTROS-01.
+
+Testes manuais (escreve nos comentários o que fizeste)
+
+Verifica em runtime que:
+
+Ao escrever em “Pesquisar”:
+
+o valor aparece no input,
+
+após ~300ms a URL passa a ter ?q=texto,
+
+o queryKey do React Query é reexecutado com esse q,
+
+a lista de leads muda.
+
+Ao escolher um valor num Select de estado:
+
+o Select mostra a opção escolhida como value,
+
+a URL passa a ter estado=...,
+
+a lista é filtrada.
+
+Ao alterar “Ordenar por”:
+
+o Select mantém a opção selecionada,
+
+a URL tem orderBy=...&orderDir=...,
+
+a lista aparece visivelmente ordenada de forma diferente.
+
+No final, mostra:
+
+O diff das partes relevantes de AdminLeadsPage.tsx (e ficheiros auxiliares se mexer em fetchLeads).
+
+Uma explicação curta de como os filtros estão agora ligados ao URL, ao React Query e ao backend.
