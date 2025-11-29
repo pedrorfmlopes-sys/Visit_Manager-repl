@@ -5,6 +5,7 @@ import { odooConnectionsStorage } from "../../storage/odooConnections";
 import { insertOdooConnectionSchema } from "@shared/schema";
 import { testOdooConnection, searchOdooPartners, getOdooPartnerById, createOdooLead, assertOdooEnabled } from "../../integrations/odooClient";
 import { createLeadForVisita } from "../../integrations/odooLeadsFromVisitas";
+import { assertLeadsEnabled } from "../../integrations/crmLeads";
 import express from "express";
 
 export function setupOdooRoutes(app: any): void {
@@ -173,6 +174,7 @@ export function setupOdooRoutes(app: any): void {
         return res.status(400).json({ error: "User has no company assigned" });
       }
 
+      await assertLeadsEnabled(empresaId);
       await assertOdooEnabled(empresaId);
 
       const visitaId = String(req.params.id);
