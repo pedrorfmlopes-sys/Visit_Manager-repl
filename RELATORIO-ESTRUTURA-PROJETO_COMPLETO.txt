@@ -1,0 +1,992 @@
+================================================================================
+RELATORIO COMPLETO: ESTRUTURA DO PROJETO VISIT MANAGER
+================================================================================
+
+Data: 29 Novembro 2025
+Versao: FINAL - ESTRUTURA BACKEND COMPLETA
+
+================================================================================
+INDICE
+================================================================================
+
+1. RESUMO EXECUTIVO
+2. ESTRUTURA DE DIRECTORIO (Visao Geral)
+3. CAMADAS DO PROJETO
+   3.1. Raiz (Config)
+   3.2. Shared Layer (Schema & Tipos)
+   3.3. Backend Layer
+4. FICHEIROS PRINCIPAIS IDENTIFICADOS
+5. DATABASE & STORAGE INTERFACE
+6. AUTHENTICATION & CONTEXT
+7. ROTAS & ENDPOINTS
+8. INTEGRACOES EXTERNAS
+9. FLUXO DE DADOS COMPLETO
+
+================================================================================
+1. RESUMO EXECUTIVO
+================================================================================
+
+Projeto: Commercial Visits Management PWA
+Tipo: Full-stack TypeScript (React + Express + PostgreSQL)
+Status: EM DESENVOLVIMENTO
+
+Arquitetura Principal:
+- Frontend: React 18 + TypeScript + Wouter + TanStack Query + Shadcn/ui
+- Backend: Express.js + TypeScript + Drizzle ORM + PostgreSQL (Neon)
+- Database: PostgreSQL serverless (Neon-backed)
+- Build: Vite + TypeScript
+- Deploy: Replit
+
+Total de ficheiros TS/TSX: 40+ ficheiros
+Linhas de codigo: 5000+
+
+================================================================================
+2. ESTRUTURA DE DIRECTORIO (VISAO GERAL)
+================================================================================
+
+Raiz do Projeto:
+.
+|-- package.json                    [Dependencias]
+|-- tsconfig.json                   [TypeScript config]
+|-- vite.config.ts                  [Vite build config]
+|-- drizzle.config.ts               [Drizzle ORM config]
+|-- tailwind.config.ts              [Tailwind CSS config]
+|-- components.json                 [Shadcn/ui config]
+|-- replit.md                        [Documentacao projeto]
+|
+|-- client/                          [FRONTEND - React]
+|   |-- src/
+|   |   |-- pages/                  [Page components]
+|   |   |-- components/             [React components]
+|   |   |-- lib/                    [Utilities]
+|   |   |-- hooks/                  [React hooks]
+|   |   |-- App.tsx                 [Main router]
+|   |   |-- index.css               [Styles]
+|   |
+|   |-- public/                     [Static assets]
+|
+|-- server/                          [BACKEND - Express.js]
+|   |-- index.ts                    [Entry point]
+|   |-- routes.ts                   [Main router]
+|   |-- storage.ts                  [Data layer (IStorage)]
+|   |-- db.ts                       [Database connection]
+|   |-- authContext.ts              [Auth utilities]
+|   |
+|   |-- routes/
+|   |   |-- crmLeads.ts             [CRM Leads routes]
+|   |   |-- integrations/           [External integrations]
+|   |
+|   |-- integrations/
+|   |   |-- crmLeads.ts             [CRM business logic]
+|   |   |-- odooClient.ts           [Odoo API client]
+|   |   |-- odooLeadsFromVisitas.ts [Lead sync logic]
+|   |
+|   |-- storage/
+|   |   |-- googleConnections.ts    [Google auth storage]
+|   |   |-- microsoftConnections.ts [Microsoft auth storage]
+|   |   |-- odooConnections.ts      [Odoo API keys]
+|   |
+|   |-- [External services]
+|   |   |-- openai.ts               [OpenAI integration]
+|   |   |-- email.ts                [Email service]
+|   |   |-- enrichment.ts           [Data enrichment]
+|   |   |-- icsExport.ts            [Calendar export]
+|   |   |-- pdfGenerator.ts         [PDF generation]
+|   |   |-- reminders.ts            [Reminders]
+|   |
+|   |-- scripts/                    [Utility scripts]
+|   |-- types/                      [Type definitions]
+|
+|-- shared/                          [SHARED LAYER]
+|   |-- schema.ts                   [Main schema + types (43KB)]
+|   |-- emailTemplates.ts           [Email templates]
+|
+|-- migrations/                      [Database migrations]
+|   |-- meta/
+|
+|-- tests/                           [Test files]
+
+================================================================================
+3. CAMADAS DO PROJETO
+================================================================================
+
+3.1 RAIZ (Config files)
+────────────────────
+
+package.json
+  - Dependencias: React, Express, Drizzle, TypeScript, etc.
+  - Scripts: dev, build, db:push, db:pull
+
+tsconfig.json
+  - Target: ES2020
+  - Module: ESNext
+  - Paths: @/* = client/src, @shared = shared
+
+vite.config.ts
+  - Frontend: http://0.0.0.0:5000
+  - Backend: Express integration
+  - Aliases: @, @shared
+
+drizzle.config.ts
+  - Database: PostgreSQL
+  - Migrations: ./migrations
+
+tailwind.config.ts
+  - UI Framework: Shadcn/ui (New York style)
+  - Dark mode: class-based
+  - Customization: empresa-specific themes
+
+
+3.2 SHARED LAYER - schema.ts (43KB)
+────────────────────────────────────
+
+Define TODOS os tipos e schemas do projeto.
+
+TABELAS E SCHEMAS:
+
+1. USERS
+   - id (uuid)
+   - email (string)
+   - role (admin | agent)
+   - empresaId (uuid, foreign key)
+   - createdAt, updatedAt
+
+2. EMPRESAS
+   - id (uuid)
+   - nome (string)
+   - theme (JSON - company-specific colors)
+   - crmLeadsEnabled (boolean - feature toggle)
+   - openai_api_key (string - optional, BYOK mode)
+   - mostrarGPS (boolean)
+   - createdAt
+
+3. ENTIDADES (Universal business entities)
+   - id (uuid)
+   - empresaId (uuid, foreign key)
+   - nome (string)
+   - nif (string, unique per empresa)
+   - enderecoTipo (Gabinete | Distribuidor | Parceiro | Construtor)
+   - enderecoBase (JSON - address fields)
+   - createdByUserId (uuid)
+   - assignedUserId (uuid)
+   - createdAt
+
+4. ENTIDADE_TIPOS (Configurable entity types)
+   - id (uuid)
+   - empresaId (uuid)
+   - nome (string)
+   - cor (string - hex color)
+
+5. CONTACTOS
+   - id (uuid)
+   - empresaId (uuid)
+   - entidadeId (uuid, foreign key)
+   - nome (string)
+   - email (string)
+   - telefone (string)
+   - createdByUserId (uuid)
+   - createdAt
+
+6. VISITAS
+   - id (uuid)
+   - empresaId (uuid)
+   - entidadeId (uuid, foreign key)
+   - data (timestamp)
+   - notaVisita (text - rich text)
+   - marcasArray (array of strings)
+   - audioFileName (string)
+   - audioTranscription (text)
+   - gps (JSON - coordinates)
+   - distanceKm (numeric)
+   - createdAt
+
+7. VISITASAUDIO
+   - id (uuid)
+   - visitaId (uuid, foreign key)
+   - audioFileName (string)
+   - originalFileName (string)
+   - uploadedAt
+
+8. VISITASCONTACTOS (Many-to-many)
+   - visitaId (uuid)
+   - contactoId (uuid)
+
+9. MARCAS (Brands)
+   - id (uuid)
+   - empresaId (uuid)
+   - nome (string)
+
+10. TAREFAS
+    - id (uuid)
+    - empresaId (uuid)
+    - assignedUserId (uuid)
+    - titulo (string)
+    - descricao (text)
+    - status (pending | done)
+    - repeatInterval (none | daily | 2days | 3days | weekly)
+    - createdAt
+
+11. LEMBRETES (Reminders)
+    - id (uuid)
+    - usuarioId (uuid)
+    - conteudo (text)
+    - tipo (alerta | reminder)
+    - lido (boolean)
+    - createdAt
+
+12. CRM LEADS *** NOVO ***
+    - id (uuid)
+    - empresaId (uuid)
+    - entidadeId (uuid, nullable)
+    - contactoId (uuid, nullable)
+    - visitaId (uuid, nullable)
+    - titulo (string)
+    - descricao (text)
+    - marca (string)
+    - estado (string - open | qualified | won | lost)
+    - valorPrevisto (numeric)
+    - moeda (string - EUR | USD)
+    - odooLeadId (integer, optional - Odoo sync)
+    - createdAt
+
+ZOD SCHEMAS (Validation):
+- leadSchema (select type)
+- insertLeadSchema (insert type with validation)
+- Type inferrence for TypeScript
+
+SEARCH RESULT TYPES:
+- SearchResult<T> (generic)
+- EntidadeSearchResult
+- ContactoSearchResult
+- VisitaSearchResult
+
+
+3.3 BACKEND LAYER
+────────────────
+
+server/index.ts
+  ENTRY POINT
+  - Express app initialization
+  - Middleware setup (session, auth, static files)
+  - Server listening on port 5000
+
+server/db.ts
+  DATABASE CONNECTION
+  - Drizzle ORM connection pool
+  - Neon PostgreSQL client
+  - Connection pooling
+
+server/storage.ts (IStorage interface)
+  DATA ACCESS LAYER
+  - Abstraction for database operations
+  - CRUD methods for all entities
+  - RBAC filtering helpers
+  - MemStorage implementation for development
+
+server/authContext.ts
+  AUTHENTICATION & AUTHORIZATION
+  - getUserContext(req) - Extract user data from session
+  - ensureAuthenticated - Middleware for protected routes
+  - requireAdmin - Middleware for admin-only routes
+  - RBAC enforcement (admin sees all, agent sees own)
+
+server/routes.ts (Main router)
+  REST API ENDPOINTS
+  - Auth routes
+  - User routes
+  - Entidades routes (CRUD)
+  - Contactos routes (CRUD)
+  - Visitas routes (CRUD)
+  - Tarefas routes (CRUD)
+  - Dashboard routes
+  - Analytics routes
+  - Search routes
+
+server/routes/crmLeads.ts
+  CRM LEADS ENDPOINTS
+  - GET /api/crm/leads (list with filtering)
+  - GET /api/crm/leads/:id (detail)
+  - POST /api/crm/leads (create)
+  - PATCH /api/crm/leads/:id (update)
+
+server/integrations/
+  BUSINESS LOGIC
+  - crmLeads.ts - Lead management logic
+  - odooClient.ts - Odoo ERP API client
+  - odooLeadsFromVisitas.ts - Sync leads from visitas to Odoo
+
+server/storage/
+  INTEGRATION-SPECIFIC STORAGE
+  - googleConnections.ts - Google auth tokens
+  - microsoftConnections.ts - Microsoft auth tokens
+  - odooConnections.ts - Odoo API keys
+
+================================================================================
+4. FICHEIROS PRINCIPAIS IDENTIFICADOS
+================================================================================
+
+FICHEIRO: shared/schema.ts (43KB)
+──────────────────────────────
+Localizacao: ./shared/schema.ts
+Tamanho: 43KB (1196 linhas)
+
+Conteudo:
+  1. Import declarations (Drizzle, Zod, etc)
+  2. ENUMS definitions (roles, entity types, statuses)
+  3. TABLE definitions (12 tables - users, empresas, leads, etc)
+  4. ZOD SCHEMAS (validation)
+  5. TYPE DEFINITIONS (TypeScript types)
+  6. RELATIONS (foreign keys, connections)
+
+Responsabilidade:
+  - Single source of truth para tipos de dados
+  - Validation schemas com Zod
+  - TypeScript type safety
+  - Database schema definition
+
+Usado por:
+  - server/storage.ts (table references)
+  - server/routes.ts (type validation)
+  - client/ (type inference)
+  - server/routes/crmLeads.ts (Lead types)
+
+
+FICHEIRO: server/storage.ts (1824 linhas)
+──────────────────────────────────────
+Localizacao: ./server/storage.ts
+Tamanho: 1824 linhas
+
+Interface IStorage com metodos:
+  - getUser(id) - Retrieve user
+  - getEmpresa(id) - Retrieve company
+  - listEntidades(params) - List entities
+  - getEntidade(id) - Get single entity
+  - createEntidade(data) - Create entity
+  - updateEntidade(id, data) - Update entity
+  - deleteEntidade(id) - Delete entity
+  - listContactos(params) - List contacts
+  - listVisitas(params) - List visits
+  - listTarefas(params) - List tasks
+  - listLeads(params) - List leads with filtering
+  - createLead(data) - Create lead
+  - updateLead(id, data) - Update lead
+  - ... (40+ methods)
+
+RBAC Helpers:
+  - buildEntidadeAccessWhere() - Admin sees all, Agent sees own
+  - buildContactoAccessWhere() - Same pattern
+  - buildVisitaAccessWhere() - Same pattern
+
+MemStorage Implementation:
+  - In-memory storage for development
+  - No database required
+  - All CRUD operations implemented
+
+Responsabilidade:
+  - Abstraction layer between routes and database
+  - Single place for RBAC enforcement
+  - Type-safe database access
+  - Decoupling routes from database
+
+Usado por:
+  - server/routes.ts (all CRUD operations)
+  - server/routes/crmLeads.ts (Lead operations)
+  - server/authContext.ts (User retrieval)
+
+
+FICHEIRO: server/authContext.ts (76 linhas)
+──────────────────────────────────────────
+Localizacao: ./server/authContext.ts
+Tamanho: 76 linhas (MUITO COMPACT)
+
+Exports:
+  1. UserContext interface
+     {
+       userId: string,
+       empresaId?: string,
+       userRole: 'admin' | 'agent'
+     }
+
+  2. getUserContext(req) - Main function
+     - Extract userId from req.user.claims.sub
+     - Retrieve user from storage
+     - Get empresaId and role
+     - Return UserContext object
+
+  3. requireAdmin middleware
+     - Check if user is admin
+     - Return 403 if not admin
+     - Attach context to req
+
+  4. ensureAuthenticated middleware
+     - Call getUserContext()
+     - Attach context to req
+     - Allow next middleware
+
+Responsabilidade:
+  - Centralized authentication logic
+  - RBAC pattern enforcement
+  - User context extraction
+
+Usado por:
+  - server/routes.ts (all protected routes)
+  - server/routes/crmLeads.ts (routes)
+  - middleware chains
+
+
+FICHEIRO: server/routes.ts (MAIN)
+─────────────────────────────────
+Localizacao: ./server/routes.ts
+Tamanho: ~800 linhas (GRANDE)
+
+Rotas implementadas:
+
+AUTH:
+  GET  /api/auth/user           - Current user info
+  POST /api/auth/login          - Passport login
+  GET  /auth/microsoft/callback - OAuth callback
+
+USERS:
+  GET  /api/users               - List users (admin only)
+
+ENTIDADES:
+  GET  /api/entidades           - List with RBAC
+  GET  /api/entidades/:id       - Detail
+  POST /api/entidades           - Create
+  PATCH /api/entidades/:id      - Update
+  DELETE /api/entidades/:id     - Delete
+
+CONTACTOS:
+  GET  /api/contactos           - List
+  GET  /api/contactos/:id       - Detail
+  POST /api/contactos           - Create
+  PATCH /api/contactos/:id      - Update
+  DELETE /api/contactos/:id     - Delete
+
+VISITAS:
+  GET  /api/visitas             - List
+  GET  /api/visitas/:id         - Detail
+  POST /api/visitas             - Create
+  PATCH /api/visitas/:id        - Update
+  DELETE /api/visitas/:id       - Delete
+
+TAREFAS:
+  GET  /api/tarefas             - List
+  POST /api/tarefas             - Create
+  PATCH /api/tarefas/:id        - Update
+  DELETE /api/tarefas/:id       - Delete
+
+SEARCH:
+  GET  /api/search/entidades    - Async search (max 20)
+  GET  /api/search/contactos    - Async search (max 20)
+  GET  /api/search/visitas      - Async search (max 20)
+
+DASHBOARD:
+  GET  /api/dashboard           - Overview data
+  GET  /api/dashboard/insights  - AI insights
+
+ANALYTICS:
+  GET  /api/analytics           - Analytics data
+
+INTEGRAÇÕES:
+  GET  /api/integrations/google/callback
+  GET  /api/integrations/microsoft/callback
+  GET  /api/integrations/odoo/...
+
+Middleware pattern:
+  - Todas as rotas autenticadas usam ensureAuthenticated
+  - Rotas admin usam requireAdmin
+  - getUserContext anexado a req.userContext
+
+
+FICHEIRO: server/routes/crmLeads.ts
+───────────────────────────────────
+Localizacao: ./server/routes/crmLeads.ts
+Tamanho: ~150 linhas
+
+Endpoints CRM Leads (NOVOS):
+
+GET /api/crm/leads
+  Query params:
+    - q (search query)
+    - estado (status filter)
+    - entidadeId (entity filter)
+    - contactoId (contact filter)
+    - hasOdoo (boolean - has Odoo sync)
+    - orderBy (createdAt | titulo | valorPrevisto)
+    - orderDir (asc | desc)
+  Response: { leads: Lead[] }
+  RBAC: Admin sees all, Agent sees assigned
+
+GET /api/crm/leads/:id
+  Response: { lead: Lead }
+
+POST /api/crm/leads
+  Body: insertLeadSchema validation
+  - titulo (required)
+  - estado (required)
+  - entidadeId (optional but at least one of entidade/contacto)
+  - contactoId (optional but at least one of entidade/contacto)
+  - valorPrevisto (optional)
+  - odooLeadId (optional)
+  Response: { success: true, lead: Lead }
+
+PATCH /api/crm/leads/:id
+  Body: Partial lead update
+  Response: { success: true, lead: Lead }
+
+DELETE /api/crm/leads/:id
+  Response: { success: true }
+
+RBAC:
+  - Admin: Full access to all leads
+  - Agent: Access only to leads assigned to them
+
+
+================================================================================
+5. DATABASE & STORAGE INTERFACE
+================================================================================
+
+DATABASE CONNECTION (server/db.ts):
+──────────────────────────────────
+
+  import { neon } from '@neondatabase/serverless';
+  import { drizzle } from 'drizzle-orm/neon-http';
+
+  const pool = neon(process.env.DATABASE_URL);
+  export const db = drizzle(pool);
+
+  Usado por:
+  - storage.ts (all queries)
+  - migrations
+  - seed scripts
+
+
+STORAGE INTERFACE (server/storage.ts):
+──────────────────────────────────────
+
+  export interface IStorage {
+    // Users
+    getUser(userId: string): Promise<User | null>;
+    upsertUser(data: UpsertUser): Promise<User>;
+
+    // Empresas
+    getEmpresa(empresaId: string): Promise<Empresa | null>;
+    listEmpresas(): Promise<Empresa[]>;
+
+    // Entidades
+    listEntidades(params: ListEntidadesParams): Promise<Entidade[]>;
+    getEntidade(id: string): Promise<EntidadeWithRelations | null>;
+    createEntidade(data: InsertEntidade): Promise<Entidade>;
+    updateEntidade(id: string, data: Partial<Entidade>): Promise<Entidade>;
+    deleteEntidade(id: string): Promise<void>;
+
+    // Contactos
+    listContactos(params: ListContactosParams): Promise<Contacto[]>;
+    getContacto(id: string): Promise<ContactoWithRelations | null>;
+    createContacto(data: InsertContacto): Promise<Contacto>;
+    updateContacto(id: string, data: Partial<Contacto>): Promise<Contacto>;
+    deleteContacto(id: string): Promise<void>;
+
+    // Visitas
+    listVisitas(params: ListVisitasParams): Promise<Visita[]>;
+    getVisita(id: string): Promise<VisitaWithRelations | null>;
+    createVisita(data: InsertVisita): Promise<Visita>;
+    updateVisita(id: string, data: Partial<Visita>): Promise<Visita>;
+    deleteVisita(id: string): Promise<void>;
+
+    // Tarefas
+    listTarefas(params: ListTarefasParams): Promise<Tarefa[]>;
+    createTarefa(data: InsertTarefa): Promise<Tarefa>;
+    updateTarefa(id: string, data: Partial<Tarefa>): Promise<Tarefa>;
+    deleteTarefa(id: string): Promise<void>;
+
+    // Leads *** NOVO ***
+    listLeads(params: ListLeadsParams): Promise<Lead[]>;
+    getLead(id: string): Promise<Lead | null>;
+    createLead(data: InsertLead): Promise<Lead>;
+    updateLead(id: string, data: Partial<Lead>): Promise<Lead>;
+    deleteLead(id: string): Promise<void>;
+
+    // Search
+    searchEntidades(...): Promise<EntidadeSearchResult[]>;
+    searchContactos(...): Promise<ContactoSearchResult[]>;
+    searchVisitas(...): Promise<VisitaSearchResult[]>;
+
+    ... (20+ more methods)
+  }
+
+
+RBAC FILTERING (buildXxxAccessWhere helpers):
+──────────────────────────────────────────
+
+  function buildEntidadeAccessWhere(
+    empresaId: string,
+    userId: string,
+    userRole: 'admin' | 'agent'
+  ) {
+    if (userRole === 'admin') {
+      return eq(entidades.empresaId, empresaId);
+    }
+    // Agent only sees own or assigned
+    return and(
+      eq(entidades.empresaId, empresaId),
+      or(
+        eq(entidades.createdByUserId, userId),
+        eq(entidades.assignedUserId, userId)
+      )
+    );
+  }
+
+  Same pattern for:
+  - buildContactoAccessWhere()
+  - buildVisitaAccessWhere()
+  - buildLeadAccessWhere()
+
+
+================================================================================
+6. AUTHENTICATION & CONTEXT
+================================================================================
+
+AUTHENTICATION FLOW:
+────────────────────
+
+1. User Login
+   - POST /auth/passport
+   - Replit OAuth via OpenID Connect
+   - Session stored in PostgreSQL
+
+2. Session Storage
+   - connect-pg-simple (session storage)
+   - Table: sessions
+   - TTL: Configurable
+
+3. User Context Extraction
+   - req.user.claims.sub (userId from OAuth)
+   - storage.getUser(userId) -> {userId, empresaId, role}
+   - req.userContext = {userId, empresaId, userRole}
+
+4. RBAC Enforcement
+   - Admin: Full access to empresa data
+   - Agent: Only own or assigned data
+   - Every query filtered via buildXxxAccessWhere()
+
+
+MIDDLEWARE CHAIN:
+────────────────
+
+  ensureAuthenticated
+    ↓
+  (Optional) requireAdmin
+    ↓
+  req.userContext available in handler
+
+
+USER ROLES:
+───────────
+
+Admin:
+  - Create/read/update/delete ALL company data
+  - Access all users data
+  - Configure company settings
+  - Manage API keys (Odoo, OpenAI)
+  - Access analytics
+
+Agent:
+  - Create/read/update/delete OWN data
+  - Only see assigned entities/contacts
+  - Create own visits
+  - Cannot access other agents' data
+
+
+================================================================================
+7. ROTAS & ENDPOINTS (RESUMO COMPLETO)
+================================================================================
+
+BASE URL: http://localhost:5000/api
+
+AUTHENTICATION:
+  GET  /auth/user                     - Current user
+  POST /auth/login                    - Login (Replit OAuth)
+  GET  /auth/logout                   - Logout
+
+ENTIDADES (Companies/Businesses):
+  GET  /entidades                     - List all (RBAC filtered)
+  GET  /entidades/:id                 - Get one
+  POST /entidades                     - Create new
+  PATCH /entidades/:id                - Update
+  DELETE /entidades/:id               - Delete
+
+ENTIDADE_TIPOS (Entity Types):
+  GET  /entidade-tipos                - List types
+  POST /entidade-tipos                - Create type
+  DELETE /entidade-tipos/:id          - Delete type
+
+CONTACTOS (Contacts):
+  GET  /contactos                     - List
+  GET  /contactos/:id                 - Get one
+  POST /contactos                     - Create
+  PATCH /contactos/:id                - Update
+  DELETE /contactos/:id               - Delete
+
+VISITAS (Visits):
+  GET  /visitas                       - List
+  GET  /visitas/:id                   - Get one
+  POST /visitas                       - Create (with file upload)
+  PATCH /visitas/:id                  - Update
+  DELETE /visitas/:id                 - Delete
+
+TAREFAS (Tasks):
+  GET  /tarefas                       - List
+  POST /tarefas                       - Create
+  PATCH /tarefas/:id                  - Update
+  DELETE /tarefas/:id                 - Delete
+
+LEADS (CRM Leads) *** NOVO ***:
+  GET  /crm/leads                     - List with filtering
+    Query: q, estado, entidadeId, contactoId, hasOdoo, orderBy, orderDir
+  GET  /crm/leads/:id                 - Get one
+  POST /crm/leads                     - Create
+  PATCH /crm/leads/:id                - Update
+  DELETE /crm/leads/:id               - Delete
+
+SEARCH (Async search):
+  GET  /search/entidades?q=...        - Max 20 results
+  GET  /search/contactos?q=...        - Max 20 results
+  GET  /search/visitas?q=...          - Max 20 results
+
+DASHBOARD:
+  GET  /dashboard                     - Overview KPIs
+  GET  /dashboard/insights            - AI-powered insights
+
+ANALYTICS:
+  GET  /analytics                     - Analytics data
+
+INTEGRATIONS:
+  GET  /integrations/google/callback  - Google OAuth
+  GET  /integrations/microsoft/callback - Microsoft OAuth
+  POST /integrations/odoo/sync        - Odoo sync
+  GET  /integrations/odoo/leads       - Odoo leads
+
+
+RESPONSE PATTERN:
+─────────────────
+
+Success (200):
+  {
+    "success": true,
+    "data": {...}
+  }
+
+Or for list endpoints:
+  {
+    "leads": [...],
+    "total": 42
+  }
+
+Error (400, 403, 500):
+  {
+    "error": "error_code",
+    "message": "Human readable message"
+  }
+
+
+================================================================================
+8. INTEGRACOES EXTERNAS
+================================================================================
+
+ODOO ERP:
+─────────
+- Backend client: server/integrations/odooClient.ts
+- API: JSON-RPC 2.0
+- Methods: crm.lead.create, read, write, search
+- Sync: Manual + automatic via visitas
+- Storage: server/storage/odooConnections.ts
+- Routes: server/routes/integrations/odoo.ts
+
+Features:
+  - Create/read/update leads in Odoo
+  - Sync attachments (fotos, documentos)
+  - Bi-directional sync (partial)
+  - Odoo lead ID tracking (odooLeadId)
+
+Exemplo:
+  const odoo = new OdooClient(apiUrl, apiKey);
+  const leadId = await odoo.createLead({titulo, descricao, empresa, etc});
+
+
+GOOGLE INTEGRATION:
+───────────────────
+- OAuth 2.0
+- Calendar integration (ICS export)
+- Contacts sync (optional)
+- Storage: server/storage/googleConnections.ts
+- Routes: server/routes/integrations/google.ts
+
+
+MICROSOFT 365:
+──────────────
+- OAuth 2.0
+- Calendar integration
+- Email integration
+- Storage: server/storage/microsoftConnections.ts
+- Routes: server/routes/integrations/microsoft.ts
+
+
+OPENAI:
+───────
+- Whisper: Audio transcription
+- GPT-4o-mini: Text summarization, email generation
+- API: server/openai.ts
+- Config: Per-empresa API keys (opcional)
+
+
+EMAIL SERVICE:
+───────────────
+- SMTP configuration
+- Templates: shared/emailTemplates.ts
+- Usage: Notifications, reports
+
+
+================================================================================
+9. FLUXO DE DADOS COMPLETO (EXEMPLO PRATICO)
+================================================================================
+
+CENARIO: Criar uma nova Lead (CRM)
+
+1. FRONTEND
+   ├─ AdminLeadDetailPage.tsx
+   ├─ Form component com SearchSelect
+   ├─ User inputs: titulo, estado, entidade, contacto, valor
+   ├─ Form validation com Zod (insertLeadSchema)
+   ├─ Submit → apiRequest() POST /api/crm/leads
+   └─ React Query mutation
+
+2. BACKEND - ROUTE
+   ├─ POST /api/crm/leads
+   ├─ Check: ensureAuthenticated middleware
+   ├─ Extract: req.userContext (userId, empresaId, userRole)
+   ├─ Validate: insertLeadSchema.parse(req.body)
+   ├─ Check: At least one of entidadeId OR contactoId
+   └─ Call: storage.createLead(data)
+
+3. BACKEND - STORAGE
+   ├─ db.insert(leads).values({
+   │    id: uuid(),
+   │    empresaId,
+   │    titulo,
+   │    estado,
+   │    entidadeId,
+   │    contactoId,
+   │    visitaId,
+   │    valorPrevisto,
+   │    odooLeadId: null,
+   │    createdAt: now()
+   │  })
+   ├─ If contactoId: db.insert(leads_contactos).values(...)
+   ├─ Return: { id, titulo, ... }
+   └─ PostgreSQL transaction
+
+4. BACKEND - RESPONSE
+   ├─ { success: true, lead: {...} }
+   └─ 200 OK
+
+5. FRONTEND - UPDATE UI
+   ├─ React Query mutation.isSuccess
+   ├─ Invalidate cache: queryClient.invalidateQueries(['/api/crm/leads'])
+   ├─ Show toast: "Lead criada com sucesso"
+   ├─ Navigate: /admin/leads/:id (novo lead)
+   └─ Table re-render com novo lead
+
+
+CENARIO 2: Listar Leads com Filtros
+
+1. FRONTEND - STATE
+   ├─ AdminLeadsPage.tsx
+   ├─ State: q, estado, entidadeId, contactoId, hasOdoo, orderBy, orderDir
+   ├─ handleSearchChange: setQ com 300ms debounce
+   ├─ Build queryKey: ["/api/crm/leads", {q, estado, entidadeId, ...}]
+   └─ useQuery trigger
+
+2. BACKEND - FILTERING
+   ├─ GET /api/crm/leads?q=test&estado=open&entidadeId=123
+   ├─ Extract params
+   ├─ Build WHERE clause: 
+   │    buildLeadAccessWhere(empresaId, userId, userRole)
+   │    + (q ? search titulo/descricao : true)
+   │    + (estado ? estado = estado : true)
+   │    + (entidadeId ? entidadeId = entidadeId : true)
+   │    + (contactoId ? contactoId = contactoId : true)
+   │    + (hasOdoo ? odooLeadId IS NOT NULL : true)
+   ├─ ORDER BY orderBy, orderDir
+   ├─ LIMIT 100
+   └─ Execute query
+
+3. BACKEND - RESPONSE
+   ├─ { leads: [...], total: 42 }
+   └─ 200 OK
+
+4. FRONTEND - PROCESSING
+   ├─ React Query caches result
+   ├─ allLeads = data.leads
+   ├─ filteredLeads = allLeads.filter(...) [6 filtros em-memória]
+   ├─ sortedLeads = filteredLeads.sort(...) [3 opcoes sort]
+   ├─ Table re-render com sortedLeads
+   └─ Display contagem total
+
+
+================================================================================
+RESUMO FINAL
+================================================================================
+
+ARQUITETURA OBSERVADA:
+
+✅ Multi-tenant com empresaId em cada tabela
+✅ RBAC enforcement em storage layer (buildXxxAccessWhere)
+✅ Type-safe com TypeScript + Zod validation
+✅ Express.js REST API com clear patterns
+✅ Drizzle ORM para database abstraction
+✅ React Query para client-side caching
+✅ IStorage interface para data access layer
+✅ CRM Leads module completo (CRUD + filtering)
+✅ Search components com debounce 300ms
+✅ Integrations: Odoo, Google, Microsoft, OpenAI
+✅ Session-based auth com Replit OAuth
+✅ In-memory storage option (MemStorage)
+
+
+FICHEIROS-CHAVE LOCALIZADOS:
+
+1. shared/schema.ts
+   - Todos os tipos e schemas
+   - 43KB com 12 tabelas principais
+
+2. server/storage.ts
+   - IStorage interface (40+ methods)
+   - RBAC helpers (buildXxxAccessWhere)
+   - Single source for data access
+
+3. server/authContext.ts
+   - getUserContext(req)
+   - ensureAuthenticated middleware
+   - requireAdmin middleware
+
+4. server/routes.ts
+   - Main router (20+ endpoints)
+   - All CRUD operations
+
+5. server/routes/crmLeads.ts
+   - CRM Leads endpoints (4 CRUD)
+   - Filtering logic
+
+6. server/integrations/
+   - Odoo, Google, Microsoft clients
+   - Business logic separation
+
+
+STATUS: ESTRUTURA BEM ORGANIZADA E PRONTA PARA DESENVOLVIMENTO
+
+================================================================================
+FIM DO RELATORIO
+================================================================================
+
