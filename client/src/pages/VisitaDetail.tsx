@@ -212,7 +212,7 @@ export default function VisitaDetail() {
 
   const { data: leadsData, isLoading: leadsLoading } = useQuery<LeadsResponse>({
     queryKey: ["/api/crm/leads", { visitaId: visita?.id }],
-    enabled: !!visita?.id,
+    enabled: !!visita?.id && leadsEnabled,
     queryFn: async () => {
       const params = new URLSearchParams({ visitaId: visita!.id });
       const resp = await fetch(`/api/crm/leads?${params.toString()}`, {
@@ -2154,7 +2154,7 @@ export default function VisitaDetail() {
       />
 
       {/* FASE CRM-LEADS-VISITA-STEP1: CRM Leads Section */}
-      {visita && (
+      {visita && leadsEnabled && (
         <Card data-testid="card-leads-visita" className="mt-6">
           <CardHeader className="flex items-center justify-between">
             <div>
