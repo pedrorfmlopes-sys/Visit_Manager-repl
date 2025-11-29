@@ -309,17 +309,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerCrmLeadsRoutes(app);
 
   // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+  app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = (req as any).user?.claims?.sub;
+      if (!userId) {
+        console.error("No userId in req.user.claims");
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
       const user = await storage.getUser(userId);
-      
-      // FASE 4: Include empresa data in auth response
+
+      if (!user) {
+        console.error("No user found in DB for id", userId);
+        return res.status(401).json({ message: "User not found in database" });
+      }
+
       let empresa = null;
-      if (user?.empresaId) {
+      if (user.empresaId) {
         empresa = await storage.getEmpresa(user.empresaId);
       }
-      
+
       res.json({
         ...user,
         empresa: empresa
@@ -330,7 +339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               mostrarMarcasEmVisitas: empresa.mostrarMarcasEmVisitas,
               theme: empresa.theme,
               uiSettings: empresa.uiSettings,
-              // NOVO: feature flags vindas da BD (JSONB features)
+              // manter se já existir o campo features; se não existir, podes deixar esta linha na mesma
               features: (empresa as any).features,
             }
           : null,
