@@ -17,6 +17,7 @@ import { QuickActionButton } from "@/components/QuickActionButton";
 import { formatContactForSharing } from "@/lib/shareFormatters";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { subDays, subMonths, startOfYear, endOfYear, format } from "date-fns";
 import { pt } from "date-fns/locale";
@@ -63,6 +64,12 @@ export default function ContactoDetail() {
   const [odooSearchNotConfigured, setOdooSearchNotConfigured] = useState(false);
   
   const { isOnline, shareViaWhatsApp, shareViaEmail, copyToClipboard, copyLink } = useShareActions();
+
+  const { empresa } = useAuth();
+  const leadsEnabled =
+    typeof empresa?.crmLeadsEnabled === "boolean"
+      ? empresa.crmLeadsEnabled
+      : true;
 
   const { data: contacto, isLoading } = useQuery<ContactoWithRelations>({
     queryKey: ["/api/contactos", contactoId],
@@ -140,7 +147,7 @@ export default function ContactoDetail() {
 
   const { data: contactoLeadsData, isLoading: contactoLeadsLoading } = useQuery<LeadsResponse>({
     queryKey: ["/api/crm/leads", { contactoId: contacto?.id }],
-    enabled: !!contacto?.id,
+    enabled: !!contacto?.id && leadsEnabled,
     queryFn: async () => {
       const params = new URLSearchParams({ contactoId: contacto!.id });
       const resp = await fetch(`/api/crm/leads?${params.toString()}`, {
@@ -576,75 +583,77 @@ export default function ContactoDetail() {
 
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
         {/* FASE CRM-LEADS-ENT-CONTACTO-STEP1: Leads deste contacto */}
-        <Card data-testid="card-leads-contacto">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <Flag className="w-4 h-4" />
-              Leads deste contacto
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Oportunidades associadas a este contacto, a partir de visitas ou outras fontes.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {contactoLeadsDisabled && (
-              <p className="text-xs text-amber-600">
-                O módulo de Leads CRM está desativado para esta empresa.
-              </p>
-            )}
+        {leadsEnabled && (
+          <Card data-testid="card-leads-contacto">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Flag className="w-4 h-4" />
+                Leads deste contacto
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Oportunidades associadas a este contacto, a partir de visitas ou outras fontes.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {contactoLeadsDisabled && (
+                <p className="text-xs text-amber-600">
+                  O módulo de Leads CRM está desativado para esta empresa.
+                </p>
+              )}
 
-            {!contactoLeadsDisabled && contactoLeadsLoading && (
-              <p className="text-sm text-muted-foreground">A carregar leads...</p>
-            )}
+              {!contactoLeadsDisabled && contactoLeadsLoading && (
+                <p className="text-sm text-muted-foreground">A carregar leads...</p>
+              )}
 
-            {!contactoLeadsDisabled && !contactoLeadsLoading && contactoLeads.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                Ainda não existem leads associados a este contacto.
-              </p>
-            )}
+              {!contactoLeadsDisabled && !contactoLeadsLoading && contactoLeads.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Ainda não existem leads associados a este contacto.
+                </p>
+              )}
 
-            {!contactoLeadsDisabled && !contactoLeadsLoading && contactoLeads.length > 0 && (
-              <div className="space-y-2">
-                {contactoLeads.map((lead) => (
-                  <div
-                    key={lead.id}
-                    className="flex items-center justify-between border rounded-md px-3 py-2 text-sm"
-                    data-testid={`row-lead-contacto-${lead.id}`}
-                  >
-                    <div>
-                      <div className="font-medium">{lead.titulo}</div>
-                      <div className="text-xs text-muted-foreground space-y-1">
-                        {lead.marcas && lead.marcas.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {lead.marcas.slice(0, 2).map((marca) => (
-                              <Badge key={marca.id} variant="secondary" className="text-xs" data-testid={`badge-lead-contacto-marca-${marca.id}`}>
-                                {marca.nome}
-                              </Badge>
-                            ))}
-                            {lead.marcas.length > 2 && (
-                              <Badge variant="outline" className="text-xs" data-testid={`badge-lead-contacto-marcas-more-${lead.id}`}>
-                                +{lead.marcas.length - 2}
-                              </Badge>
-                            )}
-                          </div>
-                        )}
-                        <div>Estado: {lead.estado}</div>
+              {!contactoLeadsDisabled && !contactoLeadsLoading && contactoLeads.length > 0 && (
+                <div className="space-y-2">
+                  {contactoLeads.map((lead) => (
+                    <div
+                      key={lead.id}
+                      className="flex items-center justify-between border rounded-md px-3 py-2 text-sm"
+                      data-testid={`row-lead-contacto-${lead.id}`}
+                    >
+                      <div>
+                        <div className="font-medium">{lead.titulo}</div>
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          {lead.marcas && lead.marcas.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {lead.marcas.slice(0, 2).map((marca) => (
+                                <Badge key={marca.id} variant="secondary" className="text-xs" data-testid={`badge-lead-contacto-marca-${marca.id}`}>
+                                  {marca.nome}
+                                </Badge>
+                              ))}
+                              {lead.marcas.length > 2 && (
+                                <Badge variant="outline" className="text-xs" data-testid={`badge-lead-contacto-marcas-more-${lead.id}`}>
+                                  +{lead.marcas.length - 2}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                          <div>Estado: {lead.estado}</div>
+                        </div>
+                      </div>
+                      <div className="text-right text-xs">
+                        {lead.valorPrevisto
+                          ? `${lead.valorPrevisto} ${lead.moeda || "EUR"}`
+                          : "—"}
+                        <div className="text-[10px] text-muted-foreground">
+                          {new Date(lead.createdAt).toLocaleDateString()}
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right text-xs">
-                      {lead.valorPrevisto
-                        ? `${lead.valorPrevisto} ${lead.moeda || "EUR"}`
-                        : "—"}
-                      <div className="text-[10px] text-muted-foreground">
-                        {new Date(lead.createdAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
         {/* Contact Information */}
         <Card>
           <CardHeader>
