@@ -103,6 +103,23 @@ export default function Leads() {
     data.success === false &&
     data.notEnabled === true;
 
+  // Early return if Leads module is disabled
+  if (leadsDisabled) {
+    return (
+      <div className="p-4 max-w-5xl mx-auto">
+        <Card className="mt-4" data-testid="card-leads-disabled-user">
+          <CardHeader>
+            <CardTitle>Módulo de Leads CRM desativado</CardTitle>
+            <CardDescription>
+              O módulo de Leads CRM está desativado para esta empresa.
+              Fala com o administrador para ativar o módulo de Leads nas definições da empresa.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
   const leads: Lead[] = data && "leads" in data ? data.leads : [];
 
   // 🔽 Ordenação "humana" no frontend (case-insensitive para título;
@@ -207,24 +224,7 @@ export default function Leads() {
         </Card>
       )}
 
-      {leadsDisabled && !isLoading && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Módulo de Leads desativado</CardTitle>
-            <CardDescription>
-              O módulo de Leads CRM não está ativo para esta empresa.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-3">
-              Ativa o módulo de Leads nas definições de CRMs para começar a
-              criar e gerir leads.
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {!isLoading && !isError && !leadsDisabled && (
+      {!isLoading && !isError && (
         <>
           {/* Filtros */}
           <Card data-testid="card-leads-filters-user">
