@@ -28,7 +28,7 @@ const agentNavItems: NavItem[] = [
   { path: "/", icon: LayoutDashboard, label: "Hoje" },
   { path: "/entidades", icon: Building2, label: "Entidades" },
   { path: "/contactos", icon: Users, label: "Contactos" },
-  { path: "/leads", icon: Target, label: "Leads" },               // 👈 novo
+  { path: "/leads", icon: Target, label: "Leads" }, // Leads para agente
   { path: "/visitas", icon: FileText, label: "Visitas", showBadge: "visitas" },
   { path: "/tarefas", icon: CheckCircle2, label: "Tarefas", showBadge: "tarefas" },
   { path: "/agente-mais", icon: MoreHorizontal, label: "Mais" },
@@ -38,7 +38,7 @@ const adminNavItems: NavItem[] = [
   { path: "/", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/entidades", icon: Building2, label: "Entidades" },
   { path: "/contactos", icon: Users, label: "Contactos" },
-  { path: "/leads", icon: Target, label: "Leads" },                // 👈 preparado p/ admin se usarmos este nav
+  { path: "/leads", icon: Target, label: "Leads" }, // Leads para admin
   { path: "/visitas", icon: FileText, label: "Visitas", showBadge: "visitas" },
   { path: "/tarefas", icon: CheckCircle2, label: "Tarefas", showBadge: "tarefas" },
   { path: "/lembretes", icon: Bell, label: "Lembretes", showBadge: "lembretes" },
@@ -46,10 +46,21 @@ const adminNavItems: NavItem[] = [
 
 export function BottomNav() {
   const [location] = useLocation();
-  const { isAdmin } = useAuth();
+  const { isAdmin, empresa } = useAuth();
   const { tarefasAtrasadas, tarefasHoje, visitasHoje } = useTodaySummary();
 
-  const navItems = isAdmin ? adminNavItems : agentNavItems;
+  // NOVO: decidir se Leads está ativo para esta empresa
+  const leadsEnabled =
+    empresa?.features && typeof empresa.features.leadsEnabled === "boolean"
+      ? empresa.features.leadsEnabled
+      : true; // default: ativo se não estiver definido
+
+  const baseNavItems = isAdmin ? adminNavItems : agentNavItems;
+
+  // Se leadsEnabled === false, removemos o item "/leads" do menu
+  const navItems = leadsEnabled
+    ? baseNavItems
+    : baseNavItems.filter((item) => item.path !== "/leads");
 
   const { data: lembretes } = useQuery<Lembrete[]>({
     queryKey: ["/api/lembretes"],
@@ -108,6 +119,7 @@ export function BottomNav() {
           const isActive =
             location === item.path ||
             (item.path !== "/" && location.startsWith(item.path));
+
           const badgeInfo = getBadgeInfo(item.showBadge);
 
           return (

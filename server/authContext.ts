@@ -19,15 +19,15 @@ export interface UserContext {
  */
 export async function getUserContext(req: any): Promise<UserContext> {
   const userId = req.user?.claims?.sub;
-  
+
   if (!userId) {
     throw new Error("User not authenticated");
   }
-  
+
   const user = await storage.getUser(userId);
   const userRole = user?.role || 'agent';
   const empresaId = user?.empresaId;
-  
+
   return { userId, userRole, empresaId };
 }
 
@@ -38,14 +38,14 @@ export async function getUserContext(req: any): Promise<UserContext> {
 export async function requireAdmin(req: any, res: any, next: any) {
   try {
     const context = await getUserContext(req);
-    
+
     if (context.userRole !== 'admin') {
       return res.status(403).json({
         error: 'Access denied',
         message: 'This action is reserved for administrators'
       });
     }
-    
+
     // Attach context to request for use in route handlers
     req.userContext = context;
     next();

@@ -97,7 +97,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   getAllUsers(): Promise<User[]>;
-  
+
   // Entidades (Universal Entities) - FASE 2: all filtered by empresaId
   getEntidades(empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<Entidade[]>;
   getEntidade(id: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<EntidadeWithRelations | undefined>;
@@ -107,21 +107,21 @@ export interface IStorage {
   updateEntidade(id: string, entidade: Partial<InsertEntidade>, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<Entidade | undefined>;
   deleteEntidade(id: string, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void>;
   checkEntidadeHasRelations(id: string): Promise<boolean>;
-  
+
   // Contactos - FASE 2: all filtered by empresaId (STEP 1: refactored with params object)
   getContactos(params: ListContactosParams): Promise<ContactoWithRelations[]>;
   getContacto(id: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<ContactoWithRelations | undefined>;
   createContacto(contacto: InsertContacto, empresaId: string): Promise<Contacto>;
   updateContacto(id: string, contacto: Partial<InsertContacto>, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<Contacto | undefined>;
   deleteContacto(id: string, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void>;
-  
+
   // Visitas - FASE 2: all filtered by empresaId
   getVisitas(empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<VisitaWithRelations[]>;
   getVisita(id: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<VisitaWithRelations | undefined>;
   createVisita(visita: InsertVisita, empresaId: string): Promise<Visita>;
   updateVisita(id: string, visita: Partial<Visita>, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<Visita | undefined>;
   deleteVisita(id: string, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void>;
-  
+
   // Tarefas - FASE 2: all filtered by empresaId
   getTarefas(empresaId: string, userId: string, userRole: 'admin' | 'agent', filters?: { status?: string; assignedUserId?: string; entidadeId?: string; visitaId?: string; overdue?: boolean }): Promise<TarefaWithRelations[]>;
   getTarefa(id: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<TarefaWithRelations | undefined>;
@@ -131,14 +131,14 @@ export interface IStorage {
   getTarefasByVisitaId(visitaId: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<TarefaWithRelations[]>;
   getTarefasByEntidadeId(entidadeId: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<TarefaWithRelations[]>;
   getTarefasInPeriod(startDate: Date, endDate: Date, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<TarefaWithRelations[]>;
-  
+
   // Visitas helpers - FASE 2: all filtered by empresaId
   getVisitasByEntidade(entidadeId: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<VisitaWithRelations[]>;
   getVisitasInPeriod(startDate: Date, endDate: Date, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<VisitaWithRelations[]>;
-  
+
   // Entidades helpers - FASE 2: all filtered by empresaId
   getAllEntidades(empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<EntidadeWithRelations[]>;
-  
+
   // Marcas (by empresa)
   getMarcasByEmpresa(empresaId: string): Promise<Marca[]>;
   getMarcasByEmpresaAtiva(empresaId: string): Promise<Marca[]>;
@@ -154,7 +154,7 @@ export interface IStorage {
   updateEntidadeTipo(id: string, tipo: Partial<InsertEntidadeTipo>, empresaId: string): Promise<EntidadeTipo | undefined>;
   // PASSO 7: Migration function
   migrateEntidadeTipos(): Promise<{ empresasProcessadas: number; entidadesMigradas: number; tiposCriados: number }>;
-  
+
   // FASE 1: Contactos management for visitas
   addContactosToVisita(visitaId: string, contactosIds: string[], empresaId: string): Promise<void>;
   getContactosFromVisita(visitaId: string, empresaId: string): Promise<Array<{ id: string; nome: string; email?: string | null; telefone?: string | null; role?: string | null }>>;
@@ -164,10 +164,10 @@ export interface IStorage {
   getVisitasAudio(visitaId: string, empresaId: string): Promise<VisitasAudio[]>;
   deleteVisitasAudio(audioId: string, empresaId: string): Promise<void>;
   updateVisitasAudioTranscription(audioId: string, transcricao: string): Promise<VisitasAudio | undefined>;
-  
+
   // FASE 14: AI summary management
   updateVisitaAISummary(visitaId: string, empresaId: string, data: { resumoIA: string; pontosChaveIA: string[]; tarefasSugeridasIA: any[] }): Promise<Visita | undefined>;
-  
+
   // FASE 3: Empresa & Users management
   updateEmpresa(id: string, empresa: Partial<InsertEmpresa>): Promise<Empresa | undefined>;
   getUtilizadoresByEmpresa(empresaId: string): Promise<User[]>;
@@ -180,7 +180,7 @@ export interface IStorage {
 
   // Legacy Marcas (deprecated - for migration)
   getMarcas(): Promise<Marca[]>;
-  
+
   // Dashboard stats
   getDashboardStats(userId: string, userRole: 'admin' | 'agent'): Promise<{
     totalEntidades: number;
@@ -273,7 +273,7 @@ export class DatabaseStorage implements IStorage {
   // Entidades (Universal Entities) - FASE 2: filtered by empresaId
   async getEntidades(empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<Entidade[]> {
     const baseWhere = buildEntidadeAccessWhere(empresaId, userId, userRole);
-    
+
     return db.query.entidades.findMany({
       where: baseWhere,
       orderBy: desc(entidades.createdAt),
@@ -290,7 +290,7 @@ export class DatabaseStorage implements IStorage {
     const whereClause = and(eq(entidades.id, id), baseWhere);
 
     console.log("[storage.getEntidade] called with", { id, empresaId, userId, userRole });
-    
+
     const [entidade] = await db.query.entidades.findMany({
       where: whereClause,
       with: {
@@ -310,9 +310,9 @@ export class DatabaseStorage implements IStorage {
         entidadeTipo: true,
       },
     });
-    
+
     console.log("[storage.getEntidade] DB result", { id, empresaId, found: !!entidade });
-    
+
     return entidade;
   }
 
@@ -334,13 +334,13 @@ export class DatabaseStorage implements IStorage {
         )
       );
     }
-    
+
     const [entidade] = await db
       .select()
       .from(entidades)
       .where(whereClause)
       .limit(1);
-    
+
     return entidade;
   }
 
@@ -362,13 +362,13 @@ export class DatabaseStorage implements IStorage {
         )
       );
     }
-    
+
     const [entidade] = await db
       .select()
       .from(entidades)
       .where(whereClause)
       .limit(1);
-    
+
     return entidade;
   }
 
@@ -385,7 +385,7 @@ export class DatabaseStorage implements IStorage {
     // FASE 2: Always include empresaId in where clause
     console.log("[DEBUG ENTIDADE UPDATE] entidadeData recebido:", JSON.stringify(entidadeData, null, 2));
     console.log("[DEBUG ENTIDADE UPDATE] entidadeTipoId:", entidadeData.entidadeTipoId);
-    
+
     const whereClause = (userId && userRole === 'agent')
       ? and(
           eq(entidades.id, id),
@@ -399,16 +399,16 @@ export class DatabaseStorage implements IStorage {
           eq(entidades.id, id),
           eq(entidades.empresaId, empresaId)
         );
-    
+
     const [entidade] = await db
       .update(entidades)
       .set({ ...entidadeData, updatedAt: new Date() })
       .where(whereClause)
       .returning();
-    
+
     console.log("[DEBUG ENTIDADE UPDATE] entidade gravada na BD:", JSON.stringify(entidade, null, 2));
     console.log("[DEBUG ENTIDADE UPDATE] entidadeTipoId após update:", entidade?.entidadeTipoId);
-    
+
     return entidade;
   }
 
@@ -418,13 +418,13 @@ export class DatabaseStorage implements IStorage {
       .from(contactos)
       .where(eq(contactos.entidadeId, id))
       .limit(1);
-    
+
     const relatedVisitas = await db
       .select()
       .from(visitas)
       .where(eq(visitas.entidadeId, id))
       .limit(1);
-    
+
     return relatedContactos.length > 0 || relatedVisitas.length > 0;
   }
 
@@ -443,26 +443,26 @@ export class DatabaseStorage implements IStorage {
           eq(entidades.id, id),
           eq(entidades.empresaId, empresaId)
         );
-    
+
     await db.delete(entidades).where(whereClause);
   }
 
   // Contactos - FASE 2: filtered by empresaId (STEP 1: refactored with params object)
   async getContactos(params: ListContactosParams): Promise<ContactoWithRelations[]> {
     const { empresaId, assignedUserId, entidadeId } = params;
-    
+
     // Start with base RBAC where clause (admin role for now - userId not in params)
     let whereClause: any = eq(contactos.empresaId, empresaId);
-    
+
     // Apply optional filters
     if (entidadeId) {
       whereClause = and(whereClause, eq(contactos.entidadeId, entidadeId));
     }
-    
+
     if (assignedUserId) {
       whereClause = and(whereClause, eq(contactos.assignedUserId, assignedUserId));
     }
-    
+
     return db.query.contactos.findMany({
       where: whereClause,
       orderBy: desc(contactos.createdAt),
@@ -492,7 +492,7 @@ export class DatabaseStorage implements IStorage {
         )
       );
     }
-    
+
     return db.query.contactos.findFirst({
       where: whereClause,
       with: {
@@ -525,7 +525,7 @@ export class DatabaseStorage implements IStorage {
           eq(contactos.id, id),
           eq(contactos.empresaId, empresaId)
         );
-    
+
     const [updated] = await db
       .update(contactos)
       .set(contacto)
@@ -549,7 +549,7 @@ export class DatabaseStorage implements IStorage {
           eq(contactos.id, id),
           eq(contactos.empresaId, empresaId)
         );
-    
+
     await db.delete(contactos).where(whereClause);
   }
 
@@ -569,7 +569,7 @@ export class DatabaseStorage implements IStorage {
     } else {
       whereClause = eq(visitas.empresaId, empresaId);
     }
-    
+
     return db.query.visitas.findMany({
       where: whereClause,
       orderBy: desc(visitas.dataVisita),
@@ -613,7 +613,7 @@ export class DatabaseStorage implements IStorage {
         )
       );
     }
-    
+
     return db.query.visitas.findFirst({
       where: whereClause,
       with: {
@@ -649,10 +649,10 @@ export class DatabaseStorage implements IStorage {
   // FASE 5: Add marcas to visita
   async addMarcasToVisita(visitaId: string, marcasIds: string[], empresaId: string): Promise<void> {
     if (!marcasIds || marcasIds.length === 0) return;
-    
+
     // Delete existing marcas for this visita
     await db.delete(visitasMarcas).where(eq(visitasMarcas.visitaId, visitaId));
-    
+
     // Insert new marcas
     if (marcasIds.length > 0) {
       const marcasData = marcasIds.map(marcaId => ({
@@ -667,10 +667,10 @@ export class DatabaseStorage implements IStorage {
   // FASE 1: Add contactos to visita (multiple contacts per visit)
   async addContactosToVisita(visitaId: string, contactosIds: string[], empresaId: string): Promise<void> {
     if (!contactosIds || contactosIds.length === 0) return;
-    
+
     // Delete existing contactos for this visita
     await db.delete(visitasContactos).where(eq(visitasContactos.visitaId, visitaId));
-    
+
     // Insert new contactos
     if (contactosIds.length > 0) {
       const contactosData = contactosIds.map(contactoId => ({
@@ -700,7 +700,7 @@ export class DatabaseStorage implements IStorage {
         }
       },
     });
-    
+
     return records.map(r => ({
       id: r.contacto.id,
       nome: r.contacto.nome,
@@ -786,7 +786,7 @@ export class DatabaseStorage implements IStorage {
           eq(visitas.id, id),
           eq(visitas.empresaId, empresaId)
         );
-    
+
     const [updated] = await db
       .update(visitas)
       .set(visita)
@@ -811,7 +811,7 @@ export class DatabaseStorage implements IStorage {
           eq(visitas.id, id),
           eq(visitas.empresaId, empresaId)
         );
-    
+
     await db.delete(visitas).where(whereClause);
   }
 
@@ -819,7 +819,7 @@ export class DatabaseStorage implements IStorage {
   async getTarefas(empresaId: string, userId: string, userRole: 'admin' | 'agent', filters?: { status?: string; assignedUserId?: string; entidadeId?: string; visitaId?: string; overdue?: boolean }): Promise<TarefaWithRelations[]> {
     // Build where clauses for role-based filtering - FASE 2: always include empresaId
     const conditions: any[] = [eq(tarefas.empresaId, empresaId)];
-    
+
     // Role-based access: admin sees all, agent sees only created/assigned
     if (userRole === 'agent') {
       conditions.push(
@@ -829,7 +829,7 @@ export class DatabaseStorage implements IStorage {
         )
       );
     }
-    
+
     // Apply filters
     if (filters?.status) {
       conditions.push(eq(tarefas.status, filters.status as any));
@@ -851,9 +851,9 @@ export class DatabaseStorage implements IStorage {
         )
       );
     }
-    
+
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-    
+
     return db.query.tarefas.findMany({
       where: whereClause,
       orderBy: [desc(tarefas.createdAt)],
@@ -884,7 +884,7 @@ export class DatabaseStorage implements IStorage {
         eq(tarefas.empresaId, empresaId)
       );
     }
-    
+
     return db.query.tarefas.findFirst({
       where: whereClause,
       with: {
@@ -920,7 +920,7 @@ export class DatabaseStorage implements IStorage {
           eq(tarefas.id, id),
           eq(tarefas.empresaId, empresaId)
         );
-    
+
     const [tarefa] = await db
       .update(tarefas)
       .set({ ...tarefaData, updatedAt: new Date() })
@@ -944,7 +944,7 @@ export class DatabaseStorage implements IStorage {
           eq(tarefas.id, id),
           eq(tarefas.empresaId, empresaId)
         );
-    
+
     await db.delete(tarefas).where(whereClause);
   }
 
@@ -963,12 +963,12 @@ export class DatabaseStorage implements IStorage {
           eq(tarefas.visitaId, visitaId),
           eq(tarefas.empresaId, empresaId)
         );
-    
+
     const results = await db.select().from(tarefas)
       .leftJoin(entidades, eq(tarefas.entidadeId, entidades.id))
       .where(whereClause)
       .orderBy(desc(tarefas.createdAt));
-    
+
     return results.map(row => ({
       ...row.tarefas,
       entidade: row.entidades || undefined,
@@ -990,12 +990,12 @@ export class DatabaseStorage implements IStorage {
           eq(tarefas.entidadeId, entidadeId),
           eq(tarefas.empresaId, empresaId)
         );
-    
+
     const results = await db.select().from(tarefas)
       .leftJoin(entidades, eq(tarefas.entidadeId, entidades.id))
       .where(whereClause)
       .orderBy(desc(tarefas.createdAt));
-    
+
     return results.map(row => ({
       ...row.tarefas,
       entidade: row.entidades || undefined,
@@ -1019,12 +1019,12 @@ export class DatabaseStorage implements IStorage {
           sql`${tarefas.dueDate} >= ${startDate}`,
           sql`${tarefas.dueDate} <= ${endDate}`
         );
-    
+
     const results = await db.select().from(tarefas)
       .leftJoin(entidades, eq(tarefas.entidadeId, entidades.id))
       .where(whereClause)
       .orderBy(desc(tarefas.dueDate));
-    
+
     return results.map(row => ({
       ...row.tarefas,
       entidade: row.entidades || undefined,
@@ -1043,12 +1043,12 @@ export class DatabaseStorage implements IStorage {
           eq(visitas.entidadeId, entidadeId),
           eq(visitas.empresaId, empresaId)
         );
-    
+
     const results = await db.select().from(visitas)
       .leftJoin(entidades, eq(visitas.entidadeId, entidades.id))
       .where(whereClause)
       .orderBy(desc(visitas.dataVisita));
-    
+
     return results.map(row => ({
       ...row.visitas,
       entidade: row.entidades || undefined,
@@ -1069,12 +1069,12 @@ export class DatabaseStorage implements IStorage {
           sql`${visitas.dataVisita} >= ${startDate}`,
           sql`${visitas.dataVisita} <= ${endDate}`
         );
-    
+
     const results = await db.select().from(visitas)
       .leftJoin(entidades, eq(visitas.entidadeId, entidades.id))
       .where(whereClause)
       .orderBy(desc(visitas.dataVisita));
-    
+
     return results.map(row => ({
       ...row.visitas,
       entidade: row.entidades || undefined,
@@ -1434,7 +1434,7 @@ export class DatabaseStorage implements IStorage {
     } else {
       visitasWhereClause = eq(visitas.empresaId, empresaId);
     }
-    
+
     const allVisitas = await db.query.visitas.findMany({
       where: visitasWhereClause,
       with: {
@@ -1444,7 +1444,7 @@ export class DatabaseStorage implements IStorage {
     });
 
     const totalVisitas = allVisitas.length;
-    
+
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const visitasEstesMes = allVisitas.filter(v => new Date(v.dataVisita) >= startOfMonth).length;
@@ -1494,7 +1494,7 @@ export class DatabaseStorage implements IStorage {
         marcasMap.set(marca, (marcasMap.get(marca) || 0) + 1);
       });
     });
-    
+
     const marcasMaisEntregues = Array.from(marcasMap.entries())
       .map(([marca, count]) => ({ marca, count }))
       .sort((a, b) => b.count - a.count)
@@ -1629,11 +1629,11 @@ export class DatabaseStorage implements IStorage {
     // Visits by agent
     const visitsByAgentMap = new Map<string, number>();
     const userCache = new Map<string, User>();
-    
+
     for (const visita of filteredVisitas) {
       const agentId = visita.createdByUserId || visita.userId || 'Desconhecido';
       visitsByAgentMap.set(agentId, (visitsByAgentMap.get(agentId) || 0) + 1);
-      
+
       if (agentId !== 'Desconhecido' && !userCache.has(agentId)) {
         const user = await this.getUser(agentId);
         if (user) userCache.set(agentId, user);
@@ -1724,7 +1724,7 @@ export class DatabaseStorage implements IStorage {
     for (const tarefa of allTarefas) {
       const agentId = tarefa.createdByUserId || 'Desconhecido';
       tasksByAgentMap.set(agentId, (tasksByAgentMap.get(agentId) || 0) + 1);
-      
+
       if (agentId !== 'Desconhecido' && !userCache.has(agentId)) {
         const user = await this.getUser(agentId);
         if (user) userCache.set(agentId, user);

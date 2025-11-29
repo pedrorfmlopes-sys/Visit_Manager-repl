@@ -75,7 +75,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
       const orderByFn = (l: any, { asc, desc }: any) => {
         const isAsc = orderDir === "asc";
         const compareFn = isAsc ? asc : desc;
-        
+
         switch (orderBy) {
           case "titulo":
             return compareFn(l.titulo);
@@ -287,7 +287,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
           message: "Título é obrigatório.",
         });
       }
-      
+
       if (!entidadeId && !contactoId) {
         return res.status(400).json({
           success: false,
@@ -850,7 +850,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
       // Save file to temp location for transcription
       const tmpDir = "/tmp";
       const tmpFile = path.join(tmpDir, `audio_${Date.now()}.webm`);
-      
+
       try {
         // Write buffer to file
         console.log("[CRM Leads AI] Writing buffer to temp file...", { tmpFile, bufferSize: req.file.buffer.length });
@@ -864,10 +864,10 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         // Transcribe audio
         console.log("[CRM Leads AI] Calling transcribeAudio()...");
         const result = await transcribeAudio(tmpFile);
-        
+
         // Clean up temp file
         await fs.promises.unlink(tmpFile).catch(() => {});
-        
+
         // Validate result
         if (!result.text || result.text.includes("indisponível")) {
           console.warn("[CRM Leads AI] Transcription returned warning/placeholder text", { text: result.text });
@@ -882,7 +882,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
       } catch (transcribeError: any) {
         // Clean up temp file on error
         await fs.promises.unlink(tmpFile).catch(() => {});
-        
+
         // Distinguish between different error types
         console.error("[CRM Leads AI] Transcription error caught:", {
           message: transcribeError?.message || String(transcribeError),
@@ -893,14 +893,14 @@ export function registerCrmLeadsRoutes(app: express.Express) {
 
         // Determine error type and return appropriate message
         const errorMsg = transcribeError?.message || String(transcribeError) || "Unknown error";
-        
+
         if (errorMsg.includes("empty") || errorMsg.includes("0 bytes")) {
           return res.status(400).json({ 
             success: false, 
             message: "Ficheiro de áudio vazio. Grava de novo." 
           });
         }
-        
+
         if (errorMsg.includes("API key") || errorMsg.includes("not configured")) {
           return res.status(503).json({ 
             success: false, 
@@ -969,7 +969,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
 
       try {
         const client = getOpenAIClient();
-        
+
         const prompt = `Analisa este contexto de lead de vendas e cria uma descrição profissional e estruturada em português.
 
 **Título do Lead:** ${titulo || "Sem título"}
@@ -997,7 +997,7 @@ Responde apenas com o texto melhorado, sem explicações adicionais.`;
         });
 
         const improvedText = response.choices[0].message.content || text;
-        
+
         console.log("[CRM Leads AI] Summarize success", { empresaId, originalLength: text.length, improvedLength: improvedText.length });
         return res.json({ success: true, text: improvedText });
       } catch (aiError: any) {

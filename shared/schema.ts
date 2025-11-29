@@ -151,6 +151,12 @@ export const empresas = pgTable("empresas", {
   odooCrmEnabled: boolean("odoo_crm_enabled").notNull().default(true),
   // CRM Leads module flag - premium feature, disabled by default
   crmLeadsEnabled: boolean("crm_leads_enabled").notNull().default(false),
+  
+  // Feature flags por empresa (ex: módulos premium como Leads)
+  features: jsonb("features")
+    .notNull()
+    .default(sql`'{"leadsEnabled": true}'`),
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -372,16 +378,16 @@ function validateNIF(value: string): boolean {
   if (!value || value.length !== 9 || !/^\d{9}$/.test(value)) {
     return false;
   }
-  
+
   // Calculate weighted sum of first 8 digits
   let sum = 0;
   for (let i = 0; i < 8; i++) {
     sum += (9 - i) * parseInt(value[i]);
   }
-  
+
   // Calculate mod 11
   const mod = sum % 11;
-  
+
   // Determine expected check digit
   let expectedCheckDigit: number;
   if (mod === 0 || mod === 1) {
@@ -389,7 +395,7 @@ function validateNIF(value: string): boolean {
   } else {
     expectedCheckDigit = 11 - mod;
   }
-  
+
   // Compare with actual last digit
   return expectedCheckDigit === parseInt(value[8]);
 }
@@ -651,42 +657,42 @@ export type Visita = typeof visitas.$inferSelect;
 // FASE CRM-LEADS-01: Leads (CRM Leads) table for lead tracking
 export const leads = pgTable("leads", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  
+
   empresaId: varchar("empresa_id")
     .notNull()
     .references(() => empresas.id, { onDelete: "cascade" }),
-  
+
   // FASE-LEADS-CLEAN-01: Make entidadeId optional (at least one of entidade/contacto required)
   entidadeId: varchar("entidade_id")
     .references(() => entidades.id, { onDelete: "cascade" }),
-  
+
   // FASE-LEADS-CLEAN-01: Make contactoId optional (at least one of entidade/contacto required)
   contactoId: varchar("contacto_id")
     .references(() => contactos.id, { onDelete: "cascade" }),
-  
+
   visitaId: varchar("visita_id")
     .references(() => visitas.id, { onDelete: "set null" }),
-  
+
   // Core do lead
   titulo: text("titulo").notNull(),
   descricao: text("descricao"),
-  
+
   // Marca ligada ao lead
   marca: text("marca"),
-  
+
   // Estado / etapa
   estado: text("estado").notNull().default("novo"),
-  
+
   // Valor previsto
   valorPrevisto: numeric("valor_previsto"),
   moeda: varchar("moeda", { length: 3 }).default("EUR"),
-  
+
   // Responsável interno
   responsavelUserId: varchar("responsavel_user_id"),
-  
+
   // Integração CRM externo
   odooLeadId: varchar("odoo_lead_id"),
-  
+
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

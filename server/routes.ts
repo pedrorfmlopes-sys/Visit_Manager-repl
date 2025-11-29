@@ -322,14 +322,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({
         ...user,
-        empresa: empresa ? {
-          id: empresa.id,
-          nome: empresa.nome,
-          logoUrl: empresa.logoUrl,
-          mostrarMarcasEmVisitas: empresa.mostrarMarcasEmVisitas,
-          theme: empresa.theme,
-          uiSettings: empresa.uiSettings,
-        } : null,
+        empresa: empresa
+          ? {
+              id: empresa.id,
+              nome: empresa.nome,
+              logoUrl: empresa.logoUrl,
+              mostrarMarcasEmVisitas: empresa.mostrarMarcasEmVisitas,
+              theme: empresa.theme,
+              uiSettings: empresa.uiSettings,
+              // NOVO: feature flags vindas da BD (JSONB features)
+              features: (empresa as any).features,
+            }
+          : null,
       });
     } catch (error) {
       console.error("Error fetching user:", error);

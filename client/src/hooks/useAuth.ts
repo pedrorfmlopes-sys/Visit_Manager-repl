@@ -1,24 +1,24 @@
 import { useQuery } from "@tanstack/react-query";
 import type { User } from "@shared/schema";
 
+export interface EmpresaFeatures {
+  leadsEnabled?: boolean;
+  // futuro: outras flags (odooEnabled, ms365Enabled, etc.)
+  [key: string]: any;
+}
+
+export interface EmpresaAuthInfo {
+  id: string;
+  nome: string;
+  logoUrl?: string;
+  mostrarMarcasEmVisitas: boolean;
+  theme?: "light-business" | "dark-pro";
+  uiSettings?: any;
+  features?: EmpresaFeatures;
+}
+
 export interface AuthUser extends User {
-  empresa?: {
-    id: string;
-    nome: string;
-    logoUrl?: string;
-    mostrarMarcasEmVisitas: boolean;
-    theme?: "light-business" | "dark-pro";
-    uiSettings?: {
-      visitas?: {
-        enableFilterDateQuick?: boolean;
-        enableFilterUser?: boolean;
-        enableFilterMarca?: boolean;
-        enableFilterEntidade?: boolean;
-        enableFilterContacto?: boolean;
-        enableFilterHasAudio?: boolean;
-      };
-    };
-  } | null;
+  empresa?: EmpresaAuthInfo;
 }
 
 export function useAuth() {
@@ -31,7 +31,7 @@ export function useAuth() {
     user,
     isLoading,
     isAuthenticated: !!user,
-    isAdmin: user?.role === 'admin',
+    isAdmin: user?.role === "admin",
     empresa: user?.empresa,
   };
 }
