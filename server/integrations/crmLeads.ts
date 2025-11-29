@@ -2,11 +2,10 @@ import { storage } from "../storage";
 
 /**
  * Garante que o módulo de Leads está ativo para a empresa.
- *
  * - empresaId vem normalmente do getUserContext(req)
- * - Verifica primeiro features.leadsEnabled (nova abordagem)
+ * - Verifica primeiro features.leadsEnabled (campo JSONB novo)
  * - Faz fallback para crmLeadsEnabled (coluna antiga), para retrocompatibilidade
- * - Por omissão, se nada estiver definido, assume true (não quebra empresas antigas)
+ * - Se nada estiver definido, assume true (não quebra empresas antigas)
  */
 export async function assertLeadsEnabled(empresaId?: string | null): Promise<void> {
   if (!empresaId) {
@@ -27,13 +26,8 @@ export async function assertLeadsEnabled(empresaId?: string | null): Promise<voi
     throw error;
   }
 
-  // Novo campo JSONB com feature flags
   const features: any = (empresa as any).features ?? {};
 
-  // Regra de decisão:
-  // 1) Se features.leadsEnabled for boolean, usamos isso
-  // 2) Senão, se crmLeadsEnabled existir, usamos isso (retrocompat)
-  // 3) Senão, por omissão, true (não partimos empresas antigas)
   const hasExplicitFeatureFlag =
     Object.prototype.hasOwnProperty.call(features, "leadsEnabled") &&
     typeof features.leadsEnabled === "boolean";
