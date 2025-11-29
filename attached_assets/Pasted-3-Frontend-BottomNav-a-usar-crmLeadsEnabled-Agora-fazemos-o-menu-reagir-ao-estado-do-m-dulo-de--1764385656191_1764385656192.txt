@@ -1,3 +1,10 @@
+3️⃣ Frontend – BottomNav a usar crmLeadsEnabled
+
+Agora fazemos o menu reagir ao estado do módulo de Leads.
+
+Ficheiro: client/src/components/BottomNav.tsx
+👉 Abre, apaga tudo e cola isto:
+
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
@@ -49,8 +56,8 @@ export function BottomNav() {
   const { isAdmin, empresa } = useAuth();
   const { tarefasAtrasadas, tarefasHoje, visitasHoje } = useTodaySummary();
 
-  // Regra: se crmLeadsEnabled estiver definido, respeitamos;
-  // se não estiver, por omissão consideramos Leads ativo.
+  // 👇 Regra: se crmLeadsEnabled estiver definido, respeitamos;
+  //           se não estiver, por omissão consideramos Leads ativo.
   const leadsEnabled =
     typeof empresa?.crmLeadsEnabled === "boolean"
       ? empresa.crmLeadsEnabled
@@ -157,3 +164,19 @@ export function BottomNav() {
     </nav>
   );
 }
+
+🔁 Depois disto, o que deve acontecer
+
+Reinicias o servidor (npm run dev ou o que usas).
+
+Vais ao /admin/empresa:
+
+Toggle “Módulo de Leads CRM” para Inativo → Guardar definições de Leads.
+
+A app deve:
+
+Deixar de mostrar o item “Leads” na BottomNav (user e admin).
+
+Se tentares ir manualmente a /leads ou /admin/leads, o backend responde com erro LEADS_NOT_ENABLED (e a própria página de Leads mostra o cartão “módulo desativado”).
+
+Se depois disto o botão ainda não “manda” no menu, diz-me se é o menu admin, o menu user ou as páginas em si — mas com estas três mudanças, backend + menu ficam alinhados com o estado do toggle.
