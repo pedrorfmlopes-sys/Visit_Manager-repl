@@ -1,3 +1,8 @@
+Prompt 6 – BottomNav esconder “Leads” se leadsEnabled = false
+
+Tarefa:
+Abre client/src/components/BottomNav.tsx e substitui TODO o conteúdo por este:
+
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
