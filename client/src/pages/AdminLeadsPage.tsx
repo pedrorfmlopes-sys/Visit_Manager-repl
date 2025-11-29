@@ -160,6 +160,23 @@ export default function AdminLeadsPage() {
     data.success === false &&
     data.notEnabled === true;
 
+  // Early return if Leads module is disabled
+  if (leadsDisabled) {
+    return (
+      <div className="space-y-4">
+        <Card className="mt-4" data-testid="card-leads-disabled">
+          <CardHeader>
+            <CardTitle>Módulo de Leads CRM desativado</CardTitle>
+            <CardDescription>
+              O módulo de Leads CRM está desativado para esta empresa.
+              Podes ativá-lo em <strong>Definições &gt; Empresa &gt; Módulo de Leads CRM</strong>.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -203,27 +220,7 @@ export default function AdminLeadsPage() {
         </Card>
       )}
 
-      {!isLoading && !isError && leadsDisabled && (
-        <Card data-testid="card-leads-not-enabled">
-          <CardHeader>
-            <CardTitle>Leads desativados</CardTitle>
-            <CardDescription>
-              Ative o módulo de Leads / CRM nas Definições da empresa para poder usar esta área.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button
-              variant="outline"
-              onClick={() => navigate("/admin/empresa")}
-              data-testid="button-go-to-settings"
-            >
-              Ir para Definições / CRMs
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {!isLoading && !isError && !leadsDisabled && data && "leads" in data && (
+      {!isLoading && !isError && data && "leads" in data && (
         <>
           {/* FASE-LEADS-FILTROS-02: Filters bar */}
           <Card data-testid="card-leads-filters">
