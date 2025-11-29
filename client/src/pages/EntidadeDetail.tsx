@@ -23,6 +23,7 @@ import { formatEntityForSharing } from "@/lib/shareFormatters";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useCurrentUser } from "@/hooks/use-user-context";
+import { useAuth } from "@/hooks/useAuth";
 import type { EntidadeWithRelations, Lembrete } from "@shared/schema";
 import { useState } from "react";
 
@@ -79,6 +80,12 @@ export default function EntidadeDetail() {
 
   const entityReminders = allLembretes?.filter(l => l.entidadeId === entidadeId) || [];
 
+  const { empresa } = useAuth();
+  const leadsEnabled =
+    typeof empresa?.crmLeadsEnabled === "boolean"
+      ? empresa.crmLeadsEnabled
+      : true;
+
   // FASE CRM-LEADS-ENT-CONTACTO-STEP1: Load leads for this entity
   type Lead = {
     id: string;
@@ -97,7 +104,7 @@ export default function EntidadeDetail() {
 
   const { data: entidadeLeadsData, isLoading: entidadeLeadsLoading } = useQuery<LeadsResponse>({
     queryKey: ["/api/crm/leads", { entidadeId: entidade?.id }],
-    enabled: !!entidade?.id,
+    enabled: !!entidade?.id && leadsEnabled,
     queryFn: async () => {
       const params = new URLSearchParams({ entidadeId: entidade!.id });
       const resp = await fetch(`/api/crm/leads?${params.toString()}`, {
@@ -697,75 +704,77 @@ export default function EntidadeDetail() {
         )}
 
         {/* FASE CRM-LEADS-ENT-CONTACTO-STEP1: Leads desta entidade */}
-        <Card data-testid="card-leads-entidade">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <Flag className="w-4 h-4" />
-              Leads desta entidade
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Todas as oportunidades associadas a contactos e visitas desta entidade.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {entidadeLeadsDisabled && (
-              <p className="text-xs text-amber-600">
-                O módulo de Leads CRM está desativado para esta empresa.
-              </p>
-            )}
+        {leadsEnabled && (
+          <Card data-testid="card-leads-entidade">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Flag className="w-4 h-4" />
+                Leads desta entidade
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Todas as oportunidades associadas a contactos e visitas desta entidade.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {entidadeLeadsDisabled && (
+                <p className="text-xs text-amber-600">
+                  O módulo de Leads CRM está desativado para esta empresa.
+                </p>
+              )}
 
-            {!entidadeLeadsDisabled && entidadeLeadsLoading && (
-              <p className="text-sm text-muted-foreground">A carregar leads...</p>
-            )}
+              {!entidadeLeadsDisabled && entidadeLeadsLoading && (
+                <p className="text-sm text-muted-foreground">A carregar leads...</p>
+              )}
 
-            {!entidadeLeadsDisabled && !entidadeLeadsLoading && entidadeLeads.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                Ainda não existem leads associados a esta entidade.
-              </p>
-            )}
+              {!entidadeLeadsDisabled && !entidadeLeadsLoading && entidadeLeads.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Ainda não existem leads associados a esta entidade.
+                </p>
+              )}
 
-            {!entidadeLeadsDisabled && !entidadeLeadsLoading && entidadeLeads.length > 0 && (
-              <div className="space-y-2">
-                {entidadeLeads.map((lead) => (
-                  <div
-                    key={lead.id}
-                    className="flex items-center justify-between border rounded-md px-3 py-2 text-sm"
-                    data-testid={`row-lead-entidade-${lead.id}`}
-                  >
-                    <div>
-                      <div className="font-medium">{lead.titulo}</div>
-                      <div className="text-xs text-muted-foreground space-y-1">
-                        {lead.marcas && lead.marcas.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {lead.marcas.slice(0, 2).map((marca) => (
-                              <Badge key={marca.id} variant="secondary" className="text-xs" data-testid={`badge-lead-entidade-marca-${marca.id}`}>
-                                {marca.nome}
-                              </Badge>
-                            ))}
-                            {lead.marcas.length > 2 && (
-                              <Badge variant="outline" className="text-xs" data-testid={`badge-lead-entidade-marcas-more-${lead.id}`}>
-                                +{lead.marcas.length - 2}
-                              </Badge>
-                            )}
-                          </div>
-                        )}
-                        <div>Estado: {lead.estado}</div>
+              {!entidadeLeadsDisabled && !entidadeLeadsLoading && entidadeLeads.length > 0 && (
+                <div className="space-y-2">
+                  {entidadeLeads.map((lead) => (
+                    <div
+                      key={lead.id}
+                      className="flex items-center justify-between border rounded-md px-3 py-2 text-sm"
+                      data-testid={`row-lead-entidade-${lead.id}`}
+                    >
+                      <div>
+                        <div className="font-medium">{lead.titulo}</div>
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          {lead.marcas && lead.marcas.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {lead.marcas.slice(0, 2).map((marca) => (
+                                <Badge key={marca.id} variant="secondary" className="text-xs" data-testid={`badge-lead-entidade-marca-${marca.id}`}>
+                                  {marca.nome}
+                                </Badge>
+                              ))}
+                              {lead.marcas.length > 2 && (
+                                <Badge variant="outline" className="text-xs" data-testid={`badge-lead-entidade-marcas-more-${lead.id}`}>
+                                  +{lead.marcas.length - 2}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                          <div>Estado: {lead.estado}</div>
+                        </div>
+                      </div>
+                      <div className="text-right text-xs">
+                        {lead.valorPrevisto
+                          ? `${lead.valorPrevisto} ${lead.moeda || "EUR"}`
+                          : "—"}
+                        <div className="text-[10px] text-muted-foreground">
+                          {new Date(lead.createdAt).toLocaleDateString()}
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right text-xs">
-                      {lead.valorPrevisto
-                        ? `${lead.valorPrevisto} ${lead.moeda || "EUR"}`
-                        : "—"}
-                      <div className="text-[10px] text-muted-foreground">
-                        {new Date(lead.createdAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Basic Information */}
         <Card>

@@ -29,6 +29,16 @@ export function AdminSidebar() {
   const { user, empresa, isAdmin } = useAuth();
   const { tarefasAtrasadas, tarefasHoje, visitasHoje } = useTodaySummary();
 
+  // Esconder "Leads" no menu admin quando o módulo estiver desativado
+  const leadsEnabled =
+    typeof empresa?.crmLeadsEnabled === "boolean"
+      ? empresa.crmLeadsEnabled
+      : true; // se não estiver definido, assume ativo (retrocompatibilidade)
+
+  const visibleSidebarItems = leadsEnabled
+    ? sidebarItems
+    : sidebarItems.filter((item) => item.path !== "/admin/leads");
+  
   const handleLogout = () => {
     window.location.href = "/api/logout";
   };
@@ -59,7 +69,7 @@ export function AdminSidebar() {
       <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
         <div>
           <p className="px-2 text-xs font-semibold text-muted-foreground mb-2">NAVEGAÇÃO</p>
-          {sidebarItems.map((item) => {
+          {visibleSidebarItems.map((item) => {
             const Icon = item.icon;
             const isActive = location === item.path || (item.path !== "/" && location.startsWith(item.path));
             

@@ -1,11 +1,16 @@
 import { storage } from "../storage";
 
 /**
- * Garante que o módulo de Leads está ativo para a empresa.
- * - empresaId vem normalmente do getUserContext(req)
- * - Verifica primeiro features.leadsEnabled (campo JSONB novo)
- * - Faz fallback para crmLeadsEnabled (coluna antiga), para retrocompatibilidade
- * - Se nada estiver definido, assume true (não quebra empresas antigas)
+ * Guard do módulo de Leads (CRM).
+ *
+ * Regra atual (simples e profissional):
+ * - A fonte da verdade é empresa.crmLeadsEnabled (boolean).
+ * - Se for true  → módulo ativo.
+ * - Se for false → módulo desativado.
+ * - Se for undefined/null → assume true (para empresas antigas).
+ *
+ * NOTA: Campo `features` fica reservado para futuro (planos avançados),
+ * mas não é usado nesta versão do guard.
  */
 export async function assertLeadsEnabled(empresaId?: string | null): Promise<void> {
   if (!empresaId) {
@@ -26,16 +31,13 @@ export async function assertLeadsEnabled(empresaId?: string | null): Promise<voi
     throw error;
   }
 
-  const features: any = (empresa as any).features ?? {};
-
-  const hasExplicitFeatureFlag =
-    Object.prototype.hasOwnProperty.call(features, "leadsEnabled") &&
-    typeof features.leadsEnabled === "boolean";
+  // Fonte de verdade: crmLeadsEnabled
+  const rawFlag = (empresa as any).crmLeadsEnabled;
 
   const leadsEnabled =
-    (hasExplicitFeatureFlag ? features.leadsEnabled : undefined) ??
-    (empresa as any).crmLeadsEnabled ??
-    true;
+    typeof rawFlag === "boolean"
+      ? rawFlag           // se vier true/false da BD, usamos
+      : true;             // se não vier nada, por defeito fica ativo (não parte empresas antigas)
 
   if (!leadsEnabled) {
     const error: any = new Error("Módulo de Leads está desativado para esta empresa.");
@@ -45,3 +47,5 @@ export async function assertLeadsEnabled(empresaId?: string | null): Promise<voi
     throw error;
   }
 }
+
+export default { assertLeadsEnabled };
