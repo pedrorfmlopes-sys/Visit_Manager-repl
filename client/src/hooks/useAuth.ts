@@ -3,7 +3,6 @@ import type { User } from "@shared/schema";
 
 export interface EmpresaFeatures {
   leadsEnabled?: boolean;
-  // futuro: outras flags (odooEnabled, ms365Enabled, etc.)
   [key: string]: any;
 }
 
