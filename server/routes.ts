@@ -339,7 +339,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               mostrarMarcasEmVisitas: empresa.mostrarMarcasEmVisitas,
               theme: empresa.theme,
               uiSettings: empresa.uiSettings,
-              // manter se já existir o campo features; se não existir, podes deixar esta linha na mesma
+              // NOVO: estado do módulo de Leads para esta empresa
+              crmLeadsEnabled: (empresa as any).crmLeadsEnabled ?? false,
+              // opcional: podemos continuar a enviar features, mesmo que ainda não usemos
               features: (empresa as any).features,
             }
           : null,
