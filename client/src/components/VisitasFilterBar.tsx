@@ -45,7 +45,7 @@ export function VisitasFilterBar({
   visitasSettings,
 }: VisitasFilterBarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  
+
   // Settings with safe defaults (all true by default for backward compatibility)
   const showDateQuick = visitasSettings?.enableFilterDateQuick ?? true;
   const showUser = visitasSettings?.enableFilterUser ?? true;
@@ -53,20 +53,22 @@ export function VisitasFilterBar({
   const showEntidade = visitasSettings?.enableFilterEntidade ?? true;
   const showContacto = visitasSettings?.enableFilterContacto ?? true;
   const showHasAudio = visitasSettings?.enableFilterHasAudio ?? true;
-  
+
   const today = new Date();
   const weekStart = startOfWeek(today, { locale: pt });
   const weekEnd = endOfWeek(today, { locale: pt });
-  
+
   const handleDateFilter = (from: string, to: string) => {
     onFilterChange({ ...filters, from, to });
   };
-  
+
   const handleClear = () => {
     onFilterChange({});
   };
-  
-  const activeFilters = Object.entries(filters).filter(([, v]) => v !== undefined && v !== "").length;
+
+  const activeFilters = Object.entries(filters).filter(
+    ([, v]) => v !== undefined && v !== ""
+  ).length;
 
   return (
     <div className="space-y-2">
@@ -77,7 +79,9 @@ export function VisitasFilterBar({
           type="text"
           placeholder="Pesquisar visitas..."
           value={filters.search || ""}
-          onChange={(e) => onFilterChange({ ...filters, search: e.target.value || undefined })}
+          onChange={(e) =>
+            onFilterChange({ ...filters, search: e.target.value || undefined })
+          }
           className="pl-10 pr-4"
           data-testid="input-search-visitas"
         />
@@ -95,7 +99,9 @@ export function VisitasFilterBar({
             Tudo
           </Button>
           <Button
-            variant={filters.from === format(today, "yyyy-MM-dd") ? "default" : "outline"}
+            variant={
+              filters.from === format(today, "yyyy-MM-dd") ? "default" : "outline"
+            }
             size="sm"
             onClick={() => {
               const todayStr = format(today, "yyyy-MM-dd");
@@ -106,22 +112,40 @@ export function VisitasFilterBar({
             Hoje
           </Button>
           <Button
-            variant={filters.from === format(weekStart, "yyyy-MM-dd") ? "default" : "outline"}
+            variant={
+              filters.from === format(weekStart, "yyyy-MM-dd")
+                ? "default"
+                : "outline"
+            }
             size="sm"
-            onClick={() => handleDateFilter(format(weekStart, "yyyy-MM-dd"), format(weekEnd, "yyyy-MM-dd"))}
+            onClick={() =>
+              handleDateFilter(
+                format(weekStart, "yyyy-MM-dd"),
+                format(weekEnd, "yyyy-MM-dd")
+              )
+            }
             data-testid="filter-this-week"
           >
             Esta semana
           </Button>
           <Button
-            variant={filters.from === format(subDays(today, 30), "yyyy-MM-dd") ? "default" : "outline"}
+            variant={
+              filters.from === format(subDays(today, 30), "yyyy-MM-dd")
+                ? "default"
+                : "outline"
+            }
             size="sm"
-            onClick={() => handleDateFilter(format(subDays(today, 30), "yyyy-MM-dd"), format(today, "yyyy-MM-dd"))}
+            onClick={() =>
+              handleDateFilter(
+                format(subDays(today, 30), "yyyy-MM-dd"),
+                format(today, "yyyy-MM-dd")
+              )
+            }
             data-testid="filter-last-30-days"
           >
             Últimos 30 dias
           </Button>
-          
+
           {activeFilters > 0 && (
             <Button
               variant="outline"
@@ -165,7 +189,10 @@ export function VisitasFilterBar({
             <select
               value={filters.entidadeId || ""}
               onChange={(e) =>
-                onFilterChange({ ...filters, entidadeId: e.target.value || undefined })
+                onFilterChange({
+                  ...filters,
+                  entidadeId: e.target.value || undefined,
+                })
               }
               className="text-sm p-2 rounded border border-input bg-background"
               data-testid="select-entidade-filter"
@@ -178,12 +205,15 @@ export function VisitasFilterBar({
               ))}
             </select>
           )}
-          
+
           {showContacto && contactos.length > 0 && (
             <select
               value={filters.contactoId || ""}
               onChange={(e) =>
-                onFilterChange({ ...filters, contactoId: e.target.value || undefined })
+                onFilterChange({
+                  ...filters,
+                  contactoId: e.target.value || undefined,
+                })
               }
               className="text-sm p-2 rounded border border-input bg-background"
               data-testid="select-contacto-filter"
@@ -206,7 +236,10 @@ export function VisitasFilterBar({
             <select
               value={filters.userId || ""}
               onChange={(e) =>
-                onFilterChange({ ...filters, userId: e.target.value || undefined })
+                onFilterChange({
+                  ...filters,
+                  userId: e.target.value || undefined,
+                })
               }
               className="text-sm p-2 rounded border border-input bg-background"
               data-testid="select-user-filter"
@@ -219,12 +252,15 @@ export function VisitasFilterBar({
               ))}
             </select>
           )}
-          
+
           {showMarca && marcas.length > 0 && (
             <select
               value={filters.marcaId || ""}
               onChange={(e) =>
-                onFilterChange({ ...filters, marcaId: e.target.value || undefined })
+                onFilterChange({
+                  ...filters,
+                  marcaId: e.target.value || undefined,
+                })
               }
               className="text-sm p-2 rounded border border-input bg-background"
               data-testid="select-marca-filter"

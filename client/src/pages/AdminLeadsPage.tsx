@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ type Lead = {
   marcas?: Marca[] | null;
   entidade?: { id: string; nome: string } | null;
   contacto?: { id: string; nome: string } | null;
+  odooLeadId?: number | null;
 };
 
 type LeadsResponse =
@@ -30,72 +31,38 @@ type LeadsResponse =
   | { success: false; notEnabled?: boolean; message?: string };
 
 export default function AdminLeadsPage() {
-  const [location, navigate] = useLocation();
-  const searchParams = new URLSearchParams(location.split("?")[1] || "");
-  
-  // FASE-LEADS-FILTROS-02: Read query params from URL
-  const q = searchParams.get("q") || "";
-  const estado = searchParams.get("estado") || "";
-  const entidadeId = searchParams.get("entidadeId") || "";
-  const contactoId = searchParams.get("contactoId") || "";
-  const hasOdoo = searchParams.get("hasOdoo") || "";
-  const orderBy = searchParams.get("orderBy") || "createdAt";
-  const orderDir = searchParams.get("orderDir") || "desc";
+  const [, navigate] = useLocation();
 
-  // FASE-LEADS-FILTROS-01: Local state for search debounce
-  const [localSearch, setLocalSearch] = useState(q);
+  // Estado interno dos filtros e ordenação
+  const [q, setQ] = useState("");
+  const [estado, setEstado] = useState<string>("");
+  const [entidadeId, setEntidadeId] = useState<string>("");
+  const [contactoId, setContactoId] = useState<string>("");
+  const [hasOdoo, setHasOdoo] = useState<string>("");
+  const [orderBy, setOrderBy] = useState<string>("createdAt");
+  const [orderDir, setOrderDir] = useState<"asc" | "desc">("desc");
+
+  // Estado local para o debounce da pesquisa
+  const [localSearch, setLocalSearch] = useState("");
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
 
-  // Sync local search with URL search param
-  useEffect(() => {
-    setLocalSearch(q);
-  }, [q]);
+  // Handler com debounce para a pesquisa
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      setLocalSearch(value);
 
-  // FASE-LEADS-FILTROS-02: Helper to update URL with new params
-  // FASE-LEADS-FILTROS-04: Preserve current path (/admin/leads)
-  const updateParams = useCallback((updates: Record<string, string>) => {
-    const [currentPath, currentSearch] = location.split("?");
-    const newParams = new URLSearchParams(currentSearch || "");
-    Object.entries(updates).forEach(([key, value]) => {
-      if (value) {
-        newParams.set(key, value);
-      } else {
-        newParams.delete(key);
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
       }
-    });
-    const newSearch = newParams.toString();
-    navigate(`${currentPath}${newSearch ? `?${newSearch}` : ""}`);
-  }, [location, navigate]);
 
-  // Debounced search handler
-  const handleSearchChange = useCallback((value: string) => {
-    setLocalSearch(value);
-    
-    if (searchTimeout) clearTimeout(searchTimeout);
-    
-    const timeout = setTimeout(() => {
-      updateParams({ q: value });
-    }, 300);
-    
-    setSearchTimeout(timeout);
-  }, [searchTimeout, updateParams]);
+      const timeout = setTimeout(() => {
+        setQ(value);
+      }, 300);
 
-  // Fetch entidades and contactos for select dropdowns
-  const { data: entidadesData } = useQuery({
-    queryKey: ["/api/entidades"],
-    queryFn: async () => {
-      const resp = await fetch("/api/entidades", { credentials: "include" });
-      return resp.json();
+      setSearchTimeout(timeout);
     },
-  });
-
-  const { data: contactosData } = useQuery({
-    queryKey: ["/api/contactos"],
-    queryFn: async () => {
-      const resp = await fetch("/api/contactos", { credentials: "include" });
-      return resp.json();
-    },
-  });
+    [searchTimeout]
+  );
 
   // FASE-LEADS-FILTROS-02: Build query params for API
   const apiParams = new URLSearchParams();
@@ -121,12 +88,12 @@ export default function AdminLeadsPage() {
 
   const filteredLeads = allLeads.filter((lead) => {
     const normalizedQuery = q.trim().toLowerCase();
-    
+
     // Search filter: q in titulo, descricao, entidade.nome, contacto.nome
     if (normalizedQuery) {
       const haystack = [
         lead.titulo,
-        lead.descricao,
+        (lead as any).descricao,
         lead.entidade?.nome,
         lead.contacto?.nome,
       ]
@@ -141,12 +108,10 @@ export default function AdminLeadsPage() {
     if (estado && estado !== "all" && lead.estado !== estado) return false;
 
     // EntidadeId filter
-    if (entidadeId && entidadeId !== "all" && lead.entidadeId !== entidadeId)
-      return false;
+    if (entidadeId && entidadeId !== "all" && lead.entidadeId !== entidadeId) return false;
 
     // ContactoId filter
-    if (contactoId && contactoId !== "all" && lead.contactoId !== contactoId)
-      return false;
+    if (contactoId && contactoId !== "all" && lead.contactoId !== contactoId) return false;
 
     // Odoo sync status filter
     if (hasOdoo && hasOdoo !== "all") {
@@ -178,11 +143,16 @@ export default function AdminLeadsPage() {
   });
 
   // Reset all filters
-  // FASE-LEADS-FILTROS-04: Preserve current path, only clear query string
   const resetFilters = useCallback(() => {
-    const [currentPath] = location.split("?");
-    navigate(currentPath);
-  }, [location, navigate]);
+    setQ("");
+    setEstado("");
+    setEntidadeId("");
+    setContactoId("");
+    setHasOdoo("");
+    setOrderBy("createdAt");
+    setOrderDir("desc");
+    setLocalSearch("");
+  }, []);
 
   const leadsDisabled =
     data &&
@@ -202,51 +172,48 @@ export default function AdminLeadsPage() {
         <Button
           onClick={() => navigate("/admin/leads/new?returnTo=/admin/leads")}
           size="sm"
-          data-testid="button-novo-lead"
+          data-testid="button-new-lead"
         >
-          Novo lead
+          Nova Lead
         </Button>
       </div>
 
       {isLoading && (
         <Card>
-          <CardHeader>
-            <CardTitle>Carregando leads...</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-10 w-full mb-2" />
-            <Skeleton className="h-10 w-full mb-2" />
-            <Skeleton className="h-10 w-full" />
+          <CardContent className="pt-6 space-y-2">
+            <Skeleton className="h-8 w-1/3" />
+            <Skeleton className="h-4 w-1/4" />
+            <div className="space-y-1">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {isError && !isLoading && (
+      {isError && (
         <Card>
           <CardHeader>
             <CardTitle>Erro ao carregar leads</CardTitle>
             <CardDescription>
-              Tenta recarregar a página ou verifica a ligação.
+              Ocorreu um erro ao carregar as leads. Por favor, tente novamente.
             </CardDescription>
           </CardHeader>
         </Card>
       )}
 
-      {leadsDisabled && !isLoading && (
-        <Card>
+      {!isLoading && !isError && leadsDisabled && (
+        <Card data-testid="card-leads-not-enabled">
           <CardHeader>
-            <CardTitle>Módulo de Leads desativado</CardTitle>
+            <CardTitle>Leads desativados</CardTitle>
             <CardDescription>
-              O módulo de Leads CRM não está ativo para esta empresa.
+              Ative o módulo de Leads / CRM nas Definições da empresa para poder usar esta área.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-3">
-              Ativa o módulo de Leads nas definições de CRMs para começar a
-              criar e gerir leads.
-            </p>
             <Button
-              size="sm"
+              variant="outline"
               onClick={() => navigate("/admin/empresa")}
               data-testid="button-go-to-settings"
             >
@@ -273,10 +240,13 @@ export default function AdminLeadsPage() {
                       data-testid="input-lead-search"
                     />
                   </div>
-                  
+
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">Estado</label>
-                    <Select value={estado || "all"} onValueChange={(value) => updateParams({ estado: value === "all" ? "" : value })}>
+                    <Select
+                      value={estado || "all"}
+                      onValueChange={(value) => setEstado(value === "all" ? "" : value)}
+                    >
                       <SelectTrigger data-testid="select-lead-estado">
                         <SelectValue placeholder="Todos os estados" />
                       </SelectTrigger>
@@ -292,39 +262,60 @@ export default function AdminLeadsPage() {
 
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">Entidade</label>
-                    <Select value={entidadeId || "all"} onValueChange={(value) => updateParams({ entidadeId: value === "all" ? "" : value })}>
+                    <Select
+                      value={entidadeId || "all"}
+                      onValueChange={(value) => {
+                        const v = value === "all" ? "" : value;
+                        setEntidadeId(v);
+                        setContactoId("");
+                      }}
+                    >
                       <SelectTrigger data-testid="select-lead-entidade">
                         <SelectValue placeholder="Todas as entidades" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todas</SelectItem>
-                        {Array.isArray(entidadesData) &&
-                          entidadesData.map((ent: any) => (
-                            <SelectItem key={ent.id} value={ent.id}>
-                              {ent.nome}
-                            </SelectItem>
-                          ))}
+                        {/* As entidades vêm já "embedded" nos leads ou de outro hook, adapta se necessário */}
+                        {Array.from(
+                          new Map(
+                            allLeads
+                              .filter((lead) => lead.entidade)
+                              .map((lead) => [lead.entidade!.id, lead.entidade!])
+                          ).values()
+                        ).map((ent) => (
+                          <SelectItem key={ent.id} value={ent.id}>
+                            {ent.nome}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
 
-                {/* Row 2: Contacto + Só com Odoo + Ordenar */}
+                {/* Row 2: Contacto + Filtros extra + Ordenar por */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">Contacto</label>
-                    <Select value={contactoId || "all"} onValueChange={(value) => updateParams({ contactoId: value === "all" ? "" : value })}>
+                    <Select
+                      value={contactoId || "all"}
+                      onValueChange={(value) => setContactoId(value === "all" ? "" : value)}
+                    >
                       <SelectTrigger data-testid="select-lead-contacto">
                         <SelectValue placeholder="Todos os contactos" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos</SelectItem>
-                        {Array.isArray(contactosData) &&
-                          contactosData.map((cont: any) => (
-                            <SelectItem key={cont.id} value={cont.id}>
-                              {cont.nome}
-                            </SelectItem>
-                          ))}
+                        {Array.from(
+                          new Map(
+                            allLeads
+                              .filter((lead) => lead.contacto)
+                              .map((lead) => [lead.contacto!.id, lead.contacto!])
+                          ).values()
+                        ).map((cont) => (
+                          <SelectItem key={cont.id} value={cont.id}>
+                            {cont.nome}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -334,7 +325,7 @@ export default function AdminLeadsPage() {
                     <Button
                       variant={hasOdoo === "true" ? "default" : "outline"}
                       size="sm"
-                      onClick={() => updateParams({ hasOdoo: hasOdoo === "true" ? "" : "true" })}
+                      onClick={() => setHasOdoo(hasOdoo === "true" ? "" : "true")}
                       className="w-full"
                       data-testid="toggle-lead-odoo"
                     >
@@ -348,7 +339,8 @@ export default function AdminLeadsPage() {
                       value={`${orderBy}-${orderDir}`}
                       onValueChange={(value) => {
                         const [by, dir] = value.split("-");
-                        updateParams({ orderBy: by, orderDir: dir });
+                        setOrderBy(by);
+                        setOrderDir(dir === "asc" ? "asc" : "desc");
                       }}
                     >
                       <SelectTrigger data-testid="select-lead-orderby">
@@ -366,8 +358,7 @@ export default function AdminLeadsPage() {
                   </div>
                 </div>
 
-                {/* Reset button */}
-                {(q || estado || entidadeId || contactoId || hasOdoo) && (
+                <div className="flex justify-end">
                   <Button
                     variant="outline"
                     size="sm"
@@ -376,76 +367,61 @@ export default function AdminLeadsPage() {
                   >
                     Limpar filtros
                   </Button>
-                )}
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* FASE-LEADS-FILTROS-03: Leads list using sortedLeads */}
-          <Card data-testid="card-leads-list">
-            <CardHeader>
-              <CardTitle>Leads</CardTitle>
-              <CardDescription>
-                {sortedLeads.length === 0
-                  ? allLeads.length === 0
-                    ? "Ainda não existem leads registados."
-                    : "Nenhum lead corresponde aos filtros."
-                  : `${sortedLeads.length} lead${sortedLeads.length !== 1 ? "s" : ""} encontrado${sortedLeads.length !== 1 ? "s" : ""}.`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+          {/* Tabela de resultados */}
+          <Card data-testid="card-leads-table">
+            <CardContent className="pt-6">
               {sortedLeads.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  {allLeads.length === 0
-                    ? "Nenhum lead encontrado."
-                    : "Nenhum lead corresponde aos filtros aplicados."}
+                  Nenhuma lead encontrada com os filtros aplicados.
                 </p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-2 pr-2">Título</th>
-                        <th className="text-left py-2 pr-2">Marca</th>
-                        <th className="text-left py-2 pr-2">Estado</th>
-                        <th className="text-left py-2 pr-2">Valor</th>
-                        <th className="text-left py-2 pr-2">Criado em</th>
+                      <tr className="border-b text-xs text-muted-foreground">
+                        <th className="text-left pb-2 pr-2">Título</th>
+                        <th className="text-left pb-2 pr-2">Entidade</th>
+                        <th className="text-left pb-2 pr-2">Contacto</th>
+                        <th className="text-left pb-2 pr-2">Estado</th>
+                        <th className="text-left pb-2 pr-2">Valor previsto</th>
+                        <th className="text-left pb-2 pr-2">Odoo</th>
+                        <th className="text-left pb-2 pr-2">Criada em</th>
                       </tr>
                     </thead>
                     <tbody>
                       {sortedLeads.map((lead) => (
                         <tr
                           key={lead.id}
-                          className="border-b hover:bg-muted cursor-pointer"
-                          data-testid={`row-lead-${lead.id}`}
+                          className="border-b last:border-0 hover:bg-muted/40 cursor-pointer"
                           onClick={() => navigate(`/admin/leads/${lead.id}`)}
+                          data-testid={`row-lead-${lead.id}`}
                         >
-                          <td className="py-2 pr-2">{lead.titulo}</td>
+                          <td className="py-2 pr-2 font-medium">{lead.titulo}</td>
                           <td className="py-2 pr-2">
-                            {lead.marcas && lead.marcas.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {lead.marcas.slice(0, 2).map((marca) => (
-                                  <Badge key={marca.id} variant="secondary" className="text-xs" data-testid={`badge-lead-marca-${marca.id}`}>
-                                    {marca.nome}
-                                  </Badge>
-                                ))}
-                                {lead.marcas.length > 2 && (
-                                  <Badge variant="outline" className="text-xs" data-testid={`badge-lead-marcas-more-${lead.id}`}>
-                                    +{lead.marcas.length - 2}
-                                  </Badge>
-                                )}
-                              </div>
-                            ) : (
-                              "—"
-                            )}
+                            {lead.entidade ? lead.entidade.nome : "—"}
                           </td>
-                          <td className="py-2 pr-2 capitalize">
-                            {lead.estado}
+                          <td className="py-2 pr-2">
+                            {lead.contacto ? lead.contacto.nome : "—"}
+                          </td>
+                          <td className="py-2 pr-2">
+                            <Badge variant="outline">{lead.estado}</Badge>
                           </td>
                           <td className="py-2 pr-2">
                             {lead.valorPrevisto
-                              ? `${lead.valorPrevisto} ${lead.moeda || "EUR"}`
+                              ? `${lead.valorPrevisto} ${lead.moeda || ""}`.trim()
                               : "—"}
+                          </td>
+                          <td className="py-2 pr-2">
+                            {lead.odooLeadId ? (
+                              <Badge variant="outline">Odoo #{lead.odooLeadId}</Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
                           </td>
                           <td className="py-2 pr-2">
                             {new Date(lead.createdAt).toLocaleDateString()}

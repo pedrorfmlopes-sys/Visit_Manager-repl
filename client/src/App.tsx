@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -7,7 +7,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { MainLayout } from "@/layouts/MainLayout";
 import { SyncIndicator } from "@/components/SyncIndicator";
 import { FABMenu } from "@/components/FABMenu";
-import { useLocation } from "wouter";
 import { offlineStorage } from "@/lib/offlineStorage";
 import { syncPTEnrichmentQueue } from "@/lib/offlineQueue";
 import { useEffect, useRef, useState } from "react";
@@ -36,16 +35,16 @@ import Analytics from "@/pages/Analytics";
 import QRScanner from "@/pages/QRScanner";
 import AdminEmpresa from "@/pages/AdminEmpresa";
 import AdminDebug from "@/pages/AdminDebug";
+import Leads from "@/pages/Leads";
 import AdminLeadsPage from "@/pages/AdminLeadsPage";
 import AdminLeadDetailPage from "@/pages/AdminLeadDetailPage";
 import AgentMore from "@/pages/AgentMore";
 import Perfil from "@/pages/Perfil";
-// import MicrosoftIntegration from "@/pages/MicrosoftIntegration"; // Disabled: requires valid Azure credentials
 
-// Protected admin route component
-function AdminRoute({ component: Component }: { component: typeof AdminEmpresa }) {
+// Rota protegida apenas para páginas que são mesmo só de admin
+function AdminRoute({ component: Component }: { component: React.ComponentType<any> }) {
   const { isAdmin, isLoading } = useAuth();
-  
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -55,11 +54,11 @@ function AdminRoute({ component: Component }: { component: typeof AdminEmpresa }
       </div>
     );
   }
-  
+
   if (!isAdmin) {
     return <NotFound />;
   }
-  
+
   return <Component />;
 }
 
@@ -76,6 +75,7 @@ function Router() {
     );
   }
 
+  // Não autenticado → só landing
   if (!isAuthenticated) {
     return (
       <Switch>
@@ -85,64 +85,85 @@ function Router() {
     );
   }
 
+  // Autenticado → layout principal
   return (
     <MainLayout>
       <Switch>
-        {/* Dashboard - shows different page based on role */}
+        {/* Dashboard: admin vs agente */}
         <Route path="/" component={isAdmin ? AdminDashboard : Dashboard} />
-        
-        {/* Entidades routes */}
+
+        {/* Entidades */}
         <Route path="/entidades" component={Entidades} />
         <Route path="/entidades/nova" component={EntidadeForm} />
         <Route path="/entidades/:id/editar" component={EntidadeForm} />
         <Route path="/entidades/:id" component={EntidadeDetail} />
-        
-        {/* Gabinetes routes (backward compatibility) */}
+
+        {/* Gabinetes (retrocompatibilidade) */}
         <Route path="/gabinetes" component={Gabinetes} />
         <Route path="/gabinetes/novo" component={GabineteForm} />
         <Route path="/gabinetes/:id" component={GabineteForm} />
-        
-        {/* Contactos routes */}
+
+        {/* Contactos */}
         <Route path="/contactos" component={Contactos} />
         <Route path="/contactos/novo" component={ContactoForm} />
         <Route path="/contactos/:id/detalhes" component={ContactoDetail} />
         <Route path="/contactos/:id/editar" component={ContactoForm} />
         <Route path="/contactos/:id" component={ContactoForm} />
-        
-        {/* Visitas routes */}
-        <Route path="/visitas" component={isAdmin ? AdminVisitas : Visitas} />
+
+        {/* Leads – lista vista utilizador */}
+        <Route path="/leads" component={Leads} />
+
+        {/* Leads “admin” (lista + detalhe) – agora acessíveis a QUALQUER utilizador autenticado */}
+        <Route path="/admin/leads/:id" component={AdminLeadDetailPage} />
+        <Route path="/admin/leads" component={AdminLeadsPage} />
+
+        {/* Visitas */}
+        <Route path="/visitas" component={Visitas} />
         <Route path="/visitas/nova" component={VisitaForm} />
         <Route path="/visitas/:id/editar" component={VisitaForm} />
         <Route path="/visitas/:id" component={VisitaDetail} />
-        
-        {/* Tarefas routes */}
-        <Route path="/tarefas" component={isAdmin ? AdminTarefas : Tarefas} />
+
+        {/* Tarefas */}
+        <Route path="/tarefas" component={Tarefas} />
         <Route path="/tarefas/nova" component={TarefaForm} />
         <Route path="/tarefas/:id" component={TarefaDetail} />
         <Route path="/tarefas/:id/editar" component={TarefaForm} />
-        
-        {/* Agent-specific routes */}
+
+        {/* Rotas de agente */}
         <Route path="/agente-mais" component={AgentMore} />
         <Route path="/perfil" component={Perfil} />
-        
-        {/* Lembretes and Analytics */}
+
+        {/* Lembretes e Analytics */}
         <Route path="/lembretes" component={Lembretes} />
         <Route path="/analytics" component={Analytics} />
-        
+
         {/* QR Scanner */}
         <Route path="/qr" component={QRScanner} />
         <Route path="/qr-scanner" component={QRScanner} />
-        
-        {/* Admin routes */}
+
+        {/* Rotas verdadeiramente só de admin */}
         {isAdmin && (
           <>
-            <Route path="/admin/empresa" component={() => <AdminRoute component={AdminEmpresa} />} />
-            <Route path="/admin/leads/:id" component={() => <AdminRoute component={AdminLeadDetailPage} />} />
-            <Route path="/admin/leads" component={() => <AdminRoute component={AdminLeadsPage} />} />
-            <Route path="/admin/debug" component={() => <AdminRoute component={AdminDebug} />} />
+            <Route
+              path="/admin/empresa"
+              component={() => <AdminRoute component={AdminEmpresa} />}
+            />
+            <Route
+              path="/admin/visitas"
+              component={() => <AdminRoute component={AdminVisitas} />}
+            />
+            <Route
+              path="/admin/tarefas"
+              component={() => <AdminRoute component={AdminTarefas} />}
+            />
+            <Route
+              path="/admin/debug"
+              component={() => <AdminRoute component={AdminDebug} />}
+            />
           </>
         )}
-        
+
+        {/* Fallback */}
         <Route component={NotFound} />
       </Switch>
     </MainLayout>
@@ -155,11 +176,20 @@ function AppContent() {
   const prevOnlineStatus = useRef<boolean | null>(null);
   const [location] = useLocation();
 
-  // Pages where FAB should appear
-  const mainPages = ["/", "/visitas", "/tarefas", "/entidades", "/contactos"];
-  const showFAB = mainPages.some(page => location === page || location.startsWith(page + "/"));
-  
-  // Hide FAB on create/edit routes
+  const mainPages = [
+    "/",
+    "/visitas",
+    "/admin/visitas",
+    "/tarefas",
+    "/admin/tarefas",
+    "/leads",
+    "/entidades",
+    "/contactos",
+  ];
+  const showFAB = mainPages.some(
+    (page) => location === page || location.startsWith(page + "/")
+  );
+
   const hideFABRoutes = [
     "/entidades/nova",
     "/entidades/:id/editar",
@@ -168,26 +198,24 @@ function AppContent() {
     "/visitas/nova",
     "/visitas/:id/editar",
     "/tarefas/nova",
-    "/tarefas/:id/editar"
+    "/tarefas/:id/editar",
   ];
-  const isFABHidden = hideFABRoutes.some(route => {
+  const isFABHidden = hideFABRoutes.some((route) => {
     if (route.includes(":id")) {
       const pattern = route.replace(":id", "[^/]+");
       return new RegExp(`^${pattern}$`).test(location);
     }
     return location === route;
   });
-  
 
   useEffect(() => {
     offlineStorage.init().catch(console.error);
   }, []);
 
-  // FASE 9: Apply theme from empresa.theme
+  // Tema da empresa
   useEffect(() => {
     if (isAuthenticated && empresa?.theme) {
       const root = document.documentElement;
-      
       if (empresa.theme === "dark-pro") {
         root.classList.add("dark");
         root.setAttribute("data-theme", "dark-pro");
@@ -198,27 +226,30 @@ function AppContent() {
     }
   }, [isAuthenticated, empresa?.theme]);
 
+  // Online / offline + sync
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
     };
   }, []);
 
   useEffect(() => {
     if (isOnline && prevOnlineStatus.current === false && isAuthenticated) {
-      console.log('[App] Connection restored, syncing PT enrichment queue...');
+      console.log("[App] Connection restored, syncing PT enrichment queue...");
       syncPTEnrichmentQueue()
         .then(({ success, failed }) => {
           if (success > 0 || failed > 0) {
-            console.log(`[App] PT Enrichment sync complete: ${success} success, ${failed} failed`);
-            queryClient.invalidateQueries({ queryKey: ['/api/entidades'] });
+            console.log(
+              `[App] PT Enrichment sync complete: ${success} success, ${failed} failed`
+            );
+            queryClient.invalidateQueries({ queryKey: ["/api/entidades"] });
           }
         })
         .catch(console.error);
@@ -229,6 +260,7 @@ function AppContent() {
   return (
     <>
       <Router />
+      {isAuthenticated && <SyncIndicator />}
       {isAuthenticated && showFAB && !isFABHidden && <FABMenu />}
     </>
   );

@@ -1,21 +1,45 @@
 import { useRoute, useLocation, useSearch } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { ArrowLeft, ExternalLink, Mic, Wand2, Download, FileText } from "lucide-react";
+import {
+  ArrowLeft,
+  ExternalLink,
+  Mic,
+  Wand2,
+  Download,
+  FileText,
+} from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAudioTranscription } from "@/hooks/useAudioTranscription";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { EntidadeSearchSelect, ContactoSearchSelect, VisitaSearchSelect } from "@/components/crm/SearchSelects";
-import type { Marca, VisitaWithRelations, Contacto, Entidade } from "@shared/schema";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  EntidadeSearchSelect,
+  ContactoSearchSelect,
+  VisitaSearchSelect,
+} from "@/components/crm/SearchSelects";
+import type { Marca, VisitaWithRelations, Contacto } from "@shared/schema";
 
 type OdooLeadAttachment = {
   id: number;
@@ -58,7 +82,7 @@ export default function AdminLeadDetailPage() {
   const { toast } = useToast();
   const search = useSearch();
 
-  // FASE-LEADS-NEW-03: Parse query params for create mode (with context)
+  // Parse query params for create mode (with context)
   const searchParams = new URLSearchParams(search);
   const visitaIdFromQuery = searchParams.get("visitaId");
   const entidadeId = searchParams.get("entidadeId");
@@ -67,11 +91,8 @@ export default function AdminLeadDetailPage() {
   const returnTo = rawReturnTo ? decodeURIComponent(rawReturnTo) : null;
   const isCreateMode = id === "new";
   const hasContext = isCreateMode && !!entidadeId && !!contactoIdFromQuery;
-  
-  // FASE-LEADS-MANUAL-01: Detect two creation modes
   const isCreateFromVisit = isCreateMode && !!visitaIdFromQuery;
 
-  // FASE-LEADS-CONTEXTO-02: Fetch visita data for context display
   const { data: visitaData } = useQuery<VisitaWithRelations>({
     queryKey: ["/api/visitas", visitaIdFromQuery],
     enabled: isCreateMode && !!visitaIdFromQuery,
@@ -79,7 +100,7 @@ export default function AdminLeadDetailPage() {
 
   const { data, isLoading, isError } = useQuery<LeadResponse>({
     queryKey: ["/api/crm/leads", id],
-    enabled: !!id && !isCreateMode, // FASE-LEADS-NEW-02: Skip query in create mode
+    enabled: !!id && !isCreateMode,
     queryFn: async () => {
       const resp = await fetch(`/api/crm/leads/${id}`, {
         credentials: "include",
@@ -89,15 +110,23 @@ export default function AdminLeadDetailPage() {
   });
 
   if (!id) {
-    return <p className="p-4 text-sm text-muted-foreground">ID de lead inválido.</p>;
+    return (
+      <p className="p-4 text-sm text-muted-foreground">ID de lead inválido.</p>
+    );
   }
 
-  // FASE-LEADS-NEW-02: Show loading only for existing leads
   if (!isCreateMode && isLoading) {
-    return <p className="p-4 text-sm text-muted-foreground">A carregar lead...</p>;
+    return (
+      <p className="p-4 text-sm text-muted-foreground">A carregar lead...</p>
+    );
   }
 
-  if (!isCreateMode && (isError || !data || ("success" in data && data.success === false && !data.notEnabled))) {
+  if (
+    !isCreateMode &&
+    (isError ||
+      !data ||
+      ("success" in data && data.success === false && !data.notEnabled))
+  ) {
     return (
       <div className="p-4">
         <p className="text-sm text-destructive">
@@ -115,10 +144,9 @@ export default function AdminLeadDetailPage() {
     );
   }
 
-  // FASE-LEADS-CONTEXTO-02: Build contactos list from visita data
+  // Contactos disponíveis quando se vem de uma visita
   const contactosDisponiveis: Array<{ id: string; nome: string; origem: string }> = [];
   if (visitaData) {
-    // Contacto principal da visita
     if (visitaData.contacto) {
       contactosDisponiveis.push({
         id: visitaData.contacto.id,
@@ -126,7 +154,6 @@ export default function AdminLeadDetailPage() {
         origem: "Contacto principal",
       });
     }
-    // Contactos presentes na visita
     if (visitaData.contactosPresentes && Array.isArray(visitaData.contactosPresentes)) {
       visitaData.contactosPresentes.forEach((c) => {
         if (!contactosDisponiveis.find((cd) => cd.id === c.id)) {
@@ -140,8 +167,7 @@ export default function AdminLeadDetailPage() {
     }
   }
 
-  // FASE-LEADS-NEW-03: Create empty lead for new mode (with context from query and visita)
-  const lead = isCreateMode 
+  const lead = isCreateMode
     ? {
         id: "new",
         titulo: "",
@@ -175,12 +201,6 @@ export default function AdminLeadDetailPage() {
               ? `/visitas/${visitaIdFromQuery}`
               : "/admin/leads";
 
-            console.log("[AdminLeadDetail] header back target:", {
-              visitaIdFromQuery,
-              returnTo,
-              target,
-            });
-
             setLocation(target);
           }}
           data-testid="button-voltar-leads"
@@ -196,23 +216,24 @@ export default function AdminLeadDetailPage() {
         <div className="lg:col-span-2">
           {isCreateMode && !hasContext && isCreateFromVisit && (
             <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded text-sm text-amber-800 dark:text-amber-200 mb-4">
-              Nota: Para pre-preencher contexto, abra este formulário a partir de uma visita existente.
+              Nota: Para pré-preencher contexto, abre este formulário a partir de
+              uma visita existente.
             </div>
           )}
-          {(isCreateMode || !isCreateMode) ? (
-            <LeadDetailForm 
-              lead={lead} 
-              isCreateMode={isCreateMode} 
-              isCreateFromVisit={isCreateFromVisit}
-              visitaId={visitaIdFromQuery || null} 
-              returnTo={returnTo || null}
-              entidadeId={entidadeId || null}
-              contactoId={contactoIdFromQuery || null}
-              hasContext={hasContext}
-              contactosDisponiveis={contactosDisponiveis}
-            />
-          ) : null}
+
+          <LeadDetailForm
+            lead={lead}
+            isCreateMode={isCreateMode}
+            isCreateFromVisit={isCreateFromVisit}
+            visitaId={visitaIdFromQuery || null}
+            returnTo={returnTo || null}
+            entidadeId={entidadeId || null}
+            contactoId={contactoIdFromQuery || null}
+            hasContext={hasContext}
+            contactosDisponiveis={contactosDisponiveis}
+          />
         </div>
+
         {!isCreateMode && (
           <div className="space-y-4">
             <OdooCrmCard leadId={lead.id} odooLeadId={lead.odooLeadId} />
@@ -224,8 +245,8 @@ export default function AdminLeadDetailPage() {
   );
 }
 
-function LeadDetailForm({ 
-  lead, 
+function LeadDetailForm({
+  lead,
   isCreateMode = false,
   isCreateFromVisit = false,
   visitaId = null,
@@ -234,8 +255,8 @@ function LeadDetailForm({
   contactoId = null,
   hasContext = false,
   contactosDisponiveis = [],
-}: { 
-  lead: Lead; 
+}: {
+  lead: Lead;
   isCreateMode?: boolean;
   isCreateFromVisit?: boolean;
   visitaId?: string | null;
@@ -250,15 +271,14 @@ function LeadDetailForm({
   const [marcasSearch, setMarcasSearch] = useState("");
   const audioInputRef = useRef<HTMLInputElement>(null);
   const [summarizing, setSummarizing] = useState(false);
-  
-  // FASE-AUDIO-CORE-03: Use unified audio transcription hook (same as Visitas)
+
   const audio = useAudioTranscription();
 
   const { data: marcas = [] } = useQuery<Marca[]>({
     queryKey: ["/api/marcas", "onlyAtivas"],
     queryFn: async () => {
       const response = await fetch("/api/marcas?onlyAtivas=true", {
-        credentials: "include"
+        credentials: "include",
       });
       if (!response.ok) throw new Error("Failed to fetch marcas");
       return response.json();
@@ -272,16 +292,13 @@ function LeadDetailForm({
     estado: lead.estado ?? "novo",
     valorPrevisto: lead.valorPrevisto ?? "",
     moeda: lead.moeda ?? "EUR",
-    // FASE-LEADS-CONTEXTO-02: Contacto selection for create mode (from visita)
-    contactoId: isCreateMode ? (contactoId || "") : (lead.contactoId || ""),
-    // FASE-LEADS-MANUAL-01: For manual mode (from list)
-    entidadeId: isCreateMode && !isCreateFromVisit ? "" : (lead.entidadeId || ""),
-    visitaId: isCreateMode && !isCreateFromVisit ? null : (lead.visitaId || null),
+    contactoId: isCreateMode ? contactoId || "" : lead.contactoId || "",
+    entidadeId: isCreateMode && !isCreateFromVisit ? "" : lead.entidadeId || "",
+    visitaId: isCreateMode && !isCreateFromVisit ? null : lead.visitaId || null,
   });
 
   const [saving, setSaving] = useState(false);
 
-  // FASE-AUDIO-CORE-04: Handler for transcribing recorded audio
   const handleTranscreverLead = async () => {
     try {
       const text = await audio.transcribe();
@@ -303,7 +320,8 @@ function LeadDetailForm({
       });
     } catch (error: any) {
       console.error("[AdminLeadDetailPage] Erro na transcrição:", error);
-      const errorMsg = error instanceof Error ? error.message : "Falha na transcrição de áudio.";
+      const errorMsg =
+        error instanceof Error ? error.message : "Falha na transcrição de áudio.";
       toast({
         title: "Erro na transcrição",
         description: errorMsg || "Falha na transcrição de áudio.",
@@ -312,7 +330,6 @@ function LeadDetailForm({
     }
   };
 
-  // Handle text summarization
   const handleSummarizeText = async () => {
     if (!form.descricao.trim()) {
       toast({
@@ -360,7 +377,12 @@ function LeadDetailForm({
 
   const handleChange =
     (field: keyof typeof form) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    (
+      e:
+        | React.ChangeEvent<HTMLInputElement>
+        | React.ChangeEvent<HTMLTextAreaElement>
+        | React.ChangeEvent<HTMLSelectElement>
+    ) => {
       setForm((f) => ({ ...f, [field]: e.target.value }));
     };
 
@@ -371,15 +393,14 @@ function LeadDetailForm({
       const body: any = {
         titulo: form.titulo.trim(),
         descricao: form.descricao.trim() || null,
-        marcasIds: form.marcasIds && form.marcasIds.length > 0 ? form.marcasIds : undefined,
+        marcasIds:
+          form.marcasIds && form.marcasIds.length > 0 ? form.marcasIds : undefined,
         estado: form.estado || "novo",
         valorPrevisto: form.valorPrevisto ? Number(form.valorPrevisto) : null,
         moeda: form.moeda || "EUR",
       };
 
-      // FASE-LEADS-CONTEXTO-02 & FASE-LEADS-MANUAL-01: POST for create mode
       if (isCreateMode) {
-        // From visit mode (existing behavior)
         if (isCreateFromVisit) {
           if (!entidadeId) {
             throw new Error("Contexto incompleto: entidade ausente");
@@ -391,9 +412,10 @@ function LeadDetailForm({
           body.entidadeId = entidadeId;
           body.contactoId = form.contactoId;
         } else {
-          // Manual mode (new: from list) - FASE-LEADS-CLEAN-02: require at least one
           if (!form.entidadeId && !form.contactoId) {
-            throw new Error("Tens de associar pelo menos uma Entidade ou um Contacto ao lead.");
+            throw new Error(
+              "Tens de associar pelo menos uma Entidade ou um Contacto ao lead."
+            );
           }
           body.entidadeId = form.entidadeId || null;
           body.contactoId = form.contactoId || null;
@@ -402,7 +424,9 @@ function LeadDetailForm({
       }
 
       const method = isCreateMode ? "POST" : "PATCH";
-      const endpoint = isCreateMode ? "/api/crm/leads" : `/api/crm/leads/${lead.id}`;
+      const endpoint = isCreateMode
+        ? "/api/crm/leads"
+        : `/api/crm/leads/${lead.id}`;
 
       const resp = await fetch(endpoint, {
         method,
@@ -419,43 +443,45 @@ function LeadDetailForm({
 
       toast({
         title: isCreateMode ? "Lead criado" : "Lead atualizado",
-        description: isCreateMode ? "Novo lead foi criado." : "Os dados do lead foram guardados.",
+        description: isCreateMode
+          ? "Novo lead foi criado."
+          : "Os dados do lead foram guardados.",
       });
 
-      // FASE-LEADS-NEW-02: After create, navigate to detail or back to returnTo
       if (isCreateMode && json.lead?.id) {
         const createdId = json.lead.id;
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ["/api/crm/leads"] }),
-          visitaId && queryClient.invalidateQueries({ queryKey: ["/api/crm/leads", { visitaId }] }),
+          visitaId &&
+            queryClient.invalidateQueries({
+              queryKey: ["/api/crm/leads", { visitaId }],
+            }),
         ]);
 
-        // FASE-LEADS-GLOBAL-01: Navigate with returnTo support
-        // Priority: returnTo > visitaId > detail page
         let target = `/admin/leads/${createdId}`;
-        
+
         if (returnTo) {
           target = returnTo;
         } else if (visitaId) {
           target = `/visitas/${visitaId}`;
         }
 
-        console.log("[AdminLeadDetail] handleSave target:", {
-          visitaId,
-          returnTo,
-          createdId,
-          target,
-        });
-
         navigate(target);
       } else {
-        // Edit mode - navigate to leads list
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ["/api/crm/leads"] }),
-          queryClient.invalidateQueries({ queryKey: ["/api/crm/leads", lead.id] }),
-          queryClient.invalidateQueries({ queryKey: ["/api/crm/leads", { visitaId: lead.visitaId }] }),
-          queryClient.invalidateQueries({ queryKey: ["/api/crm/leads", { entidadeId: lead.entidadeId }] }),
-          queryClient.invalidateQueries({ queryKey: ["/api/crm/leads", { contactoId: lead.contactoId }] }),
+          queryClient.invalidateQueries({
+            queryKey: ["/api/crm/leads", lead.id],
+          }),
+          queryClient.invalidateQueries({
+            queryKey: ["/api/crm/leads", { visitaId: lead.visitaId }],
+          }),
+          queryClient.invalidateQueries({
+            queryKey: ["/api/crm/leads", { entidadeId: lead.entidadeId }],
+          }),
+          queryClient.invalidateQueries({
+            queryKey: ["/api/crm/leads", { contactoId: lead.contactoId }],
+          }),
         ]);
         navigate("/admin/leads");
       }
@@ -481,35 +507,47 @@ function LeadDetailForm({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          {/* FASE-SS-04: In manual mode, show SearchSelect wrappers for entity/contacto/visita */}
           {isCreateMode && !isCreateFromVisit && (
             <div className="space-y-3 pb-3 border-b">
               <EntidadeSearchSelect
                 value={form.entidadeId}
-                onChange={(value) => setForm((f) => ({ ...f, entidadeId: value || "", contactoId: "" }))}
+                onChange={(value) =>
+                  setForm((f) => ({
+                    ...f,
+                    entidadeId: value || "",
+                    contactoId: "",
+                    visitaId: null,
+                  }))
+                }
                 label="Entidade (opcional)"
                 placeholder="Pesquisar entidade..."
               />
 
-              {/* FASE-SS-04: ContactoSearchSelect with entidadeId filtering */}
+              {/* Contacto: opcional, mas filtra pela entidade se existir */}
               <ContactoSearchSelect
                 value={form.contactoId}
-                onChange={(value) => setForm((f) => ({ ...f, contactoId: value || "" }))}
+                onChange={(value) =>
+                  setForm((f) => ({ ...f, contactoId: value || "" }))
+                }
                 entidadeId={form.entidadeId || undefined}
                 label="Contacto (opcional)"
                 placeholder="Pesquisar contacto..."
-                disabled={!form.entidadeId}
               />
 
-              {/* FASE-SS-04: VisitaSearchSelect optional */}
-              <div className="space-y-1">
-                <Label>Visita (opcional)</Label>
-                <p className="text-xs text-muted-foreground">
-                  Pode associar uma visita mais tarde se necessário.
-                </p>
-              </div>
+              {/* Visita opcional – só faz sentido depois de escolher Entidade */}
+              <VisitaSearchSelect
+                value={form.visitaId}
+                onChange={(value) =>
+                  setForm((f) => ({ ...f, visitaId: value || null }))
+                }
+                entidadeId={form.entidadeId || undefined}
+                label="Visita (opcional)"
+                placeholder="Pesquisar visita..."
+                disabled={!form.entidadeId}
+              />
             </div>
           )}
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="space-y-0.5">
               <div className="text-xs text-muted-foreground">Entidade</div>
@@ -517,7 +555,13 @@ function LeadDetailForm({
                 <button
                   type="button"
                   className="underline-offset-2 hover:underline text-left"
-                  onClick={() => navigate(`/entidades/${lead.entidadeId}?returnTo=${encodeURIComponent(`/admin/leads/${lead.id}`)}`)}
+                  onClick={() =>
+                    navigate(
+                      `/entidades/${lead.entidadeId}?returnTo=${encodeURIComponent(
+                        `/admin/leads/${lead.id}`
+                      )}`
+                    )
+                  }
                   data-testid="link-lead-entidade"
                 >
                   {lead.entidadeNome}
@@ -530,12 +574,20 @@ function LeadDetailForm({
             </div>
 
             <div className="space-y-0.5">
-              <div className="text-xs text-muted-foreground">Contacto principal</div>
+              <div className="text-xs text-muted-foreground">
+                Contacto principal
+              </div>
               {lead.contactoNome ? (
                 <button
                   type="button"
                   className="underline-offset-2 hover:underline text-left"
-                  onClick={() => navigate(`/contactos/${lead.contactoId}/detalhes?returnTo=${encodeURIComponent(`/admin/leads/${lead.id}`)}`)}
+                  onClick={() =>
+                    navigate(
+                      `/contactos/${lead.contactoId}/detalhes?returnTo=${encodeURIComponent(
+                        `/admin/leads/${lead.id}`
+                      )}`
+                    )
+                  }
                   data-testid="link-lead-contacto"
                 >
                   {lead.contactoNome}
@@ -553,7 +605,13 @@ function LeadDetailForm({
                 <button
                   type="button"
                   className="underline-offset-2 hover:underline text-left"
-                  onClick={() => navigate(`/visitas/${lead.visitaId}?returnTo=${encodeURIComponent(`/admin/leads/${lead.id}`)}`)}
+                  onClick={() =>
+                    navigate(
+                      `/visitas/${lead.visitaId}?returnTo=${encodeURIComponent(
+                        `/admin/leads/${lead.id}`
+                      )}`
+                    )
+                  }
                   data-testid="link-lead-visita"
                 >
                   {new Date(lead.visitaData).toLocaleDateString()}
@@ -562,7 +620,13 @@ function LeadDetailForm({
                 <button
                   type="button"
                   className="underline-offset-2 hover:underline text-left"
-                  onClick={() => navigate(`/visitas/${lead.visitaId}?returnTo=${encodeURIComponent(`/admin/leads/${lead.id}`)}`)}
+                  onClick={() =>
+                    navigate(
+                      `/visitas/${lead.visitaId}?returnTo=${encodeURIComponent(
+                        `/admin/leads/${lead.id}`
+                      )}`
+                    )
+                  }
                   data-testid="link-lead-visita"
                 >
                   Ver visita
@@ -577,13 +641,21 @@ function LeadDetailForm({
 
           {lead.contactosAssociados && lead.contactosAssociados.length > 0 && (
             <div className="space-y-1.5 border-t pt-3">
-              <div className="text-xs text-muted-foreground font-medium">Outros contactos envolvidos:</div>
+              <div className="text-xs text-muted-foreground font-medium">
+                Outros contactos envolvidos:
+              </div>
               <div className="flex flex-wrap gap-2">
                 {lead.contactosAssociados.map((c) => (
                   <button
                     key={c.id}
                     type="button"
-                    onClick={() => navigate(`/contactos/${c.id}/detalhes?returnTo=${encodeURIComponent(`/admin/leads/${lead.id}`)}`)}
+                    onClick={() =>
+                      navigate(
+                        `/contactos/${c.id}/detalhes?returnTo=${encodeURIComponent(
+                          `/admin/leads/${lead.id}`
+                        )}`
+                      )
+                    }
                     className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-secondary text-secondary-foreground hover:underline"
                     data-testid={`chip-contacto-${c.id}`}
                   >
@@ -596,10 +668,16 @@ function LeadDetailForm({
 
           {lead.marcas && lead.marcas.length > 0 && (
             <div className="space-y-1.5 border-t pt-3">
-              <div className="text-xs text-muted-foreground font-medium">Marcas associadas:</div>
+              <div className="text-xs text-muted-foreground font-medium">
+                Marcas associadas:
+              </div>
               <div className="flex flex-wrap gap-2">
                 {lead.marcas.map((marca) => (
-                  <Badge key={marca.id} variant="secondary" data-testid={`badge-lead-detalhe-marca-${marca.id}`}>
+                  <Badge
+                    key={marca.id}
+                    variant="secondary"
+                    data-testid={`badge-lead-detalhe-marca-${marca.id}`}
+                  >
                     {marca.nome}
                   </Badge>
                 ))}
@@ -612,9 +690,7 @@ function LeadDetailForm({
       <Card>
         <CardHeader>
           <CardTitle>Editar Lead</CardTitle>
-          <CardDescription>
-            Edita os dados principais deste lead.
-          </CardDescription>
+          <CardDescription>Edita os dados principais deste lead.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-1">
@@ -635,13 +711,17 @@ function LeadDetailForm({
                   type="button"
                   size="sm"
                   variant={audio.isRecording ? "destructive" : "outline"}
-                  onClick={() => (audio.isRecording ? audio.stopRecording() : audio.startRecording())}
+                  onClick={() =>
+                    audio.isRecording
+                      ? audio.stopRecording()
+                      : audio.startRecording()
+                  }
                   data-testid="button-lead-dictate"
                 >
                   <Mic className="h-4 w-4 mr-1" />
                   {audio.isRecording ? "Parar" : "Dictar"}
                 </Button>
-                
+
                 <Button
                   type="button"
                   size="sm"
@@ -660,13 +740,18 @@ function LeadDetailForm({
                   onClick={async () => {
                     try {
                       const text = await audio.selectFileAndTranscribe();
-                      setForm((f) => ({ ...f, descricao: (f.descricao || "") ? f.descricao + "\n\n" + text : text }));
+                      setForm((f) => ({
+                        ...f,
+                        descricao: (f.descricao || "")
+                          ? f.descricao + "\n\n" + text
+                          : text,
+                      }));
                       toast({
                         title: "Ficheiro transcrito",
                         description: "Texto adicionado à descrição.",
                       });
-                    } catch (error) {
-                      // Error already handled by hook
+                    } catch {
+                      // já tratamos erro no hook
                     }
                   }}
                   disabled={audio.isTranscribing}
@@ -701,13 +786,14 @@ function LeadDetailForm({
             />
           </div>
 
-          {/* FASE-LEADS-CONTEXTO-02: Contacto selection field only in create from visit mode */}
           {isCreateMode && isCreateFromVisit && (
             <div className="space-y-1">
               <Label htmlFor="lead-contacto">Contacto *</Label>
               <Select
                 value={form.contactoId}
-                onValueChange={(value) => setForm((f) => ({ ...f, contactoId: value }))}
+                onValueChange={(value) =>
+                  setForm((f) => ({ ...f, contactoId: value }))
+                }
               >
                 <SelectTrigger id="lead-contacto" data-testid="select-lead-contacto">
                   <SelectValue placeholder="Seleciona um contacto" />
@@ -746,7 +832,11 @@ function LeadDetailForm({
                     data-testid="button-lead-edit-marcas-dropdown"
                   >
                     {form.marcasIds?.length
-                      ? `${form.marcasIds.length} marca${form.marcasIds.length === 1 ? "" : "s"} selecionada${form.marcasIds.length === 1 ? "" : "s"}`
+                      ? `${form.marcasIds.length} marca${
+                          form.marcasIds.length === 1 ? "" : "s"
+                        } selecionada${
+                          form.marcasIds.length === 1 ? "" : "s"
+                        }`
                       : "Seleciona uma ou mais marcas"}
                   </Button>
                 </PopoverTrigger>
@@ -768,7 +858,9 @@ function LeadDetailForm({
                     ) : (
                       marcas
                         .filter((marca) =>
-                          marca.nome.toLowerCase().includes(marcasSearch.toLowerCase())
+                          marca.nome
+                            .toLowerCase()
+                            .includes(marcasSearch.toLowerCase())
                         )
                         .map((marca) => {
                           const isSelected = form.marcasIds?.includes(marca.id);
@@ -778,7 +870,9 @@ function LeadDetailForm({
                               className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted"
                               onClick={() => {
                                 const newIds = isSelected
-                                  ? (form.marcasIds || []).filter((id) => id !== marca.id)
+                                  ? (form.marcasIds || []).filter(
+                                      (id) => id !== marca.id
+                                    )
                                   : [...(form.marcasIds || []), marca.id];
                                 setForm((f) => ({ ...f, marcasIds: newIds }));
                               }}
@@ -844,16 +938,7 @@ function LeadDetailForm({
           <Button
             variant="outline"
             onClick={() => {
-              const target = visitaId
-                ? `/visitas/${visitaId}`
-                : "/admin/leads";
-
-              console.log("[AdminLeadDetail] cancel target:", {
-                visitaId,
-                returnTo,
-                target,
-              });
-
+              const target = visitaId ? `/visitas/${visitaId}` : "/admin/leads";
               navigate(target);
             }}
             data-testid="button-cancelar-lead"
@@ -884,7 +969,6 @@ function OdooAttachmentsSection({
   leadId: string;
   odooLeadId: string | null;
 }) {
-  // Hooks must be called unconditionally, BEFORE any return statements
   const { toast } = useToast();
   const qc = useQueryClient();
   const [isUploading, setIsUploading] = useState(false);
@@ -906,7 +990,6 @@ function OdooAttachmentsSection({
     enabled: hasOdooLead,
   });
 
-  // Guard check AFTER all hooks
   if (!hasOdooLead) {
     return (
       <div className="mt-2 text-xs text-slate-500">
@@ -927,14 +1010,11 @@ function OdooAttachmentsSection({
       const formData = new FormData();
       formData.append("file", file);
 
-      const resp = await fetch(
-        `/api/crm/leads/${leadId}/odoo/attachments`,
-        {
-          method: "POST",
-          body: formData,
-          credentials: "include",
-        }
-      );
+      const resp = await fetch(`/api/crm/leads/${leadId}/odoo/attachments`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
 
       const json = await resp.json();
 
@@ -954,12 +1034,10 @@ function OdooAttachmentsSection({
         description: "Ficheiro enviado para o Odoo com sucesso.",
       });
 
-      // Invalidate and refetch attachments
       await qc.invalidateQueries({
         queryKey: ["lead-odoo-attachments", leadId],
       });
 
-      // Clear input
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -1002,11 +1080,12 @@ function OdooAttachmentsSection({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {/* Upload toolbar */}
         <div className="flex items-center gap-2">
           <label className="inline-flex items-center gap-2 text-xs cursor-pointer">
-            <span className="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-950 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
-                  data-testid="button-upload-attachment">
+            <span
+              className="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-950 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
+              data-testid="button-upload-attachment"
+            >
               + Carregar ficheiro
             </span>
             <input
@@ -1025,7 +1104,6 @@ function OdooAttachmentsSection({
           )}
         </div>
 
-        {/* Attachments list */}
         {attachments.length === 0 ? (
           <div className="text-xs text-slate-500">
             Sem anexos registados no Odoo para este lead.
@@ -1068,19 +1146,26 @@ function AttachmentChip({ attachment }: { attachment: OdooLeadAttachment }) {
   );
 }
 
-function OdooCrmCard({ leadId, odooLeadId }: { leadId: string; odooLeadId: string | null }) {
+function OdooCrmCard({
+  leadId,
+  odooLeadId,
+}: {
+  leadId: string;
+  odooLeadId: string | null;
+}) {
   const { toast } = useToast();
   const [syncing, setSyncing] = useState(false);
 
-  const { data: odooStatus, isLoading: statusLoading } = useQuery<OdooStatusResponse>({
-    queryKey: ["/api/integrations/odoo/status"],
-    queryFn: async () => {
-      const resp = await fetch("/api/integrations/odoo/status", {
-        credentials: "include",
-      });
-      return resp.json();
-    },
-  });
+  const { data: odooStatus, isLoading: statusLoading } =
+    useQuery<OdooStatusResponse>({
+      queryKey: ["/api/integrations/odoo/status"],
+      queryFn: async () => {
+        const resp = await fetch("/api/integrations/odoo/status", {
+          credentials: "include",
+        });
+        return resp.json();
+      },
+    });
 
   const handleSync = async () => {
     try {
@@ -1107,7 +1192,6 @@ function OdooCrmCard({ leadId, odooLeadId }: { leadId: string; odooLeadId: strin
         description: message,
       });
 
-      // Refazer fetch do lead para atualizar odooLeadId
       await queryClient.invalidateQueries({
         queryKey: ["/api/crm/leads", leadId],
       });
@@ -1123,11 +1207,13 @@ function OdooCrmCard({ leadId, odooLeadId }: { leadId: string; odooLeadId: strin
     }
   };
 
-  const isOdooConfigured = odooStatus && "configured" in odooStatus && odooStatus.configured;
+  const isOdooConfigured =
+    odooStatus && "configured" in odooStatus && odooStatus.configured;
   const odooBaseUrl = isOdooConfigured ? (odooStatus as any).baseUrl : null;
-  const odooLeadUrl = odooLeadId && odooBaseUrl
-    ? `${odooBaseUrl}/web#id=${odooLeadId}&model=crm.lead&view_type=form`
-    : null;
+  const odooLeadUrl =
+    odooLeadId && odooBaseUrl
+      ? `${odooBaseUrl}/web#id=${odooLeadId}&model=crm.lead&view_type=form`
+      : null;
 
   return (
     <Card data-testid="card-odoo-crm">
@@ -1149,7 +1235,8 @@ function OdooCrmCard({ leadId, odooLeadId }: { leadId: string; odooLeadId: strin
             {odooLeadId ? (
               <div className="space-y-2">
                 <p className="text-xs text-muted-foreground">
-                  Lead sincronizado: <span className="font-mono text-xs">{odooLeadId}</span>
+                  Lead sincronizado:{" "}
+                  <span className="font-mono text-xs">{odooLeadId}</span>
                 </p>
                 <div className="flex gap-2">
                   <Button

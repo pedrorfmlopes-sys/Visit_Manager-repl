@@ -1,5 +1,16 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Building2, Users, FileText, CheckCircle2, QrCode, Bell, Settings, MoreHorizontal } from "lucide-react";
+import {
+  LayoutDashboard,
+  Building2,
+  Users,
+  FileText,
+  CheckCircle2,
+  QrCode,
+  Bell,
+  Settings,
+  MoreHorizontal,
+  Target, // ícone para Leads
+} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { Lembrete } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +28,7 @@ const agentNavItems: NavItem[] = [
   { path: "/", icon: LayoutDashboard, label: "Hoje" },
   { path: "/entidades", icon: Building2, label: "Entidades" },
   { path: "/contactos", icon: Users, label: "Contactos" },
+  { path: "/leads", icon: Target, label: "Leads" },               // 👈 novo
   { path: "/visitas", icon: FileText, label: "Visitas", showBadge: "visitas" },
   { path: "/tarefas", icon: CheckCircle2, label: "Tarefas", showBadge: "tarefas" },
   { path: "/agente-mais", icon: MoreHorizontal, label: "Mais" },
@@ -26,6 +38,7 @@ const adminNavItems: NavItem[] = [
   { path: "/", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/entidades", icon: Building2, label: "Entidades" },
   { path: "/contactos", icon: Users, label: "Contactos" },
+  { path: "/leads", icon: Target, label: "Leads" },                // 👈 preparado p/ admin se usarmos este nav
   { path: "/visitas", icon: FileText, label: "Visitas", showBadge: "visitas" },
   { path: "/tarefas", icon: CheckCircle2, label: "Tarefas", showBadge: "tarefas" },
   { path: "/lembretes", icon: Bell, label: "Lembretes", showBadge: "lembretes" },
@@ -35,11 +48,11 @@ export function BottomNav() {
   const [location] = useLocation();
   const { isAdmin } = useAuth();
   const { tarefasAtrasadas, tarefasHoje, visitasHoje } = useTodaySummary();
-  
+
   const navItems = isAdmin ? adminNavItems : agentNavItems;
-  
+
   const { data: lembretes } = useQuery<Lembrete[]>({
-    queryKey: ['/api/lembretes'],
+    queryKey: ["/api/lembretes"],
     refetchInterval: 60000,
   });
 
@@ -105,7 +118,9 @@ export function BottomNav() {
             >
               <div
                 className={`flex flex-col items-center gap-1 px-4 py-2 rounded-md transition-colors relative ${
-                  isActive ? "text-primary" : "text-muted-foreground hover-elevate"
+                  isActive
+                    ? "text-primary"
+                    : "text-muted-foreground hover-elevate"
                 }`}
               >
                 <div className="relative">

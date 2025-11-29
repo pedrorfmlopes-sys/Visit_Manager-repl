@@ -6,16 +6,36 @@ import { ArrowLeft, Loader2, WifiOff, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+  FormDescription,
+} from "@/components/ui/form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useCurrentUser, useAllUsers, useIsAdmin } from "@/hooks/use-user-context";
-import { insertContactoSchema, type InsertContacto, type Contacto, type Entidade } from "@shared/schema";
+import {
+  insertContactoSchema,
+  type InsertContacto,
+  type Contacto,
+  type Entidade,
+} from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { syncManager } from "@/lib/syncManager";
+import { EntidadeSearchSelect } from "@/components/crm/SearchSelects";
 
 export default function ContactoForm() {
   const [, setLocation] = useLocation();
@@ -24,13 +44,13 @@ export default function ContactoForm() {
   const queryClient = useQueryClient();
   const isOnline = useOnlineStatus();
   const isEdit = params?.id && params.id !== "novo";
-  
+
   // User context for multi-agent system
   const { data: currentUser } = useCurrentUser();
   const { data: allUsers = [] } = useAllUsers();
   const isAdmin = useIsAdmin();
-  
-  // Get entidadeId from query params
+
+  // Get entidadeId from query params (ex: criado a partir da EntidadeDetail)
   const searchParams = new URLSearchParams(window.location.search);
   const entidadeIdFromQuery = searchParams.get("entidadeId") || "";
 
@@ -39,6 +59,7 @@ export default function ContactoForm() {
     enabled: !!isEdit,
   });
 
+  // Continua a carregar entidades completas para permitir auto-preenchimento de morada
   const { data: entidades } = useQuery<Entidade[]>({
     queryKey: ["/api/entidades"],
   });
@@ -50,7 +71,7 @@ export default function ContactoForm() {
       funcao: "",
       telemovel: "",
       email: "",
-      entidadeId: entidadeIdFromQuery,
+      entidadeId: entidadeIdFromQuery || undefined,
       observacoes: "",
       fotoUrl: "",
       createdByUserId: currentUser?.id,
@@ -59,25 +80,21 @@ export default function ContactoForm() {
     values: contacto,
   });
 
-  // Auto-fill address when entity is selected
-  const handleEntidadeChange = (entidadeId: string) => {
-    // Handle "Sem entidade" option by setting to undefined
-    if (entidadeId === "__none__" || !entidadeId) {
-      return;
-    }
-    
-    const selectedEntity = entidades?.find(e => e.id === entidadeId);
+  // Auto-fill de morada em "Observações" quando é escolhida uma entidade
+  const handleEntidadeChange = (entidadeId?: string | null) => {
+    if (!entidadeId) return;
+
+    const selectedEntity = entidades?.find((e) => e.id === entidadeId);
     if (selectedEntity) {
-      // Only auto-fill observacoes if it's currently empty
       const currentObservacoes = form.getValues("observacoes") || "";
       if (!currentObservacoes.trim()) {
         const addressParts = [
           selectedEntity.morada,
-          selectedEntity.codigoPostal && selectedEntity.cidade 
+          selectedEntity.codigoPostal && selectedEntity.cidade
             ? `${selectedEntity.codigoPostal} ${selectedEntity.cidade}`
-            : selectedEntity.codigoPostal || selectedEntity.cidade
+            : selectedEntity.codigoPostal || selectedEntity.cidade,
         ].filter(Boolean);
-        
+
         if (addressParts.length > 0) {
           form.setValue("observacoes", `Morada: ${addressParts.join(", ")}`);
         }
@@ -101,11 +118,12 @@ export default function ContactoForm() {
     },
     onError: async (error: Error, data) => {
       // Check if it's a network error (offline)
-      const isNetworkError = error.message.includes('fetch') || 
-                            error.message.includes('NetworkError') ||
-                            error.message.includes('Failed to fetch') ||
-                            !navigator.onLine;
-      
+      const isNetworkError =
+        error.message.includes("fetch") ||
+        error.message.includes("NetworkError") ||
+        error.message.includes("Failed to fetch") ||
+        !navigator.onLine;
+
       if (isNetworkError) {
         await syncManager.queueContactoCreation(data);
         toast({
@@ -115,7 +133,7 @@ export default function ContactoForm() {
         setLocation("/contactos");
         return;
       }
-      
+
       if (isUnauthorizedError(error)) {
         toast({
           title: "Não autorizado",
@@ -180,21 +198,21 @@ export default function ContactoForm() {
       });
       return;
     }
-    
-    // Normalize empty string and __none__ to undefined for optional entidadeId
-    if (!data.entidadeId || data.entidadeId === "__none__" || data.entidadeId === "") {
+
+    // Normalizar entidade opcional
+    if (!data.entidadeId) {
       data.entidadeId = undefined;
     }
-    
-    // Set ownership on creation (currentUser now guaranteed to exist)
+
+    // Set ownership on creation (currentUser agora garantido)
     if (!isEdit) {
       data.createdByUserId = currentUser.id;
-      // For non-admins, ALWAYS set to current user. For admins, use selected value or default to current user
+      // Para não-admins, SEMPRE o utilizador atual; para admin, usa a escolha ou default atual
       if (!isAdmin || !data.assignedUserId) {
         data.assignedUserId = currentUser.id;
       }
     }
-    
+
     if (!isOnline && !isEdit) {
       await syncManager.queueContactoCreation(data);
       toast({
@@ -208,7 +226,8 @@ export default function ContactoForm() {
     if (!isOnline && isEdit) {
       toast({
         title: "Modo Offline",
-        description: "Não é possível editar enquanto offline. Tente novamente quando voltar online.",
+        description:
+          "Não é possível editar enquanto offline. Tente novamente quando voltar online.",
         variant: "destructive",
       });
       return;
@@ -256,14 +275,20 @@ export default function ContactoForm() {
 
       <main className="max-w-2xl mx-auto px-4 py-6">
         {!isOnline && (
-          <Alert className="mb-4 border-destructive bg-destructive/10" data-testid="alert-offline">
+          <Alert
+            className="mb-4 border-destructive bg-destructive/10"
+            data-testid="alert-offline"
+          >
             <WifiOff className="h-4 w-4" />
             <AlertDescription>
-              Está offline. {isEdit ? "Não é possível editar enquanto offline." : "O contacto será guardado localmente e sincronizado quando voltar online."}
+              Está offline.{" "}
+              {isEdit
+                ? "Não é possível editar enquanto offline."
+                : "O contacto será guardado localmente e sincronizado quando voltar online."}
             </AlertDescription>
           </Alert>
         )}
-        
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
@@ -293,16 +318,26 @@ export default function ContactoForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Atribuído a</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value || undefined}
+                    >
                       <FormControl>
-                        <SelectTrigger className="h-12" data-testid="select-assigned-user">
+                        <SelectTrigger
+                          className="h-12"
+                          data-testid="select-assigned-user"
+                        >
                           <SelectValue placeholder="Selecione um utilizador" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         {allUsers.map((user) => (
-                          <SelectItem key={user.id} value={user.id} data-testid={`option-user-${user.id}`}>
-                            {user.firstName && user.lastName 
+                          <SelectItem
+                            key={user.id}
+                            value={user.id}
+                            data-testid={`option-user-${user.id}`}
+                          >
+                            {user.firstName && user.lastName
                               ? `${user.firstName} ${user.lastName}`
                               : user.email}
                           </SelectItem>
@@ -318,39 +353,28 @@ export default function ContactoForm() {
               />
             )}
 
+            {/* Entidade com SearchSelect (opcional) */}
             <FormField
               control={form.control}
               name="entidadeId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Entidade</FormLabel>
-                  <Select 
-                    onValueChange={(value) => {
-                      // Convert __none__ to undefined immediately in form state
-                      const normalizedValue = (value === "__none__" || !value) ? undefined : value;
-                      field.onChange(normalizedValue);
-                      handleEntidadeChange(value);
-                    }} 
-                    value={field.value || "__none__"}
-                  >
-                    <FormControl>
-                      <SelectTrigger className="h-12" data-testid="select-entidade">
-                        <SelectValue placeholder="Opcional - Selecione se aplicável" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="__none__" data-testid="option-entidade-none">
-                        Sem entidade
-                      </SelectItem>
-                      {entidades?.map((entidade) => (
-                        <SelectItem key={entidade.id} value={entidade.id} data-testid={`option-entidade-${entidade.id}`}>
-                          {entidade.nome} {entidade.entidadeTipo && `(${entidade.entidadeTipo.nome})`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <EntidadeSearchSelect
+                    value={field.value || null}
+                    onChange={(value) => {
+                      const normalized = value || undefined;
+                      field.onChange(normalized);
+                      // Mantém auto-preenchimento de morada se houver entidades carregadas
+                      if (value) {
+                        handleEntidadeChange(value);
+                      }
+                    }}
+                    label="Entidade (opcional)"
+                    placeholder="Pesquisar entidade..."
+                    disabled={!isOnline}
+                  />
                   <FormDescription>
-                    Contactos podem existir sem entidade associada
+                    Contactos podem existir sem entidade associada.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

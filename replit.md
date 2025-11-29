@@ -38,27 +38,20 @@ This Progressive Web Application (PWA) is designed to streamline commercial visi
 ### SS-04: Integration in Admin Leads Form (Complete)
 - ✅ **FASE-SS-04**: Integrated SearchSelect wrappers into /admin/leads/new form, replaced traditional Selects with async search components, maintained validation and returnTo navigation
 
-### FASE-LEADS-FILTROS-01: Search, Filters & Ordering (Complete)
-- ✅ Fixed search input with debounce 300ms (local state + handleSearchChange)
-- ✅ All filters (estado, entidade, contacto, hasOdoo) working with updateParams
-- ✅ Ordering dropdown synchronizes with URL and API
-- ✅ URL persistence for all filter states
-- ✅ Reset button clears all filters
-
-### FASE-LEADS-FILTROS-02: End-to-End Query Connection (Complete)
-- ✅ Frontend: URL params → React Query queryKey → API call
-- ✅ Input debounce 300ms → URL update (with immediate local feedback)
-- ✅ All filters (q, estado, entidadeId, contactoId, hasOdoo) in queryKey
-- ✅ Backend: GET /api/crm/leads implements filtering (titulo/descricao/marca search)
-- ✅ Backend: ORDER BY with orderBy/orderDir support
-- ✅ Query re-executes on any param change → data updates
-
-### FASE-LEADS-FILTROS-03: In-Memory Filtering & Sorting (Complete)
-- ✅ Frontend in-memory filtering on allLeads (q, estado, entidadeId, contactoId, hasOdoo)
-- ✅ Frontend in-memory sorting (createdAt, titulo, valorPrevisto with asc/desc)
-- ✅ Redundant security layer with backend filtering
-- ✅ Dynamic result count and differentiated messaging
-- ✅ Table renders sortedLeads with all filters/sorting applied
+### FASE-LEADS-FILTROS-01 to 04: Advanced Filtering System (Complete)
+- ✅ **Architecture**: Internal React state (useState) instead of URL params
+- ✅ **Search**: Local debounced search (300ms) with handleSearchChange → setQ()
+- ✅ **Filters**: 6 independent filters (q, estado, entidadeId, contactoId, hasOdoo, orderBy, orderDir)
+- ✅ **State Management**: All filters maintained as separate React state variables
+- ✅ **Debounce**: Only search has debounce; other filters update immediately (setEstado, setEntidadeId, etc.)
+- ✅ **Triple-Layer Processing**: allLeads → filteredLeads → sortedLeads (in-memory)
+- ✅ **Backend Integration**: React Query queryKey includes all filters; API called with full params
+- ✅ **Backend Filtering**: GET /api/crm/leads implements SQL-level filtering (titulo/descricao/marca search)
+- ✅ **Sorting**: Three sort options (createdAt, titulo, valorPrevisto) with asc/desc direction
+- ✅ **Reset**: resetFilters() clears all internal state (q="", estado="", etc.)
+- ✅ **UI**: Filter bar with 6 controls (search input, 3 selects, toggle, ordering dropdown)
+- ✅ **Performance**: In-memory filtering ensures instant visual feedback
+- ✅ **Accessibility**: data-testid on all interactive elements
 
 ### RBAC Refactoring (In Progress)
 - ✅ **ENTIDADES-RBAC-STEP1**: Centralized `buildEntidadeAccessWhere` helper + `ListEntidadesParams` object
@@ -103,9 +96,55 @@ PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities in
 -   **date-fns**: For date manipulation.
 -   **chartjs-node-canvas**: For server-side chart rendering in PDF exports.
 -   **DOMPurify**: For XSS prevention in rich text content.
-### FASE-LEADS-FILTROS-04: Navigation Path Preservation (Complete)
-- ✅ **updateParams**: Now extracts and preserves currentPath (/admin/leads)
-- ✅ **resetFilters**: Clears only query string, keeps current path
-- ✅ URL now correctly shows /admin/leads?filters instead of /?filters
-- ✅ URL persistence works (bookmarks, sharing, reload)
-- ✅ Browser history navigation works correctly
+
+## Implementation Details (Nov 28, 2025)
+
+### AdminLeadsPage.tsx - State-Based Filtering Architecture
+**Location**: `client/src/pages/AdminLeadsPage.tsx` (442 lines)
+
+**State Management**:
+- Search: `q, localSearch` (q = final search, localSearch = UI input)
+- Filters: `estado, entidadeId, contactoId, hasOdoo` (string states)
+- Sorting: `orderBy, orderDir` (orderBy options: createdAt, titulo, valorPrevisto)
+- Debounce: `searchTimeout` (NodeJS.Timeout for 300ms debounce)
+
+**Key Functions**:
+- `handleSearchChange(value)`: Sets localSearch immediately, debounces setQ() by 300ms
+- `resetFilters()`: Clears all state variables (q, estado, entidadeId, contactoId, hasOdoo, orderBy, orderDir, localSearch)
+
+**Data Flow**:
+1. State changes (e.g., setQ, setEstado) trigger React re-render
+2. React Query triggers with new queryKey: ["/api/crm/leads", { q, estado, entidadeId, contactoId, hasOdoo, orderBy, orderDir }]
+3. API called with params via URLSearchParams
+4. allLeads extracted from response
+5. filteredLeads applied (6 filters in-memory)
+6. sortedLeads applied (3 sort options in-memory)
+7. Table renders sortedLeads
+
+**Filter Logic** (filteredLeads):
+- Search: substring match in titulo + descricao + entidade.nome + contacto.nome (case-insensitive)
+- Estado: exact match (skip if "all")
+- EntidadeId: exact match (skip if "all")
+- ContactoId: exact match (skip if "all")
+- HasOdoo: !!lead.odooLeadId (true/false toggle)
+
+**Sort Logic** (sortedLeads):
+- createdAt: numeric comparison (Date.getTime())
+- titulo: localeCompare (alphabetical)
+- valorPrevisto: numeric comparison (parseFloat)
+- Direction: asc/desc via `dir = orderDir === "asc" ? 1 : -1`
+
+**UI Components**:
+- Search input → localSearch state → 300ms debounce → setQ()
+- Estado select → setState() immediately
+- EntidadeId select → setState() immediately
+- ContactoId select → setState() immediately
+- HasOdoo toggle → setHasOdoo() immediately
+- OrderBy dropdown → setOrderBy() + setOrderDir() immediately
+- Reset button → resetFilters() clears all state
+
+**Performance Characteristics**:
+- Search debounce: 300ms (prevents API spam)
+- Other filters: Immediate (instant visual feedback)
+- In-memory filtering: O(n) for filteredLeads + O(n log n) for sortedLeads
+- API caching: React Query handles deduplication
