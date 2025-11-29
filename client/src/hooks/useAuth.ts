@@ -13,6 +13,9 @@ export interface EmpresaAuthInfo {
   mostrarMarcasEmVisitas: boolean;
   theme?: "light-business" | "dark-pro";
   uiSettings?: any;
+  // Flag principal vinda do backend para o módulo de Leads
+  crmLeadsEnabled?: boolean;
+  // Preparado para futuro (feature flags mais avançadas)
   features?: EmpresaFeatures;
 }
 
