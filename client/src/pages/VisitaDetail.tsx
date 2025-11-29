@@ -86,6 +86,12 @@ export default function VisitaDetail() {
   const [odooLeadNotConfigured, setOdooLeadNotConfigured] = useState(false);
   const { data: currentUser } = useCurrentUser();
   const isAdmin = useIsAdmin();
+
+  const { empresa } = useAuth();
+  const leadsEnabled =
+    typeof empresa?.crmLeadsEnabled === "boolean"
+      ? empresa.crmLeadsEnabled
+      : true;
   
   // FASE CRM-LEADS-VISITA-STEP1: Leads section state (comentado - usar FASE-LEADS-NEW-01)
   // const [leadDialogOpen, setLeadDialogOpen] = useState(false);
@@ -2380,7 +2386,7 @@ export default function VisitaDetail() {
       </Dialog> */}
 
       {/* Odoo Integration */}
-      {visita && (
+      {visita && leadsEnabled && (
         <Card data-testid="card-odoo-lead" className="mt-6">
           <CardHeader>
             <CardTitle>Odoo</CardTitle>

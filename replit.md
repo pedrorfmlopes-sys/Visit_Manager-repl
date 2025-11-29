@@ -1,7 +1,7 @@
 # Commercial Visits Management PWA
 
 ## Overview
-This Progressive Web Application (PWA) is designed to streamline commercial visit management for field sales professionals. It enables tracking of entities, contacts, and visits, offering AI-powered summaries, audio transcription, automated notifications, geolocation, calendar integration, PDF export, and advanced analytics. The primary goal is to enhance data quality and provide actionable insights to sales teams. It is a full-stack TypeScript solution featuring a React frontend, Express backend, and PostgreSQL with Drizzle ORM, built with a mobile-first, multi-tenant architecture, user data isolation, and Role-Based Access Control (RBAC).
+This Progressive Web Application (PWA) aims to revolutionize commercial visit management for field sales professionals. It provides tools for tracking entities, contacts, and visits, enhanced with AI-powered summaries, audio transcription, automated notifications, geolocation, calendar integration, PDF export, and advanced analytics. The project's core mission is to improve data quality and deliver actionable insights to sales teams. It's a full-stack TypeScript solution featuring a React frontend, Express backend, and PostgreSQL with Drizzle ORM, built with a mobile-first, multi-tenant architecture, user data isolation, and Role-Based Access Control (RBAC).
 
 ## User Preferences
 - Preferred communication style: Simple, everyday language.
@@ -9,142 +9,41 @@ This Progressive Web Application (PWA) is designed to streamline commercial visi
 - Follow prompts EXACTLY without adding extra features or "inventions"
 - Always use test IDs and comprehensive documentation
 
-## Recent Implementation (Nov 27, 2025)
-
-### CRM Leads Module (Complete)
-- ✅ Schema with 14 fields + 4 CRUD routes
-- ✅ Admin UI: List page (/admin/leads) + Detail page (/admin/leads/:id) with inline editing
-- ✅ User UI: "Leads desta entidade/contacto/visita" cards in detail pages
-- ✅ Branding: Odoo logo (SVG) in 5 locations with state indicators (colored vs grayscale)
-- ✅ Cache: Invalidates 5 query keys on update (list, detail, visita, entidade, contacto)
-- ✅ Feature toggle: crmLeadsEnabled flag in empresa settings
-- ✅ **FASE-LEADS-MANUAL-01**: Manual lead creation from /admin/leads with Entidade/Contacto selects
-- ✅ **FASE-LEADS-ANEXOS-02**: Odoo attachments system (read + upload with 10MB validation)
-- ✅ **FASE-LEADS-CLEAN-01**: Backend permissive - entidadeId OR contactoId (at least one required)
-- ✅ **FASE-LEADS-CLEAN-02**: Frontend permissive - Entidade/Contacto both optional, at least one required
-- ✅ **FASE-LEADS-CLEAN-03**: Conditional leads_contactos insert - only when contactoId exists
-- ✅ **FASE-LEADS-FILTROS-01**: Backend search (q), filters (estado, hasOdoo), ordering (orderBy, orderDir), pagination (LIMIT 100)
-- ✅ **FASE-LEADS-FILTROS-02**: Frontend UI with filters bar, URL query params sync, responsive design
-
-### SS-01: Lightweight Search Endpoints (Complete)
-- ✅ **FASE-SS-01**: 3 search endpoints (entidades, contactos, visitas) with max 20 results, RBAC respecting, TypeScript types
-
-### SS-02: Generic SearchSelect Component (Complete)
-- ✅ **FASE-SS-02**: Generic async search component with debounce 300ms, clear selection, loading/empty states, TypeScript types
-
-### SS-03: CRM-Specific SearchSelect Wrappers (Complete)
-- ✅ **FASE-SS-03**: 3 wrapper components (Entidade/Contacto/Visita) with endpoint integration and optional entidadeId filtering
-
-### SS-04: Integration in Admin Leads Form (Complete)
-- ✅ **FASE-SS-04**: Integrated SearchSelect wrappers into /admin/leads/new form, replaced traditional Selects with async search components, maintained validation and returnTo navigation
-
-### FASE-LEADS-FILTROS-01 to 04: Advanced Filtering System (Complete)
-- ✅ **Architecture**: Internal React state (useState) instead of URL params
-- ✅ **Search**: Local debounced search (300ms) with handleSearchChange → setQ()
-- ✅ **Filters**: 6 independent filters (q, estado, entidadeId, contactoId, hasOdoo, orderBy, orderDir)
-- ✅ **State Management**: All filters maintained as separate React state variables
-- ✅ **Debounce**: Only search has debounce; other filters update immediately (setEstado, setEntidadeId, etc.)
-- ✅ **Triple-Layer Processing**: allLeads → filteredLeads → sortedLeads (in-memory)
-- ✅ **Backend Integration**: React Query queryKey includes all filters; API called with full params
-- ✅ **Backend Filtering**: GET /api/crm/leads implements SQL-level filtering (titulo/descricao/marca search)
-- ✅ **Sorting**: Three sort options (createdAt, titulo, valorPrevisto) with asc/desc direction
-- ✅ **Reset**: resetFilters() clears all internal state (q="", estado="", etc.)
-- ✅ **UI**: Filter bar with 6 controls (search input, 3 selects, toggle, ordering dropdown)
-- ✅ **Performance**: In-memory filtering ensures instant visual feedback
-- ✅ **Accessibility**: data-testid on all interactive elements
-
-### RBAC Refactoring (In Progress)
-- ✅ **ENTIDADES-RBAC-STEP1**: Centralized `buildEntidadeAccessWhere` helper + `ListEntidadesParams` object
-- ✅ **CONTACTOS-RBAC-STEP1**: Applied same pattern - `buildContactoAccessWhere` helper + `ListContactosParams` object
-- Updated 3 calls in routes.ts to use new params object format
-- 📋 TODO: Apply same pattern to Visitas, Tarefas in next sprints
-
 ## System Architecture
 
 ### Frontend Architecture
-A mobile-first React 18 application using TypeScript, Wouter for routing, and Vite. It leverages Shadcn/ui (New York style) with Radix UI and Tailwind CSS, adhering to Material Design principles. State management is handled by TanStack React Query, and form validation by React Hook Form with Zod. UI patterns emphasize card-based layouts, search-first interfaces, and Floating Action Buttons (FABs). It supports adaptive layouts for various user roles and dynamically applies company-specific themes.
+A mobile-first React 18 application built with TypeScript, Wouter for routing, and Vite. It uses Shadcn/ui (New York style) based on Radix UI and Tailwind CSS, following Material Design principles. State management is handled by TanStack React Query, and form validation by React Hook Form with Zod. UI emphasizes card-based layouts, search-first interfaces, and Floating Action Buttons (FABs), supporting adaptive layouts for various user roles and dynamic company-specific themes.
 
 ### Backend Architecture
-An Express.js application in TypeScript, utilizing session-based authentication via Replit Auth (OpenID Connect) and Passport.js, with sessions stored in PostgreSQL. It provides RESTful APIs for authentication, universal entities, contacts, visits (including file uploads and audio transcription), tasks, and analytics. Multer handles file uploads. A robust RBAC system differentiates Admin (full data access) and Agent (owner/assigned data access) roles, enforcing ownership checks.
+An Express.js application in TypeScript, using session-based authentication via Replit Auth (OpenID Connect) and Passport.js, with sessions stored in PostgreSQL. It offers RESTful APIs for authentication, universal entities, contacts, visits (supporting file uploads and audio transcription), tasks, and analytics. Multer handles file uploads. A robust RBAC system enforces data access based on Admin (full access) and Agent (owner/assigned data access) roles.
 
 ### Database Architecture
-PostgreSQL with Drizzle ORM ensures type-safe schema management. Key entities include Users, a universal `Entidades` system, Contactos, Visitas (with media, audio, AI summaries, geolocation, and brands), Tarefas, Lembretes, Marcas, and Sessions. Relationships are managed through foreign keys. The `empresas` table includes `theme` for customization, `mostrarGPS` for GPS visibility, and `openai_api_key` for company-specific OpenAI API keys (never exposed to frontend). `entidade_tipos` allows for flexible, company-configurable entity categorization. `visitasContactos` handles many-to-many relationships between visits and contacts.
+PostgreSQL with Drizzle ORM provides type-safe schema management. Key entities include Users, a universal `Entidades` system, Contactos, Visitas (with media, audio, AI summaries, geolocation, and brands), Tarefas, Lembretes, Marcas, and Sessions. Relationships are managed through foreign keys. The `empresas` table includes `theme`, `mostrarGPS`, `crmLeadsEnabled` for module control, and `openai_api_key` for company-specific OpenAI API keys. `entidade_tipos` allows for flexible, company-configurable entity categorization. `visitasContactos` manages many-to-many relationships between visits and contacts.
 
 ### System Design Choices
--   **Multi-tenant Architecture**: Supports multiple companies with complete data isolation.
--   **Role-Based Access Control (RBAC)**: Granular access control for Admin and Agent roles.
--   **Dynamic Theming**: Configurable themes per company.
--   **AI-powered Features**: Audio transcription, visit summaries, and executive PDF summaries.
--   **Universal Entidades System**: Flexible business entity types, configurable per company.
--   **Offline Capabilities**: Data caching with IndexedDB and automatic synchronization.
--   **Geolocation Integration**: Automatic GPS capture for visits and proximity suggestions.
+-   **Multi-tenant Architecture**: Ensures complete data isolation for multiple companies.
+-   **Role-Based Access Control (RBAC)**: Provides granular access for Admin and Agent roles.
+-   **Dynamic Theming**: Allows company-specific configurable themes.
+-   **AI-powered Features**: Includes audio transcription, visit summaries, and executive PDF summaries.
+-   **Universal Entidades System**: Offers flexible, company-configurable business entity types.
+-   **Offline Capabilities**: Utilizes data caching with IndexedDB and automatic synchronization.
+-   **Geolocation Integration**: Captures GPS data for visits and provides proximity suggestions.
 -   **Calendar Integration**: Generates RFC 5545 compliant `.ics` files.
--   **PDF Export**: Backend-generated reports with photos, AI summaries, and smart pagination.
--   **Advanced Analytics**: RBAC-aware dashboard with KPIs and visualizations, including AI insights.
--   **Configurable Entity Types**: Company-specific entity type management with color coding and filtering.
--   **Multi-Contact Support for Visits**: Allows associating multiple contacts per visit, with a company-level toggle for single vs. multi-contact mode.
--   **Company-level AI Configuration**: Supports global OpenAI API key usage or "Bring Your Own Key" (BYOK) mode for advanced companies, with secure storage of API keys.
+-   **PDF Export**: Generates backend reports with photos, AI summaries, and smart pagination.
+-   **Advanced Analytics**: Features an RBAC-aware dashboard with KPIs and AI insights.
+-   **Configurable Entity Types**: Enables company-specific entity type management with color coding and filtering.
+-   **Multi-Contact Support for Visits**: Supports associating multiple contacts per visit, with a toggle for single vs. multi-contact mode.
+-   **Company-level AI Configuration**: Supports global or "Bring Your Own Key" (BYOK) OpenAI API key usage, with secure storage.
+-   **Feature Toggle System**: Implements global toggles (e.g., `crmLeadsEnabled`) for module control across all UI layers.
 
 ## External Dependencies
 
 -   **Neon Database**: Serverless PostgreSQL hosting.
--   **OpenAI API**: For Whisper (audio transcription) and GPT-4o-mini (visit summaries, email generation, executive PDF summaries).
+-   **OpenAI API**: Used for Whisper (audio transcription) and GPT-4o-mini (visit summaries, email generation, executive PDF summaries).
 -   **Replit Authentication**: OAuth/OIDC provider for user authentication.
--   **Multer**: For handling file uploads.
--   **Radix UI**: UI primitives.
--   **Lucide React**: Iconography.
--   **date-fns**: For date manipulation.
+-   **Multer**: Handles file uploads.
+-   **Radix UI**: Provides UI primitives.
+-   **Lucide React**: For iconography.
+-   **date-fns**: Used for date manipulation.
 -   **chartjs-node-canvas**: For server-side chart rendering in PDF exports.
 -   **DOMPurify**: For XSS prevention in rich text content.
-
-## Implementation Details (Nov 28, 2025)
-
-### AdminLeadsPage.tsx - State-Based Filtering Architecture
-**Location**: `client/src/pages/AdminLeadsPage.tsx` (442 lines)
-
-**State Management**:
-- Search: `q, localSearch` (q = final search, localSearch = UI input)
-- Filters: `estado, entidadeId, contactoId, hasOdoo` (string states)
-- Sorting: `orderBy, orderDir` (orderBy options: createdAt, titulo, valorPrevisto)
-- Debounce: `searchTimeout` (NodeJS.Timeout for 300ms debounce)
-
-**Key Functions**:
-- `handleSearchChange(value)`: Sets localSearch immediately, debounces setQ() by 300ms
-- `resetFilters()`: Clears all state variables (q, estado, entidadeId, contactoId, hasOdoo, orderBy, orderDir, localSearch)
-
-**Data Flow**:
-1. State changes (e.g., setQ, setEstado) trigger React re-render
-2. React Query triggers with new queryKey: ["/api/crm/leads", { q, estado, entidadeId, contactoId, hasOdoo, orderBy, orderDir }]
-3. API called with params via URLSearchParams
-4. allLeads extracted from response
-5. filteredLeads applied (6 filters in-memory)
-6. sortedLeads applied (3 sort options in-memory)
-7. Table renders sortedLeads
-
-**Filter Logic** (filteredLeads):
-- Search: substring match in titulo + descricao + entidade.nome + contacto.nome (case-insensitive)
-- Estado: exact match (skip if "all")
-- EntidadeId: exact match (skip if "all")
-- ContactoId: exact match (skip if "all")
-- HasOdoo: !!lead.odooLeadId (true/false toggle)
-
-**Sort Logic** (sortedLeads):
-- createdAt: numeric comparison (Date.getTime())
-- titulo: localeCompare (alphabetical)
-- valorPrevisto: numeric comparison (parseFloat)
-- Direction: asc/desc via `dir = orderDir === "asc" ? 1 : -1`
-
-**UI Components**:
-- Search input → localSearch state → 300ms debounce → setQ()
-- Estado select → setState() immediately
-- EntidadeId select → setState() immediately
-- ContactoId select → setState() immediately
-- HasOdoo toggle → setHasOdoo() immediately
-- OrderBy dropdown → setOrderBy() + setOrderDir() immediately
-- Reset button → resetFilters() clears all state
-
-**Performance Characteristics**:
-- Search debounce: 300ms (prevents API spam)
-- Other filters: Immediate (instant visual feedback)
-- In-memory filtering: O(n) for filteredLeads + O(n log n) for sortedLeads
-- API caching: React Query handles deduplication
