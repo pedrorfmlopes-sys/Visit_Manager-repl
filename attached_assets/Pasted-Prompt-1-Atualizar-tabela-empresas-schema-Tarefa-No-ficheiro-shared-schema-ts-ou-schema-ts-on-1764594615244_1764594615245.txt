@@ -1,0 +1,87 @@
+Prompt 1 – Atualizar tabela empresas (schema)
+
+Tarefa:
+No ficheiro shared/schema.ts (ou schema.ts onde está a tabela empresas), substitui apenas a definição da tabela empresas pelo bloco seguinte:
+
+export const empresas = pgTable("empresas", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  nome: varchar("nome", { length: 255 }).notNull(),
+  nif: varchar("nif", { length: 50 }),
+  email: varchar("email", { length: 255 }),
+  telefone: varchar("telefone", { length: 50 }),
+  logoUrl: varchar("logo_url", { length: 500 }),
+  mostrarMarcasEmVisitas: boolean("mostrar_marcas_em_visitas").default(false).notNull(),
+  mostrarGPS: boolean("mostrar_gps").default(false).notNull(),
+  theme: varchar("theme", { length: 50 }).default("light-business").notNull(),
+  openai_api_key: text("openai_api_key"),
+  uiSettings: jsonb("ui_settings").default(sql`'{
+    "mostrarGPS": false,
+    "mostrarMarcasEmVisitas": false,
+    "enableIA": true,
+    "enableAudio": true,
+    "enableAudioTranscription": true,
+    "enableFollowups": true,
+    "enableAlertRibbon": true,
+    "enableBadges": true,
+    "refreshInterval": 60,
+    "ia": {
+      "aiEnabled": true,
+      "aiKeyMode": "global"
+    },
+    "entidades": {
+      "enableFilterTipoEntidade": true,
+      "enableFilterSearch": true
+    },
+    "contactos": {
+      "enableFilterEntidade": true,
+      "enableFilterCargo": true,
+      "enableFilterSearch": true
+    },
+    "visitas": {
+      "enableFilterDateQuick": true,
+      "enableFilterUser": true,
+      "enableFilterMarca": true,
+      "enableFilterEntidade": true,
+      "enableFilterContacto": true,
+      "enableFilterHasAudio": true,
+      "multiContactosEnabled": false
+    },
+    "tarefas": {
+      "enableFilterStatus": true,
+      "enableFilterOverdue": true,
+      "enableFilterAssignedUser": true,
+      "enableFilterEntidade": true,
+      "enableFilterVisita": true
+    }
+  }'`),
+
+  // Odoo CRM global
+  odooCrmEnabled: boolean("odoo_crm_enabled").notNull().default(true),
+
+  // Módulo de Leads CRM
+  crmLeadsEnabled: boolean("crm_leads_enabled").notNull().default(false),
+
+  // 🔽 3 níveis de contactos Odoo
+  odooContactsFeatureEnabled: boolean("odoo_contacts_feature_enabled")
+    .notNull()
+    .default(false),
+
+  odooContactsAdminEnabled: boolean("odoo_contacts_admin_enabled")
+    .notNull()
+    .default(true),
+
+  odooContactsAgentsEnabled: boolean("odoo_contacts_agents_enabled")
+    .notNull()
+    .default(false),
+
+  // 🔽 Sync visitas → contacto Odoo (camada 3)
+  crmVisitsOdooSyncEnabled: boolean("crm_visits_odoo_sync_enabled")
+    .notNull()
+    .default(false),
+
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+
+Não alteres mais nada no ficheiro.

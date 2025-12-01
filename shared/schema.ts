@@ -102,11 +102,9 @@ export const empresas = pgTable("empresas", {
   telefone: varchar("telefone", { length: 50 }),
   logoUrl: varchar("logo_url", { length: 500 }),
   mostrarMarcasEmVisitas: boolean("mostrar_marcas_em_visitas").default(false).notNull(),
-  mostrarGPS: boolean("mostrar_gps").default(false).notNull(), // FASE 15: Toggle GPS visibility
+  mostrarGPS: boolean("mostrar_gps").default(false).notNull(),
   theme: varchar("theme", { length: 50 }).default("light-business").notNull(),
-  // FASE 31-IA-01: OpenAI API Key for company (stored securely, never exposed to frontend)
   openai_api_key: text("openai_api_key"),
-  // FASE 22: UI Settings as JSON for future extensibility
   uiSettings: jsonb("ui_settings").default(sql`'{
     "mostrarGPS": false,
     "mostrarMarcasEmVisitas": false,
@@ -147,16 +145,31 @@ export const empresas = pgTable("empresas", {
       "enableFilterVisita": true
     }
   }'`),
-  // Odoo CRM Integration flag
+
+  // Odoo CRM global
   odooCrmEnabled: boolean("odoo_crm_enabled").notNull().default(true),
-  // CRM Leads module flag - premium feature, disabled by default
+
+  // Módulo de Leads CRM
   crmLeadsEnabled: boolean("crm_leads_enabled").notNull().default(false),
-  
-  // Feature flags por empresa (ex: módulos premium como Leads)
-  features: jsonb("features")
+
+  // 🔽 3 níveis de contactos Odoo
+  odooContactsFeatureEnabled: boolean("odoo_contacts_feature_enabled")
     .notNull()
-    .default(sql`'{"leadsEnabled": true}'`),
-  
+    .default(false),
+
+  odooContactsAdminEnabled: boolean("odoo_contacts_admin_enabled")
+    .notNull()
+    .default(true),
+
+  odooContactsAgentsEnabled: boolean("odoo_contacts_agents_enabled")
+    .notNull()
+    .default(false),
+
+  // 🔽 Sync visitas → contacto Odoo (camada 3)
+  crmVisitsOdooSyncEnabled: boolean("crm_visits_odoo_sync_enabled")
+    .notNull()
+    .default(false),
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
