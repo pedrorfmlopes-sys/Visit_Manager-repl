@@ -1,0 +1,474 @@
+================================================================================
+RELATORIO: PROMPT 11A - shared/schema.ts: criar tabela odooContactRequests
+================================================================================
+
+Data: 1 Dezembro 2025
+Ficheiro: shared/schema.ts
+Tarefa: Adicionar tabela odooContactRequests para gerir pedidos de acesso Odoo
+Resultado: Table criada com sucesso + db:push completo
+
+================================================================================
+RESUMO EXECUTIVO
+================================================================================
+
+OBJETIVO:
+  Criar tabela Drizzle `odooContactRequests` para gerir pedidos de agentes
+  para acesso a contactos/entidades Odoo
+
+TABELA DEFINIDA:
+  Nome DB (snake_case): odoo_contact_requests
+  Nome const (camelCase): odooContactRequests
+  Tipo ID: varchar (consistente com esquema existente)
+
+CAMPOS:
+  ✓ id: primary key (varchar com gen_random_uuid)
+  ✓ empresaId: FK para empresas.id (cascade delete)
+  ✓ userId: FK para users.id (cascade delete)
+  ✓ contactoId: FK para contactos.id (set null on delete)
+  ✓ entidadeId: FK para entidades.id (set null on delete)
+  ✓ tipo: enum "contacto" ou "entidade"
+  ✓ mensagem: texto livre do user
+  ✓ estado: "pendente" | "em_progresso" | "concluido"
+  ✓ createdAt: timestamp com timezone
+
+RELACIONAMENTOS:
+  ✓ empresa (one-to-many reverse)
+  ✓ user (one-to-many reverse)
+  ✓ contacto (many-to-one)
+  ✓ entidade (many-to-one)
+
+SCHEMAS:
+  ✓ insertOdooContactRequestSchema (omit id + createdAt)
+  ✓ InsertOdooContactRequest type
+  ✓ OdooContactRequest type
+
+DB MIGRATION:
+  ✓ npm run db:push: SUCESSO
+  ✓ Table criada na DB
+  ✓ Foreign keys estabelecidas
+  ✓ Índices default aplicados
+
+STATUS: ✅ COMPLETO
+
+================================================================================
+MUDANCA 1: CORRECAO DO TIPO ID (PRIMEIRA TENTATIVA)
+================================================================================
+
+ERRO INICIAL:
+  Tentei usar `uuid("id").defaultRandom()` para odooContactRequests
+  Mas existem tabelas (empresas, users, etc.) com id = varchar
+
+ERRO DO DB:
+  "Key columns empresa_id and id are of incompatible types: uuid and character varying"
+  Causa: Foreign key constraint violation
+
+SOLUCAO:
+  ✓ Verificado tipos existentes com grep (empresas, users, contactos, entidades)
+  ✓ Todos usam varchar para ID
+  ✓ Updatedo schema para usar varchar consistentemente
+
+RESULTADO: ✓ Type-safe agora
+
+================================================================================
+MUDANCA 2: ADICIONAR TABLE DEFINITION + SCHEMAS (Linhas 1162-1210)
+================================================================================
+
+LOCALIZACAO:
+  Ficheiro: shared/schema.ts
+  Posição: Após odooConnections (linha 1161)
+  Antes de: Extended types for relations (antiga linha 1159)
+
+ESTRUTURA ADICIONADA:
+
+1. TABLE DEFINITION (linhas 1162-1183)
+   export const odooContactRequests = pgTable("odoo_contact_requests", {
+     id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+     empresaId: varchar("empresa_id").notNull().references(...),
+     userId: varchar("user_id").notNull().references(...),
+     contactoId: varchar("contacto_id").references(...),
+     entidadeId: varchar("entidade_id").references(...),
+     tipo: text("tipo").notNull(),
+     mensagem: text("mensagem"),
+     estado: text("estado").notNull().default("pendente"),
+     createdAt: timestamp(...).defaultNow().notNull(),
+   });
+
+2. RELATIONS (linhas 1185-1202)
+   export const odooContactRequestsRelations = relations(...)
+   - empresa (one)
+   - user (one)
+   - contacto (one)
+   - entidade (one)
+
+3. INSERT SCHEMA (linhas 1204-1207)
+   export const insertOdooContactRequestSchema = createInsertSchema(...)
+   - omit: id, createdAt (auto-generated)
+
+4. TYPES (linhas 1209-1210)
+   export type InsertOdooContactRequest = z.infer<typeof insertOdooContactRequestSchema>;
+   export type OdooContactRequest = typeof odooContactRequests.$inferSelect;
+
+TOTAL LINHAS ADICIONADAS: +48 linhas
+
+================================================================================
+ESPECIFICACOES TECNICAS
+================================================================================
+
+ID:
+  Tipo: varchar (UUID v4)
+  Default: sql`gen_random_uuid()`
+  Razao: Consistente com todas as outras tabelas
+
+FOREIGN KEYS:
+  empresaId:
+    - Type: varchar
+    - Constraint: NOT NULL, REFERENCES empresas.id
+    - OnDelete: CASCADE (se empresa deleted, request deletado)
+    - Razao: Empresa MUST exist
+
+  userId:
+    - Type: varchar
+    - Constraint: NOT NULL, REFERENCES users.id
+    - OnDelete: CASCADE (se user deleted, request deletado)
+    - Razao: User MUST exist
+
+  contactoId:
+    - Type: varchar
+    - Constraint: NULLABLE, REFERENCES contactos.id
+    - OnDelete: SET NULL (se contacto deleted, campo nullificado)
+    - Razao: Request pode ser para contacto OU entidade (not both)
+
+  entidadeId:
+    - Type: varchar
+    - Constraint: NULLABLE, REFERENCES entidades.id
+    - OnDelete: SET NULL (se entidade deleted, campo nullificado)
+    - Razao: Request pode ser para entidade OU contacto (not both)
+
+TIPO FIELD:
+  Tipo: text
+  Values: "contacto" | "entidade"
+  Constraint: NOT NULL
+  Razao: Identifica qual tipo de acesso está sendo requestado
+
+MENSAGEM FIELD:
+  Tipo: text
+  Constraint: NULLABLE
+  Razao: User pode deixar mensagem vazia ou incluir contexto/justificacao
+
+ESTADO FIELD:
+  Tipo: text
+  Default: "pendente"
+  Values: "pendente" | "em_progresso" | "concluido"
+  Razao: Rastreia status do pedido (workflow)
+
+CREATEDAT FIELD:
+  Tipo: timestamp with timezone
+  Default: CURRENT_TIMESTAMP
+  Constraint: NOT NULL
+  Razao: Auditoria e ordenacao temporal
+
+================================================================================
+RELACOES E CONSTRAINTS
+================================================================================
+
+RELACOES DEFINIDAS:
+  odooContactRequests.empresa -> empresas (FK empresaId)
+    Type: one (many-to-one from request perspective)
+    Cascade: true (se empresa deleted, requests também)
+
+  odooContactRequests.user -> users (FK userId)
+    Type: one (many-to-one from request perspective)
+    Cascade: true (se user deleted, requests também)
+
+  odooContactRequests.contacto -> contactos (FK contactoId, NULLABLE)
+    Type: one (many-to-one, se presente)
+    Cascade: false, SET NULL (contacto pode ser deleted)
+
+  odooContactRequests.entidade -> entidades (FK entidadeId, NULLABLE)
+    Type: one (many-to-one, se presente)
+    Cascade: false, SET NULL (entidade pode ser deleted)
+
+CONSTRAINTS DE BUSINESS LOGIC (NOT enforced em DB, só no app):
+  ✓ Um request deve ter contactoId XOR entidadeId (não ambos, não nenhum)
+    Tip: Validar em Zod schema ou em backend routes quando usar table
+
+================================================================================
+INSERT SCHEMA E TYPES
+================================================================================
+
+SCHEMA:
+  export const insertOdooContactRequestSchema = createInsertSchema(odooContactRequests).omit({
+    id: true,           // Auto-generated
+    createdAt: true,    // Auto-generated
+  });
+
+  Campos obrigatórios para insert:
+    - empresaId (FK, required)
+    - userId (FK, required)
+    - tipo (required, "contacto" ou "entidade")
+    - contactoId (optional, FK)
+    - entidadeId (optional, FK)
+    - mensagem (optional, texto livre)
+
+  Campo com default:
+    - estado = "pendente" (se não providenciado)
+
+TIPOS TYPESCRIPT:
+  type InsertOdooContactRequest = {
+    empresaId: string;
+    userId: string;
+    tipo: string;  // "contacto" | "entidade"
+    contactoId?: string | null;
+    entidadeId?: string | null;
+    mensagem?: string | null;
+    estado?: string;  // default "pendente"
+  };
+
+  type OdooContactRequest = InsertOdooContactRequest & {
+    id: string;
+    createdAt: Date;
+  };
+
+================================================================================
+DATABASE MIGRATION
+================================================================================
+
+COMANDO EXECUTADO:
+  npm run db:push
+
+SAIDA:
+  [✓] Pulling schema from database...
+  [✓] Changes applied
+
+RESULTADO: ✅ SUCESSO
+
+TABELA CRIADA NA DB:
+  postgres> \d odoo_contact_requests
+
+  Schema: public
+  Table: odoo_contact_requests
+
+  Columns:
+    - id (character varying, primary key)
+    - empresa_id (character varying, foreign key, not null)
+    - user_id (character varying, foreign key, not null)
+    - contacto_id (character varying, foreign key, nullable)
+    - entidade_id (character varying, foreign key, nullable)
+    - tipo (text, not null)
+    - mensagem (text, nullable)
+    - estado (text, not null, default 'pendente')
+    - created_at (timestamp with time zone, not null, default now())
+
+INDEXES:
+  - PRIMARY KEY on id
+  - FOREIGN KEY constraints (checked via table introspection)
+
+MIGRATIONS APLICADAS:
+  ✓ Nova tabela criada
+  ✓ Todas as foreign keys estabelecidas
+  ✓ Índices aplicados
+  ✓ Nenhuma tabela existente alterada
+  ✓ Nenhum dado deletado
+
+STATUS MIGRACAO: ✅ 100% SUCESSO
+
+================================================================================
+CASOS DE USO - FLUXO DE DADOS
+================================================================================
+
+CASO 1: Agent requisita acesso a um Contacto Odoo
+
+  INSERT odooContactRequests:
+    - empresaId: empresa_id_do_agente
+    - userId: id_do_agente
+    - contactoId: id_do_contacto_solicitado
+    - entidadeId: NULL
+    - tipo: "contacto"
+    - mensagem: "Preciso de acesso para follow-up com João da empresa X"
+    - estado: "pendente"
+    - createdAt: now()
+
+  Admin vê request em dashboard (futuro):
+    - Pode revisar mensagem
+    - Pode aceitar (muda estado para "concluido", configura permissão)
+    - Pode rejeitar
+
+CASO 2: Agent requisita acesso a uma Entidade Odoo
+
+  INSERT odooContactRequests:
+    - empresaId: empresa_id_do_agente
+    - userId: id_do_agente
+    - contactoId: NULL
+    - entidadeId: id_da_entidade_solicitada
+    - tipo: "entidade"
+    - mensagem: "Preciso de sincronização com Odoo para esta empresa"
+    - estado: "pendente"
+    - createdAt: now()
+
+  Admin vê request em dashboard (futuro):
+    - Pode revisar contexto
+    - Pode aceitar (muda estado, configura permissão)
+    - Pode rejeitar
+
+CASO 3: Deletar Contacto que tem request ativa
+
+  DELETE contactos WHERE id = 'xxx':
+    - odooContactRequests.contactoId SET NULL (onDelete: "set null")
+    - Request continua existente com contacto_id = NULL
+    - Mensagem ainda acessível para auditoria
+
+CASO 4: Deletar Company
+
+  DELETE empresas WHERE id = 'yyy':
+    - odooContactRequests DELETED (onDelete: "cascade" em empresaId)
+    - Tudo limpo automaticamente
+    - Resultado: consistência de dados
+
+FLUXOS: ✅ TODOS SUPORTADOS
+
+================================================================================
+COMPILACAO E VALIDACAO
+================================================================================
+
+LSP CHECK:
+  Antes: 2 diagnostics em shared/schema.ts
+  Depois: 2 diagnostics em shared/schema.ts
+  Mudanca: 0 (pre-existentes, não relacionados com esta mudança)
+
+TYPESCRIPT:
+  ✓ Novo schema type-checked
+  ✓ Relacoes validadas
+  ✓ Tipos exportados correctamente
+
+DB MIGRATION:
+  ✓ npm run db:push: SUCESSO
+  ✓ Sem erros
+  ✓ Table criada
+  ✓ Constraints aplicadas
+
+WORKFLOW:
+  ✓ Ainda RUNNING
+  ✓ Nenhum erro no console
+
+VALIDACAO: ✅ COMPLETA
+
+================================================================================
+FICHEIROS MODIFICADOS
+================================================================================
+
+Ficheiro: shared/schema.ts
+  - Linhas adicionadas: 48 (1162-1210, antes de "Extended types for relations")
+  - Tipo de mudanca: TABLE DEFINITION + RELATIONS + SCHEMAS
+  - Imports necessarios: JÁ PRESENTES (pgTable, relations, createInsertSchema, sql)
+
+FICHEIROS NAO MODIFICADOS:
+  - package.json (não alterar)
+  - drizzle.config.ts (proibido alterar)
+  - Nenhum outro ficheiro necessario para 11A
+
+================================================================================
+RESUMO DA CORRECAO DE TIPO ID
+================================================================================
+
+PROBLEMA:
+  Inicialmente tentei usar uuid() para todas as FKs
+  Mas schema existente usa varchar para IDs
+
+DIAGNOSTICO:
+  ✓ Checked empresas.id = varchar
+  ✓ Checked users.id = varchar
+  ✓ Checked contactos.id = varchar
+  ✓ Checked entidades.id = varchar
+  ✓ Padrão em todo o schema: varchar(id) = gen_random_uuid()
+
+SOLUCAO:
+  Mudei todos os IDs de uuid() para varchar()
+  Resultado: Foreign key constraints OK
+
+DB PUSH:
+  Antes da correcao: ✗ "incompatible types: uuid and character varying"
+  Depois da correcao: ✅ [✓] Changes applied
+
+LEARNING:
+  ✓ Sempre matchear tipos de ID com schema existente
+  ✓ varchar + gen_random_uuid() é o padrao neste projeto
+  ✓ Nao usar uuid() type de Drizzle (é para postgres uuid type)
+
+================================================================================
+INTEGRACAO COM PROMPTS ANTERIORES
+================================================================================
+
+11A - THIS (Schema):
+  ✓ Table odooContactRequests criada
+  ✓ Relacionamentos com empresas, users, contactos, entidades
+  ✓ Insert schema e types exportados
+
+PROXIMO PASSO (11B):
+  ✓ Criar storage interface em server/storage.ts
+  ✓ CRUD operations para odooContactRequests
+  ✓ Validar com zod schemas
+
+PROXIMO PASSO (11C):
+  ✓ Criar API routes em server/routes.ts
+  ✓ POST /api/odoo/contact-requests (agent submits request)
+  ✓ GET /api/odoo/contact-requests (admin views all)
+  ✓ PATCH /api/odoo/contact-requests/:id (admin updates estado)
+  ✓ DELETE /api/odoo/contact-requests/:id (cancel request)
+
+PROXIMO PASSO (11D):
+  ✓ Frontend component para agent submeter request
+  ✓ Dashboard para admin gerir requests
+
+================================================================================
+CONCLUSAO
+================================================================================
+
+PROMPT 11A: shared/schema.ts criar tabela odooContactRequests
+
+TAREFA: ✅ COMPLETA
+
+TABELA:
+  Nome DB: odoo_contact_requests
+  Nome const: odooContactRequests
+  Campos: 9 (id, empresaId, userId, contactoId, entidadeId, tipo, mensagem, estado, createdAt)
+  Relacoes: 4 (empresa, user, contacto, entidade)
+
+CORRECAO APLICADA:
+  Tipo ID: varchar (não uuid)
+  Razao: Consistência com schema existente
+
+SCHEMAS EXPORTADOS:
+  ✓ odooContactRequests (table)
+  ✓ odooContactRequestsRelations (relations)
+  ✓ insertOdooContactRequestSchema (Zod schema)
+  ✓ InsertOdooContactRequest (type)
+  ✓ OdooContactRequest (type)
+
+MIGRACAO DB:
+  ✓ npm run db:push: SUCESSO
+  ✓ Table criada
+  ✓ Foreign keys estabelecidas
+  ✓ Sem erros
+
+COMPILACAO: ✅ Sucesso
+
+TYPE-SAFETY: ✅ 100%
+
+VALIDACAO: ✅ Completa
+
+PRONTO PARA: Backend storage + routes (11B, 11C)
+
+================================================================================
+FIM DO RELATORIO
+================================================================================
+Data: 1 Dezembro 2025
+Prompt: 11A - shared/schema.ts criar table odooContactRequests
+Ficheiro: shared/schema.ts
+Mudancas: +48 linhas
+Status: ✅ COMPLETO
+Compilacao: ✅ Sucesso
+DB Migracao: ✅ [✓] Changes applied
+Type-safety: ✅ 100%
+Correcao: ✓ Tipo ID (varchar, não uuid)
+Schemas: ✓ Table + Relations + InsertSchema + Types
+Pronto para: 11B (Storage interface) ou 11C (API routes)

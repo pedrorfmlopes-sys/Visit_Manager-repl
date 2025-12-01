@@ -1156,6 +1156,56 @@ export const insertOdooConnectionSchema = createInsertSchema(odooConnections).om
 export type InsertOdooConnection = z.infer<typeof insertOdooConnectionSchema>;
 export type OdooConnection = typeof odooConnections.$inferSelect;
 
+// Odoo Contact Requests table (agents requesting access to Odoo contacts/entities)
+export const odooContactRequests = pgTable("odoo_contact_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  empresaId: varchar("empresa_id")
+    .notNull()
+    .references(() => empresas.id, { onDelete: "cascade" }),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  contactoId: varchar("contacto_id").references(() => contactos.id, {
+    onDelete: "set null",
+  }),
+  entidadeId: varchar("entidade_id").references(() => entidades.id, {
+    onDelete: "set null",
+  }),
+  tipo: text("tipo").notNull(), // "contacto" or "entidade"
+  mensagem: text("mensagem"), // free text message from user
+  estado: text("estado").notNull().default("pendente"), // "pendente", "em_progresso", "concluido"
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const odooContactRequestsRelations = relations(odooContactRequests, ({ one }) => ({
+  empresa: one(empresas, {
+    fields: [odooContactRequests.empresaId],
+    references: [empresas.id],
+  }),
+  user: one(users, {
+    fields: [odooContactRequests.userId],
+    references: [users.id],
+  }),
+  contacto: one(contactos, {
+    fields: [odooContactRequests.contactoId],
+    references: [contactos.id],
+  }),
+  entidade: one(entidades, {
+    fields: [odooContactRequests.entidadeId],
+    references: [entidades.id],
+  }),
+}));
+
+export const insertOdooContactRequestSchema = createInsertSchema(odooContactRequests).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertOdooContactRequest = z.infer<typeof insertOdooContactRequestSchema>;
+export type OdooContactRequest = typeof odooContactRequests.$inferSelect;
+
 // Extended types for relations
 export type EmpresaWithRelations = Empresa & {
   users?: User[];
