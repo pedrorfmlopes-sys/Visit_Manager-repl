@@ -339,19 +339,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
               mostrarMarcasEmVisitas: empresa.mostrarMarcasEmVisitas,
               theme: empresa.theme,
               uiSettings: empresa.uiSettings,
-              // NOVO: estado do módulo de Leads para esta empresa
+
+              odooCrmEnabled: (empresa as any).odooCrmEnabled ?? false,
               crmLeadsEnabled: (empresa as any).crmLeadsEnabled ?? false,
-              // opcional: podemos continuar a enviar features, mesmo que ainda não usemos
+
+              odooContactsFeatureEnabled:
+                (empresa as any).odooContactsFeatureEnabled ?? false,
+              odooContactsAdminEnabled:
+                (empresa as any).odooContactsAdminEnabled ?? false,
+              odooContactsAgentsEnabled:
+                (empresa as any).odooContactsAgentsEnabled ?? false,
+
+              crmVisitsOdooSyncEnabled:
+                (empresa as any).crmVisitsOdooSyncEnabled ?? false,
+
               features: (empresa as any).features,
             }
           : null,
       });
     } catch (error) {
       console.error("Error fetching user:", error);
-      res.status(500).json({
-        message: "Failed to fetch user",
-        error: error instanceof Error ? error.message : String(error),
-      });
+      res.status(500).json({ message: "Failed to fetch user" });
     }
   });
 
