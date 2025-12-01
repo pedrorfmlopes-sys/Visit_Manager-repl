@@ -1,0 +1,173 @@
+Prompt 12A para o agent
+
+Copia isto para o agent:
+
+Tarefa 12A – Página admin de pedidos Odoo (AdminOdooContactRequestsPage)
+
+Cria um novo ficheiro de página, por exemplo:
+client/src/pages/AdminOdooContactRequestsPage.tsx
+
+Esta página deve:
+
+Usar useAuth() e garantir que só faz sentido em contexto admin (podes assumir que a rota já estará protegida por requireAdmin no backend, mas no frontend é bom seguir o padrão das outras páginas admin).
+
+Usar React Query (useQuery) para buscar os pedidos em
+GET /api/odoo/contact-requests.
+
+Estrutura básica do componente:
+
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Table, TableHead, TableRow, TableHeader, TableBody, TableCell } from "@/components/ui/table";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+import { pt } from "date-fns/locale";
+import { useState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Loader2 } from "lucide-react";
+
+
+Ajusta imports de componentes para o padrão real do projeto (pode haver caminhos ligeiramente diferentes).
+
+Faz o useQuery:
+
+const queryClient = useQueryClient();
+
+const { data, isLoading, isError } = useQuery({
+  queryKey: ["/api/odoo/contact-requests"],
+  queryFn: async () => {
+    const res = await fetch("/api/odoo/contact-requests");
+    if (!res.ok) throw new Error("Failed to fetch contact requests");
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || "Erro ao carregar pedidos.");
+    return json.data as Array<{
+      id: string;
+      empresaId: string;
+      userId: string;
+      contactoId: string | null;
+      entidadeId: string | null;
+      tipo: string;
+      mensagem: string | null;
+      estado: "pendente" | "em_progresso" | "concluido";
+      createdAt: string;
+    }>;
+  },
+});
+
+
+Cria uma mutation para atualizar o estado:
+
+const updateEstadoMutation = useMutation({
+  mutationFn: async ({
+    id,
+    estado,
+  }: {
+    id: string;
+    estado: "pendente" | "em_progresso" | "concluido";
+  }) => {
+    const res = await fetch(`/api/odoo/contact-requests/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estado }),
+    });
+    const json = await res.json();
+    if (!json.success) {
+      throw new Error(json.message || "Erro ao atualizar estado do pedido.");
+    }
+    return json.data;
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/odoo/contact-requests"] });
+  },
+});
+
+
+Renderização:
+
+Um <Card> com título “Pedidos de contactos Odoo” e descrição breve.
+
+Se isLoading → mostrar um loader simples (pode usar Loader2 a girar).
+
+Se isError → mostrar um Alert de erro.
+
+Se tiver dados:
+
+Mostrar uma Table com colunas:
+
+Data
+
+Tipo (contacto / entidade)
+
+Mensagem (truncada se for muito grande)
+
+Estado (Badge)
+
+Ações (Select para alterar estado)
+
+Exemplo de linha da tabela:
+
+{data?.map((req) => (
+  <TableRow key={req.id}>
+    <TableCell>
+      {format(new Date(req.createdAt), "dd/MM/yyyy HH:mm", { locale: pt })}
+    </TableCell>
+    <TableCell>
+      <Badge variant="outline">
+        {req.tipo === "contacto" ? "Contacto" : "Entidade"}
+      </Badge>
+    </TableCell>
+    <TableCell className="max-w-xs truncate">
+      {req.mensagem || "—"}
+    </TableCell>
+    <TableCell>
+      <Badge
+        variant={
+          req.estado === "concluido"
+            ? "default"
+            : req.estado === "em_progresso"
+            ? "secondary"
+            : "outline"
+        }
+      >
+        {req.estado === "pendente"
+          ? "Pendente"
+          : req.estado === "em_progresso"
+          ? "Em progresso"
+          : "Concluído"}
+      </Badge>
+    </TableCell>
+    <TableCell>
+      <Select
+        value={req.estado}
+        onValueChange={(value) =>
+          updateEstadoMutation.mutate({
+            id: req.id,
+            estado: value as
+              | "pendente"
+              | "em_progresso"
+              | "concluido",
+          })
+        }
+      >
+        <SelectTrigger className="w-[160px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="pendente">Pendente</SelectItem>
+          <SelectItem value="em_progresso">Em progresso</SelectItem>
+          <SelectItem value="concluido">Concluído</SelectItem>
+        </SelectContent>
+      </Select>
+    </TableCell>
+  </TableRow>
+))}
+
+
+Exporta o componente como default:
+
+export default AdminOdooContactRequestsPage;
+
+
+Garante que o ficheiro compila sem erros e segue o mesmo estilo visual das restantes páginas admin.

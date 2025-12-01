@@ -38,6 +38,7 @@ import AdminDebug from "@/pages/AdminDebug";
 import Leads from "@/pages/Leads";
 import AdminLeadsPage from "@/pages/AdminLeadsPage";
 import AdminLeadDetailPage from "@/pages/AdminLeadDetailPage";
+import AdminOdooContactRequestsPage from "@/pages/AdminOdooContactRequestsPage";
 import AgentMore from "@/pages/AgentMore";
 import Perfil from "@/pages/Perfil";
 
@@ -159,6 +160,10 @@ function Router() {
             <Route
               path="/admin/debug"
               component={() => <AdminRoute component={AdminDebug} />}
+            />
+            <Route
+              path="/admin/odoo-contact-requests"
+              component={() => <AdminRoute component={AdminOdooContactRequestsPage} />}
             />
           </>
         )}
