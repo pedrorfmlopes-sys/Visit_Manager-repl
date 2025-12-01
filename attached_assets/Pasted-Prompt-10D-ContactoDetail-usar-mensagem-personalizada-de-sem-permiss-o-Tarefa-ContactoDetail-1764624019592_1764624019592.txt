@@ -1,0 +1,67 @@
+Prompt 10D – ContactoDetail: usar mensagem personalizada de “sem permissão”
+
+Tarefa – ContactoDetail (ex.: client/src/pages/ContactoDetail.tsx):
+
+Garante que o componente importa o hook de auth (se ainda não importar):
+
+import { useAuth } from "@/hooks/useAuth";
+
+
+Dentro do componente ContactoDetail (ou nome equivalente), obtém do useAuth:
+
+const { canUseOdooContacts, empresa, isAdmin } = useAuth();
+
+const odooContactsFeatureEnabled =
+  empresa?.odooContactsFeatureEnabled ?? false;
+const noPermissionMsg = empresa?.odooContactsNoPermissionMessage;
+
+
+Localiza a secção/card de Odoo para o contacto (onde está o conteúdo do cartão Odoo e onde antes já embrulhámos com canUseOdooContacts && (...) na Prompt 8B).
+
+Ajusta a lógica de renderização desse bloco para ter 3 casos:
+
+Caso A – Feature Odoo contactos desligada para a empresa
+
+Se !odooContactsFeatureEnabled, não renderizar nada de Odoo (nem card funcional, nem mensagem).
+
+Caso B – Utilizador com permissão para usar Odoo contactos
+
+Se odooContactsFeatureEnabled && canUseOdooContacts, renderizar o card Odoo atual, com toda a lógica que já existia (botões, dados, etc.).
+
+Caso C – Feature ativa, mas este utilizador NÃO tem permissão
+
+Se odooContactsFeatureEnabled && !canUseOdooContacts && !isAdmin, renderizar um card informativo em vez do card funcional.
+
+Exemplo:
+
+const fallbackMsg =
+  "A integração de contactos com o Odoo está ativa para esta empresa, mas esta funcionalidade está reservada ao administrador.";
+
+const messageToShow =
+  noPermissionMsg && noPermissionMsg.trim().length > 0
+    ? noPermissionMsg
+    : fallbackMsg;
+
+...
+{odooContactsFeatureEnabled && !canUseOdooContacts && !isAdmin && (
+  <Card className="mt-4">
+    <CardHeader>
+      <CardTitle>Contactos Odoo</CardTitle>
+      <CardDescription>
+        A integração de contactos com o Odoo está ativa para esta empresa.
+      </CardDescription>
+    </CardHeader>
+    <CardContent>
+      <p className="text-sm text-muted-foreground">
+        {messageToShow}
+      </p>
+    </CardContent>
+  </Card>
+)}
+
+
+O card funcional Odoo (com os botões, selects, etc.) deve ficar condicionado apenas pelo Caso B (odooContactsFeatureEnabled && canUseOdooContacts).
+
+Não alterar outros cards da página (visitas, tarefas, leads, etc.).
+
+Garantir que o ficheiro compila sem erros.

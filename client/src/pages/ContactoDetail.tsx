@@ -65,11 +65,16 @@ export default function ContactoDetail() {
   
   const { isOnline, shareViaWhatsApp, shareViaEmail, copyToClipboard, copyLink } = useShareActions();
 
-  const { empresa, canUseOdooContacts } = useAuth();
+  const { empresa, canUseOdooContacts, isAdmin } = useAuth();
   const leadsEnabled =
     typeof empresa?.crmLeadsEnabled === "boolean"
       ? empresa.crmLeadsEnabled
       : true;
+
+  // PROMPT 10D: Odoo Contacts feature flag and custom no-permission message
+  const odooContactsFeatureEnabled =
+    empresa?.odooContactsFeatureEnabled ?? false;
+  const noPermissionMsg = empresa?.odooContactsNoPermissionMessage;
 
   const { data: contacto, isLoading } = useQuery<ContactoWithRelations>({
     queryKey: ["/api/contactos", contactoId],
@@ -816,8 +821,10 @@ export default function ContactoDetail() {
           </CardContent>
         </Card>
 
-        {/* PROMPT 8B: Odoo Integration Card - Conditional rendering based on canUseOdooContacts */}
-        {canUseOdooContacts && (
+        {/* PROMPT 10D: Odoo Integration Card - 3-tier conditional rendering based on feature flag and permissions */}
+        {/* CASE A: Feature is disabled - render nothing */}
+        {/* CASE B: Feature enabled AND user has permission - render functional card */}
+        {odooContactsFeatureEnabled && canUseOdooContacts && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -951,6 +958,28 @@ export default function ContactoDetail() {
                   )}
                 </>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* CASE C: Feature enabled but user has NO permission (and is not admin) - render informational card with custom message */}
+        {odooContactsFeatureEnabled && !canUseOdooContacts && !isAdmin && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Store className="h-5 w-5" />
+                Contactos Odoo
+              </CardTitle>
+              <CardDescription>
+                A integração de contactos com o Odoo está ativa para esta empresa.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground" data-testid="text-odoo-no-permission-message">
+                {noPermissionMsg && noPermissionMsg.trim().length > 0
+                  ? noPermissionMsg
+                  : "A integração de contactos com o Odoo está ativa para esta empresa, mas esta funcionalidade está reservada ao administrador."}
+              </p>
             </CardContent>
           </Card>
         )}
