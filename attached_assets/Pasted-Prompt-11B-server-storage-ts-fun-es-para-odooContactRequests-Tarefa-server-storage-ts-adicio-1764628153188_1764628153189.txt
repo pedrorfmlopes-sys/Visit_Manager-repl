@@ -1,0 +1,77 @@
+Prompt 11B – server/storage.ts: funções para odooContactRequests
+
+Tarefa – server/storage.ts: adicionar funções para pedidos de contacto Odoo
+
+Abre o ficheiro server/storage.ts (ou equivalente onde estão as funções de acesso à DB).
+
+Importa a tabela e os tipos necessários de shared/schema:
+
+import {
+  odooContactRequests,
+  insertOdooContactRequestSchema,
+  type InsertOdooContactRequest,
+  type OdooContactRequest,
+} from "../shared/schema";
+
+
+Ajusta o caminho do import se neste projeto for diferente (segue o padrão dos outros imports de tabelas).
+
+Adiciona uma função para criar um pedido:
+
+export async function createOdooContactRequest(
+  input: InsertOdooContactRequest
+): Promise<OdooContactRequest> {
+  // validação com Zod (mantém o mesmo padrão das outras funções)
+  const data = insertOdooContactRequestSchema.parse(input);
+
+  const [created] = await db
+    .insert(odooContactRequests)
+    .values(data)
+    .returning();
+
+  return created;
+}
+
+
+Segue o mesmo estilo de validação e returning() que já existe noutras funções de storage.ts.
+
+Adiciona uma função para listar pedidos de uma empresa (para usar no painel de admin mais tarde):
+
+export async function listOdooContactRequestsByEmpresa(
+  empresaId: string
+): Promise<OdooContactRequest[]> {
+  return db
+    .select()
+    .from(odooContactRequests)
+    .where(eq(odooContactRequests.empresaId, empresaId))
+    .orderBy(desc(odooContactRequests.createdAt));
+}
+
+
+Usa os helpers eq e desc já usados noutros queries (importa-os de drizzle-orm se ainda não estiverem importados neste ficheiro).
+
+Adiciona uma função para atualizar o estado de um pedido (para o admin marcar como concluído / em progresso mais tarde):
+
+export async function updateOdooContactRequestStatus(
+  empresaId: string,
+  requestId: string,
+  estado: "pendente" | "em_progresso" | "concluido"
+): Promise<OdooContactRequest | null> {
+  const [updated] = await db
+    .update(odooContactRequests)
+    .set({ estado })
+    .where(
+      and(
+        eq(odooContactRequests.id, requestId),
+        eq(odooContactRequests.empresaId, empresaId)
+      )
+    )
+    .returning();
+
+  return updated ?? null;
+}
+
+
+Usa and e eq da mesma forma que noutras funções do ficheiro.
+
+Não alteres o comportamento das funções existentes em storage.ts. Apenas adiciona estas três funções novas e garante que o ficheiro compila sem erros TypeScript.

@@ -11,6 +11,7 @@ import {
   visitasAudio,
   visitasContactos,
   lembretes,
+  odooContactRequests,
   type Empresa,
   type InsertEmpresa,
   type User,
@@ -33,6 +34,9 @@ import {
   type TarefaWithRelations,
   type VisitasAudio,
   type InsertVisitasAudio,
+  type InsertOdooContactRequest,
+  type OdooContactRequest,
+  insertOdooContactRequestSchema,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, gte, sql, or, and } from "drizzle-orm";
@@ -1817,6 +1821,50 @@ export class DatabaseStorage implements IStorage {
         brand_frequency,
       },
     };
+  }
+
+  // ============ ODOO CONTACT REQUESTS (11B) ============
+
+  async createOdooContactRequest(
+    input: InsertOdooContactRequest
+  ): Promise<OdooContactRequest> {
+    const data = insertOdooContactRequestSchema.parse(input);
+
+    const [created] = await db
+      .insert(odooContactRequests)
+      .values(data)
+      .returning();
+
+    return created;
+  }
+
+  async listOdooContactRequestsByEmpresa(
+    empresaId: string
+  ): Promise<OdooContactRequest[]> {
+    return db
+      .select()
+      .from(odooContactRequests)
+      .where(eq(odooContactRequests.empresaId, empresaId))
+      .orderBy(desc(odooContactRequests.createdAt));
+  }
+
+  async updateOdooContactRequestStatus(
+    empresaId: string,
+    requestId: string,
+    estado: "pendente" | "em_progresso" | "concluido"
+  ): Promise<OdooContactRequest | null> {
+    const [updated] = await db
+      .update(odooContactRequests)
+      .set({ estado })
+      .where(
+        and(
+          eq(odooContactRequests.id, requestId),
+          eq(odooContactRequests.empresaId, empresaId)
+        )
+      )
+      .returning();
+
+    return updated ?? null;
   }
 }
 
