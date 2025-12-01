@@ -80,7 +80,7 @@ export default function EntidadeDetail() {
 
   const entityReminders = allLembretes?.filter(l => l.entidadeId === entidadeId) || [];
 
-  const { empresa } = useAuth();
+  const { empresa, canUseOdooContacts } = useAuth();
   const leadsEnabled =
     typeof empresa?.crmLeadsEnabled === "boolean"
       ? empresa.crmLeadsEnabled
@@ -1069,154 +1069,156 @@ export default function EntidadeDetail() {
           </Card>
         )}
 
-        {/* Odoo Integration */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Store className="h-5 w-5" />
-              Odoo
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {!entidade.odooPartnerId ? (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Esta entidade ainda não está ligada a nenhum parceiro Odoo.
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setOdooSearchOpen(true);
-                      setOdooSearchError(null);
-                      setOdooSearchResults([]);
-                    }}
-                    data-testid="button-odoo-open-search"
-                  >
-                    Ligar a Odoo
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <p className="text-sm">
-                  <span className="text-muted-foreground">Ligado ao parceiro Odoo </span>
-                  <span className="font-medium" data-testid="text-odoo-partner-id">
-                    #{entidade.odooPartnerId}
-                  </span>
-                </p>
-
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleFetchOdooPartner}
-                    disabled={odooPartnerLoading}
-                    data-testid="button-odoo-fetch-partner"
-                  >
-                    {odooPartnerLoading ? (
-                      <div className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                    ) : null}
-                    Ver detalhes do parceiro
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-destructive"
-                    onClick={handleUnlinkOdooPartnerFromEntidade}
-                    data-testid="button-odoo-unlink-partner"
-                  >
-                    Remover ligação
-                  </Button>
-                </div>
-
-                {odooPartnerLoading && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <div className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    A carregar...
+        {/* PROMPT 8A: Odoo Integration - Conditional rendering based on canUseOdooContacts */}
+        {canUseOdooContacts && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Store className="h-5 w-5" />
+                Odoo
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!entidade.odooPartnerId ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Esta entidade ainda não está ligada a nenhum parceiro Odoo.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setOdooSearchOpen(true);
+                        setOdooSearchError(null);
+                        setOdooSearchResults([]);
+                      }}
+                      data-testid="button-odoo-open-search"
+                    >
+                      Ligar a Odoo
+                    </Button>
                   </div>
-                )}
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">Ligado ao parceiro Odoo </span>
+                    <span className="font-medium" data-testid="text-odoo-partner-id">
+                      #{entidade.odooPartnerId}
+                    </span>
+                  </p>
 
-                {odooNotConfigured && (
-                  <Alert data-testid="alert-odoo-not-configured">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Integração não configurada</AlertTitle>
-                    <AlertDescription>
-                      Integração Odoo ainda não está configurada para esta empresa.
-                    </AlertDescription>
-                  </Alert>
-                )}
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleFetchOdooPartner}
+                      disabled={odooPartnerLoading}
+                      data-testid="button-odoo-fetch-partner"
+                    >
+                      {odooPartnerLoading ? (
+                        <div className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                      ) : null}
+                      Ver detalhes do parceiro
+                    </Button>
 
-                {odooPartnerError && (
-                  <Alert variant="destructive" data-testid="alert-odoo-error">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Erro</AlertTitle>
-                    <AlertDescription>{odooPartnerError}</AlertDescription>
-                  </Alert>
-                )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-destructive"
+                      onClick={handleUnlinkOdooPartnerFromEntidade}
+                      data-testid="button-odoo-unlink-partner"
+                    >
+                      Remover ligação
+                    </Button>
+                  </div>
 
-                {odooPartner && (
-                  <div className="space-y-3 pt-2 border-t">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Nome</p>
-                      <p className="font-medium" data-testid="text-odoo-partner-name">
-                        {odooPartner.name}
-                      </p>
+                  {odooPartnerLoading && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      A carregar...
                     </div>
+                  )}
 
-                    {odooPartner.email && (
+                  {odooNotConfigured && (
+                    <Alert data-testid="alert-odoo-not-configured">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Integração não configurada</AlertTitle>
+                      <AlertDescription>
+                        Integração Odoo ainda não está configurada para esta empresa.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {odooPartnerError && (
+                    <Alert variant="destructive" data-testid="alert-odoo-error">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Erro</AlertTitle>
+                      <AlertDescription>{odooPartnerError}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  {odooPartner && (
+                    <div className="space-y-3 pt-2 border-t">
                       <div>
-                        <p className="text-sm text-muted-foreground">Email</p>
-                        <p className="text-sm" data-testid="text-odoo-partner-email">
-                          {odooPartner.email}
+                        <p className="text-sm text-muted-foreground">Nome</p>
+                        <p className="font-medium" data-testid="text-odoo-partner-name">
+                          {odooPartner.name}
                         </p>
                       </div>
-                    )}
 
-                    {(odooPartner.phone || odooPartner.mobile) && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Telefone</p>
-                        <p className="text-sm" data-testid="text-odoo-partner-phone">
-                          {odooPartner.phone || odooPartner.mobile}
-                        </p>
-                      </div>
-                    )}
+                      {odooPartner.email && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Email</p>
+                          <p className="text-sm" data-testid="text-odoo-partner-email">
+                            {odooPartner.email}
+                          </p>
+                        </div>
+                      )}
 
-                    {odooPartner.vat && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">NIF</p>
-                        <p className="text-sm" data-testid="text-odoo-partner-vat">
-                          {odooPartner.vat}
-                        </p>
-                      </div>
-                    )}
+                      {(odooPartner.phone || odooPartner.mobile) && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Telefone</p>
+                          <p className="text-sm" data-testid="text-odoo-partner-phone">
+                            {odooPartner.phone || odooPartner.mobile}
+                          </p>
+                        </div>
+                      )}
 
-                    {(odooPartner.city || odooPartner.country) && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Localização</p>
-                        <p className="text-sm" data-testid="text-odoo-partner-location">
-                          {[odooPartner.city, odooPartner.country]
-                            .filter(Boolean)
-                            .join(", ")}
-                        </p>
-                      </div>
-                    )}
+                      {odooPartner.vat && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">NIF</p>
+                          <p className="text-sm" data-testid="text-odoo-partner-vat">
+                            {odooPartner.vat}
+                          </p>
+                        </div>
+                      )}
 
-                    {odooPartner.street && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Rua</p>
-                        <p className="text-sm" data-testid="text-odoo-partner-street">
-                          {odooPartner.street}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
+                      {(odooPartner.city || odooPartner.country) && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Localização</p>
+                          <p className="text-sm" data-testid="text-odoo-partner-location">
+                            {[odooPartner.city, odooPartner.country]
+                              .filter(Boolean)
+                              .join(", ")}
+                          </p>
+                        </div>
+                      )}
+
+                      {odooPartner.street && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Rua</p>
+                          <p className="text-sm" data-testid="text-odoo-partner-street">
+                            {odooPartner.street}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Geolocation */}
         {gpsLocation && (
