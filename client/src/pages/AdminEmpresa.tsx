@@ -69,12 +69,29 @@ export default function AdminEmpresa() {
   const [leadsEnabled, setLeadsEnabled] = useState<boolean>(false);
   const [savingLeads, setSavingLeads] = useState(false);
 
+  // PROMPT 6: Manage 4 new Odoo Contacts flags state
+  const [odooContactsFeatureEnabled, setOdooContactsFeatureEnabled] = useState<boolean>(false);
+  const [odooContactsAdminEnabled, setOdooContactsAdminEnabled] = useState<boolean>(true);
+  const [odooContactsAgentsEnabled, setOdooContactsAgentsEnabled] = useState<boolean>(false);
+  const [crmVisitsOdooSyncEnabled, setCrmVisitsOdooSyncEnabled] = useState<boolean>(false);
+  const [savingOdooContacts, setSavingOdooContacts] = useState(false);
+
   // Update leadsEnabled state when empresa data changes
   useEffect(() => {
     if (empresa?.crmLeadsEnabled !== undefined) {
       setLeadsEnabled(empresa.crmLeadsEnabled);
     }
   }, [empresa?.crmLeadsEnabled]);
+
+  // PROMPT 6: Load Odoo Contacts flags when empresa data changes
+  useEffect(() => {
+    if (empresa) {
+      setOdooContactsFeatureEnabled((empresa as any).odooContactsFeatureEnabled ?? false);
+      setOdooContactsAdminEnabled((empresa as any).odooContactsAdminEnabled ?? true);
+      setOdooContactsAgentsEnabled((empresa as any).odooContactsAgentsEnabled ?? false);
+      setCrmVisitsOdooSyncEnabled((empresa as any).crmVisitsOdooSyncEnabled ?? false);
+    }
+  }, [empresa?.id]);
 
   const form = useForm<UpdateEmpresaForm>({
     resolver: zodResolver(updateEmpresaSchema),
@@ -153,6 +170,51 @@ export default function AdminEmpresa() {
       });
     } finally {
       setSavingLeads(false);
+    }
+  };
+
+  // PROMPT 6: Handler for saving Odoo Contacts flags (all 4 together)
+  const handleSaveOdooContactsFlags = async () => {
+    try {
+      setSavingOdooContacts(true);
+
+      const resp = await fetch("/api/admin/empresa", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          odooCrmEnabled: empresa?.odooCrmEnabled ?? true,
+          crmLeadsEnabled: leadsEnabled,
+          odooContactsFeatureEnabled,
+          odooContactsAdminEnabled,
+          odooContactsAgentsEnabled,
+          crmVisitsOdooSyncEnabled,
+        }),
+      });
+
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
+
+      toast({
+        title: "Configurações de Odoo Contacts guardadas",
+        description: odooContactsFeatureEnabled
+          ? "Integração de contactos Odoo está ativa."
+          : "Integração de contactos Odoo foi desativada.",
+      });
+
+      // Refresh data after successful save
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/empresa"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    } catch (error: any) {
+      console.error("[Settings] Error saving Odoo Contacts flags:", error);
+      toast({
+        title: "Erro ao guardar definições de Odoo Contacts",
+        description: "Verifica a ligação e tenta novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingOdooContacts(false);
     }
   };
 
@@ -1314,7 +1376,101 @@ export default function AdminEmpresa() {
                 </div>
               </div>
 
-              <div className="flex justify-end">
+              {/* PROMPT 6: Odoo Contacts 3-Tier RBAC Section */}
+              <div className="space-y-3 border-t pt-4">
+                <h4 className="text-sm font-semibold">Integração de Contactos Odoo</h4>
+                
+                {/* Toggle 1: Feature Gate */}
+                <div className="border rounded-lg p-4 flex items-center justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-medium">Ativar integração de contactos com Odoo</div>
+                    <p className="text-xs text-muted-foreground">
+                      Quando ativo, permite sincronizar contactos com Odoo CRM.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {odooContactsFeatureEnabled ? "Ativo" : "Inativo"}
+                    </span>
+                    <Switch
+                      checked={odooContactsFeatureEnabled}
+                      onCheckedChange={setOdooContactsFeatureEnabled}
+                      data-testid="toggle-odoo-contacts-feature-enabled"
+                    />
+                  </div>
+                </div>
+
+                {/* Toggle 2: Admin Level (visible if feature is enabled) */}
+                {odooContactsFeatureEnabled && (
+                  <div className="border rounded-lg p-4 flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-sm font-medium">Permitir integração de contactos Odoo para administradores</div>
+                      <p className="text-xs text-muted-foreground">
+                        Os administradores podem sincronizar contactos.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {odooContactsAdminEnabled ? "Ativo" : "Inativo"}
+                      </span>
+                      <Switch
+                        checked={odooContactsAdminEnabled}
+                        onCheckedChange={setOdooContactsAdminEnabled}
+                        data-testid="toggle-odoo-contacts-admin-enabled"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Toggle 3: Agent Level (visible if feature and admin are enabled) */}
+                {odooContactsFeatureEnabled && odooContactsAdminEnabled && (
+                  <div className="border rounded-lg p-4 flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-sm font-medium">Permitir integração de contactos Odoo para utilizadores</div>
+                      <p className="text-xs text-muted-foreground">
+                        Os utilizadores (agentes) podem sincronizar contactos.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {odooContactsAgentsEnabled ? "Ativo" : "Inativo"}
+                      </span>
+                      <Switch
+                        checked={odooContactsAgentsEnabled}
+                        onCheckedChange={setOdooContactsAgentsEnabled}
+                        data-testid="toggle-odoo-contacts-agents-enabled"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Toggle 4: Sync Visitas (visible if CRM and feature are enabled) */}
+                {empresa?.odooCrmEnabled && odooContactsFeatureEnabled && (
+                  <div className="space-y-2 border-t pt-3">
+                    <p className="text-xs font-medium text-muted-foreground">Sincronização de visitas</p>
+                    <div className="border rounded-lg p-4 flex items-center justify-between gap-4">
+                      <div>
+                        <div className="text-sm font-medium">Permitir sincronização de visitas com contactos Odoo</div>
+                        <p className="text-xs text-muted-foreground">
+                          Sincroniza automaticamente dados de visitas para Odoo.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          {crmVisitsOdooSyncEnabled ? "Ativo" : "Inativo"}
+                        </span>
+                        <Switch
+                          checked={crmVisitsOdooSyncEnabled}
+                          onCheckedChange={setCrmVisitsOdooSyncEnabled}
+                          data-testid="toggle-crm-visits-odoo-sync-enabled"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
                 <Button
                   size="sm"
                   onClick={handleSaveCrmLeadsFlag}
@@ -1322,6 +1478,14 @@ export default function AdminEmpresa() {
                   data-testid="button-save-crm-leads"
                 >
                   {savingLeads ? "A guardar..." : "Guardar definições de Leads"}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSaveOdooContactsFlags}
+                  disabled={savingOdooContacts}
+                  data-testid="button-save-odoo-contacts"
+                >
+                  {savingOdooContacts ? "A guardar..." : "Guardar definições de Odoo"}
                 </Button>
               </div>
               

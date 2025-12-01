@@ -1,0 +1,74 @@
+Próximo passo: Prompt 6 – Toggles em /admin/empresa (AdminEmpresa.tsx)
+
+Esta é a próxima coisa a fazer com o agent.
+
+Copia isto e envia ao agent:
+
+Tarefa – client/src/pages/AdminEmpresa.tsx (Odoo Contacts + Sync Visitas):
+
+Garante que o carregamento de /api/admin/empresa (useQuery ou fetch) está a colocar no state local os seguintes campos vindos do backend:
+
+odooCrmEnabled
+
+crmLeadsEnabled
+
+odooContactsFeatureEnabled
+
+odooContactsAdminEnabled
+
+odooContactsAgentsEnabled
+
+crmVisitsOdooSyncEnabled
+Se algum destes ainda não estiver no state, adiciona-o com valores por defeito coerentes com o backend (os defaults do schema).
+
+No card/área de configuração do Odoo / CRM (onde já existem os switches de odooCrmEnabled e crmLeadsEnabled), adiciona:
+
+Toggle 1 – nível global de contactos Odoo
+
+Label: "Ativar integração de contactos com Odoo"
+
+Ligado à variável de estado odooContactsFeatureEnabled.
+
+Toggle 2 – admin
+
+Só visível se odooContactsFeatureEnabled === true.
+
+Label: "Permitir integração de contactos Odoo para administradores"
+
+Ligado à variável odooContactsAdminEnabled.
+
+Toggle 3 – utilizadores (agentes)
+
+Só visível se odooContactsFeatureEnabled === true && odooContactsAdminEnabled === true.
+
+Label: "Permitir integração de contactos Odoo para utilizadores"
+
+Ligado à variável odooContactsAgentsEnabled.
+
+Toggle 4 – sync visitas → contacto Odoo (camada 3)
+
+Mantém este toggle no mesmo card, idealmente com um pequeno subtítulo tipo “Sincronização de visitas”.
+
+Label: "Permitir sincronização de visitas com contactos Odoo"
+
+Ligado à variável crmVisitsOdooSyncEnabled.
+
+Só visível se odooCrmEnabled === true && odooContactsFeatureEnabled === true.
+
+No handler de guardar desta secção (o que faz PATCH /api/admin/empresa), garante que o body do pedido inclui também:
+
+{
+  ...,
+  odooCrmEnabled,
+  crmLeadsEnabled,
+  odooContactsFeatureEnabled,
+  odooContactsAdminEnabled,
+  odooContactsAgentsEnabled,
+  crmVisitsOdooSyncEnabled,
+}
+
+
+Mantém o comportamento atual depois de guardar, incluindo o
+queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] }), para o useAuth() ficar logo com os novos valores.
+
+Não alteres o resto da página nem outros cards.
