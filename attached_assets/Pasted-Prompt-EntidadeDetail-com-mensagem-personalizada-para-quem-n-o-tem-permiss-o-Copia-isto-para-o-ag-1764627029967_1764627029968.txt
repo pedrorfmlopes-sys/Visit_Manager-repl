@@ -1,0 +1,71 @@
+Prompt – EntidadeDetail com mensagem personalizada para quem não tem permissão
+
+Copia isto para o agent:
+
+Tarefa – EntidadeDetail (ex.: client/src/pages/EntidadeDetail.tsx): governança Odoo + mensagem personalizada
+
+Garante que o componente importa o hook de autenticação:
+
+import { useAuth } from "@/hooks/useAuth";
+
+
+Dentro do componente EntidadeDetail (ou nome equivalente), obtém do useAuth:
+
+const { canUseOdooContacts, empresa, isAdmin } = useAuth();
+
+const odooContactsFeatureEnabled =
+  empresa?.odooContactsFeatureEnabled ?? false;
+const noPermissionMsg = empresa?.odooContactsNoPermissionMessage;
+
+
+Localiza a secção/card de Odoo para a entidade (onde se mostra a ligação da entidade a um parceiro Odoo, botões para ligar, etc.).
+
+Atualmente esse card pode já estar embrulhado em canUseOdooContacts && (...).
+
+Ajusta a lógica de renderização dessa secção para 3 casos, tal como no ContactoDetail:
+
+Caso A – Feature Odoo contactos desligada para a empresa
+
+Se !odooContactsFeatureEnabled, não renderizar nada relacionado com Odoo (nem card funcional, nem mensagem informativa).
+
+Caso B – Utilizador com permissão (canUseOdooContacts === true)
+
+Se odooContactsFeatureEnabled && canUseOdooContacts, renderizar o card Odoo atual da entidade, com toda a lógica que já existia (sem alterações internas).
+
+Caso C – Feature ativa, mas este utilizador NÃO tem permissão
+
+Se odooContactsFeatureEnabled && !canUseOdooContacts && !isAdmin, renderizar um card informativo em vez do card funcional.
+
+Usa a mensagem personalizada vinda de empresa.odooContactsNoPermissionMessage, com fallback:
+
+const fallbackMsg =
+  "A integração de contactos com o Odoo está ativa para esta empresa, mas esta funcionalidade está reservada ao administrador.";
+
+const messageToShow =
+  noPermissionMsg && noPermissionMsg.trim().length > 0
+    ? noPermissionMsg
+    : fallbackMsg;
+
+...
+{odooContactsFeatureEnabled && !canUseOdooContacts && !isAdmin && (
+  <Card className="mt-4">
+    <CardHeader>
+      <CardTitle>Entidade Odoo</CardTitle>
+      <CardDescription>
+        A integração de contactos com o Odoo está ativa para esta empresa.
+      </CardDescription>
+    </CardHeader>
+    <CardContent>
+      <p className="text-sm text-muted-foreground">
+        {messageToShow}
+      </p>
+    </CardContent>
+  </Card>
+)}
+
+
+Garante que o card funcional Odoo da entidade só é renderizado no Caso B (odooContactsFeatureEnabled && canUseOdooContacts).
+
+Não alterar outros cards (visitas da entidade, contactos, leads, etc.).
+
+Compilar sem erros.
