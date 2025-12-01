@@ -1,0 +1,69 @@
+Prompt 9A – Backend: endpoint de sync para visitas
+
+Para o agent:
+
+Tarefa – Backend: endpoint de sync de visita com Odoo
+
+No ficheiro server/routes/odoo.ts (ou equivalente, onde está setupOdooRoutes):
+
+Já existe um import de createLeadForVisita de "../integrations/odooLeadsFromVisitas".
+
+Dentro do router de /api/integrations/odoo, adiciona um novo endpoint:
+
+// POST /api/integrations/odoo/visitas/:id/sync
+router.post("/visitas/:id/sync", isAuthenticated, async (req: any, res) => {
+  try {
+    const { empresaId, userId } = await getUserContext(req);
+    const visitaId = req.params.id;
+
+    if (!empresaId) {
+      return res.status(400).json({ success: false, message: "Utilizador sem empresa associada." });
+    }
+
+    // Verifica se a integração Odoo está ativa para a empresa
+    await assertOdooEnabled(empresaId);
+
+    // Verifica se a sync de visitas está ativa nas flags da empresa
+    // (usa a storage existente para ler a empresa e verificar crmVisitsOdooSyncEnabled)
+    const empresa = await /* reutilizar storage/getEmpresa ou função equivalente */;
+    if (!(empresa as any).crmVisitsOdooSyncEnabled) {
+      return res.status(200).json({
+        success: false,
+        notEnabled: true,
+        message: "Sincronização de visitas com o Odoo está desativada para esta empresa.",
+      });
+    }
+
+    // Usa a função existente para criar/atualizar lead Odoo a partir da visita
+    const result = await createLeadForVisita({
+      empresaId,
+      visitaId,
+      userId,
+    });
+
+    return res.json({
+      success: true,
+      ...result,
+    });
+  } catch (error: any) {
+    if (error?.message === "ODOO_NOT_CONFIGURED") {
+      return res.status(200).json({
+        success: false,
+        notConfigured: true,
+      });
+    }
+
+    console.error("[Odoo] Erro ao sincronizar visita com Odoo:", error);
+    return res.status(500).json({
+      success: false,
+      message: error?.message ?? "Erro ao sincronizar visita com Odoo.",
+    });
+  }
+});
+
+
+Ajusta a forma como obténs a empresa para verificar crmVisitsOdooSyncEnabled reutilizando o storage que já é usado noutros pontos (ex.: storage.getEmpresa ou similar).
+
+Ajusta a assinatura de createLeadForVisita de acordo com a função já existente no projeto (se não for exatamente { empresaId, visitaId, userId }, adapta).
+
+Garante que o router continua a ser montado em app.use("/api/integrations/odoo", router); e que o ficheiro compila sem erros.

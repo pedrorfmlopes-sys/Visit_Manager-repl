@@ -2,6 +2,7 @@ import type { Router } from "express";
 import { isAuthenticated } from "../../replitAuth";
 import { getUserContext } from "../../authContext";
 import { odooConnectionsStorage } from "../../storage/odooConnections";
+import { storage } from "../../storage";
 import { insertOdooConnectionSchema } from "@shared/schema";
 import { testOdooConnection, searchOdooPartners, getOdooPartnerById, createOdooLead, assertOdooEnabled } from "../../integrations/odooClient";
 import { createLeadForVisita } from "../../integrations/odooLeadsFromVisitas";
@@ -274,6 +275,54 @@ export function setupOdooRoutes(app: any): void {
         success: false,
         error: "Odoo lead creation error",
         message: error?.message ?? "Unknown error",
+      });
+    }
+  });
+
+  // POST /api/integrations/odoo/visitas/:id/sync
+  // PROMPT 9A: Endpoint de sync de visita com Odoo
+  // Sincroniza uma visita com Odoo criando/atualizando uma lead (se crmVisitsOdooSyncEnabled = true)
+  router.post("/visitas/:id/sync", isAuthenticated, async (req: any, res) => {
+    try {
+      const { empresaId, userId } = await getUserContext(req);
+      const visitaId = req.params.id;
+
+      if (!empresaId) {
+        return res.status(400).json({ success: false, message: "Utilizador sem empresa associada." });
+      }
+
+      // Verifica se a integração Odoo está ativa para a empresa
+      await assertOdooEnabled(empresaId);
+
+      // Verifica se a sync de visitas está ativa nas flags da empresa
+      const empresa = await storage.getEmpresa(empresaId);
+      if (!(empresa as any)?.crmVisitsOdooSyncEnabled) {
+        return res.status(200).json({
+          success: false,
+          notEnabled: true,
+          message: "Sincronização de visitas com o Odoo está desativada para esta empresa.",
+        });
+      }
+
+      // Usa a função existente para criar/atualizar lead Odoo a partir da visita
+      const result = await createLeadForVisita(empresaId, visitaId);
+
+      return res.json({
+        success: true,
+        ...result,
+      });
+    } catch (error: any) {
+      if (error?.message === "ODOO_NOT_CONFIGURED") {
+        return res.status(200).json({
+          success: false,
+          notConfigured: true,
+        });
+      }
+
+      console.error("[Odoo] Erro ao sincronizar visita com Odoo:", error);
+      return res.status(500).json({
+        success: false,
+        message: error?.message ?? "Erro ao sincronizar visita com Odoo.",
       });
     }
   });
