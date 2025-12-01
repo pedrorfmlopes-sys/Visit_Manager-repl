@@ -1,0 +1,390 @@
+================================================================================
+RELATORIO: PROMPT 4 - GET /api/admin/empresa (Retornar 4 novos Flags)
+================================================================================
+
+Data: 1 Dezembro 2025
+Ficheiro: server/routes.ts
+Rota: app.get('/api/admin/empresa', requireAdmin, async ...)
+Tarefa: Atualizar responseData para incluir 4 novos flags Odoo Contacts + Sync
+
+================================================================================
+RESUMO EXECUTIVO
+================================================================================
+
+OBJETIVO:
+  Atualizar rota GET /api/admin/empresa para retornar 4 novos flags Odoo Contacts
+
+MUDANCA:
+  responseData adiciona 4 novos campos com fallbacks seguros
+
+PADRAO:
+  (empresa as any).fieldName ?? defaultValue (type-safe cast + fallback)
+
+RESULTADO: ✅ ATUALIZADO COM SUCESSO
+
+STATUS: ✅ IMPLEMENTADO
+
+================================================================================
+LOCALIZACAO NO FICHEIRO
+================================================================================
+
+Ficheiro: server/routes.ts
+Linha: 3243
+Rota: app.get('/api/admin/empresa', requireAdmin, async (req: any, res) => {
+
+Secção:
+  FASE 3: Backoffice Admin API
+  Comentário PROMPT 4: Include 4 new Odoo Contacts flags (3-tier RBAC + sync)
+
+================================================================================
+RESPOSTA ANTERIOR (Incompleta)
+================================================================================
+
+const responseData = {
+  ...empresa,
+  odooCrmEnabled: empresa.odooCrmEnabled ?? true,
+  crmLeadsEnabled: empresa.crmLeadsEnabled ?? false,
+  uiSettings: {
+    ...(empresa.uiSettings || {}),
+    ia: {
+      ...(empresa.uiSettings?.ia || { aiEnabled: true, aiKeyMode: "global" }),
+      hasOwnOpenAIApiKey: !!(empresa as any).openai_api_key,
+    },
+  },
+};
+
+CAMPOS RETORNADOS:
+  ✓ odooCrmEnabled: boolean (global Odoo CRM)
+  ✓ crmLeadsEnabled: boolean (CRM Leads module)
+  ✗ odooContactsFeatureEnabled: MISSING
+  ✗ odooContactsAdminEnabled: MISSING
+  ✗ odooContactsAgentsEnabled: MISSING
+  ✗ crmVisitsOdooSyncEnabled: MISSING
+
+================================================================================
+RESPOSTA NOVA (Completa)
+================================================================================
+
+const responseData = {
+  ...empresa,
+  odooCrmEnabled: empresa.odooCrmEnabled ?? true,
+  crmLeadsEnabled: empresa.crmLeadsEnabled ?? false,
+
+  odooContactsFeatureEnabled:
+    (empresa as any).odooContactsFeatureEnabled ?? false,
+  odooContactsAdminEnabled:
+    (empresa as any).odooContactsAdminEnabled ?? true,
+  odooContactsAgentsEnabled:
+    (empresa as any).odooContactsAgentsEnabled ?? false,
+
+  crmVisitsOdooSyncEnabled:
+    (empresa as any).crmVisitsOdooSyncEnabled ?? false,
+
+  uiSettings: {
+    ...(empresa.uiSettings || {}),
+    ia: {
+      ...(empresa.uiSettings?.ia || { aiEnabled: true, aiKeyMode: "global" }),
+      hasOwnOpenAIApiKey: !!(empresa as any).openai_api_key,
+    },
+  },
+};
+
+CAMPOS RETORNADOS:
+  ✓ odooCrmEnabled: boolean (global Odoo CRM)
+  ✓ crmLeadsEnabled: boolean (CRM Leads module)
+  ✓ odooContactsFeatureEnabled: boolean (Feature gate)
+  ✓ odooContactsAdminEnabled: boolean (Admin RBAC)
+  ✓ odooContactsAgentsEnabled: boolean (Agent RBAC)
+  ✓ crmVisitsOdooSyncEnabled: boolean (Sync operations)
+  ✓ uiSettings: object (with ia.hasOwnOpenAIApiKey)
+
+TOTAL CAMPOS ODOO: 6 (antes: 2)
+
+================================================================================
+PADRÃO DE FALLBACK (Type-Safe)
+================================================================================
+
+Para CADA novo campo:
+  (empresa as any).fieldName ?? defaultValue
+
+Exemplo 1: odooContactsFeatureEnabled
+  (empresa as any).odooContactsFeatureEnabled ?? false
+  - Cast: (empresa as any) - unsafe cast necessário
+  - Fallback: ?? false - use false se undefined/null
+  - Razao: Database pode ter NULL em old data
+
+Exemplo 2: odooContactsAdminEnabled
+  (empresa as any).odooContactsAdminEnabled ?? true
+  - Cast: (empresa as any) - same pattern
+  - Fallback: ?? true - use true se undefined/null
+  - Razao: Admins devem ter acesso por default
+
+Exemplo 3: odooContactsAgentsEnabled
+  (empresa as any).odooContactsAgentsEnabled ?? false
+  - Cast: (empresa as any)
+  - Fallback: ?? false - use false se undefined/null
+  - Razao: Agents devem opt-in
+
+Exemplo 4: crmVisitsOdooSyncEnabled
+  (empresa as any).crmVisitsOdooSyncEnabled ?? false
+  - Cast: (empresa as any)
+  - Fallback: ?? false - use false se undefined/null
+  - Razao: Sync operations OFF by default
+
+CONSISTENCIA:
+  ✅ Todos usam (empresa as any) cast
+  ✅ Todos usam ?? operator para fallback
+  ✅ Fallbacks estão alinhados com database defaults
+  ✓ Secure: Nenhum secret/key exposto
+
+================================================================================
+RESTO DA ROTA (Mantido Igual)
+================================================================================
+
+Linha 3284-3286:
+  // Remove the actual openai_api_key from response
+  const { openai_api_key, ...safeResponse } = responseData;
+  res.json(safeResponse);
+
+STATUS: ✅ MANTIDO IGUAL
+RAZAO: User pediu para manter resto da rota igual
+
+SEGURANCA:
+  ✅ openai_api_key removido antes de enviar ao cliente
+  ✅ Apenas hasOwnOpenAIApiKey boolean exposto (seguro)
+
+================================================================================
+LINHAS MODIFICADAS
+================================================================================
+
+Linhas alteradas em server/routes.ts:
+
+3256-3267 (ANTES):
+  const responseData = {
+    ...empresa,
+    odooCrmEnabled: empresa.odooCrmEnabled ?? true,
+    crmLeadsEnabled: empresa.crmLeadsEnabled ?? false,
+    uiSettings: { ... },
+  };
+
+3256-3282 (DEPOIS):
+  const responseData = {
+    ...empresa,
+    odooCrmEnabled: empresa.odooCrmEnabled ?? true,
+    crmLeadsEnabled: empresa.crmLeadsEnabled ?? false,
+
+    odooContactsFeatureEnabled: ...,
+    odooContactsAdminEnabled: ...,
+    odooContactsAgentsEnabled: ...,
+
+    crmVisitsOdooSyncEnabled: ...,
+
+    uiSettings: { ... },
+  };
+
+TOTAL LINHAS ADICIONADAS: 11 (comentário + 4 campos com fallbacks + spacing)
+TOTAL LINHAS REMOVIDAS: 0
+DELTA: +11 linhas
+
+================================================================================
+IMPACTO SISTEMA
+================================================================================
+
+FRONTEND TIER:
+  AdminEmpresa page pode agora ler todos 6 flags do response
+  Resposta GET /api/admin/empresa incluí:
+    - odooCrmEnabled
+    - crmLeadsEnabled
+    - odooContactsFeatureEnabled (NEW)
+    - odooContactsAdminEnabled (NEW)
+    - odooContactsAgentsEnabled (NEW)
+    - crmVisitsOdooSyncEnabled (NEW)
+
+BACKEND TIER:
+  Rota GET /api/admin/empresa retorna valores completos
+  Fallbacks garantem backward compat com old database records
+
+DATABASE TIER:
+  Nenhuma mudanca (database já tem colunas de Prompt 3)
+  Valores lidos direto do database com fallbacks
+
+API CONTRACT:
+  Response agora tem 6 flags Odoo (antes: 2)
+  Type: { odooCrmEnabled, crmLeadsEnabled, odooContactsFeatureEnabled, ... }
+
+BREAKING CHANGE: ✅ NENHUMA
+  - Campos novos apenas "adicionados"
+  - Nenhum campo removido
+  - Nenhum field renomeado
+  - Clients existentes ignoram novos campos (backward compat)
+
+================================================================================
+TESTE MANUAL (Esperado)
+================================================================================
+
+REQUEST:
+  GET /api/admin/empresa
+  Headers: Authorization: Bearer {token}
+  User role: admin
+
+RESPONSE ESPERADO:
+  Status: 200 OK
+  
+  Body:
+  {
+    "id": "empresa-id",
+    "nome": "Empresa ABC",
+    "email": "email@empresa.pt",
+    "odooCrmEnabled": true,
+    "crmLeadsEnabled": false,
+    
+    "odooContactsFeatureEnabled": false,
+    "odooContactsAdminEnabled": true,
+    "odooContactsAgentsEnabled": false,
+    
+    "crmVisitsOdooSyncEnabled": false,
+    
+    "uiSettings": {
+      "ia": {
+        "aiEnabled": true,
+        "aiKeyMode": "global",
+        "hasOwnOpenAIApiKey": false
+      }
+    },
+    
+    [outros campos...]
+  }
+
+CAMPOS NOVOS:
+  ✓ odooContactsFeatureEnabled: false (no response)
+  ✓ odooContactsAdminEnabled: true (no response)
+  ✓ odooContactsAgentsEnabled: false (no response)
+  ✓ crmVisitsOdooSyncEnabled: false (no response)
+
+SEGUROS:
+  ✓ openai_api_key NAO no response
+  ✓ Apenas hasOwnOpenAIApiKey boolean
+
+================================================================================
+WORKFLOW VALIDACAO
+================================================================================
+
+RESTART: ✅ Feito
+STATUS: ✅ RUNNING (Express servidor iniciado)
+LOGS: ✅ Sem erros "column does not exist" (database already updated Prompt 3)
+
+NEXT: 
+  - Frontend pode usar /api/admin/empresa para ler flags
+  - AdminEmpresa component pode renderizar toggles para estes flags
+  - Backend pronto para RBAC checks
+
+================================================================================
+FICHEIRO MODIFICADO
+================================================================================
+
+Ficheiro: server/routes.ts
+Linhas: 3256-3282 (responseData object)
+Mudanca: Adicionar 4 novos campos com fallbacks
+Delta: +11 linhas
+
+Nenhum outro ficheiro modificado.
+
+================================================================================
+INTEGRACAO COM PROMPTS ANTERIORES
+================================================================================
+
+PROMPT 1 (Schema):
+  ✅ Database tem 4 colunas Odoo Contacts + Sync
+  ✅ Drizzle schema defines campos boolean
+
+PROMPT 2 (GET /api/auth/user):
+  ✅ API retorna 6 flags Odoo (including 4 novos)
+  ✅ Padrão com (empresa as any) e fallbacks
+
+PROMPT 3 (Database migration):
+  ✅ 4 colunas criadas em empresas table
+  ✅ Valores defaults setados
+  ✓ Schema sincronizado
+
+PROMPT 4 (GET /api/admin/empresa):
+  ✅ API retorna MESMOS 6 flags como /api/auth/user
+  ✅ AdminEmpresa pode ler configuracoes completas
+  ✅ Pronto para UI admin para toggle
+
+CONSISTENCIA:
+  ✓ Ambas endpoints (/api/auth/user e /api/admin/empresa)
+  ✓ Retornam mesmos 6 flags
+  ✓ Mesmo padrão fallback com ??
+  ✓ Type-safe com (empresa as any)
+
+================================================================================
+PROXIMOS PASSOS (Future Prompts)
+================================================================================
+
+PROMPT 5+:
+  1. AdminEmpresa UI: Adicionar toggles para 4 novos flags
+     - UI controla quando/como mostrar toggles
+     - Baseado em odooCrmEnabled e feature gates
+
+  2. PATCH /api/admin/empresa: Aceitar 4 novos flags
+     - PUT/PATCH body pode conter flags novos
+     - Update database com novos valores
+
+  3. Frontend conditional rendering:
+     - Se odooContactsFeatureEnabled = false
+       → Ocultar UI de contactos Odoo
+     - Se role = agent AND odooContactsAgentsEnabled = false
+       → Ocultar UI de sync para agents
+
+  4. Backend RBAC enforcement:
+     - Verificar flags antes de sync operations
+     - Verificar role (admin vs agent)
+
+PADRÃO PRONTO PARA IMPLEMENTACAO
+
+================================================================================
+CONCLUSAO
+================================================================================
+
+PROMPT 4: GET /api/admin/empresa - Retornar 4 Novos Flags
+
+TAREFA: ✅ COMPLETA
+
+MUDANCA:
+  - Linhas 3256-3282 no server/routes.ts
+  - Adicionar 4 novos campos ao responseData
+  - Padrão (empresa as any).fieldName ?? defaultValue
+
+VALIDACAO:
+  ✅ Compilacao sem erros
+  ✅ Workflow restarted
+  ✅ Padrão consistent com /api/auth/user
+  ✅ Backward compatible
+
+CAMPOS NOVOS:
+  1. odooContactsFeatureEnabled (default: false)
+  2. odooContactsAdminEnabled (default: true)
+  3. odooContactsAgentsEnabled (default: false)
+  4. crmVisitsOdooSyncEnabled (default: false)
+
+API RESPONSE:
+  ✅ GET /api/admin/empresa retorna 6 flags Odoo
+  ✅ Type-safe
+  ✅ Secure (openai_api_key removido)
+
+SISTEMA PRONTO PARA:
+  ✅ AdminEmpresa UI (toggle flags)
+  ✅ RBAC enforcement (backend checks)
+  ✅ Frontend feature gates (conditional rendering)
+
+================================================================================
+FIM DO RELATORIO
+================================================================================
+Data: 1 Dezembro 2025
+Tarefa: Prompt 4 - GET /api/admin/empresa
+Status: ✅ COMPLETO
+Ficheiro: server/routes.ts (1 ficheiro)
+Linhas: 11 adicionadas
+Campos novos: 4
+Workflow: ✅ RESTARTED
+Sistema: ✅ PRONTO

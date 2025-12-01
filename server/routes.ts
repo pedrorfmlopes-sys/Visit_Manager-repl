@@ -3253,10 +3253,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // FASE 31-IA-01: Add calculated hasOwnOpenAIApiKey to response, never expose the actual key
       // FASE CRM-UI-CRMS-CARD-STEP1: Include odooCrmEnabled flag
       // FASE SUBS-LEADS-FLAG-STEP1: Include crmLeadsEnabled flag
+      // PROMPT 4: Include 4 new Odoo Contacts flags (3-tier RBAC + sync)
       const responseData = {
         ...empresa,
         odooCrmEnabled: empresa.odooCrmEnabled ?? true,
         crmLeadsEnabled: empresa.crmLeadsEnabled ?? false,
+
+        odooContactsFeatureEnabled:
+          (empresa as any).odooContactsFeatureEnabled ?? false,
+        odooContactsAdminEnabled:
+          (empresa as any).odooContactsAdminEnabled ?? true,
+        odooContactsAgentsEnabled:
+          (empresa as any).odooContactsAgentsEnabled ?? false,
+
+        crmVisitsOdooSyncEnabled:
+          (empresa as any).crmVisitsOdooSyncEnabled ?? false,
+
         uiSettings: {
           ...(empresa.uiSettings || {}),
           ia: {
