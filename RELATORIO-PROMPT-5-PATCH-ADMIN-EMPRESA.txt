@@ -1,0 +1,386 @@
+================================================================================
+RELATORIO: PROMPT 5 - PATCH /api/admin/empresa (Atualizar 4 novos Flags)
+================================================================================
+
+Data: 1 Dezembro 2025
+Ficheiro: server/routes.ts
+Rota: app.patch('/api/admin/empresa', requireAdmin, async (req, res) => {...})
+Tarefa: Adicionar suporte para 4 novos flags Odoo Contacts (CRUD completo)
+
+================================================================================
+RESUMO EXECUTIVO
+================================================================================
+
+OBJETIVO:
+  Permitir que admins atualizem os 4 novos flags Odoo Contacts via PATCH
+
+3 MUDANCAS REALIZADAS:
+
+1. req.body destructuring:
+   + Adicionar 4 novos campos ao destructuring
+   Linhas: 3338
+
+2. updateData validation:
+   + Adicionar 4 if statements para validar booleans
+   Linhas: 3358-3370
+
+3. responseData:
+   + Adicionar 4 campos com fallbacks (igual GET /api/admin/empresa)
+   Linhas: 3405-3428
+
+RESULTADO: ✅ CRUD COMPLETO (GET + PATCH)
+
+STATUS: ✅ IMPLEMENTADO
+
+================================================================================
+MUDANCA 1 - DESTRUCURING req.body (linha 3338)
+================================================================================
+
+ANTES:
+  const { nome, nif, email, telefone, logoUrl, mostrarMarcasEmVisitas, 
+          mostrarGPS, theme, uiSettings, iaOpenAIApiKey, odooCrmEnabled, 
+          crmLeadsEnabled } = req.body;
+
+DEPOIS:
+  const { nome, nif, email, telefone, logoUrl, mostrarMarcasEmVisitas, 
+          mostrarGPS, theme, uiSettings, iaOpenAIApiKey, odooCrmEnabled, 
+          crmLeadsEnabled, odooContactsFeatureEnabled, odooContactsAdminEnabled, 
+          odooContactsAgentsEnabled, crmVisitsOdooSyncEnabled } = req.body;
+
+CAMPOS ADICIONADOS: 4
+  1. odooContactsFeatureEnabled
+  2. odooContactsAdminEnabled
+  3. odooContactsAgentsEnabled
+  4. crmVisitsOdooSyncEnabled
+
+PADRÃO:
+  ✓ Adicionar campo ao destructuring
+  ✓ TypeScript auto-infere tipo (boolean | undefined)
+  ✓ Seguro: campos undefined se nao enviado
+
+================================================================================
+MUDANCA 2 - VALIDACAO E ADICAO AO updateData (linhas 3358-3370)
+================================================================================
+
+LOCALIZACAO:
+  Depois de tratar odooCrmEnabled e crmLeadsEnabled (linha 3356)
+  Antes de tratar iaOpenAIApiKey (linha 3372)
+
+CODIGO ADICIONADO:
+  // PROMPT 5: Add support for 4 new Odoo Contacts flags (3-tier RBAC + sync)
+  if (typeof odooContactsFeatureEnabled === "boolean") {
+    (updateData as any).odooContactsFeatureEnabled = odooContactsFeatureEnabled;
+  }
+  if (typeof odooContactsAdminEnabled === "boolean") {
+    (updateData as any).odooContactsAdminEnabled = odooContactsAdminEnabled;
+  }
+  if (typeof odooContactsAgentsEnabled === "boolean") {
+    (updateData as any).odooContactsAgentsEnabled = odooContactsAgentsEnabled;
+  }
+  if (typeof crmVisitsOdooSyncEnabled === "boolean") {
+    (updateData as any).crmVisitsOdooSyncEnabled = crmVisitsOdooSyncEnabled;
+  }
+
+PADRÃO DE VALIDACAO:
+  ✓ if (typeof field === "boolean") { ... }
+  ✓ Ignora undefined/null (campo nao atualizado se omitido)
+  ✓ Ignora strings/numbers (tipo-safe)
+  ✓ Apenas booleans sao adicionados ao updateData
+  ✓ Usa (updateData as any) cast para TS type safety
+
+LOGICA:
+  - Admin envia { odooContactsFeatureEnabled: true, ...}
+  - Se typeof true === "boolean" ✓
+  - Campo adicionado ao updateData
+  - Database atualizado com novo valor
+  - Se admin nao envia campo: ignorado (updateData nao o contem)
+  - Existing value no database nao é afetado
+
+TOTAL LINHAS ADICIONADAS: 12 (comentário + 4 if blocks com spacing)
+
+================================================================================
+MUDANCA 3 - RESPOSTA (responseData) - linhas 3405-3428
+================================================================================
+
+LOCALIZACAO:
+  Depois do await storage.updateEmpresa (linha 3399)
+  Antes de remover openai_api_key (linha 3429)
+
+CODIGO ANTERIOR (Incompleto):
+  const responseData = {
+    ...updated,
+    odooCrmEnabled: updated.odooCrmEnabled ?? true,
+    crmLeadsEnabled: updated.crmLeadsEnabled ?? false,
+    uiSettings: { ... },
+  };
+
+CODIGO NOVO (Completo):
+  // PROMPT 5: Include 4 new Odoo Contacts flags (3-tier RBAC + sync)
+  const responseData = {
+    ...updated,
+    odooCrmEnabled: updated.odooCrmEnabled ?? true,
+    crmLeadsEnabled: updated.crmLeadsEnabled ?? false,
+
+    odooContactsFeatureEnabled:
+      (updated as any).odooContactsFeatureEnabled ?? false,
+    odooContactsAdminEnabled:
+      (updated as any).odooContactsAdminEnabled ?? true,
+    odooContactsAgentsEnabled:
+      (updated as any).odooContactsAgentsEnabled ?? false,
+
+    crmVisitsOdooSyncEnabled:
+      (updated as any).crmVisitsOdooSyncEnabled ?? false,
+
+    uiSettings: { ... },
+  };
+
+PADRÃO:
+  ✓ (updated as any).fieldName ?? defaultValue
+  ✓ Fallbacks alinhados com defaults do database
+  ✓ Identico ao GET /api/admin/empresa (Prompt 4)
+
+FALLBACKS:
+  odooContactsFeatureEnabled: ?? false (OFF by default)
+  odooContactsAdminEnabled: ?? true (Admins have access by default)
+  odooContactsAgentsEnabled: ?? false (Agents opt-in)
+  crmVisitsOdooSyncEnabled: ?? false (Sync OFF by default)
+
+TOTAL LINHAS ADICIONADAS: 12 (comentário + 4 campos com fallbacks + spacing)
+
+SEGURANCA:
+  ✓ openai_api_key ainda removido antes de enviar (linha 3429)
+  ✓ Apenas hasOwnOpenAIApiKey boolean exposto
+
+================================================================================
+FLUXO PATCH /api/admin/empresa (Completo)
+================================================================================
+
+REQUEST (Admin):
+  PATCH /api/admin/empresa
+  Headers: Authorization: Bearer {token}
+  Body: {
+    "nome": "Empresa XYZ",
+    "odooContactsFeatureEnabled": true,
+    "odooContactsAdminEnabled": true,
+    "odooContactsAgentsEnabled": true,
+    "crmVisitsOdooSyncEnabled": true,
+    ...
+  }
+
+PROCESSAMENTO:
+  1. Authenticate + Verify admin role (requireAdmin middleware)
+  2. Get empresaId from user context
+  3. Destructure 4 novos campos do req.body
+  4. Validar cada boolean com typeof check
+  5. Adicionar ao updateData se válido
+  6. Chamar storage.updateEmpresa(empresaId, updateData)
+  7. Database: UPDATE empresas SET ... WHERE id = empresaId
+  8. Construir responseData com todos os campos
+  9. Remover openai_api_key do response
+  10. Retornar response JSON
+
+RESPONSE (Esperado):
+  Status: 200 OK
+  Body: {
+    "id": "empresa-id",
+    "nome": "Empresa XYZ",
+    "odooCrmEnabled": true,
+    "crmLeadsEnabled": false,
+    
+    "odooContactsFeatureEnabled": true,     ← NEW
+    "odooContactsAdminEnabled": true,       ← NEW
+    "odooContactsAgentsEnabled": true,      ← NEW
+    
+    "crmVisitsOdooSyncEnabled": true,       ← NEW
+    
+    "uiSettings": {
+      "ia": {
+        "hasOwnOpenAIApiKey": false
+      }
+    },
+    ...
+  }
+
+CAMPOS RETORNADOS: 6 flags Odoo (consistente com GET)
+
+ERROR HANDLING (Mantido igual):
+  - User nao admin: 403 Forbidden
+  - Empresa nao existe: 404 Not Found
+  - Database erro: 500 Internal Server Error
+
+================================================================================
+COMPARACAO GET vs PATCH
+================================================================================
+
+ENDPOINT               GET                          PATCH
+------                ---                          -----
+Rota                  /api/admin/empresa           /api/admin/empresa
+Metodo                GET                          PATCH
+Autorizacao           requireAdmin                 requireAdmin
+req.body              -                            6+ fields (including 4 new)
+Validacao             Nenhuma (só lê)             Type check (typeof === "boolean")
+updateData            -                            Construido dinamicamente
+Fallback              No GET response             No GET e PATCH response
+responseData          6 flags Odoo                 6 flags Odoo
+Seguranca             openai_api_key removido      openai_api_key removido
+
+CONSISTENCIA: ✅ 100%
+  - Ambos endpoints retornam mesmos 6 flags
+  - Mesmos fallback values
+  - Mesma seguranca (api_key nunca exposto)
+
+================================================================================
+INTEGRACAO COM PROMPTS ANTERIORES
+================================================================================
+
+PROMPT 1 (Schema):
+  ✅ Database tem 4 colunas boolean
+
+PROMPT 2 (GET /api/auth/user):
+  ✅ Retorna 6 flags Odoo
+
+PROMPT 3 (Database migration):
+  ✅ 4 colunas criadas em empresas table
+
+PROMPT 4 (GET /api/admin/empresa):
+  ✅ Retorna 6 flags Odoo com fallbacks
+
+PROMPT 5 (PATCH /api/admin/empresa):
+  ✅ Aceita 4 novos flags no request body
+  ✅ Valida tipos (typeof === "boolean")
+  ✅ Atualiza database
+  ✅ Retorna 6 flags Odoo com fallbacks
+
+SISTEMA COMPLETO: ✅ CRUD (Create, Read, Update, Delete)
+
+Operacoes:
+  ✓ CREATE: POST /api/admin/empresa (criar empresa - já existia)
+  ✓ READ: GET /api/auth/user (ler flags - Prompt 2)
+  ✓ READ: GET /api/admin/empresa (ler configs admin - Prompt 4)
+  ✓ UPDATE: PATCH /api/admin/empresa (atualizar flags - Prompt 5)
+  ✓ DELETE: /api/admin/empresa (deletar empresa - já existia, nao afetado)
+
+================================================================================
+FICHEIROS MODIFICADOS
+================================================================================
+
+Ficheiro: server/routes.ts
+Linhas modificadas: 3 secções
+  - Linha 3338: +4 campos ao req.body destructuring
+  - Linhas 3358-3370: +12 linhas (validacao e adicao ao updateData)
+  - Linhas 3405-3428: +12 linhas (responseData com 4 novos campos)
+
+Total Delta: +28 linhas codigo
+Nenhum outro ficheiro modificado.
+
+================================================================================
+VALIDACAO TECNICA
+================================================================================
+
+COMPILACAO:
+  ✅ TypeScript: Sem erros
+  ✅ Sintaxe: Correcta (braces, semicolons, etc)
+  ✅ Indentacao: Consistente com resto do ficheiro
+
+RUNTIME:
+  ✅ Workflow: RUNNING (sem erros)
+  ✅ Express: serving on port 5000
+  ✅ Nenhuma mensagem de erro nos logs
+
+BACKWARD COMPATIBILITY:
+  ✅ Campos 4 novos sao OPCIONALES
+  ✅ Admin pode nao enviar + ignorado
+  ✅ Existing requests continuam funcionando
+  ✅ Database valores atuais nao afetados
+
+SECURITY:
+  ✅ Type validation (typeof check)
+  ✅ requireAdmin middleware
+  ✅ openai_api_key removido antes de enviar
+  ✓ Nenhuma info sensivel exposta
+
+================================================================================
+WORKFLOW VALIDACAO
+================================================================================
+
+RESTART: ✅ Feito (1:44:25 PM)
+STATUS: ✅ RUNNING
+LOGS: ✅ Sem erros
+COMPILACAO: ✅ Sucesso
+
+NEXT:
+  - Frontend AdminEmpresa component pode enviar PATCH com 4 novos flags
+  - UI toggles para activar/desactivar Odoo Contacts features
+  - Real-time cache invalidation com useQueryClient
+
+================================================================================
+PADRÕES REUTILIZAVEIS (Para Future Features)
+================================================================================
+
+Se tiver outras features booleanas no futuro:
+
+1. req.body destructuring:
+   const { ..., newFeature1, newFeature2 } = req.body;
+
+2. updateData validation:
+   if (typeof newFeature1 === "boolean") {
+     (updateData as any).newFeature1 = newFeature1;
+   }
+
+3. responseData:
+   newFeature1: (updated as any).newFeature1 ?? false,
+
+PADRÃO PRONTO PARA REUTILIZACAO
+
+================================================================================
+CONCLUSAO
+================================================================================
+
+PROMPT 5: PATCH /api/admin/empresa - Atualizar 4 Novos Flags
+
+TAREFA: ✅ COMPLETA
+
+3 MUDANCAS:
+  1. req.body: +4 campos destructuring
+  2. updateData: +4 if blocks (type validation)
+  3. responseData: +4 campos com fallbacks
+
+LINHAS ADICIONADAS: +28
+
+SISTEMA AGORA:
+  ✅ GET /api/admin/empresa retorna 6 flags (Prompt 4)
+  ✅ PATCH /api/admin/empresa atualiza 4 novos flags (Prompt 5)
+  ✅ Type-safe (typeof validation)
+  ✅ Backward compatible (campos opcionais)
+  ✅ Secure (api_key removido)
+
+CRUD PRONTO:
+  ✓ CREATE empresa: existia
+  ✓ READ flags: GET /api/auth/user (Prompt 2)
+  ✓ READ configs: GET /api/admin/empresa (Prompt 4)
+  ✓ UPDATE flags: PATCH /api/admin/empresa (Prompt 5)
+  ✓ DELETE empresa: existia
+
+FRONTEND READY:
+  ✅ AdminEmpresa pode ler config com GET
+  ✅ AdminEmpresa pode renderizar toggles
+  ✅ AdminEmpresa pode enviar PATCH com novos valores
+  ✅ Toggles atualizados + resposta retorna valores novos
+
+PRONTO PARA:
+  - UI toggles em AdminEmpresa
+  - Frontend feature gates (conditional rendering)
+  - Backend RBAC enforcement
+
+================================================================================
+FIM DO RELATORIO
+================================================================================
+Data: 1 Dezembro 2025
+Tarefa: Prompt 5 - PATCH /api/admin/empresa
+Status: ✅ COMPLETO
+Ficheiro: server/routes.ts (1 ficheiro)
+Mudancas: 3 secções (destructuring, validation, response)
+Linhas adicionadas: 28
+Campos novos: 4
+Workflow: ✅ RESTARTED
+Sistema: ✅ PRONTO

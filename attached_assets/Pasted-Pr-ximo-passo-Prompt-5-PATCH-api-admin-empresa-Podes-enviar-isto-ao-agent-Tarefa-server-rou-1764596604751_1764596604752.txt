@@ -1,0 +1,73 @@
+Próximo passo: Prompt 5 (PATCH /api/admin/empresa)
+
+Podes enviar isto ao agent:
+
+Tarefa – server/routes.ts (PATCH /api/admin/empresa):
+Na rota app.patch('/api/admin/empresa', requireAdmin, async (req, res) => { ... }):
+
+No const { ... } = req.body; adiciona:
+
+  const {
+    nome,
+    nif,
+    email,
+    telefone,
+    logoUrl,
+    mostrarMarcasEmVisitas,
+    mostrarGPS,
+    theme,
+    uiSettings,
+    iaOpenAIApiKey,
+    odooCrmEnabled,
+    crmLeadsEnabled,
+    odooContactsFeatureEnabled,
+    odooContactsAdminEnabled,
+    odooContactsAgentsEnabled,
+    crmVisitsOdooSyncEnabled,
+  } = req.body;
+
+
+No updateData, depois de tratar odooCrmEnabled e crmLeadsEnabled, adiciona:
+
+  if (typeof odooContactsFeatureEnabled === "boolean") {
+    (updateData as any).odooContactsFeatureEnabled = odooContactsFeatureEnabled;
+  }
+  if (typeof odooContactsAdminEnabled === "boolean") {
+    (updateData as any).odooContactsAdminEnabled = odooContactsAdminEnabled;
+  }
+  if (typeof odooContactsAgentsEnabled === "boolean") {
+    (updateData as any).odooContactsAgentsEnabled = odooContactsAgentsEnabled;
+  }
+  if (typeof crmVisitsOdooSyncEnabled === "boolean") {
+    (updateData as any).crmVisitsOdooSyncEnabled = crmVisitsOdooSyncEnabled;
+  }
+
+
+No responseData dessa rota, adiciona os mesmos campos (com fallbacks), tal como na GET /api/admin/empresa:
+
+  const responseData = {
+    ...updated,
+    odooCrmEnabled: updated.odooCrmEnabled ?? true,
+    crmLeadsEnabled: updated.crmLeadsEnabled ?? false,
+
+    odooContactsFeatureEnabled:
+      (updated as any).odooContactsFeatureEnabled ?? false,
+    odooContactsAdminEnabled:
+      (updated as any).odooContactsAdminEnabled ?? true,
+    odooContactsAgentsEnabled:
+      (updated as any).odooContactsAgentsEnabled ?? false,
+
+    crmVisitsOdooSyncEnabled:
+      (updated as any).crmVisitsOdooSyncEnabled ?? false,
+
+    uiSettings: {
+      ...(updated.uiSettings || {}),
+      ia: {
+        ...(updated.uiSettings?.ia || { aiEnabled: true, aiKeyMode: "global" }),
+        hasOwnOpenAIApiKey: !!(updated as any).openai_api_key,
+      },
+    },
+  };
+
+
+Mantém o resto da rota igual.

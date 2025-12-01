@@ -3332,7 +3332,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       
-      const { nome, nif, email, telefone, logoUrl, mostrarMarcasEmVisitas, mostrarGPS, theme, uiSettings, iaOpenAIApiKey, odooCrmEnabled, crmLeadsEnabled } = req.body;
+      const { nome, nif, email, telefone, logoUrl, mostrarMarcasEmVisitas, mostrarGPS, theme, uiSettings, iaOpenAIApiKey, odooCrmEnabled, crmLeadsEnabled, odooContactsFeatureEnabled, odooContactsAdminEnabled, odooContactsAgentsEnabled, crmVisitsOdooSyncEnabled } = req.body;
       
       // Validate theme if provided
       if (theme !== undefined && !["light-business", "dark-pro"].includes(theme)) {
@@ -3351,6 +3351,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (uiSettings !== undefined) updateData.uiSettings = uiSettings; // FASE 22
       if (typeof odooCrmEnabled === "boolean") updateData.odooCrmEnabled = odooCrmEnabled; // FASE CRM-UI-CRMS-CARD-STEP1
       if (typeof crmLeadsEnabled === "boolean") updateData.crmLeadsEnabled = crmLeadsEnabled; // FASE SUBS-LEADS-FLAG-STEP1
+      
+      // PROMPT 5: Add support for 4 new Odoo Contacts flags (3-tier RBAC + sync)
+      if (typeof odooContactsFeatureEnabled === "boolean") {
+        (updateData as any).odooContactsFeatureEnabled = odooContactsFeatureEnabled;
+      }
+      if (typeof odooContactsAdminEnabled === "boolean") {
+        (updateData as any).odooContactsAdminEnabled = odooContactsAdminEnabled;
+      }
+      if (typeof odooContactsAgentsEnabled === "boolean") {
+        (updateData as any).odooContactsAgentsEnabled = odooContactsAgentsEnabled;
+      }
+      if (typeof crmVisitsOdooSyncEnabled === "boolean") {
+        (updateData as any).crmVisitsOdooSyncEnabled = crmVisitsOdooSyncEnabled;
+      }
       
       // FASE 31-IA-01: Handle custom OpenAI API Key management
       if (iaOpenAIApiKey !== undefined) {
@@ -3385,10 +3399,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Return response WITHOUT the actual openai_api_key
+      // PROMPT 5: Include 4 new Odoo Contacts flags (3-tier RBAC + sync)
       const responseData = {
         ...updated,
         odooCrmEnabled: updated.odooCrmEnabled ?? true,
         crmLeadsEnabled: updated.crmLeadsEnabled ?? false,
+
+        odooContactsFeatureEnabled:
+          (updated as any).odooContactsFeatureEnabled ?? false,
+        odooContactsAdminEnabled:
+          (updated as any).odooContactsAdminEnabled ?? true,
+        odooContactsAgentsEnabled:
+          (updated as any).odooContactsAgentsEnabled ?? false,
+
+        crmVisitsOdooSyncEnabled:
+          (updated as any).crmVisitsOdooSyncEnabled ?? false,
+
         uiSettings: {
           ...(updated.uiSettings || {}),
           ia: {
