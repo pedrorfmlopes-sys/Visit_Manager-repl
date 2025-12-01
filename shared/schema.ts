@@ -165,6 +165,9 @@ export const empresas = pgTable("empresas", {
     .notNull()
     .default(false),
 
+  // Mensagem personalizada para utilizadores sem permissão de contactos Odoo
+  odooContactsNoPermissionMessage: text("odoo_contacts_no_permission_message"),
+
   // 🔽 Sync visitas → contacto Odoo (camada 3)
   crmVisitsOdooSyncEnabled: boolean("crm_visits_odoo_sync_enabled")
     .notNull()
