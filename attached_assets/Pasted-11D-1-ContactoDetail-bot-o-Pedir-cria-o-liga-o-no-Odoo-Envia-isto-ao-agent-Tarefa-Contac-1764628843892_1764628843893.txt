@@ -1,0 +1,92 @@
+11D-1 – ContactoDetail: botão “Pedir criação/ligação no Odoo”
+
+Envia isto ao agent:
+
+Tarefa – ContactoDetail: pedido de criação/ligação de contacto Odoo (sem permissão)
+
+Contexto: Já existe no ContactoDetail um card informativo quando:
+odooContactsFeatureEnabled && !canUseOdooContacts && !isAdmin
+e é aí que queremos colocar o botão de pedido.
+
+No ficheiro client/src/pages/ContactoDetail.tsx (ou equivalente), garante os imports:
+
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+
+
+(Só adiciona os que ainda não existirem.)
+
+Dentro do componente ContactoDetail, adiciona estado local para o pedido:
+
+const [requestMessage, setRequestMessage] = useState("");
+const [isSendingRequest, setIsSendingRequest] = useState(false);
+const [requestFeedback, setRequestFeedback] = useState<string | null>(null);
+
+
+Adiciona uma função handleCreateOdooContactRequest:
+
+const handleCreateOdooContactRequest = async () => {
+  if (!contacto?.id) return;
+
+  try {
+    setIsSendingRequest(true);
+    setRequestFeedback(null);
+
+    const res = await fetch("/api/odoo/contact-requests", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        tipo: "contacto",
+        contactoId: contacto.id,
+        entidadeId: contacto.entidadeId || null,
+        mensagem: requestMessage || null,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      setRequestFeedback(
+        data.message || "Erro ao enviar pedido ao administrador."
+      );
+      return;
+    }
+
+    setRequestFeedback("Pedido enviado ao administrador com sucesso.");
+    setRequestMessage("");
+  } catch (error: any) {
+    setRequestFeedback(
+      error?.message || "Erro inesperado ao enviar o pedido."
+    );
+  } finally {
+    setIsSendingRequest(false);
+  }
+};
+
+
+Ajusta contacto.id / contacto.entidadeId conforme o nome da variável que guarda o contacto no componente (por ex. contact, data, etc.).
+
+No card de “sem permissão” (Caso C: odooContactsFeatureEnabled && !canUseOdooContacts && !isAdmin), mantém o texto atual mas adiciona, dentro de <CardContent>:
+
+<p className="text-sm text-muted-foreground mb-2">
+  {messageToShow}
+</p>
+<div className="space-y-2 mt-2">
+  <Textarea
+    value={requestMessage}
+    onChange={(e) => setRequestMessage(e.target.value)}
+    placeholder="Opcional: explica ao administrador porque precisas deste contacto no Odoo."
+  />
+  <Button onClick={handleCreateOdooContactRequest} disabled={isSendingRequest}>
+    {isSendingRequest ? "A enviar pedido..." : "Pedir criação/ligação no Odoo"}
+  </Button>
+  {requestFeedback && (
+    <p className="text-xs text-muted-foreground">{requestFeedback}</p>
+  )}
+</div>
+
+
+Não mexas no card funcional de Odoo (Caso B) nem no resto da página. Garante que o ficheiro compila sem erros.

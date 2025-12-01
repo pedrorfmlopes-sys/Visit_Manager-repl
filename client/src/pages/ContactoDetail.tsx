@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ShareDialog, useShareActions } from "@/components/ShareDialog";
@@ -75,6 +76,11 @@ export default function ContactoDetail() {
   const odooContactsFeatureEnabled =
     empresa?.odooContactsFeatureEnabled ?? false;
   const noPermissionMsg = empresa?.odooContactsNoPermissionMessage;
+
+  // PROMPT 11D: Odoo Contact Request state
+  const [requestMessage, setRequestMessage] = useState("");
+  const [isSendingRequest, setIsSendingRequest] = useState(false);
+  const [requestFeedback, setRequestFeedback] = useState<string | null>(null);
 
   const { data: contacto, isLoading } = useQuery<ContactoWithRelations>({
     queryKey: ["/api/contactos", contactoId],
@@ -975,11 +981,56 @@ export default function ContactoDetail() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground" data-testid="text-odoo-no-permission-message">
+              <p className="text-sm text-muted-foreground mb-2" data-testid="text-odoo-no-permission-message">
                 {noPermissionMsg && noPermissionMsg.trim().length > 0
                   ? noPermissionMsg
                   : "A integração de contactos com o Odoo está ativa para esta empresa, mas esta funcionalidade está reservada ao administrador."}
               </p>
+              <div className="space-y-2 mt-2">
+                <Textarea
+                  value={requestMessage}
+                  onChange={(e) => setRequestMessage(e.target.value)}
+                  placeholder="Opcional: explica ao administrador porque precisas deste contacto no Odoo."
+                  data-testid="textarea-odoo-request-message"
+                />
+                <Button 
+                  onClick={async () => {
+                    if (!contacto?.id) return;
+                    try {
+                      setIsSendingRequest(true);
+                      setRequestFeedback(null);
+                      const res = await fetch("/api/odoo/contact-requests", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          tipo: "contacto",
+                          contactoId: contacto.id,
+                          entidadeId: contacto.entidadeId || null,
+                          mensagem: requestMessage || null,
+                        }),
+                      });
+                      const data = await res.json();
+                      if (!data.success) {
+                        setRequestFeedback(data.message || "Erro ao enviar pedido ao administrador.");
+                        return;
+                      }
+                      setRequestFeedback("Pedido enviado ao administrador com sucesso.");
+                      setRequestMessage("");
+                    } catch (error: any) {
+                      setRequestFeedback(error?.message || "Erro inesperado ao enviar o pedido.");
+                    } finally {
+                      setIsSendingRequest(false);
+                    }
+                  }}
+                  disabled={isSendingRequest}
+                  data-testid="button-odoo-request-create"
+                >
+                  {isSendingRequest ? "A enviar pedido..." : "Pedir criação/ligação no Odoo"}
+                </Button>
+                {requestFeedback && (
+                  <p className="text-xs text-muted-foreground" data-testid="text-odoo-request-feedback">{requestFeedback}</p>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}
