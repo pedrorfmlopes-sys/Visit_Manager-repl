@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Building2, Users, FileText, CheckCircle2, Calendar, AlertCircle, Zap, TrendingUp, ArrowRight, Download, Settings } from "lucide-react";
+import { Building2, Users, FileText, CheckCircle2, Calendar, AlertCircle, Zap, TrendingUp, ArrowRight, Download, Settings, Mail } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,6 +29,14 @@ interface KeyClient {
   lastVisitDate?: string;
 }
 
+interface OdooContactRequest {
+  id: string;
+  estado: "pendente" | "em_progresso" | "concluido";
+  tipo: "contacto" | "entidade";
+  mensagem?: string;
+  createdAt: string;
+}
+
 export default function AdminDashboard() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -46,6 +54,10 @@ export default function AdminDashboard() {
 
   const { data: tarefas, isLoading: tarefasLoading } = useQuery<Tarefa[]>({
     queryKey: ["/api/tarefas"],
+  });
+
+  const { data: odooRequests, isLoading: odooRequestsLoading, isError: odooRequestsError } = useQuery<OdooContactRequest[]>({
+    queryKey: ["/api/odoo/contact-requests", "dashboard"],
   });
 
   const toggleRoleMutation = useMutation({
@@ -94,6 +106,16 @@ export default function AdminDashboard() {
   const tarefasEmAtraso = tarefas?.filter(t => {
     return t.status !== 'done' && (t.dueDate ? new Date(t.dueDate) < today : false);
   }).length || 0;
+
+  // Odoo Requests Filters
+  const pendingOdooRequests =
+    odooRequests?.filter((r) => r.estado === "pendente").length ?? 0;
+
+  const inProgressOdooRequests =
+    odooRequests?.filter((r) => r.estado === "em_progresso").length ?? 0;
+
+  const totalRelevantOdooRequests =
+    pendingOdooRequests + inProgressOdooRequests;
 
   // Get visitas desta semana
   const weekStart = startOfWeek(today, { locale: pt });
@@ -505,6 +527,60 @@ export default function AdminDashboard() {
 
       {/* IA Insights */}
       <DashboardInsightsCard />
+
+      {/* Pedidos Odoo */}
+      {odooRequestsLoading ? (
+        <Skeleton className="h-32 rounded-lg" />
+      ) : odooRequestsError ? (
+        <Card data-testid="card-odoo-requests-error" className="border-red-300/30 bg-red-50 dark:bg-red-950/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg text-red-600 dark:text-red-400">
+              <AlertCircle className="h-5 w-5" />
+              Erro ao carregar pedidos Odoo
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-red-600 dark:text-red-400">
+              Não foi possível carregar a lista de pedidos. Tente novamente mais tarde.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card data-testid="card-odoo-requests" className="border-blue-300/30 bg-blue-50 dark:bg-blue-950/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Mail className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              Pedidos Odoo
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-1">
+              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totalRelevantOdooRequests}</p>
+              <p className="text-xs text-muted-foreground">
+                Pedidos por tratar (pendentes + em progresso)
+              </p>
+              <p className="text-sm mt-2">
+                Pendentes:{" "}
+                <span className="font-semibold text-blue-600 dark:text-blue-400">{pendingOdooRequests}</span>
+              </p>
+              <p className="text-sm">
+                Em progresso:{" "}
+                <span className="font-semibold text-blue-600 dark:text-blue-400">{inProgressOdooRequests}</span>
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => setLocation("/admin/odoo-contact-requests")}
+                data-testid="button-odoo-requests-view"
+                className="w-full mt-3"
+                size="sm"
+              >
+                <Mail className="h-4 w-4 mr-2" />
+                Ver todos os pedidos
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Admin Tools */}
       <Card data-testid="card-admin-tools" className="border-amber-300/30 bg-amber-50 dark:bg-amber-950/20">
