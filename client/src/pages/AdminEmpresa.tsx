@@ -74,6 +74,8 @@ export default function AdminEmpresa() {
   const [odooContactsAdminEnabled, setOdooContactsAdminEnabled] = useState<boolean>(true);
   const [odooContactsAgentsEnabled, setOdooContactsAgentsEnabled] = useState<boolean>(false);
   const [crmVisitsOdooSyncEnabled, setCrmVisitsOdooSyncEnabled] = useState<boolean>(false);
+  // PROMPT 10C: Manage Odoo Contacts no-permission message state
+  const [odooContactsNoPermissionMessage, setOdooContactsNoPermissionMessage] = useState<string>("");
   const [savingOdooContacts, setSavingOdooContacts] = useState(false);
 
   // Update leadsEnabled state when empresa data changes
@@ -90,6 +92,8 @@ export default function AdminEmpresa() {
       setOdooContactsAdminEnabled((empresa as any).odooContactsAdminEnabled ?? true);
       setOdooContactsAgentsEnabled((empresa as any).odooContactsAgentsEnabled ?? false);
       setCrmVisitsOdooSyncEnabled((empresa as any).crmVisitsOdooSyncEnabled ?? false);
+      // PROMPT 10C: Load Odoo Contacts no-permission message
+      setOdooContactsNoPermissionMessage((empresa as any).odooContactsNoPermissionMessage ?? "");
     }
   }, [empresa?.id]);
 
@@ -188,6 +192,7 @@ export default function AdminEmpresa() {
           odooContactsFeatureEnabled,
           odooContactsAdminEnabled,
           odooContactsAgentsEnabled,
+          odooContactsNoPermissionMessage,
           crmVisitsOdooSyncEnabled,
         }),
       });
@@ -1443,6 +1448,30 @@ export default function AdminEmpresa() {
                     </div>
                   </div>
                 )}
+
+                {/* PROMPT 10C: Textarea for no-permission message (visible only when feature and admin enabled, but agents disabled) */}
+                {odooContactsFeatureEnabled &&
+                  odooContactsAdminEnabled &&
+                  !odooContactsAgentsEnabled && (
+                    <div className="space-y-2 mt-4 border-t pt-3">
+                      <Label htmlFor="odoo-no-permission-msg">
+                        Mensagem para utilizadores sem permissão de contactos Odoo
+                      </Label>
+                      <Textarea
+                        id="odoo-no-permission-msg"
+                        value={odooContactsNoPermissionMessage}
+                        onChange={(e) =>
+                          setOdooContactsNoPermissionMessage(e.target.value)
+                        }
+                        placeholder="Ex.: Para criar contactos no Odoo, envia um pedido para crm@empresa.com ou abre um ticket no sistema interno."
+                        data-testid="textarea-odoo-no-permission-message"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Esta mensagem será mostrada aos utilizadores que não têm
+                        permissão para criar/ligar contactos no Odoo.
+                      </p>
+                    </div>
+                  )}
 
                 {/* Toggle 4: Sync Visitas (visible if CRM and feature are enabled) */}
                 {empresa?.odooCrmEnabled && odooContactsFeatureEnabled && (

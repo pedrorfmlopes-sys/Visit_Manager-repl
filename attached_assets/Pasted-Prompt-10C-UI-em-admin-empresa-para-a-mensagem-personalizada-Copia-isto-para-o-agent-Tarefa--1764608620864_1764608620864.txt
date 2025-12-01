@@ -1,0 +1,73 @@
+Prompt 10C – UI em /admin/empresa para a mensagem personalizada
+
+Copia isto para o agent:
+
+Tarefa – client/src/pages/AdminEmpresa.tsx (campo de mensagem Odoo)
+
+No componente AdminEmpresa, garante que o estado/local form inclui o campo odooContactsNoPermissionMessage, carregado a partir de /api/admin/empresa.
+
+Se estiveres a usar useForm, garante que defaultValues inclui:
+
+odooContactsNoPermissionMessage: data?.odooContactsNoPermissionMessage ?? "",
+
+
+Se estiveres a usar useState, algo do género:
+
+const [odooContactsNoPermissionMessage, setOdooContactsNoPermissionMessage] =
+  useState(data?.odooContactsNoPermissionMessage ?? "");
+
+
+Na secção do card de Odoo / CRM, onde já tens:
+
+odooContactsFeatureEnabled
+
+odooContactsAdminEnabled
+
+odooContactsAgentsEnabled
+
+adiciona um textarea que só aparece quando:
+
+odooContactsFeatureEnabled &&
+odooContactsAdminEnabled &&
+!odooContactsAgentsEnabled
+
+
+Exemplo (ajusta para o padrão de UI que já usas — Label, Textarea, etc.):
+
+{odooContactsFeatureEnabled &&
+  odooContactsAdminEnabled &&
+  !odooContactsAgentsEnabled && (
+    <div className="space-y-2 mt-4">
+      <Label>
+        Mensagem para utilizadores sem permissão de contactos Odoo
+      </Label>
+      <Textarea
+        value={odooContactsNoPermissionMessage}
+        onChange={(e) =>
+          setOdooContactsNoPermissionMessage(e.target.value)
+        }
+        placeholder="Ex.: Para criar contactos no Odoo, envia um pedido para crm@empresa.com ou abre um ticket no sistema interno."
+      />
+      <p className="text-xs text-muted-foreground">
+        Esta mensagem será mostrada aos utilizadores que não têm
+        permissão para criar/ligar contactos no Odoo.
+      </p>
+    </div>
+  )}
+
+
+No handler de guardar desta página (PATCH /api/admin/empresa), garante que o body inclui o campo:
+
+{
+  ...,
+  odooContactsFeatureEnabled,
+  odooContactsAdminEnabled,
+  odooContactsAgentsEnabled,
+  crmVisitsOdooSyncEnabled,
+  odooContactsNoPermissionMessage,
+}
+
+
+Mantém o invalidateQueries para /api/auth/user e o resto da lógica como está.
+
+Compilar sem erros.
