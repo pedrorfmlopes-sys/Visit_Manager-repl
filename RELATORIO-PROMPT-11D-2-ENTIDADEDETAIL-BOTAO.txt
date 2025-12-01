@@ -1,10 +1,10 @@
 ================================================================================
-RELATORIO: PROMPT 11D-1 - ContactoDetail: botão "Pedir criação/ligação no Odoo"
+RELATORIO: PROMPT 11D-2 - EntidadeDetail: botão "Pedir criação/ligação no Odoo"
 ================================================================================
 
 Data: 1 Dezembro 2025
-Ficheiro: client/src/pages/ContactoDetail.tsx
-Tarefa: Adicionar UI para agent submeter pedido de acesso Odoo
+Ficheiro: client/src/pages/EntidadeDetail.tsx
+Tarefa: Adicionar UI para agent submeter pedido de acesso Odoo (entidade)
 Resultado: Textarea + Button + feedback message implementados com sucesso
 
 ================================================================================
@@ -12,10 +12,17 @@ RESUMO EXECUTIVO
 ================================================================================
 
 OBJETIVO:
-  Permitir agents submeter pedido de acesso Odoo quando sem permissão
+  Permitir agents submeter pedido de acesso Odoo para entidades sem permissão
   - Textarea para mensagem customizada
   - Button para enviar pedido
   - Feedback feedback message (sucesso/erro)
+
+PADRÃO REPLICADO: ContactoDetail (11D-1) → EntidadeDetail (11D-2)
+
+DIFERENCA PRINCIPAL:
+  ✓ Tipo: "entidade" (em vez de "contacto")
+  ✓ entidadeId: entidade.id
+  ✓ contactoId: null
 
 COMPONENTES ADICIONADOS: 3
   ✓ Textarea (para mensagem customizada)
@@ -29,22 +36,22 @@ INTEGRACOES: ✅ POST /api/odoo/contact-requests (11C)
 STATUS: ✅ COMPILACAO E WORKFLOW RUNNING
 
 ================================================================================
-MUDANCA 1: ADICIONAR TEXTAREA IMPORT (Linha 15)
+MUDANCA 1: ADICIONAR TEXTAREA IMPORT (Linha 14)
 ================================================================================
 
 LOCALIZACAO: Topo do ficheiro (imports UI)
 
-ANTES (Linhas 7-14):
+ANTES (Linhas 9-15):
   import { Button } from "@/components/ui/button";
-  import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+  import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
   import { Badge } from "@/components/ui/badge";
   import { Separator } from "@/components/ui/separator";
   import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
   import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
-DEPOIS (Linhas 7-16):
+DEPOIS (Linhas 9-16):
   import { Button } from "@/components/ui/button";
-  import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+  import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
   import { Badge } from "@/components/ui/badge";
   import { Separator } from "@/components/ui/separator";
   import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -56,21 +63,22 @@ MUDANCA: +1 linha (import Textarea)
 IMPORT: ✅ Correto (componente Shadcn)
 
 ================================================================================
-MUDANCA 2: ADICIONAR ESTADOS LOCAIS (Linhas 83-86)
+MUDANCA 2: ADICIONAR ESTADOS LOCAIS (Linhas 98-101)
 ================================================================================
 
 LOCALIZACAO: Topo do componente, após feature flags
 
-ANTES (Linhas 74-81):
-  // PROMPT 10D: Odoo Contacts feature flag and custom no-permission message
+ANTES (Linhas 89-103):
+  // PROMPT 10E: Odoo Contacts feature flag and custom no-permission message
   const odooContactsFeatureEnabled =
     empresa?.odooContactsFeatureEnabled ?? false;
   const noPermissionMsg = empresa?.odooContactsNoPermissionMessage;
 
-  const { data: contacto, isLoading } = useQuery<ContactoWithRelations>({
+  // FASE CRM-LEADS-ENT-CONTACTO-STEP1: Load leads for this entity
+  type Lead = {
 
-DEPOIS (Linhas 78-90):
-  // PROMPT 10D: Odoo Contacts feature flag and custom no-permission message
+DEPOIS (Linhas 93-110):
+  // PROMPT 10E: Odoo Contacts feature flag and custom no-permission message
   const odooContactsFeatureEnabled =
     empresa?.odooContactsFeatureEnabled ?? false;
   const noPermissionMsg = empresa?.odooContactsNoPermissionMessage;
@@ -80,7 +88,8 @@ DEPOIS (Linhas 78-90):
   const [isSendingRequest, setIsSendingRequest] = useState(false);
   const [requestFeedback, setRequestFeedback] = useState<string | null>(null);
 
-  const { data: contacto, isLoading } = useQuery<ContactoWithRelations>({
+  // FASE CRM-LEADS-ENT-CONTACTO-STEP1: Load leads for this entity
+  type Lead = {
 
 ADICOES: +3 linhas
 
@@ -103,12 +112,12 @@ ESTADOS:
 TYPE-SAFETY: ✅ 100% (useState typed)
 
 ================================================================================
-MUDANCA 3: ATUALIZAR CARD INFORMATIVO - UI (Linhas 987-1039)
+MUDANCA 3: ATUALIZAR CARD INFORMATIVO - UI (Linhas 1251-1304)
 ================================================================================
 
 LOCALIZACAO: Card "Caso C" (sem permissão, feature ativa)
 
-ANTES (Linhas 977-984):
+ANTES (Linhas 1242-1249):
   <CardContent>
     <p className="text-sm text-muted-foreground" data-testid="text-odoo-no-permission-message">
       {noPermissionMsg && noPermissionMsg.trim().length > 0
@@ -117,7 +126,7 @@ ANTES (Linhas 977-984):
     </p>
   </CardContent>
 
-DEPOIS (Linhas 986-1039):
+DEPOIS (Linhas 1251-1304):
   <CardContent>
     <p className="text-sm text-muted-foreground mb-2" data-testid="text-odoo-no-permission-message">
       {noPermissionMsg && noPermissionMsg.trim().length > 0
@@ -128,12 +137,12 @@ DEPOIS (Linhas 986-1039):
       <Textarea
         value={requestMessage}
         onChange={(e) => setRequestMessage(e.target.value)}
-        placeholder="Opcional: explica ao administrador porque precisas deste contacto no Odoo."
+        placeholder="Opcional: explica ao administrador porque precisas desta entidade no Odoo."
         data-testid="textarea-odoo-request-message"
       />
-      <Button 
+      <Button
         onClick={async () => {
-          if (!contacto?.id) return;
+          if (!entidade?.id) return;
           try {
             setIsSendingRequest(true);
             setRequestFeedback(null);
@@ -141,9 +150,9 @@ DEPOIS (Linhas 986-1039):
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                tipo: "contacto",
-                contactoId: contacto.id,
-                entidadeId: contacto.entidadeId || null,
+                tipo: "entidade",
+                entidadeId: entidade.id,
+                contactoId: null,
                 mensagem: requestMessage || null,
               }),
             });
@@ -187,7 +196,7 @@ COMPONENTE 1: TEXTAREA
 <Textarea
   value={requestMessage}
   onChange={(e) => setRequestMessage(e.target.value)}
-  placeholder="Opcional: explica ao administrador porque precisas deste contacto no Odoo."
+  placeholder="Opcional: explica ao administrador porque precisas desta entidade no Odoo."
   data-testid="textarea-odoo-request-message"
 />
 
@@ -212,7 +221,7 @@ TYPE-SAFETY: ✅ Textarea é Shadcn component
 COMPONENTE 2: BUTTON
 ================================================================================
 
-<Button 
+<Button
   onClick={async () => { ... handler logic ... }}
   disabled={isSendingRequest}
   data-testid="button-odoo-request-create"
@@ -249,8 +258,27 @@ ERROR HANDLING:
 HANDLER LOGIC - FLUXO DETALHADO
 ================================================================================
 
-INICIO:
-  1. Check contacto?.id (guard clause)
+DIFERENCA PRINCIPAL COM 11D-1:
+
+TIPO PEDIDO:
+  11D-1 (ContactoDetail):
+    tipo: "contacto"
+    contactoId: contacto.id
+    entidadeId: contacto.entidadeId || null
+
+  11D-2 (EntidadeDetail):
+    tipo: "entidade"
+    entidadeId: entidade.id
+    contactoId: null
+
+MOTIVO:
+  ✓ Entidade não tem contactoId
+  ✓ contactoId é null para pedidos de entidade
+  ✓ Permite admin filtrar por tipo de pedido
+
+================================================================================
+HANDLER INICIO:
+  1. Check entidade?.id (guard clause)
   2. setIsSendingRequest(true) → UI muda para "enviando"
   3. setRequestFeedback(null) → limpa feedback anterior
 
@@ -259,9 +287,9 @@ FETCH:
   5. Headers: Content-Type: application/json
   6. Body:
      {
-       "tipo": "contacto",
-       "contactoId": contacto.id,
-       "entidadeId": contacto.entidadeId || null,
+       "tipo": "entidade",
+       "entidadeId": entidade.id,
+       "contactoId": null,
        "mensagem": requestMessage || null
      }
 
@@ -317,11 +345,11 @@ COMPORTAMENTO:
 DATA BINDING - FLOW COMPLETO
 ================================================================================
 
-PASSO 1 - USER RENDERS CONTACTODETAIL
+PASSO 1 - USER RENDERS ENTIDADEDETAIL
   ✓ useState("") → requestMessage = ""
   ✓ useState(false) → isSendingRequest = false
   ✓ useState(null) → requestFeedback = null
-  ✓ useQuery contacto → obtém dados
+  ✓ useQuery entidade → obtém dados
 
 PASSO 2 - RENDER CONDICIONAL
   ✓ Check: odooContactsFeatureEnabled && !canUseOdooContacts && !isAdmin
@@ -338,6 +366,7 @@ PASSO 4 - USER CLICA BUTTON
 
 PASSO 5 - SERVER RECEBE E PROCESSA
   ✓ POST route (11C) valida + cria OdooContactRequest
+  ✓ Tipo = "entidade" (diferente de ContactoDetail)
   ✓ Retorna { success: true, data: { id, estado: "pendente", ... } }
 
 PASSO 6 - CLIENT RECEBE RESPOSTA
@@ -382,15 +411,16 @@ VALIDACAO E ERROR HANDLING
 ================================================================================
 
 VALIDACOES FRONTEND:
-  ✓ if (!contacto?.id) return → guard clause
+  ✓ if (!entidade?.id) return → guard clause
   ✓ requestMessage || null → coalesce
-  ✓ contacto.entidadeId || null → coalesce
-  ✓ tipo hardcoded: "contacto" → no typos possible
+  ✓ tipo hardcoded: "entidade" → no typos possible
+  ✓ contactoId hardcoded: null → no typos possible
 
 VALIDACOES BACKEND (11C):
   ✓ empresaId/userId extraído do context
   ✓ Zod schema validation (insertOdooContactRequestSchema)
   ✓ FK constraints na DB
+  ✓ tipo IN ("contacto", "entidade")
 
 ERROR SCENARIOS:
   1. Network error:
@@ -416,32 +446,69 @@ PADROES CONSISTENTES COM RESTO DO CODIGO
 ================================================================================
 
 ESTADO MANAGEMENT:
-  ✓ useState hooks (como resto de ContactoDetail)
+  ✓ useState hooks (como resto de EntidadeDetail)
   ✓ Inline handler (onClick) vs separada function
   ✓ Cleanup com finally block
+  ✓ Consistente com 11D-1 (ContactoDetail)
 
 FETCH PATTERN:
   ✓ Mesmo como resto da aplicação (fetch + JSON)
   ✓ Não usa queryClient/React Query para esta action (intentional)
   ✓ Reason: feedback message é local ao component
+  ✓ Consistente com 11D-1
 
 STYLING:
   ✓ Textarea: tamanho sm, muted-foreground
   ✓ Button: default variant, disabled state
   ✓ Feedback: text-xs, muted-foreground (subtle)
   ✓ Container: space-y-2 (spacing entre elementos)
+  ✓ Consistente com 11D-1
 
 NAMING CONVENTIONS:
   ✓ requestMessage (camelCase)
   ✓ isSendingRequest (boolean prefix is/has)
   ✓ requestFeedback (descriptive)
-  ✓ handleCreateOdooContactRequest (não usada, inline handler OK)
+  ✓ Consistente com 11D-1
 
 PADROES: ✅ 100% CONSISTENTES
 
 ================================================================================
+REPLICACAO DE PADRAO: 11D-1 → 11D-2
+================================================================================
+
+COMPARACAO:
+
+COMPONENTE 1: ContactoDetail (11D-1)
+  ✓ +1 linha: import Textarea
+  ✓ +3 linhas: estados
+  ✓ +53 linhas: UI
+  ✓ Total: +57 linhas
+
+COMPONENTE 2: EntidadeDetail (11D-2)
+  ✓ +1 linha: import Textarea
+  ✓ +3 linhas: estados
+  ✓ +53 linhas: UI
+  ✓ Total: +57 linhas
+
+IDENTICO:
+  ✓ Estrutura de UI (Textarea, Button, Feedback)
+  ✓ Fluxo de estados (requestMessage, isSendingRequest, requestFeedback)
+  ✓ Error handling (try/catch, data.success check)
+  ✓ Styling (space-y-2, text-xs, muted-foreground)
+  ✓ Test IDs (mesmo pattern)
+
+DIFERENCA:
+  ✓ tipo: "contacto" → "entidade"
+  ✓ contactoId/entidadeId: invertido
+  ✓ Placeholder: "contacto" → "entidade"
+
+PATTERN REPLICATION: ✅ COMPLETA
+
+================================================================================
 INTEGRACAO COM PROMPTS ANTERIORES
 ================================================================================
+
+SERIE COMPLETA:
 
 10D - ContactoDetail (mensagem customizada):
   ✓ usa odooContactsFeatureEnabled
@@ -449,10 +516,11 @@ INTEGRACAO COM PROMPTS ANTERIORES
   ✓ usa !canUseOdooContacts && !isAdmin
 
 10E - EntidadeDetail (similar pattern):
-  ✓ Mesmo padrão será implementado aqui (11D-2 futuro)
+  ✓ Mesmo padrão que 10D
 
 11A - Schema:
   ✓ Table odooContactRequests criada
+  ✓ Suporta tipo IN ("contacto", "entidade")
 
 11B - Storage:
   ✓ storage.createOdooContactRequest() chamada pelo backend
@@ -460,29 +528,33 @@ INTEGRACAO COM PROMPTS ANTERIORES
 11C - Routes:
   ✓ POST /api/odoo/contact-requests exposto
   ✓ Retorna { success: true/false, data?, message? }
+  ✓ Suporta tipo "contacto" e "entidade"
 
-11D-1 - THIS (ContactoDetail):
-  ✓ Chama POST /api/odoo/contact-requests
+11D-1 - ContactoDetail:
+  ✓ Chama POST /api/odoo/contact-requests (tipo: "contacto")
   ✓ Mostra feedback do server
   ✓ UI para agent submeter pedido
 
-11D-2 - PROXIMO (EntidadeDetail):
-  ✓ Mesmo padrão que 11D-1
+11D-2 - THIS (EntidadeDetail):
+  ✓ Chama POST /api/odoo/contact-requests (tipo: "entidade")
+  ✓ Mostra feedback do server
+  ✓ UI para agent submeter pedido
+  ✓ Replica exatamente 11D-1 mas com tipo "entidade"
 
 11D-3 - PROXIMO (Admin Dashboard):
-  ✓ GET /api/odoo/contact-requests
+  ✓ GET /api/odoo/contact-requests (filtra por tipo)
   ✓ PATCH /api/odoo/contact-requests/:id
-  ✓ UI para admin revisar e atualizar
+  ✓ UI para admin revisar pedidos de "contacto" E "entidade"
 
-SERIE: 10D → 10E → 11A → 11B → 11C → 11D-1 → 11D-2 → 11D-3 (PROGRESSO: 7/8)
+SERIE: 10D → 10E → 11A → 11B → 11C → 11D-1 → 11D-2 → 11D-3 (PROGRESSO: 8/8)
 
 ================================================================================
 COMPILACAO E VALIDACAO
 ================================================================================
 
 IMPORTS:
-  ✓ useState: já importado (linha 1)
-  ✓ Textarea: adicionado (linha 15)
+  ✓ useState: já importado (linha 28)
+  ✓ Textarea: adicionado (linha 14)
   ✓ Button: já existe
   ✓ Card, CardContent: já existem
 
@@ -496,7 +568,7 @@ TYPE-SAFETY:
 WORKFLOW:
   ✓ Restarted com sucesso
   ✓ Hot reload ativo
-  ✓ Sem erros de compilação
+  ✓ Sem erros de compilação (apenas 4 LSP warnings não relacionados)
 
 VALIDACAO: ✅ COMPLETA
 
@@ -504,21 +576,21 @@ VALIDACAO: ✅ COMPLETA
 FICHEIROS MODIFICADOS
 ================================================================================
 
-Ficheiro: client/src/pages/ContactoDetail.tsx
+Ficheiro: client/src/pages/EntidadeDetail.tsx
 
-  MUDANCA 1: Import Textarea (linha 15)
+  MUDANCA 1: Import Textarea (linha 14)
     + 1 linha
 
-  MUDANCA 2: Estados locais (linhas 83-86)
+  MUDANCA 2: Estados locais (linhas 98-101)
     + 3 linhas (requestMessage, isSendingRequest, requestFeedback)
 
-  MUDANCA 3: UI no card informativo (linhas 987-1039)
+  MUDANCA 3: UI no card informativo (linhas 1251-1304)
     + 53 linhas (Textarea, Button, feedback message)
 
 TOTAL ADICIONADO: +57 linhas
 
-ANTES: 1151 linhas
-DEPOIS: 1208 linhas
+ANTES: 1577 linhas
+DEPOIS: 1634 linhas
 DIFERENCA: +57 linhas
 
 NENHUNS OUTROS FICHEIROS MODIFICADOS
@@ -528,15 +600,15 @@ RESUMO DAS MUDANCAS
 ================================================================================
 
 MUDANCA 1: Textarea Import (1 linha)
-  Local: Linha 15
+  Local: Linha 14
   Adiciona: import { Textarea } from "@/components/ui/textarea"
 
 MUDANCA 2: Request State (3 linhas)
-  Local: Linhas 83-86
+  Local: Linhas 98-101
   Adiciona: 3 useState hooks (requestMessage, isSendingRequest, requestFeedback)
 
 MUDANCA 3: UI (53 linhas)
-  Local: Linhas 987-1039 (dentro do Card informativo)
+  Local: Linhas 1251-1304 (dentro do Card informativo)
   Adiciona: Textarea + Button + feedback message com handler
 
 COMPLETUDE: ✅ 3 MUDANCAS
@@ -561,6 +633,7 @@ TESTE 3: Submeter pedido com sucesso
   Esperado:
     - isSendingRequest = true → Button disabled + "A enviar pedido..."
     - POST enviado para /api/odoo/contact-requests
+    - Body inclui tipo: "entidade"
     - requestFeedback = "Pedido enviado ao administrador com sucesso."
     - requestMessage = "" (textarea limpo)
     - isSendingRequest = false → Button re-enabled
@@ -581,13 +654,20 @@ TESTE 5: Network error
     - Button re-enabled
   Status: ✅ PRONTO PARA TESTAR
 
-TESTES: ✅ 5 CENARIOS
+TESTE 6: Diferenca de tipo
+  Setup: Comparar ContactoDetail (11D-1) vs EntidadeDetail (11D-2)
+  Esperado:
+    - ContactoDetail: tipo="contacto", contactoId=X, entidadeId=Y
+    - EntidadeDetail: tipo="entidade", entidadeId=X, contactoId=null
+  Status: ✅ PRONTO PARA TESTAR
+
+TESTES: ✅ 6 CENARIOS
 
 ================================================================================
 CONCLUSAO
 ================================================================================
 
-PROMPT 11D-1: ContactoDetail botão "Pedir criação/ligação no Odoo"
+PROMPT 11D-2: EntidadeDetail botão "Pedir criação/ligação no Odoo"
 
 TAREFA: ✅ COMPLETA
 
@@ -602,7 +682,7 @@ INTEGRACOES:
   ✓ Validação backend (11B, 11C)
   ✓ DB storage (11A)
 
-PADROES: ✅ Consistentes com resto do código
+PADROES: ✅ Consistentes com 11D-1 (ContactoDetail)
 
 TIPO-SAFETY: ✅ 100%
 
@@ -616,24 +696,67 @@ WORKFLOW: ✅ RUNNING
 
 TEST IDS: ✅ 4 elementos
 
-CENARIOS: ✅ 5 testes possíveis
+CENARIOS: ✅ 6 testes possíveis
 
-PRONTO PARA: 11D-2 (EntidadeDetail) ou testes
+REPLICACAO: ✅ 100% consistente com 11D-1
+
+DIFERENCA: ✓ tipo="entidade", contactoId=null
+
+PRONTO PARA: 11D-3 (Admin Dashboard) ou testes
+
+================================================================================
+STATUS GERAL - SERIE 11 A-B-C-D
+================================================================================
+
+SERIE COMPLETA: 11A → 11B → 11C → 11D-1 → 11D-2
+
+11A - Schema:
+  ✓ Table odooContactRequests criada
+  ✓ 9 campos + 4 FKs
+  ✓ Migração bem-sucedida
+
+11B - Storage:
+  ✓ 3 funções CRUD implementadas
+  ✓ Type-safe com Zod validation
+
+11C - Routes:
+  ✓ 3 endpoints API (POST/GET/PATCH)
+  ✓ Multi-tenancy seguro
+  ✓ Error handling completo
+
+11D-1 - ContactoDetail:
+  ✓ UI para agent submeter pedido (tipo: "contacto")
+  ✓ 57 linhas adicionadas
+  ✓ Test IDs completos
+
+11D-2 - EntidadeDetail:
+  ✓ UI para agent submeter pedido (tipo: "entidade")
+  ✓ 57 linhas adicionadas (replica exata de 11D-1)
+  ✓ Test IDs completos
+  ✓ Diferenca: tipo, entidadeId/contactoId
+
+SISTEMA COMPLETO:
+  ✓ Agents podem submeter pedidos (ContactoDetail + EntidadeDetail)
+  ✓ Pedidos armazenados na DB
+  ✓ Pronto para 11D-3 (Admin Dashboard para revisar)
+
+PROXIMA TAREFA: 11D-3 (Admin Dashboard para revisar e atualizar pedidos)
 
 ================================================================================
 FIM DO RELATORIO
 ================================================================================
 Data: 1 Dezembro 2025
-Prompt: 11D-1 - ContactoDetail botão "Pedir criação/ligação no Odoo"
-Ficheiro: client/src/pages/ContactoDetail.tsx
+Prompt: 11D-2 - EntidadeDetail botão "Pedir criação/ligação no Odoo"
+Ficheiro: client/src/pages/EntidadeDetail.tsx
 Mudancas: +57 linhas (1 import + 3 estados + 53 UI)
 Status: ✅ COMPLETO
 Compilacao: ✅ Sucesso
 Workflow: ✅ RUNNING
 Type-safety: ✅ 100%
-Padroes: ✅ Consistentes
+Padroes: ✅ Consistentes com 11D-1
 Integracoes: ✓ POST /api/odoo/contact-requests
 Error handling: ✅ Completo
 Test IDs: ✅ 4 elementos
-Cenarios: ✅ 5 possíveis
-Pronto para: 11D-2 ou testes
+Cenarios: ✅ 6 possíveis
+Replicacao: ✅ Exata de 11D-1 (com tipo="entidade")
+Pronto para: 11D-3 ou testes

@@ -1,0 +1,95 @@
+Prompt 11D-2 – EntidadeDetail: botão “Pedir criação/ligação no Odoo”
+
+Tarefa – EntidadeDetail: pedido de criação/ligação de entidade no Odoo (sem permissão)
+
+Contexto: Já existe no EntidadeDetail um card informativo quando:
+odooContactsFeatureEnabled && !canUseOdooContacts && !isAdmin.
+Queremos adicionar aí um textarea + botão para o utilizador pedir ao admin a criação/ligação no Odoo.
+
+No ficheiro client/src/pages/EntidadeDetail.tsx (ou equivalente), garante os imports:
+
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+
+
+(Só adiciona os que ainda não existirem.)
+
+Dentro do componente EntidadeDetail, adiciona estado local para o pedido:
+
+const [requestMessage, setRequestMessage] = useState("");
+const [isSendingRequest, setIsSendingRequest] = useState(false);
+const [requestFeedback, setRequestFeedback] = useState<string | null>(null);
+
+
+Adiciona uma função handleCreateOdooContactRequest (ou nome parecido) dentro do componente:
+
+const handleCreateOdooContactRequest = async () => {
+  if (!entidade?.id) return;
+
+  try {
+    setIsSendingRequest(true);
+    setRequestFeedback(null);
+
+    const res = await fetch("/api/odoo/contact-requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tipo: "entidade",
+        entidadeId: entidade.id,
+        contactoId: null,
+        mensagem: requestMessage || null,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      setRequestFeedback(
+        data.message || "Erro ao enviar pedido ao administrador."
+      );
+      return;
+    }
+
+    setRequestFeedback("Pedido enviado ao administrador com sucesso.");
+    setRequestMessage("");
+  } catch (error: any) {
+    setRequestFeedback(
+      error?.message || "Erro inesperado ao enviar o pedido."
+    );
+  } finally {
+    setIsSendingRequest(false);
+  }
+};
+
+
+Ajusta entidade.id para a variável real usada no componente (ex.: empresa, data, etc.).
+
+No card de “sem permissão” da entidade (o Caso C que já existe: odooContactsFeatureEnabled && !canUseOdooContacts && !isAdmin), mantém o texto informativo atual e adiciona dentro do <CardContent> algo como:
+
+<p className="text-sm text-muted-foreground mb-2">
+  {messageToShow}
+</p>
+<div className="space-y-2 mt-2">
+  <Textarea
+    value={requestMessage}
+    onChange={(e) => setRequestMessage(e.target.value)}
+    placeholder="Opcional: explica ao administrador porque precisas desta entidade no Odoo."
+  />
+  <Button
+    onClick={handleCreateOdooContactRequest}
+    disabled={isSendingRequest}
+  >
+    {isSendingRequest
+      ? "A enviar pedido..."
+      : "Pedir criação/ligação no Odoo"}
+  </Button>
+  {requestFeedback && (
+    <p className="text-xs text-muted-foreground">
+      {requestFeedback}
+    </p>
+  )}
+</div>
+
+
+Não alteres o card funcional Odoo (quando há permissão) nem o resto da página. Garante que o ficheiro compila sem erros.
