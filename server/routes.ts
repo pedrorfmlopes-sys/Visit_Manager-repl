@@ -4,6 +4,11 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { getUserContext, ensureAuthenticated, requireAdmin } from "./authContext";
+import {
+  createOdooContactRequest,
+  listOdooContactRequestsByEmpresa,
+  updateOdooContactRequestStatus,
+} from "./storage";
 import { transcribeAudio, generateVisitSummary, extractBusinessCardData, generateEmailDraft, generateDashboardInsights } from "./openai";
 import { sendVisitEmail } from "./email";
 import { enrichEntity, type EnrichmentInput, extractDomainFromEmail, isPersonalEmailDomain } from "./enrichment";
@@ -4116,6 +4121,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(404).json({ message: "File not found" });
     }
   });
+
+  // ============ PROMPT 11C: Odoo Contact Requests Routes ============
+
+  // POST /api/odoo/contact-requests - Create new request (any authenticated user)
+  app.post("/api/odoo/contact-requests", isAuthenticated, async (req: any, res) => {
+    try {
+      const { empresaId, userId } = await getUserContext(req);
+      if (!empresaId || !userId) {
+        return res.status(400).json({
+          success: false,
+          message: "Utilizador sem empresa ou utilizador associado.",
+        });
+      }
+
+      const { contactoId, entidadeId, tipo, mensagem } = req.body;
+
+      const created = await storage.createOdooContactRequest({
+        empresaId,
+        userId,
+        contactoId: contactoId || null,
+        entidadeId: entidadeId || null,
+        tipo,
+        mensagem: mensagem || null,
+      });
+
+      return res.json({ success: true, data: created });
+    } catch (error: any) {
+      console.error("[OdooContactRequests] Erro ao criar pedido:", error);
+      return res.status(500).json({
+        success: false,
+        message: error?.message ?? "Erro ao criar pedido de contacto Odoo.",
+      });
+    }
+  });
+
+  // GET /api/odoo/contact-requests - List all requests (admin only)
+  app.get("/api/odoo/contact-requests", requireAdmin, async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) {
+        return res.status(400).json({
+          success: false,
+          message: "Administrador sem empresa associada.",
+        });
+      }
+
+      const requests = await storage.listOdooContactRequestsByEmpresa(empresaId);
+      return res.json({ success: true, data: requests });
+    } catch (error: any) {
+      console.error("[OdooContactRequests] Erro ao listar pedidos:", error);
+      return res.status(500).json({
+        success: false,
+        message: error?.message ?? "Erro ao listar pedidos de contacto Odoo.",
+      });
+    }
+  });
+
+  // PATCH /api/odoo/contact-requests/:id - Update request status (admin only)
+  app.patch(
+    "/api/odoo/contact-requests/:id",
+    requireAdmin,
+    async (req: any, res) => {
+      try {
+        const { empresaId } = await getUserContext(req);
+        if (!empresaId) {
+          return res.status(400).json({
+            success: false,
+            message: "Administrador sem empresa associada.",
+          });
+        }
+
+        const requestId = req.params.id;
+        const { estado } = req.body; // "pendente" | "em_progresso" | "concluido"
+
+        const updated = await storage.updateOdooContactRequestStatus(
+          empresaId,
+          requestId,
+          estado
+        );
+
+        if (!updated) {
+          return res.status(404).json({
+            success: false,
+            message: "Pedido não encontrado para esta empresa.",
+          });
+        }
+
+        return res.json({ success: true, data: updated });
+      } catch (error: any) {
+        console.error("[OdooContactRequests] Erro ao atualizar pedido:", error);
+        return res.status(500).json({
+          success: false,
+          message:
+            error?.message ?? "Erro ao atualizar pedido de contacto Odoo.",
+        });
+      }
+    }
+  );
 
   const httpServer = createServer(app);
   return httpServer;

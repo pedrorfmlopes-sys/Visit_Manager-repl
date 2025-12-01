@@ -1,0 +1,136 @@
+Prompt 11C – API routes para pedidos de contacto Odoo
+
+Copia isto para o agent:
+
+Tarefa – server/routes.ts (API para pedidos de contacto Odoo)
+
+Objetivo: expor 3 endpoints:
+
+POST /api/odoo/contact-requests → agentes criam pedido
+
+GET /api/odoo/contact-requests → admin lista pedidos da empresa
+
+PATCH /api/odoo/contact-requests/:id → admin atualiza estado
+
+No ficheiro server/routes.ts (ou onde estão as rotas principais), importa as funções de storage:
+
+import {
+  createOdooContactRequest,
+  listOdooContactRequestsByEmpresa,
+  updateOdooContactRequestStatus,
+} from "./storage";
+
+
+Ajusta o caminho conforme o projeto (segue o mesmo padrão de outros imports do storage).
+
+Garante que tens acesso a algo tipo getUserContext(req) ou equivalente (onde já obténs empresaId e userId noutras rotas).
+
+Adiciona a rota POST para criação de pedidos (user autenticado):
+
+app.post("/api/odoo/contact-requests", requireAuth, async (req: any, res) => {
+  try {
+    const { empresaId, userId } = await getUserContext(req);
+    if (!empresaId || !userId) {
+      return res.status(400).json({
+        success: false,
+        message: "Utilizador sem empresa ou utilizador associado.",
+      });
+    }
+
+    const { contactoId, entidadeId, tipo, mensagem } = req.body;
+
+    const created = await storage.createOdooContactRequest({
+      empresaId,
+      userId,
+      contactoId: contactoId || null,
+      entidadeId: entidadeId || null,
+      tipo,
+      mensagem: mensagem || null,
+    });
+
+    return res.json({ success: true, data: created });
+  } catch (error: any) {
+    console.error("[OdooContactRequests] Erro ao criar pedido:", error);
+    return res.status(500).json({
+      success: false,
+      message: error?.message ?? "Erro ao criar pedido de contacto Odoo.",
+    });
+  }
+});
+
+
+Usa o mesmo requireAuth/middleware que outras rotas autenticadas (ex.: visitas/tarefas).
+
+tipo deve ser "contacto" ou "entidade", conforme o front enviar.
+
+Adiciona a rota GET para listar pedidos (apenas admin da empresa):
+
+app.get("/api/odoo/contact-requests", requireAdmin, async (req: any, res) => {
+  try {
+    const { empresaId } = await getUserContext(req);
+    if (!empresaId) {
+      return res.status(400).json({
+        success: false,
+        message: "Administrador sem empresa associada.",
+      });
+    }
+
+    const requests = await storage.listOdooContactRequestsByEmpresa(empresaId);
+    return res.json({ success: true, data: requests });
+  } catch (error: any) {
+    console.error("[OdooContactRequests] Erro ao listar pedidos:", error);
+    return res.status(500).json({
+      success: false,
+      message: error?.message ?? "Erro ao listar pedidos de contacto Odoo.",
+    });
+  }
+});
+
+
+Usa o mesmo requireAdmin que já é usado noutras rotas de admin.
+
+Adiciona a rota PATCH para atualizar o estado de um pedido (admin):
+
+app.patch(
+  "/api/odoo/contact-requests/:id",
+  requireAdmin,
+  async (req: any, res) => {
+    try {
+      const { empresaId } = await getUserContext(req);
+      if (!empresaId) {
+        return res.status(400).json({
+          success: false,
+          message: "Administrador sem empresa associada.",
+        });
+      }
+
+      const requestId = req.params.id;
+      const { estado } = req.body; // "pendente" | "em_progresso" | "concluido"
+
+      const updated = await storage.updateOdooContactRequestStatus(
+        empresaId,
+        requestId,
+        estado
+      );
+
+      if (!updated) {
+        return res.status(404).json({
+          success: false,
+          message: "Pedido não encontrado para esta empresa.",
+        });
+      }
+
+      return res.json({ success: true, data: updated });
+    } catch (error: any) {
+      console.error("[OdooContactRequests] Erro ao atualizar pedido:", error);
+      return res.status(500).json({
+        success: false,
+        message:
+          error?.message ?? "Erro ao atualizar pedido de contacto Odoo.",
+      });
+    }
+  }
+);
+
+
+Garante que o ficheiro compila sem erros TypeScript e que as três rotas são registadas no mesmo setupRoutes (ou função equivalente) onde estão as restantes APIs.
