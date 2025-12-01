@@ -350,6 +350,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               odooContactsAgentsEnabled:
                 (empresa as any).odooContactsAgentsEnabled ?? false,
 
+              odooContactsNoPermissionMessage:
+                (empresa as any).odooContactsNoPermissionMessage ?? null,
+
               crmVisitsOdooSyncEnabled:
                 (empresa as any).crmVisitsOdooSyncEnabled ?? false,
 
@@ -3266,6 +3269,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         odooContactsAgentsEnabled:
           (empresa as any).odooContactsAgentsEnabled ?? false,
 
+        odooContactsNoPermissionMessage:
+          (empresa as any).odooContactsNoPermissionMessage ?? null,
+
         crmVisitsOdooSyncEnabled:
           (empresa as any).crmVisitsOdooSyncEnabled ?? false,
 
@@ -3332,7 +3338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       
-      const { nome, nif, email, telefone, logoUrl, mostrarMarcasEmVisitas, mostrarGPS, theme, uiSettings, iaOpenAIApiKey, odooCrmEnabled, crmLeadsEnabled, odooContactsFeatureEnabled, odooContactsAdminEnabled, odooContactsAgentsEnabled, crmVisitsOdooSyncEnabled } = req.body;
+      const { nome, nif, email, telefone, logoUrl, mostrarMarcasEmVisitas, mostrarGPS, theme, uiSettings, iaOpenAIApiKey, odooCrmEnabled, crmLeadsEnabled, odooContactsFeatureEnabled, odooContactsAdminEnabled, odooContactsAgentsEnabled, odooContactsNoPermissionMessage, crmVisitsOdooSyncEnabled } = req.body;
       
       // Validate theme if provided
       if (theme !== undefined && !["light-business", "dark-pro"].includes(theme)) {
@@ -3361,6 +3367,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (typeof odooContactsAgentsEnabled === "boolean") {
         (updateData as any).odooContactsAgentsEnabled = odooContactsAgentsEnabled;
+      }
+      if (typeof odooContactsNoPermissionMessage === "string") {
+        (updateData as any).odooContactsNoPermissionMessage = odooContactsNoPermissionMessage;
       }
       if (typeof crmVisitsOdooSyncEnabled === "boolean") {
         (updateData as any).crmVisitsOdooSyncEnabled = crmVisitsOdooSyncEnabled;
@@ -3411,6 +3420,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           (updated as any).odooContactsAdminEnabled ?? true,
         odooContactsAgentsEnabled:
           (updated as any).odooContactsAgentsEnabled ?? false,
+
+        odooContactsNoPermissionMessage:
+          (updated as any).odooContactsNoPermissionMessage ?? null,
 
         crmVisitsOdooSyncEnabled:
           (updated as any).crmVisitsOdooSyncEnabled ?? false,
