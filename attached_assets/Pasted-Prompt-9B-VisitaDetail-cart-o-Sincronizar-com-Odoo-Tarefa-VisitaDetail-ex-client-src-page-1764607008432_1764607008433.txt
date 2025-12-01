@@ -1,0 +1,85 @@
+Prompt 9B – VisitaDetail: cartão “Sincronizar com Odoo”
+
+Tarefa – VisitaDetail (ex.: client/src/pages/VisitaDetail.tsx): cartão de sync com Odoo
+
+No componente de detalhe de visita (VisitaDetail ou equivalente):
+
+Garante o import:
+
+import { useAuth } from "@/hooks/useAuth";
+import { useState } from "react";
+
+
+Dentro do componente, obtém:
+
+const { canSyncVisitsWithOdoo } = useAuth();
+
+
+Cria estados locais para controlar o botão e a mensagem:
+
+const [isSyncing, setIsSyncing] = useState(false);
+const [syncMessage, setSyncMessage] = useState<string | null>(null);
+
+
+Implementa o handler de sync (usa o novo endpoint backend):
+
+const handleSyncWithOdoo = async () => {
+  if (!visita?.id) return;
+
+  try {
+    setIsSyncing(true);
+    setSyncMessage(null);
+
+    const res = await fetch(`/api/integrations/odoo/visitas/${visita.id}/sync`, {
+      method: "POST",
+    });
+    const data = await res.json();
+
+    if (!data.success) {
+      if (data.notEnabled) {
+        setSyncMessage("A sincronização de visitas com o Odoo está desativada para esta empresa.");
+      } else if (data.notConfigured) {
+        setSyncMessage("A integração Odoo não está configurada. Verifica as definições em /admin/empresa.");
+      } else {
+        setSyncMessage(data.message || "Erro ao sincronizar com o Odoo.");
+      }
+      return;
+    }
+
+    setSyncMessage("Visita sincronizada com sucesso com o Odoo.");
+    // Se necessário, aqui podes fazer refetch da visita para ver o odooLeadId atualizado
+  } catch (error: any) {
+    setSyncMessage(error?.message || "Erro inesperado na sincronização com o Odoo.");
+  } finally {
+    setIsSyncing(false);
+  }
+};
+
+
+Ajusta visita.id conforme a forma como a visita é carregada (state, prop ou data de um useQuery).
+
+Na renderização do VisitaDetail, adiciona um card para a sync, visível só se canSyncVisitsWithOdoo for true. Por exemplo, usando os componentes UI já existentes (Card, CardHeader, CardTitle, CardDescription, CardContent, Button):
+
+{canSyncVisitsWithOdoo && (
+  <Card className="mt-4">
+    <CardHeader>
+      <CardTitle>Odoo – Sincronização da visita</CardTitle>
+      <CardDescription>
+        Enviar ou atualizar esta visita no Odoo como lead/oportunidade.
+      </CardDescription>
+    </CardHeader>
+    <CardContent>
+      <Button onClick={handleSyncWithOdoo} disabled={isSyncing}>
+        {isSyncing ? "A sincronizar..." : "Sincronizar com o Odoo"}
+      </Button>
+      {syncMessage && (
+        <p className="mt-2 text-sm text-muted-foreground">
+          {syncMessage}
+        </p>
+      )}
+    </CardContent>
+  </Card>
+)}
+
+
+Não alterar o resto da página. Garante que o ficheiro compila sem erros.

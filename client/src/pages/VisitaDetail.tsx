@@ -84,10 +84,13 @@ export default function VisitaDetail() {
   const [odooLeadCreating, setOdooLeadCreating] = useState(false);
   const [odooLeadError, setOdooLeadError] = useState<string | null>(null);
   const [odooLeadNotConfigured, setOdooLeadNotConfigured] = useState(false);
+  // PROMPT 9B: States para Odoo Visita Sync
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const { data: currentUser } = useCurrentUser();
   const isAdmin = useIsAdmin();
 
-  const { empresa } = useAuth();
+  const { empresa, canSyncVisitsWithOdoo } = useAuth();
   const leadsEnabled =
     typeof empresa?.crmLeadsEnabled === "boolean"
       ? empresa.crmLeadsEnabled
@@ -390,6 +393,40 @@ export default function VisitaDetail() {
       });
     } finally {
       setOdooLeadCreating(false);
+    }
+  };
+
+  // PROMPT 9B: Handler para sincronizar visita com Odoo
+  const handleSyncWithOdoo = async () => {
+    if (!visita?.id) return;
+
+    try {
+      setIsSyncing(true);
+      setSyncMessage(null);
+
+      const res = await fetch(`/api/integrations/odoo/visitas/${visita.id}/sync`, {
+        method: "POST",
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        if (data.notEnabled) {
+          setSyncMessage("A sincronização de visitas com o Odoo está desativada para esta empresa.");
+        } else if (data.notConfigured) {
+          setSyncMessage("A integração Odoo não está configurada. Verifica as definições em /admin/empresa.");
+        } else {
+          setSyncMessage(data.message || "Erro ao sincronizar com o Odoo.");
+        }
+        return;
+      }
+
+      setSyncMessage("Visita sincronizada com sucesso com o Odoo.");
+      // Refetch visita para ver odooLeadId atualizado
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
+    } catch (error: any) {
+      setSyncMessage(error?.message || "Erro inesperado na sincronização com o Odoo.");
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -2438,6 +2475,28 @@ export default function VisitaDetail() {
                   </p>
                 )}
               </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* PROMPT 9B: Odoo Visita Sync Card - Renderiza se canSyncVisitsWithOdoo = true */}
+      {canSyncVisitsWithOdoo && (
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle>Odoo – Sincronização da visita</CardTitle>
+            <CardDescription>
+              Enviar ou atualizar esta visita no Odoo como lead/oportunidade.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={handleSyncWithOdoo} disabled={isSyncing} data-testid="button-sync-visita-odoo">
+              {isSyncing ? "A sincronizar..." : "Sincronizar com o Odoo"}
+            </Button>
+            {syncMessage && (
+              <p className="mt-2 text-sm text-muted-foreground" data-testid="text-sync-message">
+                {syncMessage}
+              </p>
             )}
           </CardContent>
         </Card>
