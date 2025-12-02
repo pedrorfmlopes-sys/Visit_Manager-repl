@@ -1177,6 +1177,7 @@ export const odooContactRequests = pgTable("odoo_contact_requests", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
+  userSeenAt: timestamp("user_seen_at", { withTimezone: true }),
 });
 
 export const odooContactRequestsRelations = relations(odooContactRequests, ({ one }) => ({
