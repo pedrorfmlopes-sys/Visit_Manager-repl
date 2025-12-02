@@ -4194,16 +4194,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ============ PROMPT 11C: Odoo Contact Requests Routes ============
 
+  /**
+   * RBAC + Feature Flags Helper para rotas Odoo Contact Requests
+   * Valida: empresaId, feature flags, roles (admin/agent)
+   */
+  async function ensureOdooContactsAccess(
+    req: any,
+    scope: "any" | "admin" = "any"
+  ): Promise<{ empresaId: string; userId: string; userRole: "admin" | "agent" }> {
+    const { empresaId, userId, userRole } = await getUserContext(req);
+
+    if (!empresaId || !userId) {
+      throw {
+        status: 400,
+        message: "Utilizador sem empresa ou utilizador associado.",
+      };
+    }
+
+    const empresa = await storage.getEmpresa(empresaId);
+
+    const featureEnabled =
+      (empresa as any).odooContactsFeatureEnabled ?? false;
+    const adminEnabled =
+      (empresa as any).odooContactsAdminEnabled ?? true;
+    const agentsEnabled =
+      (empresa as any).odooContactsAgentsEnabled ?? false;
+    const noPermissionMessage =
+      (empresa as any).odooContactsNoPermissionMessage ??
+      "Funcionalidade de pedidos de contactos Odoo não está disponível para o teu perfil.";
+
+    if (!featureEnabled) {
+      throw { status: 403, message: noPermissionMessage };
+    }
+
+    if (scope === "admin" && userRole !== "admin") {
+      throw {
+        status: 403,
+        message: "Apenas administradores podem executar esta ação.",
+      };
+    }
+
+    if (userRole === "admin" && adminEnabled === false) {
+      throw { status: 403, message: noPermissionMessage };
+    }
+
+    if (userRole === "agent" && agentsEnabled === false) {
+      throw { status: 403, message: noPermissionMessage };
+    }
+
+    return { empresaId, userId, userRole };
+  }
+
   // POST /api/odoo/contact-requests - Create new request (any authenticated user)
   app.post("/api/odoo/contact-requests", isAuthenticated, async (req: any, res) => {
     try {
-      const { empresaId, userId } = await getUserContext(req);
-      if (!empresaId || !userId) {
-        return res.status(400).json({
-          success: false,
-          message: "Utilizador sem empresa ou utilizador associado.",
-        });
-      }
+      const { empresaId, userId } = await ensureOdooContactsAccess(req, "any");
 
       const { contactoId, entidadeId, tipo, mensagem } = req.body;
 
@@ -4229,20 +4274,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/odoo/contact-requests/my - List user's own requests (any authenticated user)
   app.get("/api/odoo/contact-requests/my", isAuthenticated, async (req: any, res) => {
     try {
-      const user = req.user;
-      if (!user) {
-        return res.status(401).json({ success: false, message: "Not authenticated" });
-      }
-
-      const userId = user.claims?.sub;
-      if (!userId) {
-        return res.status(401).json({ success: false, message: "Not authenticated" });
-      }
+      const { empresaId, userId } = await ensureOdooContactsAccess(req, "any");
 
       const pedidos = await db
         .select()
         .from(odooContactRequests)
-        .where(eq(odooContactRequests.userId, userId))
+        .where(
+          and(
+            eq(odooContactRequests.empresaId, empresaId),
+            eq(odooContactRequests.userId, userId)
+          )
+        )
         .orderBy(desc(odooContactRequests.createdAt));
 
       return res.json({
@@ -4261,13 +4303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/odoo/contact-requests - List all requests (admin only)
   app.get("/api/odoo/contact-requests", requireAdmin, async (req: any, res) => {
     try {
-      const { empresaId } = await getUserContext(req);
-      if (!empresaId) {
-        return res.status(400).json({
-          success: false,
-          message: "Administrador sem empresa associada.",
-        });
-      }
+      const { empresaId } = await ensureOdooContactsAccess(req, "admin");
 
       const requests = await storage.listOdooContactRequestsByEmpresa(empresaId);
       return res.json({ success: true, data: requests });
@@ -4286,13 +4322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     requireAdmin,
     async (req: any, res) => {
       try {
-        const { empresaId } = await getUserContext(req);
-        if (!empresaId) {
-          return res.status(400).json({
-            success: false,
-            message: "Administrador sem empresa associada.",
-          });
-        }
+        const { empresaId } = await ensureOdooContactsAccess(req, "admin");
 
         const requestId = req.params.id;
         const { estado } = req.body; // "pendente" | "em_progresso" | "concluido"
@@ -4328,19 +4358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     isAuthenticated,
     async (req: any, res) => {
       try {
-        const user = req.user;
-        if (!user) {
-          return res
-            .status(401)
-            .json({ success: false, message: "Not authenticated" });
-        }
-
-        const userId = user.claims?.sub;
-        if (!userId) {
-          return res
-            .status(401)
-            .json({ success: false, message: "Not authenticated" });
-        }
+        const { empresaId, userId } = await ensureOdooContactsAccess(req, "any");
 
         const now = new Date();
 
@@ -4349,6 +4367,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .set({ userSeenAt: now })
           .where(
             and(
+              eq(odooContactRequests.empresaId, empresaId),
               eq(odooContactRequests.userId, userId),
               eq(odooContactRequests.estado, "concluido"),
               isNull(odooContactRequests.userSeenAt)

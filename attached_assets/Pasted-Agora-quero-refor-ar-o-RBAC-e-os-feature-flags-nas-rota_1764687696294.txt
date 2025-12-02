@@ -1,0 +1,165 @@
+Agora quero reforçar o RBAC e os feature flags nas rotas de pedidos de contactos Odoo (odooContactRequests) em server/routes.ts.
+
+Objetivo
+
+Bloquear/autorizar o acesso às rotas de pedidos Odoo com base em:
+
+empresaId,
+
+userRole (admin ou agent),
+
+feature flags da empresa:
+
+odooContactsFeatureEnabled
+
+odooContactsAdminEnabled
+
+odooContactsAgentsEnabled
+
+odooContactsNoPermissionMessage
+
+Regras:
+
+Se odooContactsFeatureEnabled for false → qualquer rota de pedidos Odoo devolve 403 com a mensagem configurada.
+
+Admin:
+
+só pode usar estas rotas se odooContactsAdminEnabled !== false.
+
+Agent:
+
+só pode usar estas rotas se odooContactsAgentsEnabled !== false.
+
+Os dados devem continuar filtrados por empresaId.
+
+Passos
+
+Em server/routes.ts, localiza o bloco das rotas Odoo Contact Requests, normalmente marcado por um comentário do género:
+
+// ============ PROMPT 11C: Odoo Contact Requests Routes ============
+
+
+Nesse bloco, não apagues nada sem primeiro ver o que há.
+Vais introduzir um helper e ajustar as rotas existentes.
+
+Cria um helper ensureOdooContactsAccess acima das rotas de pedidos Odoo (mas ainda dentro de registerRoutes), algo como:
+
+async function ensureOdooContactsAccess(
+  req: any,
+  scope: "any" | "admin" = "any"
+): Promise<{ empresaId: string; userId: string; userRole: "admin" | "agent" }> {
+  const { empresaId, userId, userRole } = await getUserContext(req);
+
+  if (!empresaId || !userId) {
+    throw {
+      status: 400,
+      message: "Utilizador sem empresa ou utilizador associado.",
+    };
+  }
+
+  const empresa = await storage.getEmpresa(empresaId);
+
+  const featureEnabled =
+    (empresa as any).odooContactsFeatureEnabled ?? false;
+  const adminEnabled =
+    (empresa as any).odooContactsAdminEnabled ?? true;
+  const agentsEnabled =
+    (empresa as any).odooContactsAgentsEnabled ?? false;
+  const noPermissionMessage =
+    (empresa as any).odooContactsNoPermissionMessage ??
+    "Funcionalidade de pedidos de contactos Odoo não está disponível para o teu perfil.";
+
+  if (!featureEnabled) {
+    throw { status: 403, message: noPermissionMessage };
+  }
+
+  if (scope === "admin" && userRole !== "admin") {
+    throw {
+      status: 403,
+      message: "Apenas administradores podem executar esta ação.",
+    };
+  }
+
+  if (userRole === "admin" && adminEnabled === false) {
+    throw { status: 403, message: noPermissionMessage };
+  }
+
+  if (userRole === "agent" && agentsEnabled === false) {
+    throw { status: 403, message: noPermissionMessage };
+  }
+
+  return { empresaId, userId, userRole };
+}
+
+
+Agora, ajusta cada rota de pedidos Odoo para usar este helper:
+
+4.1. POST /api/odoo/contact-requests
+
+Garante que está protegida por isAuthenticated.
+
+No handler, antes de criar o pedido, chama:
+
+const { empresaId, userId } = await ensureOdooContactsAccess(req, "any");
+
+
+Usa sempre empresaId e userId devolvidos por aí para criar o pedido.
+
+4.2. GET /api/odoo/contact-requests/my
+
+Também isAuthenticated.
+
+Dentro, chama:
+
+const { empresaId, userId } = await ensureOdooContactsAccess(req, "any");
+
+
+Garante que a query filtra sempre por:
+
+odooContactRequests.empresaId === empresaId
+
+odooContactRequests.userId === userId
+
+4.3. GET /api/odoo/contact-requests (lista global)
+
+Esta rota deve ser admin only (mantém ou aplica requireAdmin).
+
+Além do requireAdmin, chama:
+
+const { empresaId } = await ensureOdooContactsAccess(req, "admin");
+
+
+Usa empresaId para listar apenas pedidos dessa empresa, via o método existente em storage (ex.: listOdooContactRequestsByEmpresa(empresaId)).
+
+4.4. PATCH /api/odoo/contact-requests/:id (atualiza estado)
+
+Também admin only (requireAdmin + ensureOdooContactsAccess(req, "admin")).
+
+Usa sempre empresaId para garantir que só atualizas pedidos da empresa do admin.
+
+4.5. PATCH /api/odoo/contact-requests/my/mark-seen
+
+isAuthenticated.
+
+Dentro, usa:
+
+const { empresaId, userId } = await ensureOdooContactsAccess(req, "any");
+
+
+Garante que o UPDATE:
+
+filtra por empresaId e userId,
+
+apenas marca como vistos pedidos com estado = "concluido" e userSeenAt IS NULL.
+
+Não alteres outras rotas Odoo não relacionadas com odooContactRequests.
+
+No final:
+
+Compila o projeto,
+
+Resume o que fizeste:
+
+“criei helper ensureOdooContactsAccess em routes.ts”,
+
+“rotas A, B, C passaram a validar feature flags e roles com esse helper”.
