@@ -22,7 +22,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { randomUUID } from "crypto";
-import { insertEntidadeSchema, insertContactoSchema, insertVisitaSchema, insertTarefaSchema, lembretes, users, entidades, contactos } from "@shared/schema";
+import { insertEntidadeSchema, insertContactoSchema, insertVisitaSchema, insertTarefaSchema, lembretes, users, entidades, contactos, odooContactRequests } from "@shared/schema";
 import { generateEmailRequestSchema, getTemplate } from "@shared/emailTemplates";
 import { eq, and, desc, sql } from "drizzle-orm";
 import express from "express";
@@ -4152,6 +4152,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({
         success: false,
         message: error?.message ?? "Erro ao criar pedido de contacto Odoo.",
+      });
+    }
+  });
+
+  // GET /api/odoo/contact-requests/my - List user's own requests (any authenticated user)
+  app.get("/api/odoo/contact-requests/my", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ success: false, message: "Not authenticated" });
+      }
+
+      const userId = user.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ success: false, message: "Not authenticated" });
+      }
+
+      const pedidos = await db
+        .select()
+        .from(odooContactRequests)
+        .where(eq(odooContactRequests.userId, userId))
+        .orderBy(desc(odooContactRequests.createdAt));
+
+      return res.json({
+        success: true,
+        data: pedidos,
+      });
+    } catch (error: any) {
+      console.error("Error fetching my Odoo contact requests", error);
+      return res.status(500).json({
+        success: false,
+        message: "Erro ao carregar os teus pedidos.",
       });
     }
   });
