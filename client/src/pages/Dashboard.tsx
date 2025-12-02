@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import { Building2, Users, FileText, Package, Calendar, LogOut, BarChart, Link2, Download, Lightbulb, X } from "lucide-react";
+import { useLocation, Link } from "wouter";
+import { Building2, Users, FileText, Package, Calendar, LogOut, BarChart, Link2, Download, Lightbulb, X, Loader2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,6 +27,14 @@ interface DashboardStats {
   proximasVisitas: VisitaWithRelations[];
 }
 
+type MyOdooRequest = {
+  id: string;
+  estado: "pendente" | "em_progresso" | "concluido";
+  createdAt: string;
+  tipo: "contacto" | "entidade";
+  mensagem: string | null;
+};
+
 export default function Dashboard() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
@@ -38,6 +46,30 @@ export default function Dashboard() {
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard"],
   });
+
+  const {
+    data: myOdooRequests = [],
+    isLoading: myOdooRequestsLoading,
+    isError: myOdooRequestsError,
+  } = useQuery<MyOdooRequest[]>({
+    queryKey: ["/api/odoo/contact-requests/my"],
+    queryFn: async () => {
+      const res = await fetch("/api/odoo/contact-requests/my");
+      if (!res.ok) {
+        throw new Error("Failed to fetch my Odoo requests");
+      }
+      const json = await res.json();
+      if (!json.success) {
+        throw new Error(json.message || "Erro ao carregar os teus pedidos.");
+      }
+      return json.data as MyOdooRequest[];
+    },
+  });
+
+  const myPending = myOdooRequests.filter((r) => r.estado === "pendente").length;
+  const myInProgress = myOdooRequests.filter((r) => r.estado === "em_progresso").length;
+  const myDone = myOdooRequests.filter((r) => r.estado === "concluido").length;
+  const myTotal = myOdooRequests.length;
 
   const handleDismissDashboardTip = async () => {
     try {
@@ -239,6 +271,46 @@ export default function Dashboard() {
                 <p className="text-xs text-muted-foreground">Este Mês</p>
               </Card>
             </div>
+
+            <Link href="/me/odoo-requests">
+              <Card className="cursor-pointer hover:bg-muted transition p-4">
+                <CardHeader className="p-0 mb-3">
+                  <CardTitle className="text-lg">Pedidos / Aprovações</CardTitle>
+                  <CardDescription>
+                    Resumo dos pedidos que fizeste para criação/ligação no CRM.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {myOdooRequestsLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>A carregar pedidos...</span>
+                    </div>
+                  ) : myOdooRequestsError ? (
+                    <p className="text-sm text-destructive">
+                      Erro ao carregar os teus pedidos.
+                    </p>
+                  ) : (
+                    <div className="space-y-1">
+                      <p className="text-2xl font-bold">{myTotal}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Total de pedidos feitos por ti
+                      </p>
+                      <p className="text-sm mt-2">
+                        Pendentes: <span className="font-semibold">{myPending}</span>
+                      </p>
+                      <p className="text-sm">
+                        Em progresso:{" "}
+                        <span className="font-semibold">{myInProgress}</span>
+                      </p>
+                      <p className="text-sm">
+                        Concluídos: <span className="font-semibold">{myDone}</span>
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </Link>
 
             <Card 
               className="p-4 hover-elevate cursor-pointer" 

@@ -1,0 +1,134 @@
+Tarefa 14B – Dashboard user: card "Pedidos / Aprovações" com pedidos do próprio utilizador
+
+Abre o ficheiro do dashboard de utilizador (NÃO o AdminDashboard).
+
+É o componente usado quando o utilizador autenticado não é admin e entra em /.
+
+No projeto tem normalmente nome tipo client/src/pages/Dashboard.tsx ou semelhante.
+
+Adiciona estes imports, se ainda não existirem:
+
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
+import { Link } from "wouter";
+
+
+Dentro do componente do dashboard user, cria um tipo para os pedidos e uma query para o endpoint /api/odoo/contact-requests/my (criado na 14A):
+
+type MyOdooRequest = {
+  id: string;
+  estado: "pendente" | "em_progresso" | "concluido";
+  createdAt: string;
+  tipo: "contacto" | "entidade";
+  mensagem: string | null;
+};
+
+const {
+  data: myOdooRequests = [],
+  isLoading: myOdooRequestsLoading,
+  isError: myOdooRequestsError,
+} = useQuery<MyOdooRequest[]>({
+  queryKey: ["/api/odoo/contact-requests/my"],
+  queryFn: async () => {
+    const res = await fetch("/api/odoo/contact-requests/my");
+    if (!res.ok) {
+      throw new Error("Failed to fetch my Odoo requests");
+    }
+    const json = await res.json();
+    if (!json.success) {
+      throw new Error(json.message || "Erro ao carregar os teus pedidos.");
+    }
+    return json.data as MyOdooRequest[];
+  },
+});
+
+
+Calcula as contagens específicas deste utilizador:
+
+const myPending = myOdooRequests.filter((r) => r.estado === "pendente").length;
+const myInProgress = myOdooRequests.filter((r) => r.estado === "em_progresso").length;
+const myDone = myOdooRequests.filter((r) => r.estado === "concluido").length;
+
+const myTotal = myOdooRequests.length;
+
+
+No layout do dashboard user, onde já existem os cards de resumo (visitas, tarefas, etc.), adiciona um novo Card para “Pedidos / Aprovações”, seguindo o mesmo estilo de grid usado aí. Exemplo de conteúdo do card:
+
+<Link href="/me/odoo-requests">
+  <Card className="cursor-pointer hover:bg-muted transition">
+    <CardHeader>
+      <CardTitle>Pedidos / Aprovações</CardTitle>
+      <CardDescription>
+        Resumo dos pedidos que fizeste para criação/ligação no CRM.
+      </CardDescription>
+    </CardHeader>
+    <CardContent>
+      {myOdooRequestsLoading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>A carregar pedidos...</span>
+        </div>
+      ) : myOdooRequestsError ? (
+        <p className="text-sm text-destructive">
+          Erro ao carregar os teus pedidos.
+        </p>
+      ) : (
+        <div className="space-y-1">
+          <p className="text-2xl font-bold">{myTotal}</p>
+          <p className="text-xs text-muted-foreground">
+            Total de pedidos feitos por ti
+          </p>
+          <p className="text-sm mt-2">
+            Pendentes: <span className="font-semibold">{myPending}</span>
+          </p>
+          <p className="text-sm">
+            Em progresso:{" "}
+            <span className="font-semibold">{myInProgress}</span>
+          </p>
+          <p className="text-sm">
+            Concluídos: <span className="font-semibold">{myDone}</span>
+          </p>
+        </div>
+      )}
+    </CardContent>
+  </Card>
+</Link>
+
+
+Integra este card no mesmo grid/layout dos outros KPIs do dashboard user (mesmas classes Tailwind de grid/spacing), para ficar visualmente consistente.
+
+Cria uma rota placeholder simples para /me/odoo-requests (para já apenas uma página básica):
+
+No App.tsx (ou router principal), adiciona uma rota protegida por autenticação, acessível a utilizadores normais:
+
+<Route path="/me/odoo-requests">
+  <OdooMyRequestsPage />
+</Route>
+
+
+Cria o componente OdooMyRequestsPage em client/src/pages/OdooMyRequestsPage.tsx (ou nome equivalente) com algo simples por agora, por exemplo:
+
+export function OdooMyRequestsPage() {
+  return (
+    <main className="p-4 md:p-6">
+      <h1 className="text-2xl font-bold mb-2">Os meus pedidos</h1>
+      <p className="text-sm text-muted-foreground">
+        Página de listagem dos teus pedidos ao CRM (em construção).
+      </p>
+    </main>
+  );
+}
+
+
+Não é preciso implementar já a tabela; o objetivo é não dar 404 quando o utilizador clicar no card.
+
+Garante que:
+
+O projeto compila sem erros.
+
+Um utilizador não-admin vê o card “Pedidos / Aprovações” no seu dashboard.
+
+As contagens no card correspondem aos pedidos que esse utilizador criou.
+
+Clicar no card abre a rota /me/odoo-requests.

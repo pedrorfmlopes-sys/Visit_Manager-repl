@@ -39,6 +39,7 @@ import Leads from "@/pages/Leads";
 import AdminLeadsPage from "@/pages/AdminLeadsPage";
 import AdminLeadDetailPage from "@/pages/AdminLeadDetailPage";
 import AdminOdooContactRequestsPage from "@/pages/AdminOdooContactRequestsPage";
+import { OdooMyRequestsPage } from "@/pages/OdooMyRequestsPage";
 import AgentMore from "@/pages/AgentMore";
 import Perfil from "@/pages/Perfil";
 
@@ -133,6 +134,7 @@ function Router() {
         {/* Rotas de agente */}
         <Route path="/agente-mais" component={AgentMore} />
         <Route path="/perfil" component={Perfil} />
+        <Route path="/me/odoo-requests" component={OdooMyRequestsPage} />
 
         {/* Lembretes e Analytics */}
         <Route path="/lembretes" component={Lembretes} />
