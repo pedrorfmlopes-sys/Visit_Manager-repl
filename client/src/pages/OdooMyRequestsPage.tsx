@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "wouter";
 import {
   Card,
   CardHeader,
@@ -16,7 +17,8 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
 
@@ -82,11 +84,20 @@ export function OdooMyRequestsPage() {
   return (
     <main className="p-4 md:p-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Os meus pedidos</CardTitle>
-          <CardDescription>
-            Pedidos de criação/ligação de contactos e entidades que fiz ao administrador.
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Link href="/">
+              <Button variant="ghost" size="icon" data-testid="button-back-dashboard">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <div>
+              <CardTitle>Os meus pedidos</CardTitle>
+              <CardDescription>
+                Pedidos de criação/ligação de contactos e entidades que fiz ao administrador.
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
