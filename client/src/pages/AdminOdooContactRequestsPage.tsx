@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { Link } from "wouter";
+import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableHead, TableRow, TableHeader, TableBody, TableCell } from "@/components/ui/table";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -8,7 +10,7 @@ import { format } from "date-fns";
 import { pt } from "date-fns/locale";
 import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, ArrowLeft } from "lucide-react";
 
 type OdooContactRequest = {
   id: string;
@@ -64,11 +66,20 @@ export default function AdminOdooContactRequestsPage() {
   return (
     <div className="space-y-6 p-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Pedidos de contactos Odoo</CardTitle>
-          <CardDescription>
-            Revise e gerencie pedidos de acesso à integração Odoo de agentes
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Link href="/">
+              <Button variant="ghost" size="icon" data-testid="button-back-dashboard">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <div>
+              <CardTitle>Pedidos / Aprovações</CardTitle>
+              <CardDescription>
+                Pedidos de criação/ligação de contactos e entidades no CRM.
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
