@@ -24,7 +24,7 @@ import fs from "fs";
 import { randomUUID } from "crypto";
 import { insertEntidadeSchema, insertContactoSchema, insertVisitaSchema, insertTarefaSchema, lembretes, users, entidades, contactos, odooContactRequests } from "@shared/schema";
 import { generateEmailRequestSchema, getTemplate } from "@shared/emailTemplates";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import express from "express";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subDays } from "date-fns";
 import { pt } from "date-fns/locale";
@@ -4247,6 +4247,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
           success: false,
           message:
             error?.message ?? "Erro ao atualizar pedido de contacto Odoo.",
+        });
+      }
+    }
+  );
+
+  // PATCH /api/odoo/contact-requests/my/mark-seen - Mark completed requests as seen by user
+  app.patch(
+    "/api/odoo/contact-requests/my/mark-seen",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const user = req.user;
+        if (!user) {
+          return res
+            .status(401)
+            .json({ success: false, message: "Not authenticated" });
+        }
+
+        const userId = user.claims?.sub;
+        if (!userId) {
+          return res
+            .status(401)
+            .json({ success: false, message: "Not authenticated" });
+        }
+
+        const now = new Date();
+
+        const updated = await db
+          .update(odooContactRequests)
+          .set({ userSeenAt: now })
+          .where(
+            and(
+              eq(odooContactRequests.userId, userId),
+              eq(odooContactRequests.estado, "concluido"),
+              isNull(odooContactRequests.userSeenAt)
+            )
+          )
+          .returning({ id: odooContactRequests.id });
+
+        return res.json({
+          success: true,
+          updatedCount: updated.length,
+        });
+      } catch (error: any) {
+        console.error(
+          "[OdooContactRequests] Erro ao marcar pedidos como vistos:",
+          error
+        );
+        return res.status(500).json({
+          success: false,
+          message:
+            error?.message ||
+            "Erro ao marcar pedidos concluídos como vistos.",
         });
       }
     }
