@@ -326,6 +326,42 @@ export default function AdminDashboard() {
               </div>
             </div>
           </Card>
+
+          {/* Pedidos / Aprovações */}
+          {odooRequestsLoading ? (
+            <Skeleton className="h-32 rounded-lg" />
+          ) : odooRequestsError ? (
+            <Card className="p-4" data-testid="card-approvals-error">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Pedidos / Aprovações</p>
+                  <p className="text-red-600 dark:text-red-400 text-sm">Erro ao carregar</p>
+                </div>
+                <div className="p-2 bg-red-500/10 rounded-lg">
+                  <AlertCircle className="h-5 w-5 text-red-500" />
+                </div>
+              </div>
+            </Card>
+          ) : (
+            <Card
+              className="p-4 cursor-pointer hover-elevate"
+              onClick={() => setLocation("/admin/odoo-contact-requests")}
+              data-testid="card-approvals"
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Pedidos / Aprovações</p>
+                  <p className="text-3xl font-bold text-foreground">{totalRelevantOdooRequests}</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Pendentes: <span className="font-semibold">{pendingOdooRequests}</span> | Em progresso: <span className="font-semibold">{inProgressOdooRequests}</span>
+                  </p>
+                </div>
+                <div className="p-2 bg-blue-500/10 rounded-lg">
+                  <Mail className="h-5 w-5 text-blue-500" />
+                </div>
+              </div>
+            </Card>
+          )}
         </div>
       )}
 
@@ -527,60 +563,6 @@ export default function AdminDashboard() {
 
       {/* IA Insights */}
       <DashboardInsightsCard />
-
-      {/* Pedidos Odoo */}
-      {odooRequestsLoading ? (
-        <Skeleton className="h-32 rounded-lg" />
-      ) : odooRequestsError ? (
-        <Card data-testid="card-odoo-requests-error" className="border-red-300/30 bg-red-50 dark:bg-red-950/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg text-red-600 dark:text-red-400">
-              <AlertCircle className="h-5 w-5" />
-              Erro ao carregar pedidos Odoo
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-red-600 dark:text-red-400">
-              Não foi possível carregar a lista de pedidos. Tente novamente mais tarde.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card data-testid="card-odoo-requests" className="border-blue-300/30 bg-blue-50 dark:bg-blue-950/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Mail className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              Pedidos Odoo
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-1">
-              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totalRelevantOdooRequests}</p>
-              <p className="text-xs text-muted-foreground">
-                Pedidos por tratar (pendentes + em progresso)
-              </p>
-              <p className="text-sm mt-2">
-                Pendentes:{" "}
-                <span className="font-semibold text-blue-600 dark:text-blue-400">{pendingOdooRequests}</span>
-              </p>
-              <p className="text-sm">
-                Em progresso:{" "}
-                <span className="font-semibold text-blue-600 dark:text-blue-400">{inProgressOdooRequests}</span>
-              </p>
-              <Button
-                variant="outline"
-                onClick={() => setLocation("/admin/odoo-contact-requests")}
-                data-testid="button-odoo-requests-view"
-                className="w-full mt-3"
-                size="sm"
-              >
-                <Mail className="h-4 w-4 mr-2" />
-                Ver todos os pedidos
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Admin Tools */}
       <Card data-testid="card-admin-tools" className="border-amber-300/30 bg-amber-50 dark:bg-amber-950/20">
