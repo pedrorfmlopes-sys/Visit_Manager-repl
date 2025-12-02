@@ -1,0 +1,181 @@
+Nome da instrução: INSTRUCAO 4 – RBAC + Feature Flag para sync de visitas com Odoo
+
+1. Contexto geral
+
+Trabalhas no projeto SalesVisitManager.
+Já existem os seguintes feature flags na entidade Empresa:
+
+odooCrmEnabled – ativa/desativa CRM Odoo globalmente.
+
+crmVisitsOdooSyncEnabled – ativa/desativa sincronização de visitas com o Odoo.
+
+Estes flags já são:
+
+guardados no endpoint PATCH /api/admin/empresa,
+
+devolvidos no GET /api/admin/empresa.
+
+Também existe um endpoint placeholder de sync manual com Odoo:
+
+// Odoo Integration Placeholder Endpoints
+// POST /api/sync/odoo - Manual sync trigger
+app.post('/api/sync/odoo', isAuthenticated, async (req: any, res) => {
+  try {
+    const { userId, userRole } = await getUserContext(req);
+
+    // TODO: Implement actual Odoo sync logic
+    // - Query entities/contacts/visits with needsSync=true
+    // - Push changes to Odoo API
+    // - Update syncStatus and lastSyncAt
+    // - Handle errors and update syncError
+
+    console.log(`[Odoo Sync] Manual sync triggered by user ${userId} (role: ${userRole})`);
+
+    res.json({ 
+      success: true, 
+      message: "Odoo sync placeholder - implementation pending",
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error("Error in Odoo sync:", error);
+    res.status(500).json({ message: "Odoo sync failed" });
+  }
+});
+
+
+Localização: server/routes.ts.
+
+2. Objetivo da alteração
+
+Atualizar apenas o endpoint POST /api/sync/odoo para:
+
+Garantir que:
+
+O utilizador pertence a uma empresa (empresaId obrigatório),
+
+O userRole é "admin",
+
+A empresa tem Odoo CRM ligado (odooCrmEnabled !== false),
+
+A empresa tem sync de visitas ligado (crmVisitsOdooSyncEnabled === true).
+
+Se alguma destas condições falhar, responder logo com erro apropriado, antes do TODO de sync.
+
+Manter o restante comportamento (TODO, console.log, resposta de sucesso) sem alterações.
+
+Não mexer em mais nenhuma rota nem helper.
+
+3. Passos concretos no código (server/routes.ts)
+3.1. Atualizar o contexto do utilizador
+
+No bloco do endpoint POST /api/sync/odoo, altera a linha onde chamas getUserContext:
+
+ANTES
+
+const { userId, userRole } = await getUserContext(req);
+
+
+DEPOIS
+
+const { userId, userRole, empresaId } = await getUserContext(req);
+
+3.2. Validar empresa e role admin
+
+Logo a seguir à linha de getUserContext, acrescenta:
+
+      if (!empresaId) {
+        return res.status(400).json({ message: "User has no company assigned" });
+      }
+
+      if (userRole !== "admin") {
+        return res.status(403).json({
+          message: "Apenas administradores podem executar a sincronização com o Odoo.",
+        });
+      }
+
+3.3. Ler a empresa e validar feature flags
+
+Ainda dentro do try, a seguir a esse bloco, acrescenta:
+
+      const empresa = await storage.getEmpresa(empresaId);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa not found" });
+      }
+
+      const odooCrmEnabled = empresa.odooCrmEnabled ?? true;
+      const crmVisitsOdooSyncEnabled = (empresa as any).crmVisitsOdooSyncEnabled ?? false;
+
+      if (!odooCrmEnabled || !crmVisitsOdooSyncEnabled) {
+        return res.status(403).json({
+          message:
+            "A integração Odoo CRM ou a sincronização de visitas com o Odoo está desativada para esta empresa.",
+        });
+      }
+
+
+Notas importantes:
+
+Usa empresa.odooCrmEnabled ?? true para manter o comportamento default já usado noutros endpoints.
+
+Usa (empresa as any).crmVisitsOdooSyncEnabled ?? false porque este campo foi adicionado mais tarde e pode não existir em todas as linhas.
+
+3.4. Manter o restante código intacto
+
+Depois destas validações, mantêm-se exatamente:
+
+Os comentários // TODO: Implement actual Odoo sync logic,
+
+O console.log atual (podes apenas acrescentar empresaId na mensagem se quiseres),
+
+O res.json({ success: true, ... }).
+
+Exemplo final aproximado (apenas para referência; o formato exato e indentação segue o ficheiro):
+
+  app.post('/api/sync/odoo', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, userRole, empresaId } = await getUserContext(req);
+      if (!empresaId) {
+        return res.status(400).json({ message: "User has no company assigned" });
+      }
+
+      if (userRole !== "admin") {
+        return res.status(403).json({
+          message: "Apenas administradores podem executar a sincronização com o Odoo.",
+        });
+      }
+
+      const empresa = await storage.getEmpresa(empresaId);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa not found" });
+      }
+
+      const odooCrmEnabled = empresa.odooCrmEnabled ?? true;
+      const crmVisitsOdooSyncEnabled = (empresa as any).crmVisitsOdooSyncEnabled ?? false;
+
+      if (!odooCrmEnabled || !crmVisitsOdooSyncEnabled) {
+        return res.status(403).json({
+          message:
+            "A integração Odoo CRM ou a sincronização de visitas com o Odoo está desativada para esta empresa.",
+        });
+      }
+
+      // TODO: Implement actual Odoo sync logic
+      // - Query entities/contacts/visits with needsSync=true
+      // - Push changes to Odoo API
+      // - Update syncStatus and lastSyncAt
+      // - Handle errors and update syncError
+
+      console.log(
+        `[Odoo Sync] Manual sync triggered by user ${userId} (role: ${userRole}) for empresa ${empresaId}`
+      );
+
+      res.json({
+        success: true,
+        message: "Odoo sync placeholder - implementation pending",
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Error in Odoo sync:", error);
+      res.status(500).json({ message: "Odoo sync failed" });
+    }
+  });

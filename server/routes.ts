@@ -2131,7 +2131,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/sync/odoo - Manual sync trigger
   app.post('/api/sync/odoo', isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, userRole } = await getUserContext(req);
+      const { userId, userRole, empresaId } = await getUserContext(req);
+
+      if (!empresaId) {
+        return res.status(400).json({ message: "User has no company assigned" });
+      }
+
+      if (userRole !== "admin") {
+        return res.status(403).json({
+          message: "Apenas administradores podem executar a sincronização com o Odoo.",
+        });
+      }
+
+      const empresa = await storage.getEmpresa(empresaId);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa not found" });
+      }
+
+      const odooCrmEnabled = empresa.odooCrmEnabled ?? true;
+      const crmVisitsOdooSyncEnabled = (empresa as any).crmVisitsOdooSyncEnabled ?? false;
+
+      if (!odooCrmEnabled || !crmVisitsOdooSyncEnabled) {
+        return res.status(403).json({
+          message:
+            "A integração Odoo CRM ou a sincronização de visitas com o Odoo está desativada para esta empresa.",
+        });
+      }
 
       // TODO: Implement actual Odoo sync logic
       // - Query entities/contacts/visits with needsSync=true
@@ -2139,12 +2164,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // - Update syncStatus and lastSyncAt
       // - Handle errors and update syncError
 
-      console.log(`[Odoo Sync] Manual sync triggered by user ${userId} (role: ${userRole})`);
+      console.log(
+        `[Odoo Sync] Manual sync triggered by user ${userId} (role: ${userRole}) for empresa ${empresaId}`
+      );
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: "Odoo sync placeholder - implementation pending",
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     } catch (error) {
       console.error("Error in Odoo sync:", error);
