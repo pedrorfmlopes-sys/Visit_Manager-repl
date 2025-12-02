@@ -69,46 +69,46 @@ const upload = multer({
 function getImageMimeType(buffer: Buffer): string | null {
   // Check magic bytes for common image formats
   if (buffer.length < 4) return null;
-  
+
   // JPEG: FF D8 FF
   if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
     return 'image/jpeg';
   }
-  
+
   // PNG: 89 50 4E 47
   if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
     return 'image/png';
   }
-  
+
   // WebP: 52 49 46 46 ... 57 45 42 50
   if (buffer.length >= 12 &&
       buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
       buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) {
     return 'image/webp';
   }
-  
+
   // HEIC/HEIF: check for ftyp box at bytes 4-7 and major_brand at bytes 8-11
   if (buffer.length >= 12) {
     const ftypBox = buffer.toString('ascii', 4, 8);
     if (ftypBox === 'ftyp') {
       // Read ftyp box size from bytes 0-3 (big-endian)
       const ftypSize = buffer.readUInt32BE(0);
-      
+
       // Validate ftyp size is reasonable and within buffer bounds
       if (ftypSize < 12 || ftypSize > buffer.length) {
         // Invalid or truncated ftyp box, cannot reliably detect
         return null;
       }
-      
+
       // The major_brand is a 4-byte value at bytes 8-11 (case-insensitive)
       const majorBrand = buffer.toString('ascii', 8, 12).toLowerCase();
-      
+
       // Direct HEIC brands (specific variants)
       const directHeicBrands = ['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'hevm', 'hevs'];
       if (directHeicBrands.includes(majorBrand)) {
         return 'image/heic';
       }
-      
+
       // Generic container brands (mif1, msf1) - check ALL compatible brands within ftyp box
       const genericBrands = ['mif1', 'msf1'];
       if (genericBrands.includes(majorBrand)) {
@@ -123,7 +123,7 @@ function getImageMimeType(buffer: Buffer): string | null {
       }
     }
   }
-  
+
   return null;
 }
 
@@ -188,7 +188,7 @@ async function createContactWithUniversalLogic(data: {
   // Step 3: If still not found but we have clues, create new entity
   if (!entidadeId && (data.organization || data.domain)) {
     const entityName = data.organization || data.domain || 'Entidade Desconhecida';
-    
+
     // Validate and create entity using schema validation
     // Default to 'Gabinete' for auto-created entities (user can change type later)
     const validatedEntityData = insertEntidadeSchema.parse({
@@ -202,24 +202,24 @@ async function createContactWithUniversalLogic(data: {
       // For auto-created entities, we assign to the creator for convenience
       assignedUserId: data.userId,
     });
-    
+
     const newEntidade = await storage.createEntidade(validatedEntityData);
     entidadeId = newEntidade.id;
     entidadeNome = newEntidade.nome;
     entidadeStatus = 'created';
-    
+
     // Step 3.5: Auto-enrich newly created entity
     try {
       console.log(`[Auto-Enrichment] Enriching new entity: ${entityName}`);
-      
+
       const enrichmentInput: EnrichmentInput = {
         name: entityName,
         domain: data.domain,
         website: data.website,
       };
-      
+
       const enrichmentResult = await enrichEntity(enrichmentInput);
-      
+
       // Only update if we got meaningful enrichment data
       if (enrichmentResult.enrichmentSource !== 'none') {
         const enrichedData: any = {
@@ -233,7 +233,7 @@ async function createContactWithUniversalLogic(data: {
           lastEnrichedAt: new Date(),
           enrichmentSource: enrichmentResult.enrichmentSource,
         };
-        
+
         // Update domain/website if enrichment found better values
         if (enrichmentResult.domain && !newEntidade.domain) {
           enrichedData.domain = enrichmentResult.domain;
@@ -247,7 +247,7 @@ async function createContactWithUniversalLogic(data: {
         if (enrichmentResult.morada && !newEntidade.morada) {
           enrichedData.morada = enrichmentResult.morada;
         }
-        
+
         // Update entity with enriched data
         await storage.updateEntidade(entidadeId, enrichedData);
         console.log(`[Auto-Enrichment] Successfully enriched entity ${entidadeId} (source: ${enrichmentResult.enrichmentSource})`);
@@ -270,7 +270,7 @@ async function createContactWithUniversalLogic(data: {
     entidadeId: entidadeId,
     createdByUserId: data.userId,
   });
-  
+
   const contacto = await storage.createContacto(validatedContactData);
 
   return {
@@ -297,7 +297,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Serve uploaded files statically
   app.use('/uploads', express.static(uploadsDir));
-  
+
   // Auth middleware
   await setupAuth(app);
 
@@ -379,10 +379,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
-      
+
       const newRole = user.role === 'admin' ? 'agent' : 'admin';
       await db.update(users).set({ role: newRole }).where(eq(users.id, userId));
-      
+
       const updatedUser = await storage.getUser(userId);
       res.json({ 
         message: `Role toggled to ${newRole}`,
@@ -398,12 +398,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/users', isAuthenticated, async (req: any, res) => {
     try {
       const { userRole } = await getUserContext(req);
-      
+
       // Only admins can list all users
       if (userRole !== 'admin') {
         return res.status(403).json({ message: "Forbidden - Admin access required" });
       }
-      
+
       const users = await storage.getAllUsers();
       res.json(users);
     } catch (error) {
@@ -430,15 +430,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       // Get empresa to check if IA is enabled
       const empresa = await storage.getEmpresa(empresaId);
       if (!empresa) return res.status(404).json({ message: "Company not found" });
-      
+
       // Check if dashboard insights are enabled (default enabled for backwards compatibility)
       const uiSettings = typeof empresa.uiSettings === 'string' ? JSON.parse(empresa.uiSettings) : empresa.uiSettings;
       const enableIA = uiSettings?.enableIA !== false; // Default to true
-      
+
       if (!enableIA) {
         return res.json({
           scope: userRole,
@@ -447,21 +447,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           insightsText: "Insights IA desativados nas definições da empresa."
         });
       }
-      
+
       // Calculate period (last 30 days)
       const to = new Date();
       const from = subDays(to, 30);
-      
+
       // Get metrics - storage methods automatically differentiate:
       // - agent: filtered by userId (createdByUserId/assignedUserId)
       // - admin: aggregated by empresaId (all users)
       const visitas = await storage.getVisitasInPeriod(from, to, empresaId, userId, userRole);
       const tarefas = await storage.getTarefasInPeriod(from, to, empresaId, userId, userRole);
-      
+
       // Get all visitas to calculate next 7 days (same role-based filtering)
       const nextWeek = new Date(to.getTime() + 7 * 24 * 60 * 60 * 1000);
       const visitasProximas = await storage.getVisitasInPeriod(to, nextWeek, empresaId, userId, userRole);
-      
+
       // Calculate client stats
       const clientStats: { [key: string]: { nome: string; count: number } } = {};
       visitas.forEach((v: any) => {
@@ -471,12 +471,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         clientStats[key].count++;
       });
-      
+
       const clientesChave = Object.values(clientStats)
         .sort((a, b) => b.count - a.count)
         .slice(0, 5)
         .map(c => ({ nome: c.nome, visitCount: c.count }));
-      
+
       // Calculate brand stats
       const brandStats: { [key: string]: number } = {};
       visitas.forEach((v: any) => {
@@ -487,16 +487,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       });
-      
+
       const marcasMaisTrabalhadas = Object.entries(brandStats)
         .map(([marca, count]) => ({ marca, count }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 5);
-      
+
       // Calculate task stats
       const tarefasConcluidas = tarefas.filter((t: any) => t.status === 'done').length;
       const tarefasEmAtraso = tarefas.filter((t: any) => t.status === 'pending' && t.dueDate && new Date(t.dueDate) < new Date()).length;
-      
+
       const metrics = {
         visitasRealizadas: visitas.length,
         visitasAgendadas: visitasProximas.length,
@@ -506,14 +506,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clientesChave,
         marcasMaisTrabalhadas,
       };
-      
+
       // Generate insights with AI - scope determines context (agent=personal, admin=team)
       const insightsText = await generateDashboardInsights({
         scope: userRole as 'agent' | 'admin',
         userName: userId,
         metrics,
       });
-      
+
       res.json({
         scope: userRole,
         period: {
@@ -534,7 +534,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       // Parse query params for filters
       const filters: {
         period?: number;
@@ -588,16 +588,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       console.log("[Entidades] GET /api/entidades/:id", {
         paramId: req.params.id,
         userId,
         userRole,
         empresaId,
       });
-      
+
       const entidade = await storage.getEntidade(req.params.id, empresaId, userId, userRole);
-      
+
       if (!entidade) {
         console.log("[Entidades] storage.getEntidade result is null", {
           paramId: req.params.id,
@@ -624,20 +624,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...validatedData,
         createdByUserId: userId,
       }, empresaId);
-      
+
       // Auto-enrich newly created entity (non-blocking)
       (async () => {
         try {
           console.log(`[Auto-Enrichment] Enriching manually created entity: ${entidade.nome}`);
-          
+
           const enrichmentInput: EnrichmentInput = {
             name: entidade.nome,
             domain: entidade.domain || undefined,
             website: entidade.website || undefined,
           };
-          
+
           const enrichmentResult = await enrichEntity(enrichmentInput);
-          
+
           if (enrichmentResult.enrichmentSource !== 'none') {
             const enrichedData: any = {
               description: enrichmentResult.description,
@@ -650,12 +650,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               lastEnrichedAt: new Date(),
               enrichmentSource: enrichmentResult.enrichmentSource,
             };
-            
+
             if (enrichmentResult.domain && !entidade.domain) enrichedData.domain = enrichmentResult.domain;
             if (enrichmentResult.website && !entidade.website) enrichedData.website = enrichmentResult.website;
             if (enrichmentResult.telefone && !entidade.telefone) enrichedData.telefone = enrichmentResult.telefone;
             if (enrichmentResult.morada && !entidade.morada) enrichedData.morada = enrichmentResult.morada;
-            
+
             await storage.updateEntidade(entidade.id, enrichedData, empresaId);
             console.log(`[Auto-Enrichment] Successfully enriched entity ${entidade.id} (source: ${enrichmentResult.enrichmentSource})`);
           }
@@ -663,7 +663,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error('[Auto-Enrichment] Failed to enrich manually created entity:', enrichmentError);
         }
       })();
-      
+
       res.json(entidade);
     } catch (error) {
       console.error("Error creating entidade:", error);
@@ -695,7 +695,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       // Check if entidade has related contacts or visits
       const hasRelations = await storage.checkEntidadeHasRelations(req.params.id);
       if (hasRelations) {
@@ -703,7 +703,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "Não é possível eliminar. Esta entidade tem contactos ou visitas associadas." 
         });
       }
-      
+
       await storage.deleteEntidade(req.params.id, empresaId, userId, userRole);
       res.json({ message: "Entidade deleted" });
     } catch (error) {
@@ -902,7 +902,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Verify actual MIME type from binary headers
       const mimeType = getImageMimeType(imageBuffer);
       console.log(`[Vision Card] Detected MIME type: ${mimeType}, Size: ${imageBuffer.length} bytes`);
-      
+
       const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
       if (!mimeType || !allowedTypes.includes(mimeType)) {
         console.warn(`[Vision Card] Rejected image with MIME: ${mimeType}`);
@@ -911,7 +911,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Build proper data URL with detected MIME type for OpenAI
       const dataUrl = `data:${mimeType};base64,${cleanBase64}`;
-      
+
       // Extract data using OpenAI Vision
       const extracted = await extractBusinessCardData(dataUrl);
 
@@ -990,7 +990,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       // Validate request
       const validationResult = generateEmailRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
@@ -1264,13 +1264,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       const { generateAllReminders } = await import('./reminders');
       const user = await storage.getUser(userId);
       if (user) {
         await generateAllReminders(user);
       }
-      
+
       let query = db
         .select()
         .from(lembretes)
@@ -1371,7 +1371,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const user = await storage.getUser(userId);
-      
+
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -1394,9 +1394,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       let visitas = await storage.getVisitas(empresaId, userId, userRole);
-      
+
       // Apply query filters (FASE 11, FASE 29: Added entidadeId and contactoId)
       const search = req.query.search as string | undefined;
       const from = req.query.from as string | undefined;
@@ -1406,7 +1406,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hasAudioToTranscribe = req.query.hasAudioToTranscribe === 'true';
       const entidadeId = req.query.entidadeId as string | undefined;
       const contactoId = req.query.contactoId as string | undefined;
-      
+
       visitas = visitas.filter(v => {
         // Search filter
         if (search) {
@@ -1417,7 +1417,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             v.notas?.toLowerCase().includes(q);
           if (!matchesSearch) return false;
         }
-        
+
         // Date range filter
         if (from || to) {
           const visitaDate = new Date(v.dataVisita);
@@ -1431,33 +1431,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (visitaDate > toDate) return false;
           }
         }
-        
+
         // User filter (admin only)
         if (filterUserId && v.createdByUserId !== filterUserId) return false;
-        
+
         // Marca filter
         if (marcaId && !v.marcas?.some(m => m.marcaId === marcaId)) return false;
-        
+
         // FASE 29: Entidade filter
         if (entidadeId && v.entidadeId !== entidadeId) return false;
-        
+
         // FASE 29: Contacto filter (deprecated - use FASE 1 visitasContactos)
         // FASE 1: Filter using visitasContactos junction table
         if (contactoId) {
           const hasContacto = v.contactos && v.contactos.some((vc: any) => vc.contactoId === contactoId);
           if (!hasContacto) return false;
         }
-        
+
         // Audio to transcribe filter
         if (hasAudioToTranscribe) {
           const hasAudio = v.audioUrl || (v.audios && v.audios.length > 0);
           const hasUntranscribedAudio = v.audios?.some(a => !a.transcricao);
           if (!hasAudio || !hasUntranscribedAudio) return false;
         }
-        
+
         return true;
       });
-      
+
       res.json(visitas);
     } catch (error) {
       console.error("Error fetching visitas:", error);
@@ -1473,10 +1473,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!visita) {
         return res.status(404).json({ message: "Visita not found" });
       }
-      
+
       // FASE 1: Get contactos presentes from visitasContactos table
       const contactosPresentes = await storage.getContactosFromVisita(req.params.id, empresaId);
-      
+
       // Return visita with contactosPresentes array
       res.json({
         ...visita,
@@ -1493,11 +1493,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       // Get all visitas and filter by visitaAnteriorId
       const allVisitas = await storage.getVisitas(empresaId, userId, userRole);
       const posteriores = allVisitas.filter(v => v.visitaAnteriorId === req.params.id);
-      
+
       res.json(posteriores);
     } catch (error) {
       console.error("Error fetching visitas posteriores:", error);
@@ -1510,7 +1510,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const visita = await storage.getVisita(req.params.id, empresaId, userId, userRole);
-      
+
       if (!visita) {
         return res.status(404).json({ message: "Visita not found" });
       }
@@ -1543,7 +1543,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const visita = await storage.getVisita(req.params.id, empresaId, userId, userRole);
-      
+
       if (!visita) {
         return res.status(404).json({ message: "Visita not found" });
       }
@@ -1568,12 +1568,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       const visita = await storage.getVisita(req.params.id, empresaId, userId, userRole);
       if (!visita) return res.status(404).json({ message: "Visita not found" });
-      
+
       if (!req.file) return res.status(400).json({ message: "No audio file provided" });
-      
+
       const fileUrl = `/uploads/${req.file.filename}`;
       const audioRecord = await storage.addAudioToVisita(req.params.id, fileUrl, empresaId);
       res.json(audioRecord);
@@ -1587,10 +1587,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       const visita = await storage.getVisita(req.params.id, empresaId, userId, userRole);
       if (!visita) return res.status(404).json({ message: "Visita not found" });
-      
+
       const audioClips = await storage.getVisitasAudio(req.params.id, empresaId);
       res.json(audioClips);
     } catch (error) {
@@ -1603,10 +1603,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       const visita = await storage.getVisita(req.params.id, empresaId, userId, userRole);
       if (!visita) return res.status(404).json({ message: "Visita not found" });
-      
+
       await storage.deleteVisitasAudio(req.params.audioId, empresaId);
       res.json({ message: "Audio deleted" });
     } catch (error) {
@@ -1619,41 +1619,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       const visita = await storage.getVisita(req.params.id, empresaId, userId, userRole);
       if (!visita) return res.status(404).json({ message: "Visita not found" });
-      
+
       const openaiApiKey = process.env.OPENAI_API_KEY;
       if (!openaiApiKey) return res.status(500).json({ message: "OpenAI not configured" });
-      
+
       const { OpenAI } = await import('openai');
       const client = new OpenAI({ apiKey: openaiApiKey });
-      
+
       const audioRecord = await storage.getVisitasAudio(req.params.id, empresaId);
       const targetAudio = audioRecord.find(a => a.id === req.params.audioId);
-      
+
       if (!targetAudio || !targetAudio.fileUrl) {
         return res.status(404).json({ message: "Audio not found" });
       }
-      
+
       // Extract filename from URL path and read from disk
       const filename = targetAudio.fileUrl.split('/').pop();
       const filePath = path.join(uploadsDir, filename);
-      
+
       // Check if file exists
       if (!fs.existsSync(filePath)) {
         return res.status(404).json({ message: "Audio file not found on disk" });
       }
-      
+
       // Create readable stream for OpenAI
       const audioStream = fs.createReadStream(filePath);
-      
+
       const transcription = await client.audio.transcriptions.create({
         file: audioStream as any,
         model: "whisper-1",
         language: "pt",
       });
-      
+
       const updated = await storage.updateVisitasAudioTranscription(req.params.audioId, transcription.text);
       res.json(updated);
     } catch (error) {
@@ -1670,7 +1670,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const files = req.files as { audio?: Express.Multer.File[], media?: Express.Multer.File[] };
-      
+
       // Parse form data with safe JSON parsing
       let marcasEntregues: string[] = [];
       if (req.body.marcasEntregues) {
@@ -1687,12 +1687,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let latitude: string | null = null;
       let longitude: string | null = null;
       let locationAccuracy: string | null = null;
-      
+
       if (req.body.latitude && req.body.longitude) {
         const lat = parseFloat(req.body.latitude);
         const lng = parseFloat(req.body.longitude);
         const acc = req.body.locationAccuracy ? parseFloat(req.body.locationAccuracy) : null;
-        
+
         if (!isNaN(lat) && !isNaN(lng)) {
           latitude = lat.toString();
           longitude = lng.toString();
@@ -1725,7 +1725,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (files?.audio && files.audio[0]) {
         const audioFile = files.audio[0];
         visitaData.audioUrl = `/uploads/${audioFile.filename}`;
-        
+
         // Transcribe audio asynchronously
         try {
           const transcription = await transcribeAudio(audioFile.path);
@@ -1788,9 +1788,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             entidadeNome: visitaComplete.entidade?.nome || '',
             contactoNome: visitaComplete.contacto?.nome,
           });
-          
+
           await storage.updateVisita(visita.id, { resumoIa: summary });
-          
+
           // Send email notification
           const user = await storage.getUser(userId);
           if (user?.email) {
@@ -1822,7 +1822,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       const visita = await storage.getVisita(req.params.id, empresaId, userId, userRole);
       if (!visita) {
         return res.status(404).json({ message: "Visita not found" });
@@ -1868,9 +1868,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       const updates: any = {};
-      
+
       // Allow updating specific fields (similar to contactos patch)
       if (req.body.proximaVisita !== undefined) {
         updates.proximaVisita = req.body.proximaVisita ? new Date(req.body.proximaVisita) : null;
@@ -1903,7 +1903,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.body.tarefasSugeridasIA !== undefined) {
         updates.tarefasSugeridasIA = req.body.tarefasSugeridasIA;
       }
-      
+
       // FASE 5: If only contactosIds provided and no other fields, skip updateVisita
       let updated: any = null;
       if (Object.keys(updates).length > 0) {
@@ -1918,7 +1918,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ message: "Visita not found" });
         }
       }
-      
+
       // FASE 1: Sync contactos if provided in update
       if (req.body.contactosIds !== undefined) {
         try {
@@ -1938,7 +1938,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error("Error updating contactos for visita:", error);
         }
       }
-      
+
       res.json(updated);
     } catch (error) {
       console.error("Error updating visita:", error);
@@ -1971,7 +1971,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         overdue: req.query.overdue === 'true',
       };
       let tarefas = await storage.getTarefas(empresaId, userId, userRole, filters);
-      
+
       // Apply search filter (FASE 11)
       const search = req.query.search as string | undefined;
       if (search) {
@@ -1982,7 +1982,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           t.entidade?.nome.toLowerCase().includes(q)
         );
       }
-      
+
       res.json(tarefas);
     } catch (error) {
       console.error("Error fetching tarefas:", error);
@@ -2010,7 +2010,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const validatedData = insertTarefaSchema.parse(req.body);
-      
+
       const cleanedData = {
         ...validatedData,
         entidadeId: validatedData.entidadeId || null,
@@ -2019,7 +2019,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dueDate: validatedData.dueDate || null,
         createdByUserId: userId,
       };
-      
+
       const tarefa = await storage.createTarefa(cleanedData, empresaId);
       res.json(tarefa);
     } catch (error) {
@@ -2033,7 +2033,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const validatedData = insertTarefaSchema.partial().parse(req.body);
-      
+
       const cleanedData = {
         ...validatedData,
         ...(validatedData.entidadeId !== undefined && { entidadeId: validatedData.entidadeId || null }),
@@ -2041,7 +2041,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...(validatedData.assignedUserId !== undefined && { assignedUserId: validatedData.assignedUserId || null }),
         ...(validatedData.dueDate !== undefined && { dueDate: validatedData.dueDate || null }),
       };
-      
+
       const tarefa = await storage.updateTarefa(req.params.id, cleanedData, empresaId, userId, userRole);
       if (!tarefa) {
         return res.status(404).json({ message: "Tarefa not found or unauthorized" });
@@ -2072,15 +2072,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/sync/odoo', isAuthenticated, async (req: any, res) => {
     try {
       const { userId, userRole } = await getUserContext(req);
-      
+
       // TODO: Implement actual Odoo sync logic
       // - Query entities/contacts/visits with needsSync=true
       // - Push changes to Odoo API
       // - Update syncStatus and lastSyncAt
       // - Handle errors and update syncError
-      
+
       console.log(`[Odoo Sync] Manual sync triggered by user ${userId} (role: ${userRole})`);
-      
+
       res.json({ 
         success: true, 
         message: "Odoo sync placeholder - implementation pending",
@@ -2101,9 +2101,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // - Update local entities/contacts/visits
       // - Set needsSync=false for synchronized records
       // - Handle conflicts and errors
-      
+
       console.log('[Odoo Webhook] Received webhook from Odoo:', req.body);
-      
+
       res.json({ 
         success: true, 
         message: "Odoo webhook placeholder - implementation pending",
@@ -2120,14 +2120,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/enrichment/autocomplete', isAuthenticated, async (req, res) => {
     try {
       const { query } = req.body;
-      
+
       if (!query || typeof query !== 'string') {
         return res.status(400).json({ message: 'Query parameter required' });
       }
-      
+
       const { fetchClearbitAutocomplete } = await import('./enrichment');
       const results = await fetchClearbitAutocomplete(query);
-      
+
       res.json(results);
     } catch (error) {
       console.error('[Enrichment] Autocomplete error:', error);
@@ -2139,14 +2139,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/enrichment/enrich', isAuthenticated, async (req, res) => {
     try {
       const { name, domain } = req.body;
-      
+
       if (!name || typeof name !== 'string') {
         return res.status(400).json({ message: 'Name parameter required' });
       }
-      
+
       const { enrichEntity } = await import('./enrichment');
       const enrichedData = await enrichEntity(name, domain);
-      
+
       res.json(enrichedData);
     } catch (error) {
       console.error('[Enrichment] Enrich error:', error);
@@ -2158,14 +2158,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/enrichment/validate-nif', isAuthenticated, async (req, res) => {
     try {
       const { nif } = req.body;
-      
+
       if (!nif || typeof nif !== 'string') {
         return res.status(400).json({ message: 'NIF parameter required' });
       }
-      
+
       const { validateNIF } = await import('./enrichment');
       const result = validateNIF(nif);
-      
+
       res.json(result);
     } catch (error) {
       console.error('[Enrichment] NIF validation error:', error);
@@ -2178,47 +2178,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole } = await getUserContext(req);
       const { nome, existingEntityId, tipoEntidade } = req.body;
-      
+
       console.log("[DEBUG IA ENTIDADE] request payload:", { nome, existingEntityId, tipoEntidade, userId });
-      
+
       if (!nome || typeof nome !== 'string') {
         return res.status(400).json({ message: 'Nome parameter required' });
       }
-      
+
       // NOTE: tipoEntidade é opcional para novas entidades (user ainda não escolheu tipo)
       // Se não vier, continua mesmo assim - vai fazer pesquisa genérica
       if (tipoEntidade && typeof tipoEntidade !== 'string') {
         console.log('[PT-Search] tipoEntidade veio mas não é string, ignorando:', tipoEntidade);
       }
-      
+
       const input: PTEnrichmentInput = {
         nome,
         userId,
         existingEntityId,
       };
-      
+
       console.log('[PT-Search] Calling ptIntelligentSearch with input:', JSON.stringify(input));
       const result = await ptIntelligentSearch(input, storage, userRole);
       console.log('[PT-Search] ptIntelligentSearch result:', { 
         fuzzyMatchesCount: result.fuzzyMatches?.length,
         enrichmentSource: result.enrichmentSource 
       });
-      
+
       if (result.fuzzyMatches.length === 0) {
         console.log(`[PT-Search] No fuzzy matches for "${nome}", attempting Google Search (user: ${userId}, role: ${userRole}, type: ${tipoEntidade})`);
         const { searchCompanyData } = await import('./googleSearch');
         const googleResults = await searchCompanyData(nome);
-        
+
         console.log(`[PT-Search] Google Search returned ${googleResults.length} results`);
         console.log("[DEBUG IA ENTIDADE] resposta OpenAI/IA:", { googleResults, fuzzyMatches: result.fuzzyMatches });
-        
+
         return res.json({
           ...result,
           googleResults,
           enrichmentSource: googleResults.length > 0 ? 'google' : result.enrichmentSource,
         });
       }
-      
+
       res.json(result);
     } catch (error) {
       console.error('[PT-Search] Intelligent search error:', error);
@@ -2231,30 +2231,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================
   // Disabled: Requires valid Azure App Registration with correct Client Secret value
   // Re-enable when proper credentials are configured
-  
+
   /*
-  
+
   // Microsoft OAuth Login
   app.get('/api/microsoft/auth/login', isAuthenticated, async (req, res) => {
     try {
       const { userId } = await getUserContext(req);
-      
+
       const clientId = process.env.MICROSOFT_CLIENT_ID;
       const redirectUri = `${req.protocol}://${req.get('host')}/api/microsoft/auth/callback`;
-      
+
       if (!clientId) {
         return res.status(500).json({ message: 'Microsoft OAuth not configured' });
       }
-      
+
       const scopes = [
         'offline_access',
         'Tasks.ReadWrite',
         'User.Read'
       ];
-      
+
       const state = randomUUID();
       req.session.msOAuthState = state;
-      
+
       const authUrl = new URL('https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize');
       authUrl.searchParams.set('client_id', clientId);
       authUrl.searchParams.set('response_type', 'code');
@@ -2262,7 +2262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       authUrl.searchParams.set('scope', scopes.join(' '));
       authUrl.searchParams.set('state', state);
       authUrl.searchParams.set('response_mode', 'query');
-      
+
       res.redirect(authUrl.toString());
     } catch (error) {
       console.error('[Microsoft Auth] Login error:', error);
@@ -2275,36 +2275,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = await getUserContext(req);
       console.log('[Microsoft Auth] Callback started for user:', userId);
-      
+
       const { code, state, error, error_description } = req.query;
-      
+
       if (error) {
         console.error('[Microsoft Auth] OAuth error:', error, error_description);
         return res.redirect('/#/integracoes/microsoft?error=' + encodeURIComponent(error_description as string || 'Authentication failed'));
       }
-      
+
       if (!code || !state || state !== req.session.msOAuthState) {
         console.error('[Microsoft Auth] State validation failed. Expected:', req.session.msOAuthState, 'Got:', state);
         return res.redirect('/#/integracoes/microsoft?error=invalid_state');
       }
-      
+
       console.log('[Microsoft Auth] State validated successfully');
-      
+
       const clientId = process.env.MICROSOFT_CLIENT_ID;
       const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
       const redirectUri = `${req.protocol}://${req.get('host')}/api/microsoft/auth/callback`;
-      
+
       console.log('[Microsoft Auth] Client ID:', clientId ? clientId.substring(0, 10) + '...' : 'MISSING');
       console.log('[Microsoft Auth] Client Secret length:', clientSecret?.length || 0);
       console.log('[Microsoft Auth] Client Secret:', clientSecret ? clientSecret.substring(0, 10) + '...' : 'MISSING');
-      
+
       if (!clientId || !clientSecret) {
         console.error('[Microsoft Auth] Missing client credentials');
         return res.status(500).json({ message: 'Microsoft OAuth not configured' });
       }
-      
+
       console.log('[Microsoft Auth] Exchanging code for tokens...');
-      
+
       const tokenEndpoint = 'https://login.microsoftonline.com/organizations/oauth2/v2.0/token';
       const params = new URLSearchParams({
         client_id: clientId,
@@ -2313,47 +2313,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         redirect_uri: redirectUri,
         grant_type: 'authorization_code',
       });
-      
+
       const response = await fetch(tokenEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: params.toString(),
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('[Microsoft Auth] Token exchange failed:', errorText);
         return res.redirect('/#/integracoes/microsoft?error=token_exchange_failed');
       }
-      
+
       const tokenData = await response.json();
       console.log('[Microsoft Auth] Tokens received, storing in database...');
-      
+
       const { storeMicrosoftTokens, getMicrosoftTokens } = await import('./microsoft');
-      
+
       await storeMicrosoftTokens(userId, {
         accessToken: tokenData.access_token,
         refreshToken: tokenData.refresh_token,
         scopes: tokenData.scope ? tokenData.scope.split(' ') : [],
         expiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
       });
-      
+
       const storedTokens = await getMicrosoftTokens(userId);
       if (!storedTokens) {
         console.error('[Microsoft Auth] Failed to verify token storage');
         return res.redirect('/#/integracoes/microsoft?error=token_storage_failed');
       }
-      
+
       console.log('[Microsoft Auth] Tokens stored successfully');
-      
+
       delete req.session.msOAuthState;
-      
+
       req.session.save((err) => {
         if (err) {
           console.error('[Microsoft Auth] Session save error:', err);
           return res.redirect('/#/integracoes/microsoft?error=session_save_failed');
         }
-        
+
         console.log('[Microsoft Auth] Session saved, redirecting to success page');
         res.redirect('/#/integracoes/microsoft?success=true');
       });
@@ -2372,7 +2372,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const scopes = ['User.Read', 'Tasks.ReadWrite', 'offline_access'];
-      
+
       const params = new URLSearchParams({
         client_id: clientId,
         scope: scopes.join(' '),
@@ -2392,7 +2392,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const data = await response.json();
       console.log('[Microsoft Auth] Device flow initiated successfully');
-      
+
       res.json({
         deviceCode: data.device_code,
         userCode: data.user_code,
@@ -2414,7 +2414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const clientId = process.env.MICROSOFT_CLIENT_ID;
       const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
-      
+
       if (!clientId || !clientSecret) {
         return res.status(500).json({ message: 'Microsoft OAuth not configured' });
       }
@@ -2452,7 +2452,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tokenData = await response.json();
 
       const { storeMicrosoftTokens, getMicrosoftTokens } = await import('./microsoft');
-      
+
       await storeMicrosoftTokens(userId, {
         accessToken: tokenData.access_token,
         refreshToken: tokenData.refresh_token,
@@ -2477,11 +2477,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/microsoft/auth/disconnect', isAuthenticated, async (req, res) => {
     try {
       const { userId } = await getUserContext(req);
-      
+
       const { deleteMicrosoftTokens } = await import('./microsoft');
-      
+
       await deleteMicrosoftTokens(userId);
-      
+
       res.json({ message: 'Microsoft account disconnected' });
     } catch (error) {
       console.error('[Microsoft Auth] Disconnect error:', error);
@@ -2493,11 +2493,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/microsoft/auth/status', isAuthenticated, async (req, res) => {
     try {
       const { userId } = await getUserContext(req);
-      
+
       const { getMicrosoftTokens } = await import('./microsoft');
-      
+
       const tokens = await getMicrosoftTokens(userId);
-      
+
       if (tokens) {
         res.json({
           connected: true,
@@ -2517,12 +2517,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/microsoft/planner/groups', isAuthenticated, async (req, res) => {
     try {
       const { userId } = await getUserContext(req);
-      
+
       const { createMicrosoftGraphClient } = await import('./microsoft');
-      
+
       const client = await createMicrosoftGraphClient(userId);
       const groups = await client.get('/me/joinedTeams');
-      
+
       res.json(groups.value || []);
     } catch (error: any) {
       console.error('[Microsoft Planner] Get groups error:', error);
@@ -2544,12 +2544,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { groupId } = req.params;
       const { userId } = await getUserContext(req);
-      
+
       const { createMicrosoftGraphClient } = await import('./microsoft');
-      
+
       const client = await createMicrosoftGraphClient(userId);
       const plans = await client.get(`/groups/${groupId}/planner/plans`);
-      
+
       res.json(plans.value || []);
     } catch (error: any) {
       console.error('[Microsoft Planner] Get plans error:', error);
@@ -2571,12 +2571,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { planId } = req.params;
       const { userId } = await getUserContext(req);
-      
+
       const { createMicrosoftGraphClient } = await import('./microsoft');
-      
+
       const client = await createMicrosoftGraphClient(userId);
       const buckets = await client.get(`/planner/plans/${planId}/buckets`);
-      
+
       res.json(buckets.value || []);
     } catch (error: any) {
       console.error('[Microsoft Planner] Get buckets error:', error);
@@ -2599,30 +2599,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { tarefaId } = req.params;
       const { planId, bucketId } = req.body;
       const { userId, userRole } = await getUserContext(req);
-      
+
       if (!planId || !bucketId) {
         return res.status(400).json({ message: 'Plan ID and Bucket ID required' });
       }
-      
+
       const tarefa = await storage.getTarefa(tarefaId, userId, userRole);
       if (!tarefa) {
         return res.status(404).json({ message: 'Tarefa not found' });
       }
-      
+
       const { createMicrosoftGraphClient } = await import('./microsoft');
       const client = await createMicrosoftGraphClient(userId);
-      
+
       const entidadeName = tarefa.entidadeId ? (await storage.getEntidade(tarefa.entidadeId, userId, userRole))?.nome : '';
       const visitaInfo = tarefa.visitaId ? (await storage.getVisita(tarefa.visitaId, userId, userRole)) : null;
-      
+
       const appUrl = `${req.protocol}://${req.get('host')}`;
       let description = `Link: ${appUrl}/#/tarefas/${tarefa.id}\n\n`;
       if (entidadeName) description += `Entidade: ${entidadeName}\n`;
       if (visitaInfo) description += `Visita relacionada\n`;
       if (tarefa.descricao) description += `\n${tarefa.descricao}`;
-      
+
       const msUser = await client.get('/me');
-      
+
       const plannerTask = await client.post('/planner/tasks', {
         planId,
         bucketId,
@@ -2635,11 +2635,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         },
       });
-      
+
       await client.patch(`/planner/tasks/${plannerTask.id}/details`, {
         description,
       });
-      
+
       await storage.updateTarefaMicrosoftFields(tarefaId, {
         plannerTaskId: plannerTask.id,
         plannerPlanId: planId,
@@ -2647,7 +2647,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         microsoftUserId: msUser.id,
         lastPlannerSyncAt: new Date(),
       });
-      
+
       res.json({ message: 'Tarefa enviada para o Planner', plannerTaskId: plannerTask.id });
     } catch (error: any) {
       console.error('[Microsoft Planner] Export error:', error);
@@ -2669,32 +2669,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { tarefaId } = req.params;
       const { userId, userRole } = await getUserContext(req);
-      
+
       const tarefa = await storage.getTarefa(tarefaId, userId, userRole);
       if (!tarefa) {
         return res.status(404).json({ message: 'Tarefa not found' });
       }
-      
+
       const { createMicrosoftGraphClient } = await import('./microsoft');
       const client = await createMicrosoftGraphClient(userId);
-      
+
       const lists = await client.get('/me/todo/lists');
       const defaultList = lists.value?.find((l: any) => l.wellknownListName === 'defaultList') || lists.value?.[0];
-      
+
       if (!defaultList) {
         return res.status(500).json({ message: 'No To-Do list found' });
       }
-      
+
       const appUrl = `${req.protocol}://${req.get('host')}`;
       const entidadeName = tarefa.entidadeId ? (await storage.getEntidade(tarefa.entidadeId, userId, userRole))?.nome : '';
-      
+
       let bodyContent = `Link: ${appUrl}/#/tarefas/${tarefa.id}\n\n`;
       if (entidadeName) bodyContent += `Entidade: ${entidadeName}\n`;
       if (tarefa.descricao) bodyContent += `\n${tarefa.descricao}`;
-      
+
       const categories: string[] = [];
       if (entidadeName) categories.push(entidadeName);
-      
+
       const todoTask = await client.post(`/me/todo/lists/${defaultList.id}/tasks`, {
         title: tarefa.titulo,
         body: {
@@ -2707,12 +2707,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } : null,
         categories: categories.length > 0 ? categories : undefined,
       });
-      
+
       await storage.updateTarefaMicrosoftFields(tarefaId, {
         todoTaskId: todoTask.id,
         lastTodoSyncAt: new Date(),
       });
-      
+
       res.json({ message: 'Tarefa criada no Microsoft To-Do', todoTaskId: todoTask.id });
     } catch (error: any) {
       console.error('[Microsoft To-Do] Export error:', error);
@@ -2729,32 +2729,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { visitaId } = req.params;
       const { startDateTime } = req.body;
       const { userId, userRole } = await getUserContext(req);
-      
+
       if (!startDateTime) {
         return res.status(400).json({ message: 'Start date/time required' });
       }
-      
+
       const visita = await storage.getVisita(visitaId, userId, userRole);
       if (!visita) {
         return res.status(404).json({ message: 'Visita not found' });
       }
-      
+
       const { createMicrosoftGraphClient } = await import('./microsoft');
       const client = await createMicrosoftGraphClient(userId);
-      
+
       const entidade = visita.entidadeId ? await storage.getEntidade(visita.entidadeId, userId, userRole) : null;
       const appUrl = `${req.protocol}://${req.get('host')}`;
-      
+
       const start = new Date(startDateTime);
       const end = new Date(start.getTime() + 60 * 60 * 1000);
-      
+
       let bodyContent = `Link: ${appUrl}/#/visitas/${visita.id}\n\n`;
       if (visita.resumoIa) bodyContent += `Resumo:\n${visita.resumoIa}\n\n`;
       if (visita.notas) bodyContent += `Notas:\n${visita.notas}\n\n`;
       if (visita.marcasEntregues && visita.marcasEntregues.length > 0) {
         bodyContent += `Marcas entregues: ${visita.marcasEntregues.join(', ')}\n`;
       }
-      
+
       const event = await client.post('/me/events', {
         subject: `Visita - ${entidade?.nome || 'Entidade'}`,
         body: {
@@ -2776,12 +2776,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         reminderMinutesBeforeStart: 30,
         isOnlineMeeting: false,
       });
-      
+
       await storage.updateVisitaMicrosoftFields(visitaId, {
         outlookEventId: event.id,
         lastCalendarSyncAt: new Date(),
       });
-      
+
       res.json({ message: 'Evento adicionado ao Outlook', eventId: event.id });
     } catch (error: any) {
       console.error('[Microsoft Calendar] Export error:', error);
@@ -2791,7 +2791,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: 'Failed to export to Outlook Calendar' });
     }
   });
-  
+
   */
 
   // ============================================
@@ -2805,20 +2805,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const { includePhotos, includeTasks, includeIA, includeCharts, type } = req.query;
-      
+
       const visita = await storage.getVisita(id, empresaId, userId, userRole);
       if (!visita) {
         return res.status(404).json({ message: 'Visita não encontrada' });
       }
-      
+
       const entidade = visita.entidadeId ? await storage.getEntidade(visita.entidadeId, empresaId, userId, userRole) : null;
       const contacto = visita.contactoId ? await storage.getContacto(visita.contactoId, empresaId, userId, userRole) : null;
       const tarefas = await storage.getTarefasByVisitaId(id, empresaId, userId, userRole);
       const recentVisits = entidade ? await storage.getVisitasByEntidade(entidade.id, empresaId, userId, userRole) : [];
-      
+
       const { generateVisitaPDFPro } = await import('./pdfPro');
       const { getOpenAIClient } = await import('./openai');
-      
+
       const options = {
         includePhotos: includePhotos !== 'false',
         includeTasks: includeTasks !== 'false',
@@ -2826,10 +2826,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         includeCharts: includeCharts !== 'false',
         type: (type === 'cliente' ? 'cliente' : 'interno') as 'interno' | 'cliente'
       };
-      
+
       const openaiClient = getOpenAIClient();
       const pdfBuffer = await generateVisitaPDFPro(visita, entidade, contacto, tarefas, recentVisits, options, openaiClient);
-      
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="visita-pro-${id}.pdf"`);
       res.send(pdfBuffer);
@@ -2846,20 +2846,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
       const { includePhotos, includeTasks, includeIA, includeCharts, type } = req.query;
-      
+
       const entidade = await storage.getEntidade(id, empresaId, userId, userRole);
       if (!entidade) {
         return res.status(404).json({ message: 'Entidade não encontrada' });
       }
-      
+
       const allContactos = await storage.getContactos({ empresaId, entidadeId: id });
       const contactos = allContactos;
       const visitas = await storage.getVisitasByEntidade(id, empresaId, userId, userRole);
       const tarefas = await storage.getTarefasByEntidadeId(id, empresaId, userId, userRole);
-      
+
       const { generateEntidadePDFPro } = await import('./pdfPro');
       const { getOpenAIClient } = await import('./openai');
-      
+
       const options = {
         includePhotos: includePhotos !== 'false',
         includeTasks: includeTasks !== 'false',
@@ -2867,10 +2867,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         includeCharts: includeCharts !== 'false',
         type: (type === 'cliente' ? 'cliente' : 'interno') as 'interno' | 'cliente'
       };
-      
+
       const openaiClient = getOpenAIClient();
       const pdfBuffer = await generateEntidadePDFPro(entidade, contactos, visitas, tarefas, options, openaiClient);
-      
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="entidade-pro-${entidade.nome?.replace(/[^a-z0-9]/gi, '_')}.pdf"`);
       res.send(pdfBuffer);
@@ -2886,25 +2886,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id: targetUserId } = req.params;
       const { userId, userRole, empresaId } = await getUserContext(req);
       const { year, month, includePhotos, includeTasks, includeIA, includeCharts } = req.query;
-      
+
       // RBAC: Agente só pode ver seus próprios relatórios, admin pode ver todos
       if (userRole !== 'admin' && userId !== targetUserId) {
         return res.status(403).json({ message: 'Sem permissão para aceder este relatório' });
       }
-      
+
       const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
       const targetMonth = month ? parseInt(month as string) - 1 : new Date().getMonth();
-      
+
       const periodStart = startOfMonth(new Date(targetYear, targetMonth));
       const periodEnd = endOfMonth(new Date(targetYear, targetMonth));
-      
+
       const visitas = await storage.getVisitasInPeriod(periodStart, periodEnd, targetUserId, userRole);
       const tarefas = await storage.getTarefasInPeriod(periodStart, periodEnd, targetUserId, userRole);
       const entidades = await storage.getAllEntidades(empresaId, targetUserId, userRole);
-      
+
       const { generateMonthlyReportPDF } = await import('./pdfPro');
       const { getOpenAIClient } = await import('./openai');
-      
+
       const options = {
         includePhotos: includePhotos !== 'false',
         includeTasks: includeTasks !== 'false',
@@ -2912,7 +2912,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         includeCharts: includeCharts !== 'false',
         type: 'interno' as const
       };
-      
+
       const openaiClient = getOpenAIClient();
       const pdfBuffer = await generateMonthlyReportPDF(
         { start: periodStart, end: periodEnd },
@@ -2924,7 +2924,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         options,
         openaiClient
       );
-      
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="relatorio-mensal-${targetMonth + 1}-${targetYear}.pdf"`);
       res.send(pdfBuffer);
@@ -2940,23 +2940,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id: targetUserId } = req.params;
       const { userId, userRole, empresaId } = await getUserContext(req);
       const { date, includePhotos, includeTasks, includeIA, includeCharts } = req.query;
-      
+
       // RBAC: Agente só pode ver seus próprios relatórios, admin pode ver todos
       if (userRole !== 'admin' && userId !== targetUserId) {
         return res.status(403).json({ message: 'Sem permissão para aceder este relatório' });
       }
-      
+
       const referenceDate = date ? new Date(date as string) : new Date();
       const periodStart = startOfWeek(referenceDate, { weekStartsOn: 1 });
       const periodEnd = endOfWeek(referenceDate, { weekStartsOn: 1 });
-      
+
       const visitas = await storage.getVisitasInPeriod(periodStart, periodEnd, targetUserId, userRole);
       const tarefas = await storage.getTarefasInPeriod(periodStart, periodEnd, targetUserId, userRole);
       const entidades = await storage.getAllEntidades(empresaId, targetUserId, userRole);
-      
+
       const { generateMonthlyReportPDF } = await import('./pdfPro');
       const { getOpenAIClient } = await import('./openai');
-      
+
       const options = {
         includePhotos: includePhotos !== 'false',
         includeTasks: includeTasks !== 'false',
@@ -2964,7 +2964,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         includeCharts: includeCharts !== 'false',
         type: 'interno' as const
       };
-      
+
       const openaiClient = getOpenAIClient();
       const pdfBuffer = await generateMonthlyReportPDF(
         { start: periodStart, end: periodEnd },
@@ -2976,7 +2976,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         options,
         openaiClient
       );
-      
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="relatorio-semanal-${format(periodStart, 'dd-MM-yyyy', { locale: pt })}.pdf"`);
       res.send(pdfBuffer);
@@ -2991,26 +2991,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       const { year, month, includePhotos, includeTasks, includeIA, includeCharts } = req.query;
-      
+
       // RBAC: Admin only
       if (userRole !== 'admin') {
         return res.status(403).json({ message: 'Relatórios da empresa requerem privilégios de admin' });
       }
-      
+
       const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
       const targetMonth = month ? parseInt(month as string) - 1 : new Date().getMonth();
-      
+
       const periodStart = startOfMonth(new Date(targetYear, targetMonth));
       const periodEnd = endOfMonth(new Date(targetYear, targetMonth));
-      
+
       // Admin vê tudo
       const visitas = await storage.getVisitasInPeriod(periodStart, periodEnd, userId, userRole);
       const tarefas = await storage.getTarefasInPeriod(periodStart, periodEnd, userId, userRole);
       const entidades = await storage.getAllEntidades(empresaId, userId, userRole);
-      
+
       const { generateMonthlyReportPDF } = await import('./pdfPro');
       const { getOpenAIClient } = await import('./openai');
-      
+
       const options = {
         includePhotos: includePhotos !== 'false',
         includeTasks: includeTasks !== 'false',
@@ -3018,7 +3018,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         includeCharts: includeCharts !== 'false',
         type: 'interno' as const
       };
-      
+
       const openaiClient = getOpenAIClient();
       const pdfBuffer = await generateMonthlyReportPDF(
         { start: periodStart, end: periodEnd },
@@ -3030,7 +3030,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         options,
         openaiClient
       );
-      
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="relatorio-empresa-${targetMonth + 1}-${targetYear}.pdf"`);
       res.send(pdfBuffer);
@@ -3041,26 +3041,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========== SIMPLIFIED PDF REPORT ENDPOINTS (RESTful) ==========
-  
+
   // GET /api/pdf/reports/monthly/agent - Relatório mensal do agente atual
   app.get('/api/pdf/reports/monthly/agent', isAuthenticated, async (req, res) => {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       const { year, month } = req.query;
-      
+
       const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
       const targetMonth = month ? parseInt(month as string) - 1 : new Date().getMonth();
-      
+
       const periodStart = startOfMonth(new Date(targetYear, targetMonth));
       const periodEnd = endOfMonth(new Date(targetYear, targetMonth));
-      
+
       const visitas = await storage.getVisitasInPeriod(periodStart, periodEnd, userId, userRole);
       const tarefas = await storage.getTarefasInPeriod(periodStart, periodEnd, userId, userRole);
       const entidades = await storage.getAllEntidades(empresaId, userId, userRole);
-      
+
       const { generateMonthlyReportPDF } = await import('./pdfPro');
       const { getOpenAIClient } = await import('./openai');
-      
+
       const options = {
         includePhotos: true,
         includeTasks: true,
@@ -3068,7 +3068,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         includeCharts: true,
         type: 'interno' as const
       };
-      
+
       const openaiClient = getOpenAIClient();
       const pdfBuffer = await generateMonthlyReportPDF(
         { start: periodStart, end: periodEnd },
@@ -3080,7 +3080,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         options,
         openaiClient
       );
-      
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="relatorio-mensal-${targetMonth + 1}-${targetYear}.pdf"`);
       res.send(pdfBuffer);
@@ -3095,18 +3095,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       const { date } = req.query;
-      
+
       const referenceDate = date ? new Date(date as string) : new Date();
       const periodStart = startOfWeek(referenceDate, { weekStartsOn: 1 });
       const periodEnd = endOfWeek(referenceDate, { weekStartsOn: 1 });
-      
+
       const visitas = await storage.getVisitasInPeriod(periodStart, periodEnd, userId, userRole);
       const tarefas = await storage.getTarefasInPeriod(periodStart, periodEnd, userId, userRole);
       const entidades = await storage.getAllEntidades(empresaId, userId, userRole);
-      
+
       const { generateMonthlyReportPDF } = await import('./pdfPro');
       const { getOpenAIClient } = await import('./openai');
-      
+
       const options = {
         includePhotos: true,
         includeTasks: true,
@@ -3114,7 +3114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         includeCharts: true,
         type: 'interno' as const
       };
-      
+
       const openaiClient = getOpenAIClient();
       const pdfBuffer = await generateMonthlyReportPDF(
         { start: periodStart, end: periodEnd },
@@ -3126,7 +3126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         options,
         openaiClient
       );
-      
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="relatorio-semanal-${format(periodStart, 'dd-MM-yyyy', { locale: pt })}.pdf"`);
       res.send(pdfBuffer);
@@ -3141,25 +3141,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       const { year, month } = req.query;
-      
+
       // RBAC: Admin only
       if (userRole !== 'admin') {
         return res.status(403).json({ message: 'Relatórios da empresa requerem privilégios de admin' });
       }
-      
+
       const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
       const targetMonth = month ? parseInt(month as string) - 1 : new Date().getMonth();
-      
+
       const periodStart = startOfMonth(new Date(targetYear, targetMonth));
       const periodEnd = endOfMonth(new Date(targetYear, targetMonth));
-      
+
       const visitas = await storage.getVisitasInPeriod(periodStart, periodEnd, userId, userRole);
       const tarefas = await storage.getTarefasInPeriod(periodStart, periodEnd, userId, userRole);
       const entidades = await storage.getAllEntidades(empresaId, userId, userRole);
-      
+
       const { generateMonthlyReportPDF } = await import('./pdfPro');
       const { getOpenAIClient } = await import('./openai');
-      
+
       const options = {
         includePhotos: true,
         includeTasks: true,
@@ -3167,7 +3167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         includeCharts: true,
         type: 'interno' as const
       };
-      
+
       const openaiClient = getOpenAIClient();
       const pdfBuffer = await generateMonthlyReportPDF(
         { start: periodStart, end: periodEnd },
@@ -3179,7 +3179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         options,
         openaiClient
       );
-      
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="relatorio-empresa-mensal-${targetMonth + 1}-${targetYear}.pdf"`);
       res.send(pdfBuffer);
@@ -3194,23 +3194,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       const { date } = req.query;
-      
+
       // RBAC: Admin only
       if (userRole !== 'admin') {
         return res.status(403).json({ message: 'Relatórios da empresa requerem privilégios de admin' });
       }
-      
+
       const referenceDate = date ? new Date(date as string) : new Date();
       const periodStart = startOfWeek(referenceDate, { weekStartsOn: 1 });
       const periodEnd = endOfWeek(referenceDate, { weekStartsOn: 1 });
-      
+
       const visitas = await storage.getVisitasInPeriod(periodStart, periodEnd, userId, userRole);
       const tarefas = await storage.getTarefasInPeriod(periodStart, periodEnd, userId, userRole);
       const entidades = await storage.getAllEntidades(empresaId, userId, userRole);
-      
+
       const { generateMonthlyReportPDF } = await import('./pdfPro');
       const { getOpenAIClient } = await import('./openai');
-      
+
       const options = {
         includePhotos: true,
         includeTasks: true,
@@ -3218,7 +3218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         includeCharts: true,
         type: 'interno' as const
       };
-      
+
       const openaiClient = getOpenAIClient();
       const pdfBuffer = await generateMonthlyReportPDF(
         { start: periodStart, end: periodEnd },
@@ -3230,7 +3230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         options,
         openaiClient
       );
-      
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="relatorio-empresa-semanal-${format(periodStart, 'dd-MM-yyyy', { locale: pt })}.pdf"`);
       res.send(pdfBuffer);
@@ -3252,12 +3252,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       const empresa = await storage.getEmpresa(empresaId);
       if (!empresa) {
         return res.status(404).json({ message: "Empresa not found" });
       }
-      
+
       // FASE 31-IA-01: Add calculated hasOwnOpenAIApiKey to response, never expose the actual key
       // FASE CRM-UI-CRMS-CARD-STEP1: Include odooCrmEnabled flag
       // FASE SUBS-LEADS-FLAG-STEP1: Include crmLeadsEnabled flag
@@ -3288,7 +3288,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         },
       };
-      
+
       // Remove the actual openai_api_key from response
       const { openai_api_key, ...safeResponse } = responseData;
       res.json(safeResponse);
@@ -3303,28 +3303,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       if (!req.file) {
         return res.status(400).json({ message: "No file provided" });
       }
-      
+
       // Validate file type (PNG, JPG, SVG only)
       const allowedMimes = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
       if (!allowedMimes.includes(req.file.mimetype)) {
         fs.unlinkSync(req.file.path); // Delete uploaded file
         return res.status(400).json({ message: "Invalid file type. Only PNG, JPG, SVG, and WebP allowed" });
       }
-      
+
       // Construct URL to uploaded file
       const fileUrl = `/uploads/${req.file.filename}`;
-      
+
       // Update empresa with new logo URL
       const updated = await storage.updateEmpresa(empresaId, { logoUrl: fileUrl });
       if (!updated) {
         fs.unlinkSync(req.file.path);
         return res.status(404).json({ message: "Empresa not found" });
       }
-      
+
       res.json({ logoUrl: fileUrl });
     } catch (error) {
       console.error("Error uploading logo:", error);
@@ -3342,14 +3342,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       const { nome, nif, email, telefone, logoUrl, mostrarMarcasEmVisitas, mostrarGPS, theme, uiSettings, iaOpenAIApiKey, odooCrmEnabled, crmLeadsEnabled, odooContactsFeatureEnabled, odooContactsAdminEnabled, odooContactsAgentsEnabled, odooContactsNoPermissionMessage, crmVisitsOdooSyncEnabled } = req.body;
-      
+
       // Validate theme if provided
       if (theme !== undefined && !["light-business", "dark-pro"].includes(theme)) {
         return res.status(400).json({ message: "Invalid theme. Must be 'light-business' or 'dark-pro'" });
       }
-      
+
       const updateData: Partial<Empresa> = {};
       if (nome !== undefined) updateData.nome = nome;
       if (nif !== undefined) updateData.nif = nif;
@@ -3362,7 +3362,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (uiSettings !== undefined) updateData.uiSettings = uiSettings; // FASE 22
       if (typeof odooCrmEnabled === "boolean") updateData.odooCrmEnabled = odooCrmEnabled; // FASE CRM-UI-CRMS-CARD-STEP1
       if (typeof crmLeadsEnabled === "boolean") updateData.crmLeadsEnabled = crmLeadsEnabled; // FASE SUBS-LEADS-FLAG-STEP1
-      
+
       // PROMPT 5: Add support for 4 new Odoo Contacts flags (3-tier RBAC + sync)
       if (typeof odooContactsFeatureEnabled === "boolean") {
         (updateData as any).odooContactsFeatureEnabled = odooContactsFeatureEnabled;
@@ -3379,7 +3379,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (typeof crmVisitsOdooSyncEnabled === "boolean") {
         (updateData as any).crmVisitsOdooSyncEnabled = crmVisitsOdooSyncEnabled;
       }
-      
+
       // FASE 31-IA-01: Handle custom OpenAI API Key management
       if (iaOpenAIApiKey !== undefined) {
         if (iaOpenAIApiKey && iaOpenAIApiKey.trim()) {
@@ -3406,12 +3406,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
-      
+
       const updated = await storage.updateEmpresa(empresaId, updateData);
       if (!updated) {
         return res.status(404).json({ message: "Empresa not found" });
       }
-      
+
       // Return response WITHOUT the actual openai_api_key
       // PROMPT 5: Include 4 new Odoo Contacts flags (3-tier RBAC + sync)
       const responseData = {
@@ -3453,7 +3453,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       const utilizadores = await storage.getUtilizadoresByEmpresa(empresaId);
       res.json(utilizadores);
     } catch (error) {
@@ -3467,13 +3467,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       const { email, firstName, lastName, role } = req.body;
-      
+
       if (!email) {
         return res.status(400).json({ message: "Email is required" });
       }
-      
+
       // FASE 3: Create user with company
       const newUser = await storage.createUtilizador({
         email,
@@ -3483,7 +3483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         empresaId,
         ativo: true,
       });
-      
+
       res.json(newUser);
     } catch (error) {
       console.error("Error creating utilizador:", error);
@@ -3496,9 +3496,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       const { role, ativo } = req.body;
-      
+
       const updateData: Partial<User> = {};
       if (role !== undefined && ['admin', 'agent'].includes(role)) {
         updateData.role = role;
@@ -3506,7 +3506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (ativo !== undefined) {
         updateData.ativo = ativo;
       }
-      
+
       const updated = await storage.updateUtilizador(req.params.id, updateData, empresaId);
       if (!updated) {
         return res.status(404).json({ message: "Utilizador not found or unauthorized" });
@@ -3523,7 +3523,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       const marcas = await storage.getMarcasByEmpresa(empresaId);
       res.json(marcas);
     } catch (error) {
@@ -3539,13 +3539,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { empresaId } = await getUserContext(req);
       console.log("[DEBUG ROUTE] getUserContext empresaId:", empresaId);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       const { nome, codigo, descricao, logoUrl, ativa } = req.body;
-      
+
       if (!nome) {
         return res.status(400).json({ message: "Brand name is required" });
       }
-      
+
       // FASE 3: Create marca with company
       const newMarca = await storage.createMarca({
         empresaId,
@@ -3555,7 +3555,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         logoUrl: logoUrl || null,
         ativa: ativa !== false, // default true
       });
-      
+
       console.log("[DEBUG ROUTE] POST /api/admin/marcas created:", newMarca);
       res.json(newMarca);
     } catch (error) {
@@ -3571,16 +3571,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { empresaId } = await getUserContext(req);
       console.log("[DEBUG ROUTE] getUserContext empresaId:", empresaId);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       const { nome, codigo, descricao, logoUrl, ativa } = req.body;
-      
+
       const updateData: Partial<Marca> = {};
       if (nome !== undefined) updateData.nome = nome;
       if (codigo !== undefined) updateData.codigo = codigo;
       if (descricao !== undefined) updateData.descricao = descricao;
       if (logoUrl !== undefined) updateData.logoUrl = logoUrl;
       if (ativa !== undefined) updateData.ativa = ativa;
-      
+
       console.log("[DEBUG ROUTE] updateData:", updateData);
       const updated = await storage.updateMarca(req.params.id, updateData, empresaId);
       console.log("[DEBUG ROUTE] PATCH result:", updated);
@@ -3599,7 +3599,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       const entidades = await storage.getEntidades(empresaId, userId, userRole);
       res.json(entidades);
     } catch (error) {
@@ -3609,13 +3609,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // FASE 29: Entidade Tipos (Entity Types) - CRUD endpoints
-  
+
   // GET /api/admin/entidade-tipos - List all entity types (admin only)
   app.get('/api/admin/entidade-tipos', requireAdmin, async (req: any, res) => {
     try {
       const { empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       const tipos = await storage.getEntidadeTipos(empresaId);
       res.json(tipos);
     } catch (error) {
@@ -3629,15 +3629,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       console.log("[DEBUG TIPO ENTIDADE API] POST body:", req.body);
-      
+
       const { nome, cor, icon, ativo, ordem } = req.body;
-      
+
       if (!nome) {
         return res.status(400).json({ message: "Entity type name is required" });
       }
-      
+
       const newTipo = await storage.createEntidadeTipo({
         nome,
         cor: cor || null,
@@ -3645,7 +3645,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ativo: ativo !== false,
         ordem: ordem || 0,
       }, empresaId);
-      
+
       console.log("[DEBUG TIPO ENTIDADE API] Created tipo with icon:", newTipo.icon);
       res.json(newTipo);
     } catch (error) {
@@ -3659,20 +3659,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       console.log("[DEBUG TIPO ENTIDADE API] PATCH body:", req.body);
-      
+
       const { nome, cor, icon, ativo, ordem } = req.body;
-      
+
       const updateData: Partial<EntidadeTipo> = {};
       if (nome !== undefined) updateData.nome = nome;
       if (cor !== undefined) updateData.cor = cor;
       if (icon !== undefined) updateData.icon = icon;
       if (ativo !== undefined) updateData.ativo = ativo;
       if (ordem !== undefined) updateData.ordem = ordem;
-      
+
       console.log("[DEBUG TIPO ENTIDADE API] PATCH updateData:", updateData);
-      
+
       const updated = await storage.updateEntidadeTipo(req.params.id, updateData, empresaId);
       if (!updated) {
         return res.status(404).json({ message: "Entidade tipo not found or unauthorized" });
@@ -3690,7 +3690,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       const tipos = await storage.getEntidadeTiposAtivos(empresaId);
       res.json(tipos);
     } catch (error) {
@@ -3718,13 +3718,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       const onlyAtivas = req.query.onlyAtivas === 'true';
-      
+
       const marcas = onlyAtivas 
         ? await storage.getMarcasByEmpresaAtiva(empresaId)
         : await storage.getMarcasByEmpresa(empresaId);
-      
+
       res.json(marcas);
     } catch (error) {
       console.error("Error fetching marcas:", error);
@@ -3923,13 +3923,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
 
       const { lat, lng } = req.body;
-      
+
       if (typeof lat !== 'number' || typeof lng !== 'number') {
         return res.status(400).json({ message: "Invalid coordinates" });
       }
 
       const sugestao = await storage.getNearbyVisitSuggestions(empresaId, lat, lng, 200);
-      
+
       res.json({ sugestao });
     } catch (error) {
       console.error("Error getting nearby suggestions:", error);
@@ -3942,7 +3942,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, empresa } = await getUserContext(req);
       const user = await storage.getUserSettings(userId);
-      
+
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -4024,10 +4024,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       const q = (req.query.q as string || "").toLowerCase();
       const entidades = await storage.getEntidades(empresaId, userId, userRole);
-      
+
       const results: EntidadeSearchResult[] = entidades
         .filter(e => e.nome.toLowerCase().includes(q))
         .sort((a, b) => a.nome.localeCompare(b.nome))
@@ -4038,7 +4038,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           extraInfo: e.cidade || e.nif || undefined,
           data: { cidade: e.cidade, nif: e.nif }
         }));
-      
+
       res.json(results);
     } catch (error) {
       console.error("Error searching entidades:", error);
@@ -4051,12 +4051,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       const q = (req.query.q as string || "").toLowerCase();
       const entidadeId = req.query.entidadeId as string | undefined;
-      
+
       const contactos = await storage.getContactos({ empresaId, entidadeId });
-      
+
       const results: ContactoSearchResult[] = contactos
         .filter(c => c.nome.toLowerCase().includes(q))
         .sort((a, b) => a.nome.localeCompare(b.nome))
@@ -4067,7 +4067,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           extraInfo: c.entidade?.nome || c.email || undefined,
           data: { entidadeNome: c.entidade?.nome, email: c.email }
         }));
-      
+
       res.json(results);
     } catch (error) {
       console.error("Error searching contactos:", error);
@@ -4080,16 +4080,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
       if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      
+
       const q = (req.query.q as string || "").toLowerCase();
       const entidadeId = req.query.entidadeId as string | undefined;
-      
+
       let visitas = await storage.getVisitas(empresaId, userId, userRole);
-      
+
       if (entidadeId) {
         visitas = visitas.filter(v => v.entidadeId === entidadeId);
       }
-      
+
       const results: VisitaSearchResult[] = visitas
         .filter(v => {
           const q_lower = q.toLowerCase();
@@ -4104,7 +4104,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           extraInfo: v.entidade?.nome,
           data: { entidadeNome: v.entidade?.nome, date: v.dataVisita }
         }));
-      
+
       res.json(results);
     } catch (error) {
       console.error("Error searching visitas:", error);

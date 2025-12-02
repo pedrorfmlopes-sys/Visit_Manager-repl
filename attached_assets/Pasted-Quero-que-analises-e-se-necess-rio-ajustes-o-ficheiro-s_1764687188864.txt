@@ -1,0 +1,140 @@
+Quero que analises e, se necessário, ajustes o ficheiro server/auth/rbac.ts do projeto SalesVisitManager, sem refatorar nada fora do necessário.
+
+Objetivo
+
+Ter um módulo de RBAC reutilizável para backend, alinhado com:
+
+server/authContext.ts
+
+modelo multi-empresa (empresaId)
+
+roles existentes: "admin" e "agent" (não inventar "user").
+
+Não mudar nada em authContext.ts exceto se for mesmo obrigatório (evitar).
+
+Passos
+
+Abre e lê o ficheiro server/authContext.ts para confirmares:
+
+nome e assinatura da função principal (por ex. getUserContext(req)),
+
+tipo de userRole (deve ser algo do género "admin" | "agent"),
+
+como é que o empresaId entra no contexto.
+
+Abre o ficheiro server/auth/rbac.ts e:
+
+Se já existir um ficheiro com helpers de RBAC:
+
+Garante que:
+
+está a importar getUserContext de ../authContext (ou outro path correto, mas a partir de server/authContext.ts),
+
+o tipo de role é compatível com o UserContext do authContext,
+
+há uma função requireUserContext(req) que:
+
+usa req.userContext se já estiver definido,
+
+caso contrário chama getUserContext(req) (async),
+
+valida que existe empresaId, senão lança erro com status 401,
+
+coloca o contexto final em req.userContext para reutilização.
+
+existem helpers:
+
+isAdmin(ctx) → retorna ctx.userRole === "admin".
+
+canUserAccessVisit(ctx, visita) → implementa:
+
+visita.empresaId === ctx.empresaId,
+
+admin → true,
+
+agent → visita.userId === ctx.userId (ou lógica equivalente usada no projeto para “dono” da visita).
+
+canUserAccessContact(ctx, contacto) → pelo menos valida contacto.empresaId === ctx.empresaId.
+
+Se não existir o ficheiro ou o código estiver muito diferente:
+
+Cria/reescreve server/auth/rbac.ts com:
+
+import:
+
+import type { Request } from "express";
+import {
+  getUserContext,
+  type UserContext as BaseUserContext,
+} from "../authContext";
+
+
+tipos:
+
+export type UserRole = BaseUserContext["userRole"]; // 'admin' | 'agent'
+
+export interface UserContext extends BaseUserContext {
+  empresaId: string;
+}
+
+
+função requireUserContext async:
+
+export async function requireUserContext(req: Request): Promise<UserContext> {
+  const existing = (req as any).userContext as BaseUserContext | undefined;
+  const base = existing ?? (await getUserContext(req));
+
+  if (!base.empresaId) {
+    const error = new Error("Empresa não encontrada no contexto do utilizador");
+    (error as any).status = 401;
+    throw error;
+  }
+
+  const ctx: UserContext = { ...base, empresaId: base.empresaId };
+  (req as any).userContext = ctx;
+  return ctx;
+}
+
+
+helper isAdmin:
+
+export function isAdmin(ctx: UserContext): boolean {
+  return ctx.userRole === "admin";
+}
+
+
+helper canUserAccessVisit:
+
+export function canUserAccessVisit(
+  ctx: UserContext,
+  visita: { empresaId: string; userId: string },
+): boolean {
+  if (visita.empresaId !== ctx.empresaId) return false;
+  if (isAdmin(ctx)) return true;
+  return visita.userId === ctx.userId;
+}
+
+
+helper canUserAccessContact:
+
+export function canUserAccessContact(
+  ctx: UserContext,
+  contacto: { empresaId: string },
+): boolean {
+  return contacto.empresaId === ctx.empresaId;
+}
+
+
+Não alteres nenhuma rota neste prompt.
+
+Este prompt é apenas para garantir que rbac.ts está presente, a compilar e alinhado com authContext.ts.
+
+No final:
+
+Confirma que o projeto compila (TS OK).
+
+Lista-me de forma resumida o que foi feito:
+
+“ficheiro já estava OK e não mexi” ou
+
+“ajustei imports / criei funções X, Y em rbac.ts”.
