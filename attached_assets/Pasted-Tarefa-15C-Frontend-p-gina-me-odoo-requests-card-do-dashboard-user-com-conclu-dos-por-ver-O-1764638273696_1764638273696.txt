@@ -1,3 +1,65 @@
+Tarefa 15C – Frontend: página /me/odoo-requests + card do dashboard user com concluídos “por ver”
+
+Objetivo:
+
+Transformar a página /me/odoo-requests numa listagem real dos pedidos do utilizador.
+
+Quando o utilizador abre essa página, marcar pedidos concluídos como vistos (userSeenAt preenchido).
+
+Ajustar o card “Pedidos / Aprovações” do dashboard user para que o número de “Concluídos” conte apenas os pedidos concluídos ainda não vistos (userSeenAt == null).
+
+Atualizar o tipo e o card do dashboard user
+
+No ficheiro do dashboard user (o mesmo onde foi criada a query para /api/odoo/contact-requests/my na 14B):
+
+1.1. Atualiza o tipo MyOdooRequest para incluir userSeenAt:
+
+type MyOdooRequest = {
+  id: string;
+  estado: "pendente" | "em_progresso" | "concluido";
+  createdAt: string;
+  tipo: "contacto" | "entidade";
+  mensagem: string | null;
+  userSeenAt: string | null;
+};
+
+
+1.2. Mantém o queryFn da query /api/odoo/contact-requests/my como está (já devolve json.data), mas passa a assumir que userSeenAt vem do backend.
+
+1.3. Ajusta os cálculos usados no card “Pedidos / Aprovações” para que “Concluídos” conte apenas os por ver:
+
+const myPending = myOdooRequests.filter(
+  (r) => r.estado === "pendente"
+).length;
+
+const myInProgress = myOdooRequests.filter(
+  (r) => r.estado === "em_progresso"
+).length;
+
+// Concluídos "por ver": estado concluído + userSeenAt null
+const myDone = myOdooRequests.filter(
+  (r) => r.estado === "concluido" && !r.userSeenAt
+).length;
+
+const myTotal = myOdooRequests.length;
+
+
+Mantém o JSX do card (título, descrições) e apenas garante que está a usar estas variáveis (myPending, myInProgress, myDone, myTotal).
+
+Transformar a página /me/odoo-requests numa listagem real
+
+No ficheiro client/src/pages/OdooMyRequestsPage.tsx (ou o nome que tiver sido usado na 14B):
+
+2.1. Substitui o conteúdo placeholder por uma página com:
+
+useQuery a chamar /api/odoo/contact-requests/my
+
+um useEffect que chama PATCH /api/odoo/contact-requests/my/mark-seen para marcar concluídos como vistos
+
+uma tabela simples com os pedidos
+
+Exemplo de implementação (ajusta caminhos de imports se necessário, mas mantém a lógica):
+
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -114,18 +176,18 @@ export function OdooMyRequestsPage() {
               </TableHeader>
               <TableBody>
                 {myOdooRequests.map((req) => (
-                  <TableRow key={req.id} data-testid={`row-request-${req.id}`}>
-                    <TableCell data-testid={`cell-date-${req.id}`}>
+                  <TableRow key={req.id}>
+                    <TableCell>
                       {format(new Date(req.createdAt), "dd/MM/yyyy HH:mm", {
                         locale: pt,
                       })}
                     </TableCell>
-                    <TableCell data-testid={`cell-type-${req.id}`}>
+                    <TableCell>
                       <Badge variant="outline">
                         {req.tipo === "contacto" ? "Contacto" : "Entidade"}
                       </Badge>
                     </TableCell>
-                    <TableCell data-testid={`cell-status-${req.id}`}>
+                    <TableCell>
                       <Badge
                         variant={
                           req.estado === "concluido"
@@ -142,7 +204,7 @@ export function OdooMyRequestsPage() {
                           : "Concluído"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="max-w-xs truncate" data-testid={`cell-message-${req.id}`}>
+                    <TableCell className="max-w-xs truncate">
                       {req.mensagem || "—"}
                     </TableCell>
                   </TableRow>
@@ -155,3 +217,6 @@ export function OdooMyRequestsPage() {
     </main>
   );
 }
+
+
+Garante que o projeto compila sem erros.

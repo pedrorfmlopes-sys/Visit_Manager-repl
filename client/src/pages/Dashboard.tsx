@@ -33,6 +33,7 @@ type MyOdooRequest = {
   createdAt: string;
   tipo: "contacto" | "entidade";
   mensagem: string | null;
+  userSeenAt: string | null;
 };
 
 export default function Dashboard() {
@@ -66,9 +67,16 @@ export default function Dashboard() {
     },
   });
 
-  const myPending = myOdooRequests.filter((r) => r.estado === "pendente").length;
-  const myInProgress = myOdooRequests.filter((r) => r.estado === "em_progresso").length;
-  const myDone = myOdooRequests.filter((r) => r.estado === "concluido").length;
+  const myPending = myOdooRequests.filter(
+    (r) => r.estado === "pendente"
+  ).length;
+  const myInProgress = myOdooRequests.filter(
+    (r) => r.estado === "em_progresso"
+  ).length;
+  // Concluídos "por ver": estado concluído + userSeenAt null
+  const myDone = myOdooRequests.filter(
+    (r) => r.estado === "concluido" && !r.userSeenAt
+  ).length;
   const myTotal = myOdooRequests.length;
 
   const handleDismissDashboardTip = async () => {
