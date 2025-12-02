@@ -288,6 +288,58 @@ async function createContactWithUniversalLogic(data: {
   };
 }
 
+/**
+ * RBAC Helper: Lista contactos visíveis para o utilizador
+ * - Admin: vê todos os contactos da empresa
+ * - Agent: vê contactos que criou, atribuídos a ele, ou ligados a visitas que pode ver
+ */
+async function listContactosForUser(options: {
+  empresaId: string;
+  userId: string;
+  userRole: "admin" | "agent";
+  entidadeId?: string;
+}) {
+  const { empresaId, userId, userRole, entidadeId } = options;
+
+  // Base: todos os contactos da empresa (opcionalmente filtrados por entidade)
+  const contactos = await storage.getContactos({ empresaId, entidadeId });
+
+  if (userRole === "admin") {
+    // Admin vê todos os contactos da empresa
+    return contactos;
+  }
+
+  const allowedIds = new Set<string>();
+
+  // 1) Contactos criados ou atribuídos ao utilizador
+  for (const c of contactos) {
+    if (c.createdByUserId === userId || c.assignedUserId === userId) {
+      allowedIds.add(c.id);
+    }
+  }
+
+  // 2) Contactos ligados a visitas que o utilizador consegue ver
+  const visitas = await storage.getVisitas(empresaId, userId, userRole);
+
+  for (const v of visitas) {
+    // Legacy: campo contactoId direto na visita
+    if ((v as any).contactoId) {
+      allowedIds.add((v as any).contactoId);
+    }
+
+    // Novo modelo: tabela de junção visitasContactos → v.contactos[]
+    if (Array.isArray((v as any).contactos)) {
+      for (const vc of (v as any).contactos) {
+        if (vc?.contactoId) {
+          allowedIds.add(vc.contactoId);
+        }
+      }
+    }
+  }
+
+  return contactos.filter((c) => allowedIds.has(c.id));
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Serve service worker with correct MIME type
   app.get('/sw.js', (req, res) => {
@@ -749,12 +801,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Contactos endpoints - FASE 2: filtered by empresaId (STEP 1: params object)
-  app.get('/api/contactos', isAuthenticated, async (req: any, res) => {
+  // Contactos endpoints - FASE 2: filtered by empresaId + RBAC via listContactosForUser
+  app.get("/api/contactos", isAuthenticated, async (req: any, res) => {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
-      if (!empresaId) return res.status(400).json({ message: "User has no company assigned" });
-      const contactos = await storage.getContactos({ empresaId });
+      if (!empresaId) {
+        return res.status(400).json({ message: "User has no company assigned" });
+      }
+
+      const contactos = await listContactosForUser({
+        empresaId,
+        userId,
+        userRole,
+      });
+
       res.json(contactos);
     } catch (error) {
       console.error("Error fetching contactos:", error);
@@ -2852,8 +2912,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Entidade não encontrada' });
       }
 
-      const allContactos = await storage.getContactos({ empresaId, entidadeId: id });
-      const contactos = allContactos;
+      // RBAC: Contactos filtrados pelo helper
+      const contactos = await listContactosForUser({
+        empresaId,
+        userId,
+        userRole,
+        entidadeId: id,
+      });
       const visitas = await storage.getVisitasByEntidade(id, empresaId, userId, userRole);
       const tarefas = await storage.getTarefasByEntidadeId(id, empresaId, userId, userRole);
 
@@ -4046,7 +4111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/crm/contactos/search?q=...&entidadeId=...
+  // GET /api/crm/contactos/search?q=...&entidadeId=... - RBAC via listContactosForUser
   app.get('/api/crm/contactos/search', isAuthenticated, async (req: any, res) => {
     try {
       const { userId, userRole, empresaId } = await getUserContext(req);
@@ -4055,7 +4120,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const q = (req.query.q as string || "").toLowerCase();
       const entidadeId = req.query.entidadeId as string | undefined;
 
-      const contactos = await storage.getContactos({ empresaId, entidadeId });
+      const contactos = await listContactosForUser({
+        empresaId,
+        userId,
+        userRole,
+        entidadeId,
+      });
 
       const results: ContactoSearchResult[] = contactos
         .filter(c => c.nome.toLowerCase().includes(q))

@@ -1,0 +1,179 @@
+Quero que reforces o RBAC (permissões) para contactos no backend, apenas no ficheiro server/routes.ts, sem partir outros módulos.
+
+Objetivo geral
+
+Admin (userRole === "admin") → vê todos os contactos da sua empresa.
+
+User normal ("agent") → só vê:
+
+contactos que criou (createdByUserId),
+
+contactos atribuídos a ele (assignedUserId),
+
+contactos que estejam ligados a visitas às quais ele tenha acesso (de acordo com o RBAC já existente em storage.getVisitas).
+
+Manter o modelo multi-empresa (empresaId) como está.
+
+Não alterar lógica de visitas nem de tarefas (essas já respeitam RBAC via storage).
+
+Passos
+
+Abre server/routes.ts e não reescrevas o ficheiro todo.
+
+Vais apenas:
+
+adicionar um helper novo,
+
+atualizar o endpoint GET /api/contactos,
+
+atualizar o endpoint GET /api/crm/contactos/search,
+
+opcionalmente, se existir algum endpoint que usa contactos numa entidade (por ex. PDF Pro), alinhar com o mesmo helper.
+
+Cria um helper listContactosForUser perto do topo do ficheiro, antes da função export async function registerRoutes(...), usando o storage existente.
+
+Antes de criar, verifica se já existe alguma função semelhante (ex.: getVisibleContactosForUser).
+
+Se existir, e fizer o que queremos, reaproveita; senão, cria algo assim (adapta nomes à tipagem existente):
+
+async function listContactosForUser(options: {
+  empresaId: string;
+  userId: string;
+  userRole: "admin" | "agent";
+  entidadeId?: string;
+}) {
+  const { empresaId, userId, userRole, entidadeId } = options;
+
+  // base: todos os contactos da empresa (e opcionalmente filtrados por entidade)
+  const contactos = await storage.getContactos({ empresaId, entidadeId });
+
+  if (userRole === "admin") {
+    // admin vê todos os contactos da empresa
+    return contactos;
+  }
+
+  const allowedIds = new Set<string>();
+
+  // 1) contactos criados ou atribuídos ao utilizador
+  for (const c of contactos) {
+    if (c.createdByUserId === userId || c.assignedUserId === userId) {
+      allowedIds.add(c.id);
+    }
+  }
+
+  // 2) contactos ligados a visitas que o utilizador consegue ver
+  const visitas = await storage.getVisitas(empresaId, userId, userRole);
+
+  for (const v of visitas) {
+    // legacy: campo contactoId direto na visita
+    if ((v as any).contactoId) {
+      allowedIds.add((v as any).contactoId);
+    }
+
+    // novo modelo: tabela de junção visitasContactos → v.contactos[]
+    if (Array.isArray((v as any).contactos)) {
+      for (const vc of (v as any).contactos) {
+        if (vc?.contactoId) {
+          allowedIds.add(vc.contactoId);
+        }
+      }
+    }
+  }
+
+  return contactos.filter((c) => allowedIds.has(c.id));
+}
+
+
+Garante que este helper não altera storage.getContactos nem storage.getVisitas, apenas os usa.
+
+Atualiza o endpoint GET /api/contactos:
+
+Procura no routes.ts a rota:
+
+app.get('/api/contactos', isAuthenticated, async (req: any, res) => { ... })
+
+
+Substitui APENAS o corpo dessa rota pelo uso do helper:
+
+app.get("/api/contactos", isAuthenticated, async (req: any, res) => {
+  try {
+    const { userId, userRole, empresaId } = await getUserContext(req);
+    if (!empresaId) {
+      return res
+        .status(400)
+        .json({ message: "User has no company assigned" });
+    }
+
+    const contactos = await listContactosForUser({
+      empresaId,
+      userId,
+      userRole,
+    });
+
+    res.json(contactos);
+  } catch (error) {
+    console.error("Error fetching contactos:", error);
+    res.status(500).json({ message: "Failed to fetch contactos" });
+  }
+});
+
+
+Não mexas nas rotas POST, PATCH, DELETE de contactos (essas já usam storage com empresaId, userId, userRole).
+
+Atualiza o endpoint GET /api/crm/contactos/search:
+
+Procura a rota:
+
+app.get('/api/crm/contactos/search', isAuthenticated, async (req: any, res) => { ... })
+
+
+Substitui APENAS a parte onde se obtêm os contactos.
+Em vez de:
+
+const contactos = await storage.getContactos({ empresaId, entidadeId });
+
+
+passa a ser:
+
+const contactos = await listContactosForUser({
+  empresaId,
+  userId,
+  userRole,
+  entidadeId,
+});
+
+
+Mantém o resto da lógica (filtro por q, .slice(0, 20), .map(...)) exatamente igual.
+
+Opcional mas desejável – PDF Pro / outros endpoints que carregam contactos de uma entidade:
+
+Se existir um endpoint tipo /api/pdf/entidade/:id/pro ou equivalente, em que atualmente faz:
+
+const allContactos = await storage.getContactos({ empresaId, entidadeId: id });
+const contactos = allContactos;
+
+
+troca para:
+
+const contactos = await listContactosForUser({
+  empresaId,
+  userId,
+  userRole,
+  entidadeId: id,
+});
+
+
+Assim, os PDFs também respeitam o mesmo RBAC de contactos.
+
+Não alteres mais nenhuma rota neste prompt.
+Não mexas em visitas, tarefas, leads, nem integrações Odoo/Google/Microsoft aqui.
+
+No final:
+
+Garante que o TypeScript compila,
+
+Devolve um resumo do que mudou:
+
+“adicionei helper listContactosForUser em routes.ts”,
+
+“roteiro GET /api/contactos e GET /api/crm/contactos/search passaram a usar o helper”.
