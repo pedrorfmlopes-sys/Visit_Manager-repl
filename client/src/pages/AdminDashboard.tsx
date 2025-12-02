@@ -56,8 +56,19 @@ export default function AdminDashboard() {
     queryKey: ["/api/tarefas"],
   });
 
-  const { data: odooRequests, isLoading: odooRequestsLoading, isError: odooRequestsError } = useQuery<OdooContactRequest[]>({
+  const { data: odooRequests = [], isLoading: odooRequestsLoading, isError: odooRequestsError } = useQuery<OdooContactRequest[]>({
     queryKey: ["/api/odoo/contact-requests", "dashboard"],
+    queryFn: async () => {
+      const res = await fetch("/api/odoo/contact-requests");
+      if (!res.ok) {
+        throw new Error("Failed to fetch Odoo contact requests");
+      }
+      const json = await res.json();
+      if (!json.success) {
+        throw new Error(json.message || "Erro ao carregar pedidos Odoo");
+      }
+      return json.data as OdooContactRequest[];
+    },
   });
 
   const toggleRoleMutation = useMutation({
@@ -272,13 +283,13 @@ export default function AdminDashboard() {
 
       {/* KPIs */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           {[1, 2, 3, 4].map((i) => (
             <Skeleton key={i} className="h-32 rounded-lg" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <Card className="p-4">
             <div className="flex items-start justify-between">
               <div>
