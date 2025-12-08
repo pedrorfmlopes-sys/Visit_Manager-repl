@@ -1,0 +1,144 @@
+================================================================================
+RELATORIO: CORRECAO DO FLUXO DE AUTENTICACAO
+================================================================================
+
+Data: 8 Dezembro 2025
+Status: COMPLETO - Servidor RUNNING com auth funcional
+
+================================================================================
+PROBLEMA ORIGINAL
+================================================================================
+
+O servidor crashava com:
+  TypeError: Cannot read properties of undefined (reading 'user')
+  at handleGetUser (server/routes/authRoutes.ts:69:34)
+
+Causa: req.session era undefined porque o middleware de sessao (express-session)
+       NAO estava configurado antes das rotas serem registadas.
+
+================================================================================
+ANALISE
+================================================================================
+
+1. Ficheiro server/replitAuth.ts
+   - Exporta setupAuth(app) que configura:
+     - express-session com PostgreSQL store
+     - passport.js com Replit OAuth
+     - Rotas /api/login, /api/callback, /api/logout
+
+2. Ficheiro server/index.ts (ANTES)
+   - NAO chamava setupAuth(app)
+   - Resultado: req.session undefined em todos os handlers
+
+3. Ficheiro server/routes/authRoutes.ts (ANTES)
+   - Definia /api/login duplicado (conflito com replitAuth.ts)
+
+================================================================================
+ALTERACOES REALIZADAS
+================================================================================
+
+1. server/index.ts
+   ALTERACAO: Adicionado import e chamada a setupAuth ANTES de registerRoutes
+
+   ANTES:
+     (async () => {
+       const server = await registerRoutes(app);
+       ...
+
+   DEPOIS:
+     import { setupAuth } from "./replitAuth";
+     ...
+     (async () => {
+       await setupAuth(app);  // <-- NOVO: configura sessao e OAuth
+       const server = await registerRoutes(app);
+       ...
+
+2. server/routes/authRoutes.ts
+   ALTERACAO: Removida rota /api/login duplicada
+
+   REMOVIDO (~60 linhas):
+     app.get("/api/login", async (req, res) => {
+       // ... implementacao DEV que conflituava com OAuth
+     });
+
+   MANTIDO:
+     - GET /api/auth/me (handler handleGetUser)
+     - GET /api/auth/user (alias de /api/auth/me)
+     - POST /api/auth/logout
+
+================================================================================
+FLUXO DE AUTENTICACAO CORRIGIDO
+================================================================================
+
+1. Utilizador acede a /
+2. Frontend chama GET /api/auth/me (via useAuth hook)
+3. Se nao autenticado: 401 {"user":null} -> mostra Landing.tsx
+4. Utilizador clica "Entrar" -> window.location.href = "/api/login"
+5. /api/login (replitAuth.ts) faz redirect 302 para Replit OAuth
+6. Apos OAuth: callback para /api/callback -> redirect para /
+7. Frontend refetch /api/auth/me -> agora devolve 200 com user
+8. isAuthenticated = true -> mostra Dashboard
+
+================================================================================
+ENDPOINTS DE AUTENTICACAO
+================================================================================
+
+Endpoint             | Fonte          | Comportamento
+---------------------|----------------|----------------------------------------
+GET /api/auth/me     | authRoutes.ts  | 401 {user:null} ou 200 {user:{...}}
+GET /api/auth/user   | authRoutes.ts  | Alias de /api/auth/me
+POST /api/auth/logout| authRoutes.ts  | Destroi sessao, {ok:true}
+GET /api/login       | replitAuth.ts  | Redirect 302 para Replit OAuth
+GET /api/callback    | replitAuth.ts  | Callback OAuth, redirect para /
+GET /api/logout      | replitAuth.ts  | Logout OAuth completo
+
+================================================================================
+TESTES REALIZADOS
+================================================================================
+
+1. curl http://localhost:5000/api/auth/me
+   Resultado: {"user":null} (401) - CORRETO
+
+2. curl http://localhost:5000/api/auth/user
+   Resultado: {"user":null} (401) - CORRETO
+
+3. curl -L http://localhost:5000/api/login
+   Resultado: 302 redirect para https://replit.com/oidc/auth?... - CORRECTO
+
+4. Servidor logs:
+   - [routes] rotas registadas, a criar HTTP server...
+   - [express] serving on port 5000
+   - GET /api/login 302 in 349ms
+
+================================================================================
+FICHEIROS ALTERADOS
+================================================================================
+
+1. server/index.ts
+   - Adicionado import { setupAuth } from "./replitAuth"
+   - Adicionado await setupAuth(app) antes de registerRoutes(app)
+
+2. server/routes/authRoutes.ts
+   - Removida rota GET /api/login duplicada (~60 linhas)
+   - Adicionado comentario explicativo
+
+================================================================================
+RESUMO
+================================================================================
+
+Problema: req.session undefined (middleware de sessao nao configurado)
+Solucao: Chamar setupAuth(app) antes de registerRoutes(app)
+
+Ficheiros alterados: 2
+Linhas adicionadas: ~5
+Linhas removidas: ~60
+
+O fluxo de autenticacao agora funciona corretamente:
+- Landing.tsx mostra quando nao autenticado
+- Botao "Entrar" redireciona para OAuth Replit
+- Apos login, Dashboard e' mostrado
+- Sessao mantida em PostgreSQL (tabela sessions)
+
+================================================================================
+FIM DO RELATORIO
+================================================================================

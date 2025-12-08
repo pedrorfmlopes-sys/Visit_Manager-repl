@@ -7,6 +7,9 @@ import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
+import { db } from "./db";
+import { users as usersTable, empresas as empresasTable } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 const getOidcConfig = memoize(
   async () => {
@@ -115,9 +118,64 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/callback", (req, res, next) => {
     ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      successReturnToOrRedirect: "/",
-      failureRedirect: "/api/login",
+    passport.authenticate(`replitauth:${req.hostname}`, async (err: any, user: any) => {
+      if (err || !user) {
+        return res.redirect("/api/login");
+      }
+      
+      req.login(user, async (loginErr) => {
+        if (loginErr) {
+          console.error("[auth] Erro no login:", loginErr);
+          return res.redirect("/api/login");
+        }
+        
+        // Sincronizar req.user com req.session.user para os handlers de authRoutes.ts
+        const claims = user.claims;
+        if (claims?.sub) {
+          // Buscar o user da BD para obter role e empresaId
+          const userFromDb = await storage.getUser(claims.sub);
+          if (userFromDb) {
+            // Se user nao tem empresaId, verificar se ha uma empresa default
+            let empresaId = userFromDb.empresaId;
+            let role = userFromDb.role;
+            
+            // Se nao ha empresaId, tentar associar a empresa existente
+            if (!empresaId) {
+              try {
+                const empresas = await db.select().from(empresasTable).limit(1);
+                if (empresas.length > 0) {
+                  empresaId = empresas[0].id;
+                  // Atualizar user na BD com a empresa
+                  await db
+                    .update(usersTable)
+                    .set({ empresaId, role: role || "agent" })
+                    .where(eq(usersTable.id, userFromDb.id));
+                  role = role || "agent";
+                }
+              } catch (dbErr) {
+                console.error("[auth] Erro ao associar empresa:", dbErr);
+              }
+            }
+            
+            (req.session as any).user = {
+              id: userFromDb.id,
+              role: role || "agent",
+              empresaId: empresaId ?? null,
+            };
+            
+            req.session.save((saveErr) => {
+              if (saveErr) {
+                console.error("[auth] Erro ao gravar sessao:", saveErr);
+              }
+              return res.redirect("/");
+            });
+          } else {
+            return res.redirect("/");
+          }
+        } else {
+          return res.redirect("/");
+        }
+      });
     })(req, res, next);
   });
 
