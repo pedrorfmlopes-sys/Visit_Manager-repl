@@ -135,32 +135,13 @@ export async function setupAuth(app: Express) {
           // Buscar o user da BD para obter role e empresaId
           const userFromDb = await storage.getUser(claims.sub);
           if (userFromDb) {
-            // Se user nao tem empresaId, verificar se ha uma empresa default
-            let empresaId = userFromDb.empresaId;
-            let role = userFromDb.role;
-            
-            // Se nao ha empresaId, tentar associar a empresa existente
-            if (!empresaId) {
-              try {
-                const empresas = await db.select().from(empresasTable).limit(1);
-                if (empresas.length > 0) {
-                  empresaId = empresas[0].id;
-                  // Atualizar user na BD com a empresa
-                  await db
-                    .update(usersTable)
-                    .set({ empresaId, role: role || "agent" })
-                    .where(eq(usersTable.id, userFromDb.id));
-                  role = role || "agent";
-                }
-              } catch (dbErr) {
-                console.error("[auth] Erro ao associar empresa:", dbErr);
-              }
-            }
-            
+            // NOTA: NAO fazemos auto-atribuicao de empresa para preservar multi-tenancy
+            // Se user nao tem empresaId, a sessao tera empresaId=null e o admin
+            // deve configurar o user manualmente na area de administracao
             (req.session as any).user = {
               id: userFromDb.id,
-              role: role || "agent",
-              empresaId: empresaId ?? null,
+              role: userFromDb.role || "agent",
+              empresaId: userFromDb.empresaId ?? null,
             };
             
             req.session.save((saveErr) => {
@@ -170,6 +151,8 @@ export async function setupAuth(app: Express) {
               return res.redirect("/");
             });
           } else {
+            // User nao encontrado na BD - redirect para login
+            console.error("[auth] User nao encontrado na BD:", claims.sub);
             return res.redirect("/");
           }
         } else {

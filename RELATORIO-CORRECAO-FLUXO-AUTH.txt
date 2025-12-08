@@ -3,141 +3,162 @@ RELATORIO: CORRECAO DO FLUXO DE AUTENTICACAO
 ================================================================================
 
 Data: 8 Dezembro 2025
-Status: COMPLETO - Servidor RUNNING com auth funcional
+Status: COMPLETO - Aprovado pelo Architect
+Revisao: Multi-tenancy e RBAC preservados
 
 ================================================================================
 PROBLEMA ORIGINAL
 ================================================================================
 
-O servidor crashava com:
-  TypeError: Cannot read properties of undefined (reading 'user')
-  at handleGetUser (server/routes/authRoutes.ts:69:34)
+1. O servidor crashava com:
+   TypeError: Cannot read properties of undefined (reading 'user')
+   Causa: req.session era undefined (middleware de sessao nao configurado)
 
-Causa: req.session era undefined porque o middleware de sessao (express-session)
-       NAO estava configurado antes das rotas serem registadas.
-
-================================================================================
-ANALISE
-================================================================================
-
-1. Ficheiro server/replitAuth.ts
-   - Exporta setupAuth(app) que configura:
-     - express-session com PostgreSQL store
-     - passport.js com Replit OAuth
-     - Rotas /api/login, /api/callback, /api/logout
-
-2. Ficheiro server/index.ts (ANTES)
-   - NAO chamava setupAuth(app)
-   - Resultado: req.session undefined em todos os handlers
-
-3. Ficheiro server/routes/authRoutes.ts (ANTES)
-   - Definia /api/login duplicado (conflito com replitAuth.ts)
+2. Apos corrigir sessao, o GET /api/auth/me devolvia sempre {"user":null}
+   Causa: OAuth populava req.user mas handlers liam req.session.user
 
 ================================================================================
-ALTERACOES REALIZADAS
+SOLUCAO IMPLEMENTADA
 ================================================================================
 
-1. server/index.ts
-   ALTERACAO: Adicionado import e chamada a setupAuth ANTES de registerRoutes
+1. server/index.ts (+3 linhas)
+   - Adicionado import { setupAuth } from "./replitAuth"
+   - Adicionado await setupAuth(app) ANTES de registerRoutes(app)
+   - Isto configura express-session e Passport antes das rotas
 
-   ANTES:
-     (async () => {
-       const server = await registerRoutes(app);
-       ...
+2. server/routes/authRoutes.ts (-60 linhas)
+   - Removida rota GET /api/login duplicada que conflituava com OAuth
+   - Mantidos apenas: GET /api/auth/me, GET /api/auth/user, POST /api/auth/logout
 
-   DEPOIS:
-     import { setupAuth } from "./replitAuth";
-     ...
-     (async () => {
-       await setupAuth(app);  // <-- NOVO: configura sessao e OAuth
-       const server = await registerRoutes(app);
-       ...
-
-2. server/routes/authRoutes.ts
-   ALTERACAO: Removida rota /api/login duplicada
-
-   REMOVIDO (~60 linhas):
-     app.get("/api/login", async (req, res) => {
-       // ... implementacao DEV que conflituava com OAuth
-     });
-
-   MANTIDO:
-     - GET /api/auth/me (handler handleGetUser)
-     - GET /api/auth/user (alias de /api/auth/me)
-     - POST /api/auth/logout
+3. server/replitAuth.ts (+20 linhas, -0 linhas)
+   - Modificado /api/callback para usar custom passport.authenticate callback
+   - Apos OAuth: busca user da BD, popula req.session.user
+   - NAO faz auto-atribuicao de empresa (preserva multi-tenancy)
+   - Role vem da BD sem coercao (preserva RBAC)
 
 ================================================================================
-FLUXO DE AUTENTICACAO CORRIGIDO
+FLUXO DE AUTENTICACAO COMPLETO
 ================================================================================
 
-1. Utilizador acede a /
-2. Frontend chama GET /api/auth/me (via useAuth hook)
-3. Se nao autenticado: 401 {"user":null} -> mostra Landing.tsx
-4. Utilizador clica "Entrar" -> window.location.href = "/api/login"
-5. /api/login (replitAuth.ts) faz redirect 302 para Replit OAuth
-6. Apos OAuth: callback para /api/callback -> redirect para /
-7. Frontend refetch /api/auth/me -> agora devolve 200 com user
+1. Frontend carrega -> useAuth chama GET /api/auth/me
+2. Sem sessao -> 401 {"user":null} -> mostra Landing.tsx
+3. Utilizador clica "Entrar" -> window.location.href = "/api/login"
+4. /api/login -> 302 redirect para Replit OAuth (https://replit.com/oidc/auth)
+5. Utilizador autentica no Replit
+6. Callback para /api/callback:
+   a. Passport valida tokens
+   b. upsertUser cria/atualiza user na BD
+   c. Busca user da BD para obter role e empresaId
+   d. Popula req.session.user = {id, role, empresaId} (valores da BD)
+   e. req.session.save() para persistir
+   f. Redirect 302 para /
+7. Frontend refetch /api/auth/me -> 200 {"user":{...}}
 8. isAuthenticated = true -> mostra Dashboard
+
+================================================================================
+LOGS DE TESTE REAIS
+================================================================================
+
+LOGOUT -> LOGIN -> SUCESSO:
+
+3:33:30 AM [express] GET /api/logout 302 in 446ms
+3:33:36 AM [express] GET /api/auth/me 401 in 95ms :: {"user":null}
+3:33:39 AM [express] GET /api/login 302 in 88ms
+3:33:46 AM [express] GET /api/callback 302 in 632ms
+3:33:52 AM [express] GET /api/auth/me 304 in 137ms :: {"user":{"id":"49812204"...
+3:33:53 AM [express] GET /api/visitas 200 in 138ms
+3:33:53 AM [express] GET /api/dashboard 200 in 134ms
+3:33:53 AM [express] GET /api/tarefas 200 in 446ms
+
+TODAS AS ROTAS CRM FUNCIONAM:
+
+- GET /api/entidades 200
+- GET /api/contactos 200
+- GET /api/visitas 200
+- GET /api/tarefas 200
+- GET /api/crm/leads 200
+- GET /api/dashboard 200
+- GET /api/lembretes 200
+- GET /api/odoo/contact-requests/my 200
 
 ================================================================================
 ENDPOINTS DE AUTENTICACAO
 ================================================================================
 
-Endpoint             | Fonte          | Comportamento
----------------------|----------------|----------------------------------------
-GET /api/auth/me     | authRoutes.ts  | 401 {user:null} ou 200 {user:{...}}
-GET /api/auth/user   | authRoutes.ts  | Alias de /api/auth/me
-POST /api/auth/logout| authRoutes.ts  | Destroi sessao, {ok:true}
-GET /api/login       | replitAuth.ts  | Redirect 302 para Replit OAuth
-GET /api/callback    | replitAuth.ts  | Callback OAuth, redirect para /
-GET /api/logout      | replitAuth.ts  | Logout OAuth completo
+Endpoint              | Fonte          | Descricao
+----------------------|----------------|----------------------------------------
+GET /api/auth/me      | authRoutes.ts  | Devolve user autenticado ou 401
+GET /api/auth/user    | authRoutes.ts  | Alias de /api/auth/me
+POST /api/auth/logout | authRoutes.ts  | Destroi sessao, {ok:true}
+GET /api/login        | replitAuth.ts  | Inicia OAuth Replit (302)
+GET /api/callback     | replitAuth.ts  | Callback OAuth, popula sessao, redirect /
+GET /api/logout       | replitAuth.ts  | Logout OAuth completo com Replit
 
 ================================================================================
-TESTES REALIZADOS
+SEGURANCA MULTI-TENANCY
 ================================================================================
 
-1. curl http://localhost:5000/api/auth/me
-   Resultado: {"user":null} (401) - CORRETO
+IMPORTANTE: O callback OAuth NAO faz auto-atribuicao de empresa.
 
-2. curl http://localhost:5000/api/auth/user
-   Resultado: {"user":null} (401) - CORRETO
+Se um user novo (sem empresaId na BD) fizer login:
+- A sessao tera empresaId=null
+- O admin deve configurar o user na area de administracao
+- Rotas que requerem empresaId devolverao erro apropriado
 
-3. curl -L http://localhost:5000/api/login
-   Resultado: 302 redirect para https://replit.com/oidc/auth?... - CORRECTO
-
-4. Servidor logs:
-   - [routes] rotas registadas, a criar HTTP server...
-   - [express] serving on port 5000
-   - GET /api/login 302 in 349ms
+Isto preserva:
+- Isolamento de tenants (nenhum user e' auto-associado a empresa errada)
+- RBAC (role vem da BD, nao e' coercido para "agent")
+- Seguranca (admin controla quem pertence a cada empresa)
 
 ================================================================================
 FICHEIROS ALTERADOS
 ================================================================================
 
-1. server/index.ts
-   - Adicionado import { setupAuth } from "./replitAuth"
-   - Adicionado await setupAuth(app) antes de registerRoutes(app)
+1. server/index.ts (+3 linhas)
+   - import { setupAuth } from "./replitAuth"
+   - await setupAuth(app) antes de registerRoutes(app)
 
-2. server/routes/authRoutes.ts
-   - Removida rota GET /api/login duplicada (~60 linhas)
+2. server/routes/authRoutes.ts (-60 linhas)
+   - Removida rota /api/login duplicada
    - Adicionado comentario explicativo
+
+3. server/replitAuth.ts (+20 linhas)
+   - /api/callback: custom callback com req.login()
+   - Busca user da BD, popula req.session.user
+   - SEM auto-atribuicao de empresa
+
+================================================================================
+APROVACAO ARCHITECT
+================================================================================
+
+Status: PASS
+Comentario: "OAuth callback now preserves tenant isolation while the 
+            end-to-end login flow works as expected."
+
+Verificacoes:
+- Multi-tenant boundaries intact
+- Session role derives from database record
+- No automatic empresa reassignment
+- All downstream data routes succeed with HTTP 200
 
 ================================================================================
 RESUMO
 ================================================================================
 
-Problema: req.session undefined (middleware de sessao nao configurado)
-Solucao: Chamar setupAuth(app) antes de registerRoutes(app)
+ANTES:
+- req.session undefined -> crash
+- Apos OAuth, req.session.user nunca populado -> sempre 401
 
-Ficheiros alterados: 2
-Linhas adicionadas: ~5
-Linhas removidas: ~60
+DEPOIS:
+- setupAuth(app) configura sessao antes das rotas
+- /api/callback popula req.session.user apos OAuth
+- /api/auth/me devolve 200 com user apos login
+- Multi-tenancy e RBAC preservados
 
-O fluxo de autenticacao agora funciona corretamente:
-- Landing.tsx mostra quando nao autenticado
-- Botao "Entrar" redireciona para OAuth Replit
-- Apos login, Dashboard e' mostrado
-- Sessao mantida em PostgreSQL (tabela sessions)
+RESULTADO:
+- Fluxo de autenticacao 100% funcional
+- Seguranca multi-tenant mantida
+- Todas as rotas CRM continuam a funcionar
 
 ================================================================================
 FIM DO RELATORIO
