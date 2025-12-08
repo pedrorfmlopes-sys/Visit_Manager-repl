@@ -1,6 +1,7 @@
 import express, { type Request, type Response, type NextFunction } from "express";
 import { setupVite, serveStatic, log } from "./vite";
 import registerRoutes from "./routes";
+import { setupAuth } from "./replitAuth";
 
 const app = express();
 
@@ -61,6 +62,9 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 (async () => {
+  // ===== IMPORTANTE: Configurar sessao e auth ANTES das rotas =====
+  await setupAuth(app);
+
   // Registo de todas as rotas (CRM, admin, Odoo, AI, etc.)
   const server = await registerRoutes(app);
 

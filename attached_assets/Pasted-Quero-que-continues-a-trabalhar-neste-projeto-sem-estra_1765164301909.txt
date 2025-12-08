@@ -1,0 +1,115 @@
+Quero que continues a trabalhar neste projeto sem estragar nada do que já está a funcionar.
+
+🎯 OBJETIVO GERAL
+Neste momento:
+- O servidor já arranca (build + start sem erros).
+- As rotas principais foram estabilizadas (ver ficheiro RELATORIO-ESTABILIZACAO-ROTAS.txt).
+- Mas ainda estamos com problemas na ENTRADA/LOGIN:
+  - O fluxo de autenticação não está a funcionar como esperado (fica preso na página de entrada/login ou devolve apenas JSON tipo {"ok": true}).
+  - O tema/layout do login também ficou “esquisito” e não está alinhado com o resto da app (tema da empresa: light-business / dark-pro).
+
+Quero que:
+1) Garantas que a ligação frontend ↔ backend (auth) está correta e que o fluxo de login funciona de ponta a ponta.
+2) Corrijas DEFINITIVAMENTE o comportamento da página de login/landing (sem soluções temporárias) e o respetivo tema/estilo.
+3) Não estragues ou alteres as restantes rotas e módulos que já estão estáveis (CRM, Admin, Odoo, etc.).
+
+
+📂 CONTEXTO TÉCNICO
+- Backend: Node + Express, com sessão (express-session).
+- Frontend: Vite + React + wouter.
+- Ficheiros importantes:
+  - server/index.ts
+  - server/routes.ts
+  - server/routes/authRoutes.ts
+  - server/db/schema.ts
+  - server/storage.ts (IStorage/DatabaseStorage)
+  - src/App.tsx
+  - src/hooks/useAuth.ts
+  - src/pages/Landing.tsx (ou outro componente que esteja a ser usado como página de login/entrada)
+- Já existe o endpoint de utilizador autenticado em: /api/auth/user
+- Existe também um endpoint de login (ex: /api/auth/login ou /api/login) e logout (ex: /api/auth/logout) – confirma no código atual.
+
+❗ MUITO IMPORTANTE – O QUE NÃO QUERO QUE TOQUES
+- NÃO mexas no schema da base de dados (server/db/schema.ts), enums, tabelas e tipos – só se encontrares um bug mesmo crítico diretamente ligado ao login.
+- NÃO alteres a lógica de negócio do CRM (entidades, contactos, visitas, tarefas, leads, Odoo, etc.) – só o necessário para auth/rotas se estiver claramente errado.
+- NÃO apagues nem reescrevas grandes blocos de server/routes.ts que já estão a funcionar. Qualquer ajuste aqui deve ser mínimo e justificado.
+- NÃO mexas em migrations nem em ficheiros de configuração da DB.
+- Evita grandes refactors. Foca-te na correção cirúrgica do fluxo de autenticação e da página de login.
+
+
+🧩 TAREFAS CONCRETAS
+
+1) Rever e estabilizar rotas de autenticação no backend
+- Abre `server/routes/authRoutes.ts` e `server/routes.ts`.
+- Garante que:
+  - `authRoutes(app)` está a ser chamado em `server/routes.ts`.
+  - As rotas de auth expõem claramente:
+    - GET /api/auth/user → devolve 200 com o utilizador + empresa quando autenticado, 401 quando não.
+    - POST /api/auth/login → faz login (cria/atualiza sessão) e devolve JSON claro (ex: { ok: true } + dados mínimos).
+    - POST /api/auth/logout → termina sessão.
+- Garante que o middleware de sessão (express-session) está corretamente configurado em `server/index.ts` ANTES de `registerRoutes(app)` ser chamado.
+- Verifica se há alguma rota tipo GET /api/login a devolver só {"ok": true} e que esteja a ser usada pelo frontend de forma errada. Se existir:
+  - Mantém o endpoint se for útil, mas garante que o frontend não fica “preso” a navegar diretamente para /api/login como página.
+  - O login deve ser feito via chamada fetch/axios (POST) e não por navegação direta do browser para /api/login.
+
+2) Garantir o contrato correto com o hook useAuth (frontend)
+- Abre `src/hooks/useAuth.ts`.
+- Confirma que:
+  - O hook faz query a `/api/auth/user` (GET) com React Query.
+  - Se a resposta for 200 → guarda o user e a empresa.
+  - Se for 401 → considera `isAuthenticated = false`.
+- Se necessário, ajusta só o MÍNIMO para alinhar com a resposta atual de `/api/auth/user` (ex.: shape do JSON).
+
+3) Corrigir o fluxo de login no frontend
+- Abre `src/App.tsx` (ou o ficheiro principal onde está o Router).
+- Já existe lógica do tipo:
+  - Se `isLoading` → mostrar spinner.
+  - Se `!isAuthenticated` → mostrar apenas rota(s) públicas (Landing/Login).
+  - Se `isAuthenticated` → mostrar MainLayout com Dashboard e restantes páginas.
+- Garante que:
+  - O componente de login/landing (por exemplo `Landing.tsx`) NÃO faz navegação direta para `/api/login`.
+  - Em vez disso, deve:
+    - Ter um botão de login.
+    - Ao clicar, faz um POST para o endpoint correto de login (ex: `/api/auth/login`).
+    - Quando o login for bem sucedido, invalida a query de `/api/auth/user` no React Query e/ou força o refetch, para o hook useAuth deixar de considerar o user como “não autenticado”.
+    - Depois disso, deve redirecionar para `/` (Dashboard), onde `isAuthenticated` já será true.
+- Verifica se, no momento, o Landing/Login não está em loop:
+  - Exemplo de erro atual: o browser navega para `/api/login` e mostra só `{"ok": true}` ou entra em refresh infinito.
+  - Corrige isso para que a navegação seja sempre dentro do SPA (wouter) e não diretamente para endpoints JSON.
+
+4) Corrigir o tema/estilo da página de login (Landing)
+- Abre `src/pages/Landing.tsx` (ou equivalente).
+- Ajusta o layout de forma a:
+  - Respeitar o tema da empresa (`empresa.theme` vindo de `useAuth` se já existir ou usar um tema neutro antes de login).
+  - Visualmente coerente com o resto da app (usar Tailwind/utilitários já usados no projeto).
+  - Manter um design simples: logo da empresa, nome da app, botão de login, eventualmente um pequeno texto explicativo.
+- IMPORTANTE: Não alteres o tema global da app (dark-pro / light-business) nem quebres o comportamento existente em AppContent (troca de tema em função de `empresa.theme`). No login, se ainda não houver empresa carregada, usa apenas uma variante default (por ex., light-business) sem efeitos colaterais no resto.
+
+5) Testes de ponta a ponta
+Depois das alterações:
+
+1. Corre:
+   - `npm run build`
+   - `npm start`
+2. No browser:
+   - Acede à raiz `/`.
+   - Verifica se aparece a página de login/landing com o tema consistente.
+   - Faz login:
+     - Confirma que NÃO abre diretamente `/api/login` no browser.
+     - O request de login deve aparecer na aba Network como XHR/fetch (POST), com resposta 200.
+   - Após login, confirma que:
+     - `/api/auth/user` devolve 200 com o utilizador + empresa.
+     - O Router passa para o MainLayout e abre o Dashboard (AdminDashboard ou Dashboard normal, dependendo do role).
+   - Verifica que as rotas do CRM continuam a funcionar: /entidades, /contactos, /visitas, /tarefas, /leads, etc.
+3. Caso tenhas de fazer algum ajuste mínimo em `server/routes.ts` ou em `authRoutes.ts`, documenta em comentário breve o que mudaste e porquê.
+
+✅ CRITÉRIOS DE ACEITAÇÃO
+- `npm run build` passa sem erros.
+- `npm start` arranca sem erros.
+- Aceder à raiz da app mostra:
+  - Se não autenticado → página de login/landing bonita, com tema consistente e sem loops/JSON no ecrã.
+  - Se autenticado → Dashboard correto (Admin ou normal).
+- O processo de login funciona de ponta a ponta e mantém a sessão.
+- Nenhuma rota do CRM/Admin/Odoo que já estava a funcionar fica partida.
+
+Por favor, faz alterações cirúrgicas, explicando nos commits e/ou em comentários curtos o que foi ajustado no fluxo de login e no tema da página de entrada.

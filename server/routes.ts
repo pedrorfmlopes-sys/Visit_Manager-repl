@@ -1,102 +1,99 @@
 // server/routes.ts
-import express, { type Express, type Router as ExpressRouter } from "express";
+import express, { type Express, type Router } from "express";
 import { createServer } from "http";
 
-// -------- Auth (FUNÇÃO que recebe app) --------
+// -------- Auth --------
 import { authRoutes } from "./routes/authRoutes";
 
-// -------- CRM (FUNÇÕES que recebem app) --------
+// -------- CRM --------
 import { registerEntidadesRoutes } from "./routes/crm/entidadesRoutes";
 import { contactosRoutes } from "./routes/crm/contactosRoutes";
 import { visitasRoutes } from "./routes/crm/visitasRoutes";
 import { tarefasRoutes } from "./routes/crm/tarefasRoutes";
 
-// -------- Admin (FUNÇÕES que recebem app) --------
+// -------- Admin --------
 import { adminRoutes } from "./routes/admin/adminRoutes";
 import { marcasRoutes } from "./routes/admin/marcasRoutes";
 
-// -------- Odoo (ROUTER) --------
+// -------- Odoo (Router) --------
 import odooContactRequestsRoutes from "./routes/odoo/odooContactRequestsRoutes";
 
-// -------- PDF / Search / AI (ROUTERS) --------
+// -------- Uploads (Router) --------
+import uploadsRoutes from "./routes/uploadsRoutes";
+
+// -------- PDF / SEARCH / AI (Routers) --------
 import pdfRoutes from "./routes/pdf/pdfRoutes";
 import searchRoutes from "./routes/search/searchRoutes";
 import aiRoutes from "./routes/ai/aiRoutes";
 
-// -------- Misc (ROUTERS) --------
+// -------- Misc (Routers) --------
 import { proximityRouter } from "./routes/misc/proximityRoutes";
 import { userSettingsRouter } from "./routes/misc/userSettingsRoutes";
 
-// -------- Uploads (ROUTER) --------
-import uploadsRoutes from "./routes/uploadsRoutes";
+// --------------------------------------------------
+// Helpers
+// --------------------------------------------------
 
-// ----------------------------------------------------
-// Helpers para montar Routers em segurança
-// ----------------------------------------------------
-function isRouter(obj: any): obj is ExpressRouter {
-  return (
-    obj &&
-    typeof obj === "function" &&
-    typeof obj.use === "function" &&
-    typeof obj.handle === "function"
-  );
+function registerModule(
+  name: string,
+  fn: (app: Express) => unknown,
+  app: Express,
+) {
+  console.log(`[routes] ▶ registar módulo "${name}"`);
+  fn(app);
+}
+
+function isRouter(obj: any): obj is Router {
+  return obj && typeof obj === "function" && "use" in obj && "handle" in obj;
 }
 
 function mountRouter(
-  app: Express | ExpressRouter,
+  app: Express,
   basePath: string,
   router: any,
   name: string,
 ) {
-  if (isRouter(router)) {
-    console.log(`[routes] ▶ montar Router "${name}" em ${basePath}`);
-    app.use(basePath, router);
-  } else {
+  if (!isRouter(router)) {
     console.warn(
-      `[routes] ⚠ "${name}" não é um Router Express válido (typeof: ${typeof router}) — a ignorar para evitar crash.`,
+      `[routes] ⚠ "${name}" não é um Router Express válido (tipo: ${typeof router})`,
     );
+    return;
   }
+  console.log(`[routes] ▶ montar Router "${name}" em ${basePath}`);
+  app.use(basePath, router);
 }
 
-// ----------------------------------------------------
+// --------------------------------------------------
 // Registo principal de rotas
-// ----------------------------------------------------
+// --------------------------------------------------
+
 export default async function registerRoutes(app: Express) {
   console.log("[routes] ▶ iniciar registo de rotas");
 
-  // -------- AUTH (FUNÇÃO) --------
-  // authRoutes exporta: export function authRoutes(app: Express)
-  authRoutes(app);
+  // Auth
+  registerModule("authRoutes", authRoutes, app);
 
-  // -------- CRM (FUNÇÕES) --------
-  registerEntidadesRoutes(app);
-  contactosRoutes(app);
-  visitasRoutes(app);
-  tarefasRoutes(app);
+  // CRM
+  registerModule("registerEntidadesRoutes", registerEntidadesRoutes, app);
+  registerModule("contactosRoutes", contactosRoutes, app);
+  registerModule("visitasRoutes", visitasRoutes, app);
+  registerModule("tarefasRoutes", tarefasRoutes, app);
 
-  // -------- ADMIN (FUNÇÕES) --------
-  adminRoutes(app);
-  marcasRoutes(app);
+  // Admin
+  registerModule("adminRoutes", adminRoutes, app);
+  registerModule("marcasRoutes", marcasRoutes, app);
 
-  // -------- Sub-Router /api para Odoo + Uploads --------
-  const api = express.Router();
-
-  // /api/odoo/contact-requests/* (ROUTER)
-  mountRouter(api, "/odoo/contact-requests", odooContactRequestsRoutes, "odooContactRequestsRoutes");
-
-  // /api/uploads/* (ROUTER)
-  mountRouter(api, "/uploads", uploadsRoutes, "uploadsRoutes");
-
-  // Montar subrouter principal
-  app.use("/api", api);
-
-  // -------- PDF / Search / AI (ROUTERS) --------
-  // Estes exportam Router, então montamos com app.use
+  // Routers montados com prefixos /api/...
+  mountRouter(
+    app,
+    "/api/odoo/contact-requests",
+    odooContactRequestsRoutes,
+    "odooContactRequestsRoutes",
+  );
+  mountRouter(app, "/api/uploads", uploadsRoutes, "uploadsRoutes");
   mountRouter(app, "/api/pdf", pdfRoutes, "pdfRoutes");
   mountRouter(app, "/api/search", searchRoutes, "searchRoutes");
   mountRouter(app, "/api/ai", aiRoutes, "aiRoutes");
-
-  // -------- MISC (ROUTERS) --------
   mountRouter(app, "/api/misc", proximityRouter, "proximityRouter");
   mountRouter(app, "/api/misc", userSettingsRouter, "userSettingsRouter");
 
