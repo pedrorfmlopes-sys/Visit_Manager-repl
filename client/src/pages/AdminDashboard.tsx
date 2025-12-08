@@ -83,12 +83,14 @@ export default function AdminDashboard() {
     onSuccess: (data) => {
       toast({
         title: "Sucesso",
-        description: `Role alterado para: ${data.role}`,
+        description: `Role alterado para: ${data.newRole}`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      // Force full page reload to apply new role
       setTimeout(() => {
-        window.location.href = "/";
-      }, 500);
+        window.location.reload();
+      }, 300);
     },
     onError: () => {
       toast({

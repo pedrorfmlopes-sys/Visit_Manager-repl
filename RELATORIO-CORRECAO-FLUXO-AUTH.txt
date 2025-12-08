@@ -186,5 +186,23 @@ Codigo adicionado (+35 linhas):
   });
 
 ================================================================================
+CORRECAO ADICIONAL: Frontend Toggle Role
+================================================================================
+
+Problema: Apos toggle, o ecra nao mudava para admin/agent
+Causa: 
+1. Frontend usava data.role mas backend devolve data.newRole
+2. Fazia window.location.href = "/" em vez de reload
+
+Solucao (ficheiros corrigidos):
+- client/src/pages/AgentMore.tsx
+- client/src/pages/AdminDashboard.tsx
+
+Alteracoes:
+- data.role -> data.newRole (nome correto da resposta)
+- Invalidar ambos queryKeys: /api/auth/user e /api/auth/me
+- window.location.reload() em vez de href = "/"
+
+================================================================================
 FIM DO RELATORIO
 ================================================================================

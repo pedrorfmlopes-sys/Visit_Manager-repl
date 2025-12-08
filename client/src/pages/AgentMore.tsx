@@ -30,14 +30,15 @@ export default function AgentMore() {
     onSuccess: (data) => {
       toast({
         title: "Sucesso",
-        description: `Role alterado para: ${data.role}`,
+        description: `Role alterado para: ${data.newRole}`,
       });
-      // Invalidate auth query to refresh user data
+      // Invalidate auth queries to refresh user data
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      // Redirect to home
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      // Force full page reload to apply new role
       setTimeout(() => {
-        window.location.href = "/";
-      }, 500);
+        window.location.reload();
+      }, 300);
     },
     onError: () => {
       toast({
