@@ -108,4 +108,42 @@ export function authRoutes(app: Express) {
 
   // NOTA: /api/login e' definido em replitAuth.ts (OAuth Replit)
   // NAO duplicar aqui para evitar conflitos
+
+  // ---------- POST /api/dev/toggle-role ----------
+  // Endpoint de desenvolvimento para alternar entre admin e agent
+  app.post("/api/dev/toggle-role", async (req: Request, res: Response) => {
+    const sessUser = req.session.user;
+    if (!sessUser?.id) {
+      return res.status(401).json({ error: "Não autenticado" });
+    }
+
+    // Toggle role
+    const newRole = sessUser.role === "admin" ? "agent" : "admin";
+
+    try {
+      // Atualizar na BD
+      await db
+        .update(users)
+        .set({ role: newRole })
+        .where(eq(users.id, sessUser.id));
+
+      // Atualizar na sessão
+      req.session.user = {
+        ...sessUser,
+        role: newRole,
+      };
+
+      // Guardar sessão
+      req.session.save((err) => {
+        if (err) {
+          console.error("[auth] Erro ao gravar sessão:", err);
+          return res.status(500).json({ error: "Erro ao gravar sessão" });
+        }
+        return res.json({ success: true, newRole });
+      });
+    } catch (error) {
+      console.error("[auth] Erro ao toggle role:", error);
+      return res.status(500).json({ error: "Erro ao alterar role" });
+    }
+  });
 }

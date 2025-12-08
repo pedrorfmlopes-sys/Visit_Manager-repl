@@ -161,5 +161,30 @@ RESULTADO:
 - Todas as rotas CRM continuam a funcionar
 
 ================================================================================
+CORRECAO ADICIONAL: Toggle Role
+================================================================================
+
+Problema: O botao "Mudar para admin" nao funcionava
+Causa: A rota POST /api/dev/toggle-role nao existia no backend
+
+Solucao: Adicionada rota em server/routes/authRoutes.ts:
+- Verifica se user esta autenticado
+- Toggle role entre "admin" e "agent"
+- Atualiza role na BD (tabela users)
+- Atualiza role na sessao
+- Guarda sessao antes de responder
+
+Codigo adicionado (+35 linhas):
+  app.post("/api/dev/toggle-role", async (req, res) => {
+    const sessUser = req.session.user;
+    if (!sessUser?.id) return res.status(401).json({ error: "..." });
+    
+    const newRole = sessUser.role === "admin" ? "agent" : "admin";
+    await db.update(users).set({ role: newRole }).where(eq(users.id, sessUser.id));
+    req.session.user = { ...sessUser, role: newRole };
+    req.session.save(() => res.json({ success: true, newRole }));
+  });
+
+================================================================================
 FIM DO RELATORIO
 ================================================================================
