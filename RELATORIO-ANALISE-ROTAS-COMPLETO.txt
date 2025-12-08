@@ -1,0 +1,749 @@
+================================================================================
+RELATORIO COMPLETO: ANALISE DE ROTAS E LIGACOES FRONTEND/BACKEND
+================================================================================
+
+Data: 8 Dezembro 2025
+Versao: 1.0
+Tipo: Analise Tecnica Profunda
+
+================================================================================
+INDICE
+================================================================================
+
+1. ROTAS DO BACKEND - Lista Completa
+2. CHAMADAS API DO FRONTEND - Lista Completa
+3. FALHAS DE LIGACAO IDENTIFICADAS
+4. PROBLEMAS DE AUTENTICACAO
+5. PROBLEMAS DE RBAC
+6. DISCREPANCIAS DE SCHEMAS
+7. ROTAS DUPLICADAS OU CONFLITUOSAS
+8. RESUMO ESTATISTICO
+
+================================================================================
+1. ROTAS DO BACKEND - LISTA COMPLETA
+================================================================================
+
+FICHEIRO: server/replitAuth.ts
+--------------------------------------------------------------------------------
+| Metodo | Rota              | Auth | Descricao                               |
+|--------|-------------------|------|-----------------------------------------|
+| GET    | /api/login        | Nao  | Inicia OAuth Replit                     |
+| GET    | /api/callback     | Nao  | Callback OAuth, popula sessao           |
+| GET    | /api/logout       | Nao  | Logout OAuth completo                   |
+--------------------------------------------------------------------------------
+
+FICHEIRO: server/routes/authRoutes.ts
+--------------------------------------------------------------------------------
+| Metodo | Rota                  | Auth | Descricao                           |
+|--------|-----------------------|------|-------------------------------------|
+| GET    | /api/auth/me          | Nao  | Devolve user autenticado ou 401     |
+| GET    | /api/auth/user        | Nao  | Alias de /api/auth/me               |
+| POST   | /api/auth/logout      | Nao  | Destroi sessao local                |
+| POST   | /api/dev/toggle-role  | Sim  | Toggle role admin/agent (dev)       |
+--------------------------------------------------------------------------------
+
+FICHEIRO: server/routes/crm/entidadesRoutes.ts
+--------------------------------------------------------------------------------
+| Metodo | Rota                  | Auth | RBAC    | Descricao                 |
+|--------|-----------------------|------|---------|---------------------------|
+| GET    | /api/entidades        | Sim  | Tenant  | Listar entidades          |
+| GET    | /api/entidades/:id    | Sim  | Tenant  | Obter entidade            |
+| POST   | /api/entidades        | Sim  | Tenant  | Criar entidade            |
+| PATCH  | /api/entidades/:id    | Sim  | Tenant  | Atualizar entidade        |
+| DELETE | /api/entidades/:id    | Sim  | Tenant  | Eliminar entidade         |
+| GET    | /api/entidade-tipos   | Sim  | Tenant  | Listar tipos de entidade  |
+--------------------------------------------------------------------------------
+
+FICHEIRO: server/routes/crm/contactosRoutes.ts
+--------------------------------------------------------------------------------
+| Metodo | Rota                      | Auth | RBAC    | Descricao             |
+|--------|---------------------------|------|---------|-----------------------|
+| GET    | /api/contactos            | Sim  | Tenant  | Listar contactos      |
+| GET    | /api/contactos/:id        | Sim  | Tenant  | Obter contacto        |
+| POST   | /api/contactos            | Sim  | Tenant  | Criar contacto        |
+| PATCH  | /api/contactos/:id        | Sim  | Tenant  | Atualizar contacto    |
+| DELETE | /api/contactos/:id        | Sim  | Tenant  | Eliminar contacto     |
+| GET    | /api/crm/contactos/search | Sim  | Tenant  | Pesquisar contactos   |
+--------------------------------------------------------------------------------
+
+FICHEIRO: server/routes/crm/visitasRoutes.ts
+--------------------------------------------------------------------------------
+| Metodo | Rota                                    | Auth | Descricao           |
+|--------|-----------------------------------------|------|---------------------|
+| POST   | /api/visitas                            | Sim  | Criar visita        |
+| PATCH  | /api/visitas/:id                        | Sim  | Atualizar visita    |
+| DELETE | /api/visitas/:id                        | Sim  | Eliminar visita     |
+| GET    | /api/visitas/:id/pdf                    | Sim  | Download PDF        |
+| GET    | /api/visitas/:id/ics                    | Sim  | Download ICS        |
+| POST   | /api/visitas/:id/audio                  | Sim  | Upload audio        |
+| GET    | /api/visitas/:id/audio                  | Sim  | Listar audios       |
+| DELETE | /api/visitas/:id/audio/:audioId         | Sim  | Eliminar audio      |
+| POST   | /api/visitas/:id/audio/:audioId/transcrever | Sim | Transcrever audio|
+| POST   | /api/visitas/proximidade                | Sim  | Sugestoes prox.     |
+--------------------------------------------------------------------------------
+NOTA: GET /api/visitas (listar todas) NAO ESTA DEFINIDO!
+
+FICHEIRO: server/routes/crm/tarefasRoutes.ts
+--------------------------------------------------------------------------------
+| Metodo | Rota                | Auth | Descricao                             |
+|--------|---------------------|------|---------------------------------------|
+| GET    | /api/tarefas        | Sim  | Listar tarefas com filtros            |
+| GET    | /api/tarefas/:id    | Sim  | Obter tarefa                          |
+| POST   | /api/tarefas        | Sim  | Criar tarefa                          |
+| PATCH  | /api/tarefas/:id    | Sim  | Atualizar tarefa                      |
+| DELETE | /api/tarefas/:id    | Sim  | Eliminar tarefa                       |
+--------------------------------------------------------------------------------
+NOTA: Rotas Microsoft Planner/Todo estao COMENTADAS (linhas 212-218)
+
+FICHEIRO: server/routes/admin/adminRoutes.ts
+--------------------------------------------------------------------------------
+| Metodo | Rota                            | Auth  | RBAC  | Descricao         |
+|--------|---------------------------------|-------|-------|-------------------|
+| GET    | /api/admin/empresa              | Admin | Admin | Config empresa    |
+| PATCH  | /api/admin/empresa              | Admin | Admin | Atualizar empresa |
+| POST   | /api/admin/empresa/logo         | Admin | Admin | Upload logo       |
+| GET    | /api/admin/utilizadores         | Admin | Admin | Listar users      |
+| POST   | /api/admin/utilizadores         | Admin | Admin | Criar user        |
+| PATCH  | /api/admin/utilizadores/:id     | Admin | Admin | Atualizar user    |
+| GET    | /api/admin/entidades            | Admin | Admin | Listar entidades  |
+| GET    | /api/admin/entidade-tipos       | Admin | Admin | Listar tipos      |
+| POST   | /api/admin/entidade-tipos       | Admin | Admin | Criar tipo        |
+| PATCH  | /api/admin/entidade-tipos/:id   | Admin | Admin | Atualizar tipo    |
+| POST   | /api/admin/entidades/migrar-tipos | Admin | Admin | Migrar tipos    |
+| GET    | /api/admin/debug                | Admin | Admin | Debug info        |
+--------------------------------------------------------------------------------
+
+FICHEIRO: server/routes/admin/marcasRoutes.ts
+--------------------------------------------------------------------------------
+| Metodo | Rota                    | Auth  | RBAC  | Descricao               |
+|--------|-------------------------|-------|-------|-------------------------|
+| GET    | /api/admin/marcas       | Admin | Admin | Listar marcas           |
+| POST   | /api/admin/marcas       | Admin | Admin | Criar marca             |
+| PATCH  | /api/admin/marcas/:id   | Admin | Admin | Atualizar marca         |
+--------------------------------------------------------------------------------
+
+FICHEIRO: server/routes/odoo/odooContactRequestsRoutes.ts
+--------------------------------------------------------------------------------
+| Metodo | Rota                                    | Auth | Descricao         |
+|--------|-----------------------------------------|------|-------------------|
+| POST   | /api/odoo/contact-requests              | Sim  | Criar pedido      |
+| GET    | /api/odoo/contact-requests/my           | Sim  | Meus pedidos      |
+| GET    | /api/odoo/contact-requests              | Sim  | Todos (admin?)    |
+| PATCH  | /api/odoo/contact-requests/:id          | Sim  | Atualizar status  |
+| DELETE | /api/odoo/contact-requests/:id          | Sim  | Eliminar (admin?) |
+| PATCH  | /api/odoo/contact-requests/my/mark-seen | Sim  | Marcar como visto |
+| DELETE | /api/odoo/contact-requests/my/:id       | Sim  | Eliminar proprio  |
+--------------------------------------------------------------------------------
+
+FICHEIRO: server/routes/ai/aiRoutes.ts
+--------------------------------------------------------------------------------
+| Metodo | Rota                      | Auth | Descricao                       |
+|--------|---------------------------|------|---------------------------------|
+| POST   | /api/ai/visit-summary     | Sim  | Gerar resumo IA de visita       |
+| POST   | /api/ai/visit-tasks       | Sim  | Gerar tarefas IA de visita      |
+| POST   | /api/ai/dashboard-insights| Sim  | Gerar insights IA dashboard     |
+--------------------------------------------------------------------------------
+
+FICHEIRO: server/routes/pdf/pdfRoutes.ts
+--------------------------------------------------------------------------------
+| Metodo | Rota                            | Auth | Descricao                 |
+|--------|---------------------------------|------|---------------------------|
+| GET    | /api/pdf/visitas/:id            | Sim  | PDF de visita             |
+| GET    | /api/pdf/visitas/:id/ics        | Sim  | ICS de visita             |
+| GET    | /api/pdf/visita/:id/pro         | Sim  | PDF pro de visita         |
+| GET    | /api/pdf/entidade/:id/pro       | Sim  | PDF pro de entidade       |
+| GET    | /api/pdf/reports/monthly/agent  | Sim  | Relatorio mensal agente   |
+| GET    | /api/pdf/reports/weekly/agent   | Sim  | Relatorio semanal agente  |
+| GET    | /api/pdf/performance-pro        | Sim  | PDF performance           |
+--------------------------------------------------------------------------------
+
+FICHEIRO: server/routes/search/searchRoutes.ts
+--------------------------------------------------------------------------------
+| Metodo | Rota                          | Auth | Descricao                   |
+|--------|-------------------------------|------|-----------------------------|
+| GET    | /api/search/entidades/search  | Sim  | Pesquisar entidades         |
+| GET    | /api/search/contactos/search  | Sim  | Pesquisar contactos         |
+| GET    | /api/search/visitas/search    | Sim  | Pesquisar visitas           |
+--------------------------------------------------------------------------------
+
+FICHEIRO: server/routes/misc/userSettingsRoutes.ts
+--------------------------------------------------------------------------------
+| Metodo | Rota                | Auth | Descricao                           |
+|--------|---------------------|------|-------------------------------------|
+| GET    | /api/user/settings  | Sim  | Obter definicoes do user            |
+| PATCH  | /api/user/settings  | Sim  | Atualizar definicoes do user        |
+--------------------------------------------------------------------------------
+
+FICHEIRO: server/routes/misc/proximityRoutes.ts
+--------------------------------------------------------------------------------
+| Metodo | Rota                      | Auth | Descricao                       |
+|--------|---------------------------|------|---------------------------------|
+| POST   | /api/visitas/proximidade  | Sim  | Sugestoes por proximidade       |
+--------------------------------------------------------------------------------
+
+FICHEIRO: server/routes/uploadsRoutes.ts
+--------------------------------------------------------------------------------
+| Metodo | Rota                    | Auth | Descricao                         |
+|--------|-------------------------|------|-----------------------------------|
+| GET    | /api/uploads/:filename  | NAO  | Servir ficheiro uploaded          |
+--------------------------------------------------------------------------------
+
+FICHEIRO: server/routes/crmLeads.ts
+--------------------------------------------------------------------------------
+| Metodo | Rota                                | Auth | Descricao               |
+|--------|-------------------------------------|------|-------------------------|
+| GET    | /api/crm/leads                      | Sim  | Listar leads            |
+| GET    | /api/crm/leads/:id                  | Sim  | Obter lead              |
+| POST   | /api/crm/leads                      | Sim  | Criar lead              |
+| PATCH  | /api/crm/leads/:id                  | Sim  | Atualizar lead          |
+| POST   | /api/crm/leads/:id/odoo/sync        | Sim  | Sincronizar com Odoo    |
+| GET    | /api/crm/leads/:id/odoo/attachments | Sim  | Obter anexos Odoo       |
+| POST   | /api/crm/leads/:id/odoo/attachments | Sim  | Criar anexo Odoo        |
+| POST   | /api/ai/leads/transcribe            | Sim  | Transcrever audio lead  |
+| POST   | /api/ai/leads/summarize             | Sim  | Resumir lead com IA     |
+--------------------------------------------------------------------------------
+
+FICHEIRO: server/routes/integrations/odoo.ts
+--------------------------------------------------------------------------------
+| Metodo | Rota                                      | Auth | Descricao         |
+|--------|-------------------------------------------|------|-------------------|
+| GET    | /api/integrations/odoo/status             | Sim  | Status Odoo       |
+| POST   | /api/integrations/odoo/save               | Sim  | Guardar config    |
+| GET    | /api/integrations/odoo/search-partner     | Sim  | Pesquisar partner |
+| GET    | /api/integrations/odoo/partner/:id        | Sim  | Obter partner     |
+| POST   | /api/integrations/odoo/visitas/:id/create-lead | Sim | Criar lead    |
+| POST   | /api/integrations/odoo/test-create-lead   | Sim  | Testar criar lead |
+| POST   | /api/integrations/odoo/visitas/:id/sync   | Sim  | Sincronizar visita|
+--------------------------------------------------------------------------------
+
+FICHEIRO: server/routes/integrations/microsoft.ts
+--------------------------------------------------------------------------------
+| Metodo | Rota                                | Auth | Descricao               |
+|--------|-------------------------------------|------|-------------------------|
+| GET    | /api/integrations/microsoft/login   | Sim  | Login Microsoft         |
+| GET    | /api/integrations/microsoft/callback| Nao  | Callback Microsoft      |
+| GET    | /api/integrations/microsoft/status  | Sim  | Status Microsoft        |
+--------------------------------------------------------------------------------
+
+FICHEIRO: server/routes/integrations/google.ts
+--------------------------------------------------------------------------------
+| Metodo | Rota                              | Auth | Descricao                 |
+|--------|-----------------------------------|------|---------------------------|
+| GET    | /api/integrations/google/login    | Sim  | Login Google              |
+| GET    | /api/integrations/google/callback | Nao  | Callback Google           |
+| GET    | /api/integrations/google/status   | Sim  | Status Google             |
+--------------------------------------------------------------------------------
+
+
+================================================================================
+2. CHAMADAS API DO FRONTEND - LISTA COMPLETA
+================================================================================
+
+FICHEIRO: client/src/hooks/useAuth.ts
+--------------------------------------------------------------------------------
+| QueryKey            | Metodo | Descricao                                    |
+|---------------------|--------|----------------------------------------------|
+| /api/auth/me        | GET    | Obter user autenticado                       |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/hooks/use-user-context.ts
+--------------------------------------------------------------------------------
+| QueryKey            | Metodo | Descricao                                    |
+|---------------------|--------|----------------------------------------------|
+| /api/auth/user      | GET    | Obter user autenticado                       |
+| /api/users          | GET    | Listar todos os users                        |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/hooks/useAllUsers.ts
+--------------------------------------------------------------------------------
+| QueryKey            | Metodo | Descricao                                    |
+|---------------------|--------|----------------------------------------------|
+| /api/users          | GET    | Listar todos os users                        |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/pages/Dashboard.tsx
+--------------------------------------------------------------------------------
+| Endpoint/QueryKey                   | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/dashboard                      | GET    | Obter stats dashboard        |
+| /api/odoo/contact-requests/my       | GET    | Obter meus pedidos Odoo      |
+| /api/user/settings                  | PATCH  | Atualizar definicoes         |
+| /api/logout                         | GET    | Logout                       |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/pages/AdminDashboard.tsx
+--------------------------------------------------------------------------------
+| Endpoint/QueryKey                   | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/dashboard                      | GET    | Obter stats dashboard        |
+| /api/visitas                        | GET    | Listar visitas               |
+| /api/tarefas                        | GET    | Listar tarefas               |
+| /api/odoo/contact-requests          | GET    | Listar pedidos Odoo          |
+| /api/dev/toggle-role                | POST   | Toggle role admin/agent      |
+| /api/auth/user                      | GET    | Refresh user                 |
+| /api/auth/me                        | GET    | Refresh user                 |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/pages/AgentMore.tsx
+--------------------------------------------------------------------------------
+| Endpoint                            | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/dev/toggle-role                | POST   | Toggle role admin/agent      |
+| /api/logout                         | GET    | Logout                       |
+| /api/auth/user                      | GET    | Refresh user                 |
+| /api/auth/me                        | GET    | Refresh user                 |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/pages/EntidadeDetail.tsx
+--------------------------------------------------------------------------------
+| Endpoint/QueryKey                   | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/entidades/:id                  | GET    | Obter entidade               |
+| /api/lembretes                      | GET    | Listar lembretes             |
+| /api/crm/leads                      | GET    | Listar leads                 |
+| /api/entidades/:id                  | DELETE | Eliminar entidade            |
+| /api/enrichment/pt-intelligent-search| POST  | Pesquisa inteligente         |
+| /api/entidades/:id                  | PATCH  | Atualizar entidade           |
+| /api/enrichment/full                | POST   | Enriquecimento completo      |
+| /api/odoo/contact-requests          | POST   | Criar pedido Odoo            |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/pages/ContactoDetail.tsx
+--------------------------------------------------------------------------------
+| Endpoint/QueryKey                   | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/contactos/:id                  | GET    | Obter contacto               |
+| /api/visitas                        | GET    | Listar visitas do contacto   |
+| /api/crm/leads                      | GET    | Listar leads do contacto     |
+| /api/contactos/:id                  | DELETE | Eliminar contacto            |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/pages/TarefaDetail.tsx
+--------------------------------------------------------------------------------
+| Endpoint/QueryKey                   | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/tarefas/:id                    | GET    | Obter tarefa                 |
+| /api/microsoft/auth/status          | GET    | Status auth Microsoft        |
+| /api/microsoft/planner/groups       | GET    | Listar grupos Planner        |
+| /api/microsoft/planner/plans        | GET    | Listar planos Planner        |
+| /api/microsoft/planner/buckets      | GET    | Listar buckets Planner       |
+| /api/tarefas/:id                    | DELETE | Eliminar tarefa              |
+| /api/tarefas/:id                    | PATCH  | Atualizar tarefa             |
+| /api/microsoft/planner/export/:id   | POST   | Exportar para Planner        |
+| /api/microsoft/todo/export/:id      | POST   | Exportar para Todo           |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/pages/VisitaForm.tsx
+--------------------------------------------------------------------------------
+| Endpoint                            | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/marcas?onlyAtivas=true         | GET    | Listar marcas ativas         |
+| /api/visitas                        | POST   | Criar visita                 |
+| /api/tarefas                        | POST   | Criar tarefa                 |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/pages/EntidadeForm.tsx
+--------------------------------------------------------------------------------
+| Endpoint/QueryKey                   | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/entidade-tipos                 | GET    | Listar tipos de entidade     |
+| /api/entidades/:id                  | GET    | Obter entidade               |
+| /api/entidades                      | POST   | Criar entidade               |
+| /api/entidades/:id                  | PATCH  | Atualizar entidade           |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/pages/ContactoForm.tsx
+--------------------------------------------------------------------------------
+| Endpoint                            | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/contactos                      | POST   | Criar contacto               |
+| /api/contactos/:id                  | PATCH  | Atualizar contacto           |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/pages/TarefaForm.tsx
+--------------------------------------------------------------------------------
+| Endpoint                            | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/tarefas                        | POST   | Criar tarefa                 |
+| /api/tarefas/:id                    | PATCH  | Atualizar tarefa             |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/pages/AdminEmpresa.tsx
+--------------------------------------------------------------------------------
+| Endpoint                            | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/admin/empresa                  | GET    | Obter config empresa         |
+| /api/admin/empresa                  | PATCH  | Atualizar empresa            |
+| /api/admin/empresa/logo             | POST   | Upload logo                  |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/pages/AdminMarcas.tsx
+--------------------------------------------------------------------------------
+| Endpoint/QueryKey                   | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/admin/marcas                   | GET    | Listar marcas                |
+| /api/admin/marcas                   | POST   | Criar marca                  |
+| /api/admin/marcas/:id               | PATCH  | Atualizar marca              |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/pages/AdminEntidadeTipos.tsx
+--------------------------------------------------------------------------------
+| Endpoint/QueryKey                   | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/admin/entidade-tipos           | GET    | Listar tipos                 |
+| /api/admin/entidade-tipos           | POST   | Criar tipo                   |
+| /api/admin/entidade-tipos/:id       | PATCH  | Atualizar tipo               |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/pages/AdminEntidades.tsx
+--------------------------------------------------------------------------------
+| Endpoint/QueryKey                   | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/admin/entidades                | GET    | Listar entidades (admin)     |
+| /api/entidades/:id                  | DELETE | Eliminar entidade            |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/pages/MicrosoftIntegration.tsx
+--------------------------------------------------------------------------------
+| Endpoint/QueryKey                   | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/microsoft/auth/status          | GET    | Status auth Microsoft        |
+| /api/microsoft/auth/disconnect      | POST   | Desconectar Microsoft        |
+| /api/microsoft/auth/device-flow/start| POST  | Iniciar device flow          |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/components/BottomNav.tsx
+--------------------------------------------------------------------------------
+| QueryKey                            | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/lembretes                      | GET    | Listar lembretes             |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/components/DashboardInsightsCard.tsx
+--------------------------------------------------------------------------------
+| QueryKey                            | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/dashboard/insights             | GET    | Obter insights IA            |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/components/EmailAIDialog.tsx
+--------------------------------------------------------------------------------
+| Endpoint                            | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/tools/generate-email           | POST   | Gerar email com IA           |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/components/GoogleCompanySearch.tsx
+--------------------------------------------------------------------------------
+| Endpoint                            | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/enrichment/pt-intelligent-search| POST  | Pesquisa inteligente PT      |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/components/CompanyAutocomplete.tsx
+--------------------------------------------------------------------------------
+| Endpoint                            | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/enrichment/autocomplete        | GET    | Autocomplete empresas        |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/pages/QRScanner.tsx
+--------------------------------------------------------------------------------
+| Endpoint                            | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/tools/vcard-import             | POST   | Importar vCard               |
+| /api/tools/vision-card              | POST   | OCR cartao de visita         |
+| /api/entidades                      | POST   | Criar entidade               |
+| /api/contactos/:id                  | PATCH  | Atualizar contacto           |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/pages/GabineteForm.tsx
+--------------------------------------------------------------------------------
+| Endpoint                            | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/gabinetes                      | POST   | Criar gabinete               |
+| /api/gabinetes/:id                  | PATCH  | Atualizar gabinete           |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/hooks/useAudioTranscription.ts
+--------------------------------------------------------------------------------
+| Endpoint                            | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/crm/leads/ai/transcribe        | POST   | Transcrever audio lead       |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/components/integrations/OdooCrmBlock.tsx
+--------------------------------------------------------------------------------
+| Endpoint                            | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/integrations/odoo/save         | POST   | Guardar config Odoo          |
+| /api/admin/empresa                  | GET    | Obter config empresa         |
+--------------------------------------------------------------------------------
+
+FICHEIRO: client/src/pages/VisitaDetail.tsx
+--------------------------------------------------------------------------------
+| Endpoint                            | Metodo | Descricao                    |
+|-------------------------------------|--------|------------------------------|
+| /api/lembretes/snooze               | POST   | Adiar lembrete               |
+| /api/lembretes/resolve              | POST   | Resolver lembrete            |
+| /api/lembretes                      | GET    | Invalidar cache lembretes    |
+--------------------------------------------------------------------------------
+
+
+================================================================================
+3. FALHAS DE LIGACAO IDENTIFICADAS
+================================================================================
+
+CRITICO - ENDPOINTS QUE NAO EXISTEM NO BACKEND:
+--------------------------------------------------------------------------------
+
+1. GET /api/dashboard
+   Chamado por: Dashboard.tsx, AdminDashboard.tsx
+   Status: NAO EXISTE NO BACKEND
+   Impacto: Dashboard nao consegue carregar estatisticas
+   
+2. GET /api/lembretes
+   Chamado por: BottomNav.tsx, EntidadeDetail.tsx, VisitaDetail.tsx
+   Status: NAO EXISTE NO BACKEND
+   Impacto: Lembretes/reminders nao funcionam
+   Nota: Existe server/reminders.ts mas nao ha rota exposta
+
+3. GET /api/users
+   Chamado por: useAllUsers.ts, use-user-context.ts
+   Status: NAO EXISTE NO BACKEND
+   Impacto: Lista de utilizadores nao carrega
+   Nota: Existe /api/admin/utilizadores mas requer admin
+
+4. GET /api/visitas (listar todas)
+   Chamado por: AdminDashboard.tsx, ContactoDetail.tsx, use-today-summary.ts
+   Status: NAO EXISTE NO BACKEND (so existe POST para criar)
+   Impacto: Lista de visitas nao carrega
+   
+5. GET /api/marcas
+   Chamado por: VisitaForm.tsx (/api/marcas?onlyAtivas=true)
+   Status: NAO EXISTE NO BACKEND (so existe /api/admin/marcas)
+   Impacto: Marcas nao aparecem no formulario de visita
+
+6. POST /api/gabinetes
+   Chamado por: GabineteForm.tsx
+   Status: NAO EXISTE NO BACKEND
+   Impacto: Criacao de gabinetes nao funciona
+
+7. PATCH /api/gabinetes/:id
+   Chamado por: GabineteForm.tsx
+   Status: NAO EXISTE NO BACKEND
+   Impacto: Atualizacao de gabinetes nao funciona
+
+8. GET /api/dashboard/insights
+   Chamado por: DashboardInsightsCard.tsx
+   Status: NAO EXISTE NO BACKEND
+   Impacto: Insights IA do dashboard nao carregam
+   Nota: Existe POST /api/ai/dashboard-insights mas frontend espera GET
+
+9. POST /api/tools/generate-email
+   Chamado por: EmailAIDialog.tsx
+   Status: NAO EXISTE NO BACKEND
+   Impacto: Geracao de email com IA nao funciona
+
+10. POST /api/enrichment/pt-intelligent-search
+    Chamado por: GoogleCompanySearch.tsx, EntidadeDetail.tsx, offlineQueue.ts
+    Status: NAO EXISTE NO BACKEND
+    Impacto: Pesquisa inteligente de empresas PT nao funciona
+
+11. GET /api/enrichment/autocomplete
+    Chamado por: CompanyAutocomplete.tsx
+    Status: NAO EXISTE NO BACKEND
+    Impacto: Autocomplete de empresas nao funciona
+
+12. POST /api/enrichment/full
+    Chamado por: EntidadeDetail.tsx
+    Status: NAO EXISTE NO BACKEND
+    Impacto: Enriquecimento completo de entidade nao funciona
+
+13. POST /api/tools/vcard-import
+    Chamado por: QRScanner.tsx
+    Status: NAO EXISTE NO BACKEND
+    Impacto: Importacao de vCard nao funciona
+
+14. POST /api/tools/vision-card
+    Chamado por: QRScanner.tsx
+    Status: NAO EXISTE NO BACKEND
+    Impacto: OCR de cartao de visita nao funciona
+
+15. GET /api/microsoft/auth/status
+    Chamado por: TarefaDetail.tsx, MicrosoftIntegration.tsx
+    Status: CAMINHO ERRADO (existe /api/integrations/microsoft/status)
+    Impacto: Status Microsoft nao carrega
+
+16. POST /api/microsoft/auth/disconnect
+    Chamado por: MicrosoftIntegration.tsx
+    Status: NAO EXISTE NO BACKEND
+    Impacto: Desconectar Microsoft nao funciona
+
+17. POST /api/microsoft/auth/device-flow/start
+    Chamado por: MicrosoftIntegration.tsx
+    Status: NAO EXISTE NO BACKEND
+    Impacto: Inicio do device flow nao funciona
+
+18. GET /api/microsoft/planner/groups
+    Chamado por: TarefaDetail.tsx
+    Status: NAO EXISTE NO BACKEND
+    Impacto: Grupos Planner nao carregam
+
+19. GET /api/microsoft/planner/plans
+    Chamado por: TarefaDetail.tsx
+    Status: NAO EXISTE NO BACKEND
+    Impacto: Planos Planner nao carregam
+
+20. GET /api/microsoft/planner/buckets
+    Chamado por: TarefaDetail.tsx
+    Status: NAO EXISTE NO BACKEND
+    Impacto: Buckets Planner nao carregam
+
+21. POST /api/microsoft/planner/export/:tarefaId
+    Chamado por: TarefaDetail.tsx
+    Status: COMENTADO NO BACKEND (tarefasRoutes.ts linha 212)
+    Impacto: Exportar para Planner nao funciona
+
+22. POST /api/microsoft/todo/export/:tarefaId
+    Chamado por: TarefaDetail.tsx
+    Status: COMENTADO NO BACKEND (tarefasRoutes.ts linha 216)
+    Impacto: Exportar para Todo nao funciona
+
+23. POST /api/lembretes/snooze
+    Chamado por: VisitaDetail.tsx
+    Status: NAO EXISTE NO BACKEND
+    Impacto: Snooze de lembretes nao funciona
+
+24. POST /api/lembretes/resolve
+    Chamado por: VisitaDetail.tsx
+    Status: NAO EXISTE NO BACKEND
+    Impacto: Resolver lembretes nao funciona
+
+
+================================================================================
+4. PROBLEMAS DE AUTENTICACAO
+================================================================================
+
+ROTAS SEM VERIFICACAO DE AUTENTICACAO:
+--------------------------------------------------------------------------------
+
+1. GET /api/uploads/:filename
+   Ficheiro: server/routes/uploadsRoutes.ts
+   Problema: Ficheiros uploaded podem ser acedidos sem autenticacao
+   Risco: MEDIO - ficheiros podem conter dados sensiveis
+
+2. GET /api/auth/me, /api/auth/user
+   Ficheiro: server/routes/authRoutes.ts
+   Problema: Nao usam middleware isAuthenticated
+   Nota: Isto e' intencional - devolvem 401 se nao autenticado
+
+3. POST /api/auth/logout
+   Ficheiro: server/routes/authRoutes.ts
+   Problema: Nao verifica se ha sessao antes de destruir
+   Nota: Baixo risco - destroir sessao inexistente e' inofensivo
+
+
+================================================================================
+5. PROBLEMAS DE RBAC
+================================================================================
+
+ROTAS COM POTENCIAIS PROBLEMAS DE CONTROLO DE ACESSO:
+--------------------------------------------------------------------------------
+
+1. GET /api/odoo/contact-requests
+   Ficheiro: odooContactRequestsRoutes.ts
+   Problema: Lista TODOS os pedidos mas nao verifica se user e' admin
+   Deveria: Verificar se req.session.user.role === "admin"
+
+2. DELETE /api/odoo/contact-requests/:id
+   Ficheiro: odooContactRequestsRoutes.ts
+   Problema: Permite eliminar qualquer pedido sem verificar role
+   Deveria: Apenas admin pode eliminar pedidos de outros users
+
+
+================================================================================
+6. DISCREPANCIAS DE SCHEMAS
+================================================================================
+
+NOMES DE CAMPOS INCONSISTENTES:
+--------------------------------------------------------------------------------
+
+1. Toggle Role Response
+   Backend: { success: true, newRole: "admin" }
+   Frontend (antigo): esperava data.role
+   Frontend (corrigido): usa data.newRole
+   Status: CORRIGIDO
+
+2. Odoo Contact Requests Response
+   Backend: { success: true, data: [...] }
+   Frontend: Alguns componentes esperam array direto
+   Status: Verificar cada componente
+
+3. Dashboard Insights
+   Backend: POST /api/ai/dashboard-insights
+   Frontend: GET /api/dashboard/insights
+   Status: Metodo HTTP diferente!
+
+
+================================================================================
+7. ROTAS DUPLICADAS OU CONFLITUOSAS
+================================================================================
+
+ROTAS DUPLICADAS:
+--------------------------------------------------------------------------------
+
+1. POST /api/visitas/proximidade
+   Definido em: visitasRoutes.ts E proximityRoutes.ts
+   Problema: Potencial conflito de handlers
+   Solucao: Remover de um dos ficheiros
+
+2. GET /api/visitas/:id/ics
+   Definido em: visitasRoutes.ts E pdfRoutes.ts (/api/pdf/visitas/:id/ics)
+   Problema: Mesma funcionalidade em dois lugares
+   Solucao: Manter apenas num ficheiro
+
+3. Pesquisa de contactos
+   /api/crm/contactos/search (contactosRoutes.ts)
+   /api/search/contactos/search (searchRoutes.ts)
+   Problema: Duas rotas para a mesma funcionalidade
+   Solucao: Unificar numa so rota
+
+
+================================================================================
+8. RESUMO ESTATISTICO
+================================================================================
+
+Total de rotas no backend:     ~85 rotas
+Total de chamadas no frontend: ~95 chamadas API
+Rotas em falta no backend:     24 rotas
+Rotas duplicadas:              3 grupos
+Problemas de RBAC:             2 rotas
+Problemas de auth:             1 rota
+
+CLASSIFICACAO POR PRIORIDADE:
+
+CRITICO (bloqueia funcionalidade principal):
+- GET /api/dashboard (0 dados no dashboard)
+- GET /api/visitas (lista vazia)
+- GET /api/lembretes (sem lembretes)
+- GET /api/marcas (formulario de visita incompleto)
+
+ALTO (funcionalidade parcial):
+- GET /api/users (lista de users)
+- Rotas /api/enrichment/* (enriquecimento)
+- Rotas /api/tools/* (ferramentas IA)
+
+MEDIO (features secundarias):
+- Rotas /api/microsoft/* (integracao Microsoft)
+- Rotas /api/gabinetes (gabinetes)
+
+BAIXO (melhorias):
+- Rotas duplicadas
+- RBAC em odoo contact requests
+- Auth em uploads
+
+
+================================================================================
+FIM DO RELATORIO
+================================================================================

@@ -1,0 +1,450 @@
+================================================================================
+RELATORIO DE PROPOSTAS DE CORRECAO
+================================================================================
+
+Data: 8 Dezembro 2025
+Versao: 1.0
+Tipo: Plano de Correcao Detalhado
+Referencia: RELATORIO-ANALISE-ROTAS-COMPLETO.txt
+
+================================================================================
+INDICE
+================================================================================
+
+1. CORRECOES PRIORITARIAS (CRITICO)
+2. CORRECOES DE ALTA PRIORIDADE
+3. CORRECOES DE MEDIA PRIORIDADE
+4. CORRECOES DE BAIXA PRIORIDADE
+5. ESTIMATIVA DE ESFORCO
+6. DEPENDENCIAS ENTRE TAREFAS
+7. RISCOS E MITIGACOES
+
+================================================================================
+1. CORRECOES PRIORITARIAS (CRITICO)
+================================================================================
+
+Estas correcoes devem ser implementadas PRIMEIRO porque bloqueiam
+funcionalidades principais da aplicacao.
+
+--------------------------------------------------------------------------------
+CORRECAO C1: Criar GET /api/dashboard
+--------------------------------------------------------------------------------
+Ficheiro a criar/editar: server/routes/crm/dashboardRoutes.ts
+
+Descricao:
+Criar endpoint que devolve estatisticas agregadas para o dashboard.
+
+Estrutura de resposta esperada:
+{
+  visitasRealizadas: number,
+  visitasAgendadas: number,
+  tarefasPendentes: number,
+  tarefasConcluidas: number,
+  entidadesAtivas: number,
+  proximasVisitas: Visita[]
+}
+
+Implementacao proposta:
+1. Criar ficheiro server/routes/crm/dashboardRoutes.ts
+2. Implementar logica de agregacao usando storage.getVisitas, storage.getTarefas
+3. Respeitar RBAC: admin ve tudo, agent ve so os seus dados
+4. Registar rota em server/routes/index.ts
+5. Adicionar isAuthenticated middleware
+
+Complexidade: MEDIA (2-3 horas)
+
+--------------------------------------------------------------------------------
+CORRECAO C2: Criar GET /api/visitas
+--------------------------------------------------------------------------------
+Ficheiro a editar: server/routes/crm/visitasRoutes.ts
+
+Descricao:
+Adicionar endpoint para listar todas as visitas com filtros.
+
+Implementacao proposta:
+1. Adicionar app.get("/api/visitas", isAuthenticated, ...) em visitasRoutes.ts
+2. Usar storage.getVisitas(empresaId, userId, userRole, filters)
+3. Suportar query params: entidadeId, contactoId, dataInicio, dataFim, status
+4. Respeitar RBAC: admin ve todas, agent ve so as suas
+
+Complexidade: BAIXA (1-2 horas)
+Nota: Verificar se storage.getVisitas ja existe ou precisa ser criado
+
+--------------------------------------------------------------------------------
+CORRECAO C3: Criar GET /api/lembretes
+--------------------------------------------------------------------------------
+Ficheiro a criar: server/routes/crm/lembretesRoutes.ts
+
+Descricao:
+Expor os lembretes gerados por server/reminders.ts como API.
+
+Implementacao proposta:
+1. Criar server/routes/crm/lembretesRoutes.ts
+2. Importar generateVisitReminders e generateTaskReminders de reminders.ts
+3. Agregar os lembretes e devolver como array
+4. Respeitar RBAC via ReminderContext
+5. Registar rota em server/routes/index.ts
+
+Endpoints a criar:
+- GET /api/lembretes - Listar todos os lembretes do user
+- POST /api/lembretes/snooze - Adiar lembrete (precisa schema na BD)
+- POST /api/lembretes/resolve - Resolver/dispensar lembrete
+
+Complexidade: MEDIA (3-4 horas)
+Dependencia: Pode precisar de tabela lembretes na BD para persistir estado
+
+--------------------------------------------------------------------------------
+CORRECAO C4: Criar GET /api/marcas
+--------------------------------------------------------------------------------
+Ficheiro a editar: server/routes/crm/marcasRoutes.ts (novo) ou admin/marcasRoutes.ts
+
+Descricao:
+Criar endpoint publico (autenticado) para listar marcas ativas.
+
+Implementacao proposta:
+1. Criar rota GET /api/marcas em novo ficheiro ou adicionar a marcasRoutes.ts
+2. Filtrar por empresaId do user autenticado
+3. Suportar query param onlyAtivas=true para filtrar marcas ativas
+4. NAO requer role admin (qualquer user autenticado pode ver)
+
+Complexidade: BAIXA (1 hora)
+
+
+================================================================================
+2. CORRECOES DE ALTA PRIORIDADE
+================================================================================
+
+--------------------------------------------------------------------------------
+CORRECAO A1: Criar GET /api/users
+--------------------------------------------------------------------------------
+Ficheiro a editar: server/routes/authRoutes.ts ou criar novo
+
+Descricao:
+Criar endpoint para listar utilizadores (para selects, atribuicoes, etc.)
+
+Implementacao proposta:
+1. Criar GET /api/users que lista users da mesma empresa
+2. Devolver apenas campos publicos: id, nome, email, role
+3. NAO devolver passwords ou tokens
+4. Qualquer user autenticado pode ver users da sua empresa
+
+Complexidade: BAIXA (1 hora)
+
+--------------------------------------------------------------------------------
+CORRECAO A2: Corrigir GET /api/dashboard/insights
+--------------------------------------------------------------------------------
+Ficheiro a editar: client/src/components/DashboardInsightsCard.tsx
+OU server/routes/ai/aiRoutes.ts
+
+Opcao 1 - Corrigir Frontend:
+- Mudar de GET para POST /api/ai/dashboard-insights
+- Enviar metrics no body
+
+Opcao 2 - Criar nova rota Backend:
+- Criar GET /api/dashboard/insights que calcula metrics internamente
+- Chama generateDashboardInsights com dados calculados
+
+Recomendacao: Opcao 2 (mais limpo, frontend mais simples)
+
+Complexidade: MEDIA (2 horas)
+
+--------------------------------------------------------------------------------
+CORRECAO A3: Criar rotas /api/enrichment/*
+--------------------------------------------------------------------------------
+Ficheiro a criar: server/routes/enrichment/enrichmentRoutes.ts
+
+Descricao:
+Implementar sistema de enriquecimento de dados de empresas.
+
+Endpoints a criar:
+- POST /api/enrichment/pt-intelligent-search - Pesquisa inteligente PT
+- GET /api/enrichment/autocomplete - Autocomplete de empresas
+- POST /api/enrichment/full - Enriquecimento completo
+
+Implementacao proposta:
+1. Criar ficheiro enrichmentRoutes.ts
+2. Integrar com APIs externas (e.g., Racius, einforma, ou APIs PT)
+3. Cachear resultados para evitar chamadas repetidas
+4. Adicionar rate limiting
+
+Complexidade: ALTA (8-12 horas)
+Nota: Depende de APIs externas disponiveis
+
+--------------------------------------------------------------------------------
+CORRECAO A4: Criar rotas /api/tools/*
+--------------------------------------------------------------------------------
+Ficheiro a criar: server/routes/tools/toolsRoutes.ts
+
+Descricao:
+Implementar ferramentas de IA e utilitarios.
+
+Endpoints a criar:
+- POST /api/tools/generate-email - Gerar email com IA
+- POST /api/tools/vcard-import - Importar vCard
+- POST /api/tools/vision-card - OCR de cartao de visita
+
+Implementacao proposta:
+1. Criar ficheiro toolsRoutes.ts
+2. generate-email: Usar OpenAI para gerar texto de email
+3. vcard-import: Parse vCard e criar contacto
+4. vision-card: Usar OpenAI Vision para extrair dados de imagem
+
+Complexidade: ALTA (6-10 horas)
+Dependencias: OpenAI API key, biblioteca vCard parser
+
+
+================================================================================
+3. CORRECOES DE MEDIA PRIORIDADE
+================================================================================
+
+--------------------------------------------------------------------------------
+CORRECAO M1: Implementar rotas Microsoft Graph
+--------------------------------------------------------------------------------
+Ficheiros a criar/editar:
+- server/routes/integrations/microsoft.ts (expandir)
+- server/services/microsoftGraph.ts (novo)
+
+Endpoints a criar:
+- GET /api/microsoft/auth/status (ja existe como /api/integrations/microsoft/status)
+- POST /api/microsoft/auth/disconnect
+- POST /api/microsoft/auth/device-flow/start
+- GET /api/microsoft/planner/groups
+- GET /api/microsoft/planner/plans
+- GET /api/microsoft/planner/buckets
+- POST /api/microsoft/planner/export/:tarefaId
+- POST /api/microsoft/todo/export/:tarefaId
+
+Implementacao proposta:
+1. Criar servico microsoftGraph.ts para gerir tokens e chamadas
+2. Implementar device flow para autenticacao
+3. Implementar endpoints Planner e Todo
+4. Descomentar rotas existentes e completar implementacao
+
+Complexidade: MUITO ALTA (12-20 horas)
+Dependencias: Registo de app no Azure AD, Microsoft Graph API
+
+--------------------------------------------------------------------------------
+CORRECAO M2: Criar rotas /api/gabinetes
+--------------------------------------------------------------------------------
+Ficheiro a criar: server/routes/crm/gabinetesRoutes.ts
+
+Descricao:
+Implementar CRUD para gabinetes (se ainda for necessario).
+
+Endpoints a criar:
+- GET /api/gabinetes
+- GET /api/gabinetes/:id
+- POST /api/gabinetes
+- PATCH /api/gabinetes/:id
+- DELETE /api/gabinetes/:id
+
+Nota: Verificar se gabinetes foram migrados para entidades.
+Se sim, remover GabineteForm.tsx do frontend.
+
+Complexidade: MEDIA (3-4 horas) ou BAIXA (1 hora se remover)
+
+--------------------------------------------------------------------------------
+CORRECAO M3: Remover rotas duplicadas
+--------------------------------------------------------------------------------
+Ficheiros a editar:
+- server/routes/crm/visitasRoutes.ts
+- server/routes/misc/proximityRoutes.ts
+- server/routes/search/searchRoutes.ts
+- server/routes/crm/contactosRoutes.ts
+
+Acoes:
+1. POST /api/visitas/proximidade: Manter em visitasRoutes.ts, remover de proximityRoutes.ts
+2. Pesquisa contactos: Manter /api/crm/contactos/search, remover /api/search/contactos/search
+   OU vice-versa (unificar)
+
+Complexidade: BAIXA (1-2 horas)
+
+
+================================================================================
+4. CORRECOES DE BAIXA PRIORIDADE
+================================================================================
+
+--------------------------------------------------------------------------------
+CORRECAO B1: Adicionar auth a /api/uploads/:filename
+--------------------------------------------------------------------------------
+Ficheiro a editar: server/routes/uploadsRoutes.ts
+
+Implementacao proposta:
+1. Adicionar middleware isAuthenticated
+2. Opcionalmente: verificar se o user tem acesso ao ficheiro
+   (requer tracking de quem uploaded cada ficheiro)
+
+Complexidade: BAIXA (30 min)
+
+--------------------------------------------------------------------------------
+CORRECAO B2: Corrigir RBAC em odoo contact requests
+--------------------------------------------------------------------------------
+Ficheiro a editar: server/routes/odoo/odooContactRequestsRoutes.ts
+
+Acoes:
+1. GET /api/odoo/contact-requests: Adicionar verificacao de admin
+2. DELETE /api/odoo/contact-requests/:id: Verificar se e' admin ou dono
+
+Implementacao:
+```javascript
+// No inicio do handler
+const { userRole } = await getUserContext(req);
+if (userRole !== "admin") {
+  return res.status(403).json({ message: "Admin only" });
+}
+```
+
+Complexidade: BAIXA (30 min)
+
+--------------------------------------------------------------------------------
+CORRECAO B3: Unificar rotas de search
+--------------------------------------------------------------------------------
+Ficheiros a editar: Multiplos
+
+Decisao necessaria:
+- Manter /api/crm/*/search OU /api/search/*/search
+- Atualizar frontend para usar rota escolhida
+- Remover rotas duplicadas
+
+Complexidade: MEDIA (2-3 horas)
+
+
+================================================================================
+5. ESTIMATIVA DE ESFORCO
+================================================================================
+
+RESUMO POR PRIORIDADE:
+
+CRITICO (C1-C4):
+- C1 GET /api/dashboard:        2-3 horas
+- C2 GET /api/visitas:          1-2 horas
+- C3 GET /api/lembretes:        3-4 horas
+- C4 GET /api/marcas:           1 hora
+SUBTOTAL CRITICO:               7-10 horas
+
+ALTA (A1-A4):
+- A1 GET /api/users:            1 hora
+- A2 /api/dashboard/insights:   2 horas
+- A3 /api/enrichment/*:         8-12 horas
+- A4 /api/tools/*:              6-10 horas
+SUBTOTAL ALTA:                  17-25 horas
+
+MEDIA (M1-M3):
+- M1 Microsoft Graph:           12-20 horas
+- M2 /api/gabinetes:            1-4 horas
+- M3 Rotas duplicadas:          1-2 horas
+SUBTOTAL MEDIA:                 14-26 horas
+
+BAIXA (B1-B3):
+- B1 Auth uploads:              0.5 horas
+- B2 RBAC odoo requests:        0.5 horas
+- B3 Unificar search:           2-3 horas
+SUBTOTAL BAIXA:                 3-4 horas
+
+TOTAL ESTIMADO:                 41-65 horas de desenvolvimento
+
+
+================================================================================
+6. DEPENDENCIAS ENTRE TAREFAS
+================================================================================
+
+GRAFO DE DEPENDENCIAS:
+
+C2 (GET /api/visitas)
+  |
+  v
+C1 (GET /api/dashboard) -- depende de visitas para calcular stats
+  |
+  v
+A2 (dashboard/insights) -- depende de dashboard para obter metrics
+
+C3 (GET /api/lembretes)
+  |
+  +-- Pode precisar de tabela na BD
+  |
+  +-- A3 (/api/enrichment) e A4 (/api/tools) sao independentes
+
+M1 (Microsoft Graph)
+  |
+  +-- Precisa de registo no Azure AD primeiro
+  |
+  +-- Pode ser desenvolvido em paralelo com outras tarefas
+
+ORDEM SUGERIDA DE IMPLEMENTACAO:
+
+Fase 1 - Fundacao (1-2 dias):
+1. C4 - GET /api/marcas (rapido, desbloqueia formularios)
+2. C2 - GET /api/visitas (base para dashboard)
+3. A1 - GET /api/users (base para selects)
+
+Fase 2 - Dashboard (1 dia):
+4. C1 - GET /api/dashboard
+5. A2 - /api/dashboard/insights
+
+Fase 3 - Lembretes (1 dia):
+6. C3 - GET /api/lembretes + snooze + resolve
+
+Fase 4 - Ferramentas IA (2-3 dias):
+7. A4 - /api/tools/* (vcard, vision, email)
+8. A3 - /api/enrichment/* (pesquisa inteligente)
+
+Fase 5 - Integracoes (2-4 dias):
+9. M1 - Microsoft Graph (se necessario)
+10. M2 - Gabinetes (verificar se necessario)
+
+Fase 6 - Limpeza (0.5 dias):
+11. M3 - Remover rotas duplicadas
+12. B1-B3 - Auth, RBAC, unificar search
+
+
+================================================================================
+7. RISCOS E MITIGACOES
+================================================================================
+
+RISCO 1: APIs externas de enriquecimento
+- Descricao: Nao ha informacao sobre que APIs usar para /api/enrichment
+- Impacto: A3 pode demorar mais ou ser impossivel
+- Mitigacao: Usar dados mockados temporariamente, ou OpenAI para pesquisa
+
+RISCO 2: Microsoft Graph complexidade
+- Descricao: Integracao com Azure AD e' complexa
+- Impacto: M1 pode demorar muito mais que estimado
+- Mitigacao: Desativar features Microsoft no frontend temporariamente
+
+RISCO 3: Tabela lembretes
+- Descricao: Snooze/resolve requerem persistencia de estado
+- Impacto: C3 pode precisar de migracao de BD
+- Mitigacao: Guardar estado em userSettings ou nova tabela simples
+
+RISCO 4: Gabinetes obsoletos
+- Descricao: GabineteForm.tsx pode estar obsoleto
+- Impacto: M2 pode ser trabalho desnecessario
+- Mitigacao: Verificar com stakeholder se gabinetes ainda sao usados
+
+RISCO 5: Breaking changes no frontend
+- Descricao: Mudar paths de rotas pode quebrar frontend
+- Impacto: Regressoes visuais
+- Mitigacao: Manter backward compatibility ou atualizar frontend em conjunto
+
+
+================================================================================
+CONCLUSAO
+================================================================================
+
+Este relatorio apresenta um plano estruturado para corrigir as 24 falhas
+de ligacao identificadas entre frontend e backend.
+
+A abordagem recomendada e':
+1. Comecar pelas correcoes CRITICAS (C1-C4) para desbloquear funcionalidades
+2. Seguir com ALTA prioridade (A1-A4) para completar features
+3. Deixar MEDIA e BAIXA para uma fase posterior
+
+Tempo total estimado: 41-65 horas (5-8 dias de trabalho)
+
+Nota: Este plano nao inclui testes, documentacao, ou code review.
+Adicionar 20-30% ao tempo estimado para estas atividades.
+
+
+================================================================================
+FIM DO RELATORIO
+================================================================================
