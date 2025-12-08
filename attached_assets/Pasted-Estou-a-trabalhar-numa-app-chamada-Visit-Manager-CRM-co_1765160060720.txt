@@ -1,0 +1,131 @@
+Estou a trabalhar numa app chamada Visit Manager / CRM, com backend em Node + Express + TypeScript e frontend em React + Vite.
+
+Neste momento o npm run build corre sem erros, mas:
+
+Já tive vários erros em runtime tipo TypeError: Cannot read properties of undefined (reading 'apply') vindos do Express Router dentro de registerRoutes.
+
+No browser fico preso no ecrã de login; muito provavelmente a chamada a /api/auth/user está a dar 404 ou a não devolver o formato esperado.
+
+Temos andado a mexer bastante em server/routes.ts e na organização dos ficheiros de rotas.
+
+O que eu quero que faças:
+
+Analisa estes ficheiros (e dependências diretas):
+
+server/index.ts
+
+server/routes.ts
+
+server/routes/authRoutes.ts
+
+server/routes/crm/entidadesRoutes.ts
+
+server/routes/crm/contactosRoutes.ts
+
+server/routes/crm/visitasRoutes.ts
+
+server/routes/crm/tarefasRoutes.ts
+
+server/routes/admin/adminRoutes.ts
+
+server/routes/admin/marcasRoutes.ts
+
+server/routes/odoo/odooContactRequestsRoutes.ts
+
+server/routes/uploadsRoutes.ts
+
+server/routes/misc/proximityRoutes.ts
+
+server/routes/misc/userSettingsRoutes.ts
+
+server/routes/pdf/pdfRoutes.ts
+
+server/routes/search/searchRoutes.ts
+
+server/routes/ai/aiRoutes.ts
+
+Para cada um destes módulos, decide e documenta se:
+
+Exporta um Router Express, OU
+
+Exporta uma função que recebe app: Express e regista as rotas diretamente.
+
+Depois:
+
+Garante que server/routes.ts está consistente com essa decisão:
+
+Se for Router: importa como default (ou nomeado) e monta com app.use("/base", router).
+
+Se for função: importa a função e chama func(app).
+
+Remove qualquer lógica “genérica” que esteja a tentar adivinhar tipos (como helpers mountRegisterFn com typeof === "function" e checks a .use/.handle) se não for estritamente necessária. Prefiro um routes.ts simples, explícito e estável.
+
+Garante que existe um endpoint de auth compatível com o frontend:
+
+O frontend usa useAuth com useQuery({ queryKey: ["/api/auth/user"] }).
+
+Quero um router em server/routes/authRoutes.ts (ou equivalente) que:
+
+Seja montado em /api/auth a partir de server/routes.ts.
+
+Implemente pelo menos GET /api/auth/user:
+
+Se não houver sessão: responder 401 { message: "Not authenticated" }.
+
+Se houver sessão: responder um objeto user que inclua:
+
+id, email?, firstName?, lastName?, role ("admin" | "agent"),
+
+empresa com os campos esperados em EmpresaAuthInfo (id, nome, logoUrl?, mostrarMarcasEmVisitas, theme?, uiSettings?, flags Odoo, etc.), para bater certo com client/src/hooks/useAuth.ts.
+
+Verifica se server/index.ts está a usar registerRoutes(app) corretamente:
+
+registerRoutes(app) deve registar as rotas e depois devolver o http.Server que o index.ts usa para integrar com o Vite dev server (já existe createServer em registerRoutes).
+
+Ajusta se necessário, mas mantém o padrão atual de integração com Vite.
+
+Corrige TODOS os erros de TypeScript relacionados com:
+
+server/routes.ts
+
+ficheiros de rotas mencionados acima
+
+ficheiros de auth relacionados
+
+Sem alterar a API pública esperada pelo frontend (paths como /api/entidades, /api/contactos, /api/visitas, /api/tarefas, /api/auth/user, etc.).
+
+Depois das correções:
+
+Corre npm run build e assegura que:
+
+O build passa sem erros.
+
+Corre npm start e assegura que:
+
+O servidor arranca sem TypeError em Express Router.
+
+Opcionalmente, faz uma chamada direta a /api/auth/user (por ex. com fetch ou curl) para confirmar que:
+
+Não devolve 404,
+
+Devolve 401 sem sessão e 200 com o objeto user quando há sessão (podes simular um user fixo se ainda não houver auth completa, mas documenta).
+
+No final, faz um resumo:
+
+Lista dos ficheiros alterados;
+
+Descrição curta do que mudaste em cada um;
+
+Qual é agora o contrato de cada módulo de rotas (Router vs função).
+
+Muito importante:
+
+Não faças refactors gigantes desnecessários.
+
+Faz o mínimo para:
+
+estabilizar o backend,
+
+ter /api/auth/user a funcionar,
+
+eliminar os erros de runtime nas rotas.

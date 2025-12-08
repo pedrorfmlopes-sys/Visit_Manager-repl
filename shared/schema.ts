@@ -1,5 +1,5 @@
-import { sql } from 'drizzle-orm';
-import { relations } from 'drizzle-orm';
+import { sql } from "drizzle-orm";
+import { relations } from "drizzle-orm";
 import {
   index,
   jsonb,
@@ -10,7 +10,6 @@ import {
   integer,
   boolean,
   pgEnum,
-  uuid,
   numeric,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -26,63 +25,60 @@ export type SearchResult<T = any> = {
   data?: T;
 };
 
-export type EntidadeSearchResult = SearchResult<{ cidade?: string; nif?: string }>;
-export type ContactoSearchResult = SearchResult<{ entidadeNome?: string; email?: string }>;
-export type VisitaSearchResult = SearchResult<{ entidadeNome?: string; date?: string }>;
+export type EntidadeSearchResult = SearchResult<{
+  cidade?: string;
+  nif?: string;
+}>;
+export type ContactoSearchResult = SearchResult<{
+  entidadeNome?: string;
+  email?: string;
+}>;
+export type VisitaSearchResult = SearchResult<{
+  entidadeNome?: string;
+  date?: string;
+}>;
 
 // ============================================
-// ENUMS (must be defined before tables that use them)
+// ENUMS
 // ============================================
 
-// User Role enum
-export const userRoleEnum = pgEnum('user_role', [
-  'admin',
-  'agent'
+export const userRoleEnum = pgEnum("user_role", ["admin", "agent"]);
+
+export const tipoEntidadeEnum = pgEnum("tipo_entidade", [
+  "Gabinete",
+  "Distribuidor",
+  "Parceiro",
+  "Construtor",
 ]);
 
-// Tipo de Entidade enum
-export const tipoEntidadeEnum = pgEnum('tipo_entidade', [
-  'Gabinete',
-  'Distribuidor',
-  'Parceiro',
-  'Construtor'
+export const syncStatusEnum = pgEnum("sync_status", [
+  "pending",
+  "synced",
+  "error",
+  "never",
 ]);
 
-// Odoo Sync Status enum
-export const syncStatusEnum = pgEnum('sync_status', [
-  'pending',
-  'synced',
-  'error',
-  'never'
+export const taskStatusEnum = pgEnum("task_status", ["pending", "done"]);
+
+export const taskRepeatEnum = pgEnum("task_repeat_interval", [
+  "none",
+  "daily",
+  "2days",
+  "3days",
+  "weekly",
 ]);
 
-// Task Status enum
-export const taskStatusEnum = pgEnum('task_status', [
-  'pending',
-  'done'
-]);
-
-// Task Repeat Interval enum
-export const taskRepeatEnum = pgEnum('task_repeat_interval', [
-  'none',
-  'daily',
-  '2days',
-  '3days',
-  'weekly'
-]);
-
-// Reminder Type enum
-export const lembreteTipoEnum = pgEnum('lembrete_tipo', [
-  'visita_followup',
-  'tarefa_overdue',
-  'ai_suggestion'
+export const lembreteTipoEnum = pgEnum("lembrete_tipo", [
+  "visita_followup",
+  "tarefa_overdue",
+  "ai_suggestion",
 ]);
 
 // ============================================
 // TABLES
 // ============================================
 
-// Session storage table (required for Replit Auth)
+// Sessions
 export const sessions = pgTable(
   "sessions",
   {
@@ -93,7 +89,7 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// NOVO: Empresas (Companies/Tenants) table
+// Empresas
 export const empresas = pgTable("empresas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   nome: varchar("nome", { length: 255 }).notNull(),
@@ -101,9 +97,13 @@ export const empresas = pgTable("empresas", {
   email: varchar("email", { length: 255 }),
   telefone: varchar("telefone", { length: 50 }),
   logoUrl: varchar("logo_url", { length: 500 }),
-  mostrarMarcasEmVisitas: boolean("mostrar_marcas_em_visitas").default(false).notNull(),
+  mostrarMarcasEmVisitas: boolean("mostrar_marcas_em_visitas")
+    .default(false)
+    .notNull(),
   mostrarGPS: boolean("mostrar_gps").default(false).notNull(),
-  theme: varchar("theme", { length: 50 }).default("light-business").notNull(),
+  theme: varchar("theme", { length: 50 })
+    .default("light-business")
+    .notNull(),
   openai_api_key: text("openai_api_key"),
   uiSettings: jsonb("ui_settings").default(sql`'{
     "mostrarGPS": false,
@@ -152,7 +152,7 @@ export const empresas = pgTable("empresas", {
   // Módulo de Leads CRM
   crmLeadsEnabled: boolean("crm_leads_enabled").notNull().default(false),
 
-  // 🔽 3 níveis de contactos Odoo
+  // 3 níveis de contactos Odoo
   odooContactsFeatureEnabled: boolean("odoo_contacts_feature_enabled")
     .notNull()
     .default(false),
@@ -165,10 +165,10 @@ export const empresas = pgTable("empresas", {
     .notNull()
     .default(false),
 
-  // Mensagem personalizada para utilizadores sem permissão de contactos Odoo
-  odooContactsNoPermissionMessage: text("odoo_contacts_no_permission_message"),
+  odooContactsNoPermissionMessage: text(
+    "odoo_contacts_no_permission_message",
+  ),
 
-  // 🔽 Sync visitas → contacto Odoo (camada 3)
   crmVisitsOdooSyncEnabled: boolean("crm_visits_odoo_sync_enabled")
     .notNull()
     .default(false),
@@ -177,29 +177,32 @@ export const empresas = pgTable("empresas", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertEmpresaSchema = createInsertSchema(empresas).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-}).extend({
-  theme: z.enum(["light-business", "dark-pro"]).optional(),
-  mostrarGPS: z.boolean().optional(), // FASE 15: Toggle GPS visibility
-});
+export const insertEmpresaSchema = createInsertSchema(empresas)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    theme: z.enum(["light-business", "dark-pro"]).optional(),
+    mostrarGPS: z.boolean().optional(),
+  });
 
 export type InsertEmpresa = z.infer<typeof insertEmpresaSchema>;
 export type Empresa = typeof empresas.$inferSelect;
 
-// User storage table (required for Replit Auth)
+// Users
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
-  role: userRoleEnum("role").notNull().default('agent'),
-  ativo: boolean("ativo").default(true).notNull(), // FASE 3: User activation toggle
-  empresaId: varchar("empresa_id").references(() => empresas.id, { onDelete: 'cascade' }), // NOVO: FK para empresas
-  // FASE 24: User-level settings (preferences, IA toggles, notifications)
+  role: userRoleEnum("role").notNull().default("agent"),
+  ativo: boolean("ativo").default(true).notNull(),
+  empresaId: varchar("empresa_id").references(() => empresas.id, {
+    onDelete: "cascade",
+  }),
   userSettings: jsonb("user_settings").default(sql`'{
     "homePage": "dashboard",
     "listDensity": "comfortable",
@@ -217,6 +220,52 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// User settings schema
+export const userSettingsSchema = z
+  .object({
+    homePage: z
+      .enum(["dashboard", "hoje", "visitas", "tarefas"])
+      .default("dashboard"),
+    listDensity: z
+      .enum(["comfortable", "compact"])
+      .default("comfortable"),
+    ia: z
+      .object({
+        showVisitSummary: z.boolean().default(true),
+        showTaskSuggestions: z.boolean().default(true),
+        showDashboardInsights: z.boolean().default(true),
+      })
+      .default({})
+      .optional(),
+    notifications: z
+      .object({
+        emailTaskReminders: z.boolean().default(false),
+        emailVisitReminders: z.boolean().default(false),
+      })
+      .default({})
+      .optional(),
+    visitasUi: z
+      .object({
+        showAdvancedFilters: z.boolean().default(true),
+      })
+      .default({})
+      .optional(),
+    onboarding: z
+      .object({
+        seenDashboardTips: z.boolean().default(false),
+        seenVisitsTips: z.boolean().default(false),
+      })
+      .default({})
+      .optional(),
+  })
+  .partial()
+  .default({});
+
+export type UserSettings = z.infer<typeof userSettingsSchema>;
+
+export type UpsertUser = typeof users.$inferInsert;
+export type User = typeof users.$inferSelect;
+
 export const usersRelations = relations(users, ({ one, many }) => ({
   empresa: one(empresas, {
     fields: [users.empresaId],
@@ -229,101 +278,82 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   lembretes: many(lembretes),
 }));
 
-// FASE 24: User settings schema
-export const userSettingsSchema = z.object({
-  homePage: z.enum(['dashboard', 'hoje', 'visitas', 'tarefas']).default('dashboard'),
-  listDensity: z.enum(['comfortable', 'compact']).default('comfortable'),
-  ia: z.object({
-    showVisitSummary: z.boolean().default(true),
-    showTaskSuggestions: z.boolean().default(true),
-    showDashboardInsights: z.boolean().default(true),
-  }).default({}).optional(),
-  notifications: z.object({
-    emailTaskReminders: z.boolean().default(false),
-    emailVisitReminders: z.boolean().default(false),
-  }).default({}).optional(),
-  // FASE 29: User UI preferences for visits filtering
-  visitasUi: z.object({
-    showAdvancedFilters: z.boolean().default(true),
-  }).default({}).optional(),
-  // FASE 28: Onboarding tips tracking
-  onboarding: z.object({
-    seenDashboardTips: z.boolean().default(false),
-    seenVisitsTips: z.boolean().default(false),
-  }).default({}).optional(),
-}).partial().default({});
-
-export type UserSettings = z.infer<typeof userSettingsSchema>;
-
-export type UpsertUser = typeof users.$inferInsert;
-export type User = typeof users.$inferSelect;
-
 // Response type for GET /api/user/settings
 export const userSettingsResponseSchema = z.object({
   id: z.string(),
   nome: z.string(),
   email: z.string().optional(),
-  role: z.enum(['admin', 'agent']),
+  role: z.enum(["admin", "agent"]),
   empresaNome: z.string(),
   userSettings: userSettingsSchema,
 });
 
-export type UserSettingsResponse = z.infer<typeof userSettingsResponseSchema>;
+export type UserSettingsResponse = z.infer<
+  typeof userSettingsResponseSchema
+>;
 
-// FASE 29: Entity Types (Tipos de Entidades) table - configurable per company
+// Entidade Tipos
 export const entidadeTipos = pgTable("entidade_tipos", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: 'cascade' }),
+  empresaId: varchar("empresa_id")
+    .notNull()
+    .references(() => empresas.id, { onDelete: "cascade" }),
   nome: varchar("nome", { length: 255 }).notNull(),
-  cor: varchar("cor", { length: 20 }), // hex or color tag, optional
-  icon: varchar("icon", { length: 50 }).default("Building2"), // FASE 30: Icon name for this type
+  cor: varchar("cor", { length: 20 }),
+  icon: varchar("icon", { length: 50 }).default("Building2"),
   ativo: boolean("ativo").default(true).notNull(),
   ordem: integer("ordem").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const entidadeTiposRelations = relations(entidadeTipos, ({ one, many }) => ({
-  empresa: one(empresas, {
-    fields: [entidadeTipos.empresaId],
-    references: [empresas.id],
+export const entidadeTiposRelations = relations(
+  entidadeTipos,
+  ({ one, many }) => ({
+    empresa: one(empresas, {
+      fields: [entidadeTipos.empresaId],
+      references: [empresas.id],
+    }),
+    entidades: many(entidades),
   }),
-  entidades: many(entidades),
-}));
+);
 
-// FASE 30: Supported icons for entity types
 export const entidadeTipoIconEnum = z.enum([
-  'Building2',
-  'Store',
-  'Factory',
-  'Briefcase',
-  'Users',
-  'Home',
-  'Handshake',
-  'Package',
+  "Building2",
+  "Store",
+  "Factory",
+  "Briefcase",
+  "Users",
+  "Home",
+  "Handshake",
+  "Package",
 ]);
 
-export const insertEntidadeTipoSchema = createInsertSchema(entidadeTipos).omit({
-  id: true,
-  empresaId: true,
-  createdAt: true,
-  updatedAt: true,
-}).extend({
-  icon: entidadeTipoIconEnum.optional(),
-});
+export const insertEntidadeTipoSchema = createInsertSchema(entidadeTipos)
+  .omit({
+    id: true,
+    empresaId: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    icon: entidadeTipoIconEnum.optional(),
+  });
 
 export type InsertEntidadeTipo = z.infer<typeof insertEntidadeTipoSchema>;
 export type EntidadeTipo = typeof entidadeTipos.$inferSelect;
 
-// REFAITA: Marcas (Brands) table - agora com empresaId, codigo, ativa
+// Marcas
 export const marcas = pgTable("marcas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: 'cascade' }), // NOVO
+  empresaId: varchar("empresa_id")
+    .notNull()
+    .references(() => empresas.id, { onDelete: "cascade" }),
   nome: varchar("nome", { length: 255 }).notNull(),
   codigo: varchar("codigo", { length: 100 }),
   descricao: text("descricao"),
   logoUrl: varchar("logo_url", { length: 500 }),
-  ativa: boolean("ativa").default(true).notNull(), // NOVO
+  ativa: boolean("ativa").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -344,12 +374,19 @@ export const insertMarcaSchema = createInsertSchema(marcas).omit({
 export type InsertMarca = z.infer<typeof insertMarcaSchema>;
 export type Marca = typeof marcas.$inferSelect;
 
-// Entidades (Universal Entities) table - replaces Gabinetes
+// Entidades
 export const entidades = pgTable("entidades", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: 'cascade' }), // NOVO
-  entidadeTipoId: varchar("entidade_tipo_id").references(() => entidadeTipos.id, { onDelete: 'set null' }), // FASE 29: FK to configurable types
-  tipoEntidade: tipoEntidadeEnum("tipo_entidade").notNull().default('Gabinete'), // Legacy enum, kept for backward compatibility
+  empresaId: varchar("empresa_id")
+    .notNull()
+    .references(() => empresas.id, { onDelete: "cascade" }),
+  entidadeTipoId: varchar("entidade_tipo_id").references(
+    () => entidadeTipos.id,
+    { onDelete: "set null" },
+  ),
+  tipoEntidade: tipoEntidadeEnum("tipo_entidade")
+    .notNull()
+    .default("Gabinete"),
   nome: varchar("nome", { length: 255 }).notNull(),
   morada: text("morada"),
   cidade: varchar("cidade", { length: 100 }),
@@ -361,7 +398,6 @@ export const entidades = pgTable("entidades", {
   latitude: varchar("latitude", { length: 50 }),
   longitude: varchar("longitude", { length: 50 }),
   nif: varchar("nif", { length: 50 }),
-  // Enrichment fields (from PT-Intelligent Search / AI)
   logoUrl: varchar("logo_url", { length: 500 }),
   domain: varchar("domain", { length: 255 }),
   industry: varchar("industry", { length: 255 }),
@@ -371,40 +407,33 @@ export const entidades = pgTable("entidades", {
   twitterUrl: varchar("twitter_url", { length: 500 }),
   instagramUrl: varchar("instagram_url", { length: 500 }),
   xUrl: varchar("x_url", { length: 500 }),
-  // Enrichment metadata
   lastEnrichedAt: timestamp("last_enriched_at"),
-  enrichmentSource: varchar("enrichment_source", { length: 50 }), // 'fuzzy', 'webscan', 'ai', 'combined', 'none'
+  enrichmentSource: varchar("enrichment_source", { length: 50 }),
   pendingEnrichment: boolean("pending_enrichment").default(false),
-  // User Ownership Fields (nullable during migration, will be made required later)
   createdByUserId: varchar("created_by_user_id", { length: 255 }),
   assignedUserId: varchar("assigned_user_id", { length: 255 }),
-  // Odoo Integration Fields
   odooEntityId: integer("odoo_entity_id"),
   odooPartnerId: text("odoo_partner_id"),
   needsSync: boolean("needs_sync").default(false).notNull(),
-  syncStatus: syncStatusEnum("sync_status").default('never'),
+  syncStatus: syncStatusEnum("sync_status").default("never"),
   lastSyncAt: timestamp("last_sync_at"),
   syncError: text("sync_error"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Portuguese NIF validation function (mod 11 algorithm)
+// NIF validation
 function validateNIF(value: string): boolean {
   if (!value || value.length !== 9 || !/^\d{9}$/.test(value)) {
     return false;
   }
 
-  // Calculate weighted sum of first 8 digits
   let sum = 0;
   for (let i = 0; i < 8; i++) {
     sum += (9 - i) * parseInt(value[i]);
   }
 
-  // Calculate mod 11
   const mod = sum % 11;
-
-  // Determine expected check digit
   let expectedCheckDigit: number;
   if (mod === 0 || mod === 1) {
     expectedCheckDigit = 0;
@@ -412,43 +441,59 @@ function validateNIF(value: string): boolean {
     expectedCheckDigit = 11 - mod;
   }
 
-  // Compare with actual last digit
   return expectedCheckDigit === parseInt(value[8]);
 }
 
-export const insertEntidadeSchema = createInsertSchema(entidades).omit({
-  id: true,
-  empresaId: true, // Set by backend from getUserContext
-  createdAt: true,
-  updatedAt: true,
-  odooEntityId: true,
-  odooPartnerId: true,
-  needsSync: true,
-  syncStatus: true,
-  lastSyncAt: true,
-  syncError: true,
-  lastEnrichedAt: true,
-  enrichmentSource: true,
-  pendingEnrichment: true,
-}).extend({
-  // PASSO 6: Make entidadeTipoId explicitly optional/nullable for old entities
-  entidadeTipoId: z.string().uuid().optional().nullable(),
-  // Add validation for coordinates (empty string treated as null)
-  latitude: z.string().regex(/^-?([0-9]{1,2}|1[0-7][0-9]|180)(\.[0-9]+)?$/).or(z.literal("")).optional().nullable(),
-  longitude: z.string().regex(/^-?([0-9]{1,2}|1[0-7][0-9]|180)(\.[0-9]+)?$/).or(z.literal("")).optional().nullable(),
-  // NIF validation (Portuguese tax number - 9 digits with mod 11 check, empty string treated as null)
-  nif: z.string()
-    .regex(/^[0-9]{9}$/, "NIF deve ter 9 dígitos")
-    .refine((val) => validateNIF(val), "NIF inválido - dígito de controlo incorreto")
-    .or(z.literal(""))
-    .optional()
-    .nullable(),
-});
+export const insertEntidadeSchema = createInsertSchema(entidades)
+  .omit({
+    id: true,
+    empresaId: true,
+    createdAt: true,
+    updatedAt: true,
+    odooEntityId: true,
+    odooPartnerId: true,
+    needsSync: true,
+    syncStatus: true,
+    lastSyncAt: true,
+    syncError: true,
+    lastEnrichedAt: true,
+    enrichmentSource: true,
+    pendingEnrichment: true,
+  })
+  .extend({
+    entidadeTipoId: z.string().uuid().optional().nullable(),
+    latitude: z
+      .string()
+      .regex(
+        /^-?([0-9]{1,2}|1[0-7][0-9]|180)(\.[0-9]+)?$/,
+      )
+      .or(z.literal(""))
+      .optional()
+      .nullable(),
+    longitude: z
+      .string()
+      .regex(
+        /^-?([0-9]{1,2}|1[0-7][0-9]|180)(\.[0-9]+)?$/,
+      )
+      .or(z.literal(""))
+      .optional()
+      .nullable(),
+    nif: z
+      .string()
+      .regex(/^[0-9]{9}$/, "NIF deve ter 9 dígitos")
+      .refine(
+        (val) => validateNIF(val),
+        "NIF inválido - dígito de controlo incorreto",
+      )
+      .or(z.literal(""))
+      .optional()
+      .nullable(),
+  });
 
 export type InsertEntidade = z.infer<typeof insertEntidadeSchema>;
 export type Entidade = typeof entidades.$inferSelect;
 
-// Gabinetes (Architecture Offices) table - DEPRECATED, will be removed after migration
+// Gabinetes (deprecated)
 export const gabinetes = pgTable("gabinetes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   nome: varchar("nome", { length: 255 }).notNull(),
@@ -471,26 +516,30 @@ export const insertGabineteSchema = createInsertSchema(gabinetes).omit({
 export type InsertGabinete = z.infer<typeof insertGabineteSchema>;
 export type Gabinete = typeof gabinetes.$inferSelect;
 
-// Contactos (Contacts) table
+// Contactos
 export const contactos = pgTable("contactos", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: 'cascade' }), // NOVO
+  empresaId: varchar("empresa_id")
+    .notNull()
+    .references(() => empresas.id, { onDelete: "cascade" }),
   nome: varchar("nome", { length: 255 }).notNull(),
   funcao: varchar("funcao", { length: 255 }),
   telemovel: varchar("telemovel", { length: 50 }),
   email: varchar("email", { length: 255 }),
-  entidadeId: varchar("entidade_id").references(() => entidades.id, { onDelete: 'set null' }),
-  gabineteId: varchar("gabinete_id").references(() => gabinetes.id, { onDelete: 'set null' }), // DEPRECATED
+  entidadeId: varchar("entidade_id").references(() => entidades.id, {
+    onDelete: "set null",
+  }),
+  gabineteId: varchar("gabinete_id").references(() => gabinetes.id, {
+    onDelete: "set null",
+  }),
   observacoes: text("observacoes"),
   fotoUrl: varchar("foto_url", { length: 500 }),
-  // User Ownership Fields (nullable during migration, will be made required later)
   createdByUserId: varchar("created_by_user_id", { length: 255 }),
   assignedUserId: varchar("assigned_user_id", { length: 255 }),
-  // Odoo Integration Fields
   odooContactId: integer("odoo_contact_id"),
   odooPartnerId: text("odoo_partner_id"),
   needsSync: boolean("needs_sync").default(false).notNull(),
-  syncStatus: syncStatusEnum("sync_status").default('never'),
+  syncStatus: syncStatusEnum("sync_status").default("never"),
   lastSyncAt: timestamp("last_sync_at"),
   syncError: text("sync_error"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -539,10 +588,10 @@ export const entidadesRelations = relations(entidades, ({ one, many }) => ({
 
 export const insertContactoSchema = createInsertSchema(contactos).omit({
   id: true,
-  empresaId: true, // Set by backend from getUserContext
+  empresaId: true,
   createdAt: true,
   updatedAt: true,
-  gabineteId: true, // DEPRECATED - use entidadeId
+  gabineteId: true,
   odooContactId: true,
   odooPartnerId: true,
   needsSync: true,
@@ -554,123 +603,138 @@ export const insertContactoSchema = createInsertSchema(contactos).omit({
 export type InsertContacto = z.infer<typeof insertContactoSchema>;
 export type Contacto = typeof contactos.$inferSelect;
 
-// Visitas (Visits) table
-export const visitas = pgTable("visitas", {
+// Visitas
+export const visitas: any = pgTable("visitas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: 'cascade' }), // NOVO
-  entidadeId: varchar("entidade_id").references(() => entidades.id, { onDelete: 'set null' }),
-  gabineteId: varchar("gabinete_id").references(() => gabinetes.id, { onDelete: 'set null' }), // DEPRECATED
-  contactoId: varchar("contacto_id").references(() => contactos.id, { onDelete: 'set null' }),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }), // Legacy field, use createdByUserId
+  empresaId: varchar("empresa_id")
+    .notNull()
+    .references(() => empresas.id, { onDelete: "cascade" }),
+  entidadeId: varchar("entidade_id").references(() => entidades.id, {
+    onDelete: "set null",
+  }),
+  gabineteId: varchar("gabinete_id").references(() => gabinetes.id, {
+    onDelete: "set null",
+  }),
+  contactoId: varchar("contacto_id").references(() => contactos.id, {
+    onDelete: "set null",
+  }),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   dataVisita: timestamp("data_visita").notNull(),
   notas: text("notas"),
   marcasEntregues: text("marcas_entregues").array(),
   audioUrl: varchar("audio_url", { length: 500 }),
   mediaUrls: text("media_urls").array(),
   proximaVisita: timestamp("proxima_visita"),
-  proximaVisitaStatus: varchar("proxima_visita_status", { length: 50 }).default('agendada'), // FASE 20: 'agendada', 'realizada', 'cancelada', 'seguimento_criado'
-  proximaVisitaStatusData: timestamp("proxima_visita_status_data"), // FASE 20: When the status was set
-  visitaAnteriorId: varchar("visita_anterior_id").references(() => visitas.id, { onDelete: 'set null' }), // FASE 15: Link to previous visit for relationship tracking
+  proximaVisitaStatus: varchar("proxima_visita_status", { length: 50 }).default(
+    "agendada",
+  ),
+  proximaVisitaStatusData: timestamp("proxima_visita_status_data"),
+  visitaAnteriorId: varchar("visita_anterior_id").references(
+    () => visitas.id,
+    { onDelete: "set null" },
+  ),
   linkVisita: varchar("link_visita", { length: 100 }).unique(),
   resumoIa: text("resumo_ia"),
-  pontosChaveIA: text("pontos_chave_ia"), // FASE 14: JSON array of key points
-  tarefasSugeridasIA: text("tarefas_sugeridas_ia"), // FASE 14: JSON array of suggested tasks
-  iaLastGeneratedAt: timestamp("ia_last_generated_at"), // FASE 14: Track when AI summary was generated
+  pontosChaveIA: text("pontos_chave_ia"),
+  tarefasSugeridasIA: text("tarefas_sugeridas_ia"),
+  iaLastGeneratedAt: timestamp("ia_last_generated_at"),
   transcricaoAudio: text("transcricao_audio"),
   latitude: varchar("latitude", { length: 50 }),
   longitude: varchar("longitude", { length: 50 }),
   locationAccuracy: varchar("location_accuracy", { length: 50 }),
-  // User Ownership Fields (nullable during migration, will be made required later)
   createdByUserId: varchar("created_by_user_id", { length: 255 }),
   assignedUserId: varchar("assigned_user_id", { length: 255 }),
-  // Odoo Integration Fields
   odooActivityId: integer("odoo_activity_id"),
   needsSync: boolean("needs_sync").default(false).notNull(),
-  syncStatus: syncStatusEnum("sync_status").default('never'),
+  syncStatus: syncStatusEnum("sync_status").default("never"),
   lastSyncAt: timestamp("last_sync_at"),
   syncError: text("sync_error"),
-  // Microsoft 365 Integration Fields
   outlookEventId: varchar("outlook_event_id", { length: 255 }),
   lastCalendarSyncAt: timestamp("last_calendar_sync_at"),
-  // Odoo Lead Integration
   odooLeadId: text("odoo_lead_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const visitasRelations = relations(visitas, ({ one, many }) => ({
-  empresa: one(empresas, {
-    fields: [visitas.empresaId],
-    references: [empresas.id],
+export const visitasRelations = relations(
+  visitas,
+  ({ one, many }): any => ({
+    empresa: one(empresas, {
+      fields: [visitas.empresaId],
+      references: [empresas.id],
+    }),
+    entidade: one(entidades, {
+      fields: [visitas.entidadeId],
+      references: [entidades.id],
+    }),
+    contacto: one(contactos, {
+      fields: [visitas.contactoId],
+      references: [contactos.id],
+    }),
+    user: one(users, {
+      fields: [visitas.userId],
+      references: [users.id],
+    }),
+    assignedUser: one(users, {
+      fields: [visitas.assignedUserId],
+      references: [users.id],
+    }),
+    createdByUser: one(users, {
+      fields: [visitas.createdByUserId],
+      references: [users.id],
+    }),
+    visitaAnterior: one(visitas, {
+      fields: [visitas.visitaAnteriorId],
+      references: [visitas.id],
+      relationName: "previousVisit",
+    }),
+    visitasPosteriores: many(visitas, {
+      relationName: "previousVisit",
+    }),
+    marcas: many(visitasMarcas),
+    audio: many(visitasAudio),
+    contactos: many(visitasContactos),
   }),
-  entidade: one(entidades, {
-    fields: [visitas.entidadeId],
-    references: [entidades.id],
-  }),
-  contacto: one(contactos, {
-    fields: [visitas.contactoId],
-    references: [contactos.id],
-  }),
-  user: one(users, {
-    fields: [visitas.userId],
-    references: [users.id],
-  }),
-  assignedUser: one(users, {
-    fields: [visitas.assignedUserId],
-    references: [users.id],
-  }),
-  createdByUser: one(users, {
-    fields: [visitas.createdByUserId],
-    references: [users.id],
-  }),
-  visitaAnterior: one(visitas, {
-    fields: [visitas.visitaAnteriorId],
-    references: [visitas.id],
-    relationName: "previousVisit",
-  }),
-  visitasPosteriores: many(visitas, {
-    relationName: "previousVisit",
-  }),
-  marcas: many(visitasMarcas),
-  audio: many(visitasAudio),
-  contactos: many(visitasContactos), // FASE 1: Multiple contacts per visit
-}));
+);
 
-export const insertVisitaSchema = createInsertSchema(visitas).omit({
-  id: true,
-  empresaId: true, // Set by backend from getUserContext
-  userId: true, // Legacy field, use createdByUserId (backend sets)
-  createdByUserId: true, // Set by backend from getUserContext
-  assignedUserId: true, // Optional, set by backend
-  visitaAnteriorId: true, // Set by frontend when creating from scheduled visit
-  createdAt: true,
-  updatedAt: true,
-  linkVisita: true,
-  resumoIa: true,
-  pontosChaveIA: true, // FASE 14: Set by AI endpoint
-  tarefasSugeridasIA: true, // FASE 14: Set by AI endpoint
-  iaLastGeneratedAt: true, // FASE 14: Set by AI endpoint
-  transcricaoAudio: true,
-  gabineteId: true, // DEPRECATED - use entidadeId
-  odooActivityId: true,
-  odooLeadId: true, // Set by backend when creating lead
-  needsSync: true,
-  syncStatus: true,
-  lastSyncAt: true,
-  syncError: true,
-  outlookEventId: true,
-  lastCalendarSyncAt: true,
-  proximaVisitaStatus: true, // FASE 20: Set by backend
-  proximaVisitaStatusData: true, // FASE 20: Set by backend
-}).extend({
-  // FASE 1: Multiple contacts per visit (optional)
-  contactosIds: z.array(z.string().uuid()).optional(),
-});
+export const insertVisitaSchema = createInsertSchema(visitas)
+  .omit({
+    id: true,
+    empresaId: true,
+    userId: true,
+    createdByUserId: true,
+    assignedUserId: true,
+    visitaAnteriorId: true,
+    createdAt: true,
+    updatedAt: true,
+    linkVisita: true,
+    resumoIa: true,
+    pontosChaveIA: true,
+    tarefasSugeridasIA: true,
+    iaLastGeneratedAt: true,
+    transcricaoAudio: true,
+    gabineteId: true,
+    odooActivityId: true,
+    odooLeadId: true,
+    needsSync: true,
+    syncStatus: true,
+    lastSyncAt: true,
+    syncError: true,
+    outlookEventId: true,
+    lastCalendarSyncAt: true,
+    proximaVisitaStatus: true,
+    proximaVisitaStatusData: true,
+  })
+  .extend({
+    contactosIds: z.array(z.string().uuid()).optional(),
+  });
 
 export type InsertVisita = z.infer<typeof insertVisitaSchema>;
 export type Visita = typeof visitas.$inferSelect;
 
-// FASE CRM-LEADS-01: Leads (CRM Leads) table for lead tracking
+// Leads
 export const leads = pgTable("leads", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
 
@@ -678,35 +742,30 @@ export const leads = pgTable("leads", {
     .notNull()
     .references(() => empresas.id, { onDelete: "cascade" }),
 
-  // FASE-LEADS-CLEAN-01: Make entidadeId optional (at least one of entidade/contacto required)
-  entidadeId: varchar("entidade_id")
-    .references(() => entidades.id, { onDelete: "cascade" }),
+  entidadeId: varchar("entidade_id").references(() => entidades.id, {
+    onDelete: "cascade",
+  }),
 
-  // FASE-LEADS-CLEAN-01: Make contactoId optional (at least one of entidade/contacto required)
-  contactoId: varchar("contacto_id")
-    .references(() => contactos.id, { onDelete: "cascade" }),
+  contactoId: varchar("contacto_id").references(() => contactos.id, {
+    onDelete: "cascade",
+  }),
 
-  visitaId: varchar("visita_id")
-    .references(() => visitas.id, { onDelete: "set null" }),
+  visitaId: varchar("visita_id").references(() => visitas.id, {
+    onDelete: "set null",
+  }),
 
-  // Core do lead
   titulo: text("titulo").notNull(),
   descricao: text("descricao"),
 
-  // Marca ligada ao lead
   marca: text("marca"),
 
-  // Estado / etapa
   estado: text("estado").notNull().default("novo"),
 
-  // Valor previsto
   valorPrevisto: numeric("valor_previsto"),
   moeda: varchar("moeda", { length: 3 }).default("EUR"),
 
-  // Responsável interno
   responsavelUserId: varchar("responsavel_user_id"),
 
-  // Integração CRM externo
   odooLeadId: varchar("odoo_lead_id"),
 
   createdAt: timestamp("created_at", { withTimezone: true })
@@ -715,6 +774,31 @@ export const leads = pgTable("leads", {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
+});
+
+// Leads Contactos
+export const leadsContactos = pgTable("leads_contactos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leadId: varchar("lead_id")
+    .notNull()
+    .references(() => leads.id, { onDelete: "cascade" }),
+  contactoId: varchar("contacto_id")
+    .notNull()
+    .references(() => contactos.id, { onDelete: "cascade" }),
+  role: text("role"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Leads Marcas
+export const leadsMarcas = pgTable("leads_marcas", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leadId: varchar("lead_id")
+    .notNull()
+    .references(() => leads.id, { onDelete: "cascade" }),
+  marcaId: varchar("marca_id")
+    .notNull()
+    .references(() => marcas.id, { onDelete: "restrict" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const leadsRelations = relations(leads, ({ one, many }) => ({
@@ -738,66 +822,19 @@ export const leadsRelations = relations(leads, ({ one, many }) => ({
   marcasAssociadas: many(leadsMarcas),
 }));
 
-export const insertLeadSchema = createInsertSchema(leads).omit({
-  id: true,
-  empresaId: true,
-  createdAt: true,
-  updatedAt: true,
-}).extend({
-  titulo: z.string().min(1, "Título obrigatório"),
-  // FASE-LEADS-CLEAN-01: Both optional, but validated in backend (at least one required)
-  entidadeId: z.string().uuid("ID entidade inválido").optional().nullable(),
-  contactoId: z.string().uuid("ID contacto inválido").optional().nullable(),
-  visitaId: z.string().uuid().optional().nullable(),
-  descricao: z.string().optional().nullable(),
-  marca: z.string().optional().nullable(),
-  estado: z.string().default("novo"),
-  valorPrevisto: z.string().or(z.number()).optional().nullable(),
-  moeda: z.string().length(3).default("EUR"),
-  responsavelUserId: z.string().optional().nullable(),
-  odooLeadId: z.string().optional().nullable(),
-  contactosIds: z.array(z.string().uuid()).optional(),
-  marcasIds: z.array(z.string().uuid()).optional(),
-});
-
-export type InsertLead = z.infer<typeof insertLeadSchema>;
-export type Lead = typeof leads.$inferSelect;
-
-// FASE CRM-LEADS-02: Leads Contactos (relationship table for multiple contacts per lead)
-export const leadsContactos = pgTable("leads_contactos", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  leadId: varchar("lead_id").notNull().references(() => leads.id, { onDelete: 'cascade' }),
-  contactoId: varchar("contacto_id").notNull().references(() => contactos.id, { onDelete: 'cascade' }),
-  role: text("role"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export const leadsContactosRelations = relations(leadsContactos, ({ one }) => ({
-  lead: one(leads, {
-    fields: [leadsContactos.leadId],
-    references: [leads.id],
+export const leadsContactosRelations = relations(
+  leadsContactos,
+  ({ one }) => ({
+    lead: one(leads, {
+      fields: [leadsContactos.leadId],
+      references: [leads.id],
+    }),
+    contacto: one(contactos, {
+      fields: [leadsContactos.contactoId],
+      references: [contactos.id],
+    }),
   }),
-  contacto: one(contactos, {
-    fields: [leadsContactos.contactoId],
-    references: [contactos.id],
-  }),
-}));
-
-export const insertLeadsContactosSchema = createInsertSchema(leadsContactos).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertLeadsContactos = z.infer<typeof insertLeadsContactosSchema>;
-export type LeadsContactos = typeof leadsContactos.$inferSelect;
-
-// FASE LEADS-EXT-02: Leads Marcas (relationship table for multiple brands per lead)
-export const leadsMarcas = pgTable("leads_marcas", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  leadId: varchar("lead_id").notNull().references(() => leads.id, { onDelete: 'cascade' }),
-  marcaId: varchar("marca_id").notNull().references(() => marcas.id, { onDelete: 'restrict' }),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+);
 
 export const leadsMarcasRelations = relations(leadsMarcas, ({ one }) => ({
   lead: one(leads, {
@@ -810,43 +847,92 @@ export const leadsMarcasRelations = relations(leadsMarcas, ({ one }) => ({
   }),
 }));
 
+export const insertLeadSchema = createInsertSchema(leads)
+  .omit({
+    id: true,
+    empresaId: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    titulo: z.string().min(1, "Título obrigatório"),
+    entidadeId: z.string().uuid("ID entidade inválido").optional().nullable(),
+    contactoId: z.string().uuid("ID contacto inválido").optional().nullable(),
+    visitaId: z.string().uuid().optional().nullable(),
+    descricao: z.string().optional().nullable(),
+    marca: z.string().optional().nullable(),
+    estado: z.string().default("novo"),
+    valorPrevisto: z.string().or(z.number()).optional().nullable(),
+    moeda: z.string().length(3).default("EUR"),
+    responsavelUserId: z.string().optional().nullable(),
+    odooLeadId: z.string().optional().nullable(),
+    contactosIds: z.array(z.string().uuid()).optional(),
+    marcasIds: z.array(z.string().uuid()).optional(),
+  });
+
+export type InsertLead = z.infer<typeof insertLeadSchema>;
+export type Lead = typeof leads.$inferSelect;
+
+export const insertLeadsContactosSchema = createInsertSchema(
+  leadsContactos,
+).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertLeadsContactos = z.infer<
+  typeof insertLeadsContactosSchema
+>;
+export type LeadsContactos = typeof leadsContactos.$inferSelect;
+
 export const insertLeadsMarcasSchema = createInsertSchema(leadsMarcas).omit({
   id: true,
   createdAt: true,
 });
-
 export type InsertLeadsMarcas = z.infer<typeof insertLeadsMarcasSchema>;
 export type LeadsMarcas = typeof leadsMarcas.$inferSelect;
 
-// FASE 5: Visitas Marcas (relationship table)
+// Visitas Marcas
 export const visitasMarcas = pgTable("visitas_marcas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  visitaId: varchar("visita_id").notNull().references(() => visitas.id, { onDelete: 'cascade' }),
-  marcaId: varchar("marca_id").notNull().references(() => marcas.id, { onDelete: 'cascade' }),
-  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: 'cascade' }),
+  visitaId: varchar("visita_id")
+    .notNull()
+    .references(() => visitas.id, { onDelete: "cascade" }),
+  marcaId: varchar("marca_id")
+    .notNull()
+    .references(() => marcas.id, { onDelete: "cascade" }),
+  empresaId: varchar("empresa_id")
+    .notNull()
+    .references(() => empresas.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const visitasMarcasRelations = relations(visitasMarcas, ({ one }) => ({
-  visita: one(visitas, {
-    fields: [visitasMarcas.visitaId],
-    references: [visitas.id],
+export const visitasMarcasRelations = relations(
+  visitasMarcas,
+  ({ one }) => ({
+    visita: one(visitas, {
+      fields: [visitasMarcas.visitaId],
+      references: [visitas.id],
+    }),
+    marca: one(marcas, {
+      fields: [visitasMarcas.marcaId],
+      references: [marcas.id],
+    }),
+    empresa: one(empresas, {
+      fields: [visitasMarcas.empresaId],
+      references: [empresas.id],
+    }),
   }),
-  marca: one(marcas, {
-    fields: [visitasMarcas.marcaId],
-    references: [marcas.id],
-  }),
-  empresa: one(empresas, {
-    fields: [visitasMarcas.empresaId],
-    references: [empresas.id],
-  }),
-}));
+);
 
-// FASE 6: Visitas Audio (multiple audio clips per visit with transcription)
+// Visitas Audio
 export const visitasAudio = pgTable("visitas_audio", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  visitaId: varchar("visita_id").notNull().references(() => visitas.id, { onDelete: 'cascade' }),
-  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: 'cascade' }),
+  visitaId: varchar("visita_id")
+    .notNull()
+    .references(() => visitas.id, { onDelete: "cascade" }),
+  empresaId: varchar("empresa_id")
+    .notNull()
+    .references(() => empresas.id, { onDelete: "cascade" }),
   fileUrl: varchar("file_url", { length: 500 }).notNull(),
   transcricao: text("transcricao"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -872,60 +958,79 @@ export const insertVisitasAudioSchema = createInsertSchema(visitasAudio).omit({
 export type InsertVisitasAudio = z.infer<typeof insertVisitasAudioSchema>;
 export type VisitasAudio = typeof visitasAudio.$inferSelect;
 
-// FASE 1: Visitas Contactos (relationship table for multiple contacts per visit)
+// Visitas Contactos
 export const visitasContactos = pgTable("visitas_contactos", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: 'cascade' }),
-  visitaId: varchar("visita_id").notNull().references(() => visitas.id, { onDelete: 'cascade' }),
-  contactoId: varchar("contacto_id").notNull().references(() => contactos.id, { onDelete: 'cascade' }),
-  role: text("role"), // Optional: "Decisor", "Técnico", etc.
+  empresaId: varchar("empresa_id")
+    .notNull()
+    .references(() => empresas.id, { onDelete: "cascade" }),
+  visitaId: varchar("visita_id")
+    .notNull()
+    .references(() => visitas.id, { onDelete: "cascade" }),
+  contactoId: varchar("contacto_id")
+    .notNull()
+    .references(() => contactos.id, { onDelete: "cascade" }),
+  role: text("role"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const visitasContactosRelations = relations(visitasContactos, ({ one }) => ({
-  empresa: one(empresas, {
-    fields: [visitasContactos.empresaId],
-    references: [empresas.id],
+export const visitasContactosRelations = relations(
+  visitasContactos,
+  ({ one }) => ({
+    empresa: one(empresas, {
+      fields: [visitasContactos.empresaId],
+      references: [empresas.id],
+    }),
+    visita: one(visitas, {
+      fields: [visitasContactos.visitaId],
+      references: [visitas.id],
+    }),
+    contacto: one(contactos, {
+      fields: [visitasContactos.contactoId],
+      references: [contactos.id],
+    }),
   }),
-  visita: one(visitas, {
-    fields: [visitasContactos.visitaId],
-    references: [visitas.id],
-  }),
-  contacto: one(contactos, {
-    fields: [visitasContactos.contactoId],
-    references: [contactos.id],
-  }),
-}));
+);
 
-export const insertVisitasContactosSchema = createInsertSchema(visitasContactos).omit({
+export const insertVisitasContactosSchema = createInsertSchema(
+  visitasContactos,
+).omit({
   id: true,
   empresaId: true,
   createdAt: true,
 });
 
-export type InsertVisitasContactos = z.infer<typeof insertVisitasContactosSchema>;
+export type InsertVisitasContactos = z.infer<
+  typeof insertVisitasContactosSchema
+>;
 export type VisitasContactos = typeof visitasContactos.$inferSelect;
 
-// Tarefas (Tasks) table
+// Tarefas
 export const tarefas = pgTable("tarefas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: 'cascade' }), // NOVO
+  empresaId: varchar("empresa_id")
+    .notNull()
+    .references(() => empresas.id, { onDelete: "cascade" }),
   titulo: varchar("titulo", { length: 500 }).notNull(),
   descricao: text("descricao"),
-  visitaId: varchar("visita_id").references(() => visitas.id, { onDelete: 'set null' }),
-  entidadeId: varchar("entidade_id").references(() => entidades.id, { onDelete: 'set null' }),
+  visitaId: varchar("visita_id").references(() => visitas.id, {
+    onDelete: "set null",
+  }),
+  entidadeId: varchar("entidade_id").references(() => entidades.id, {
+    onDelete: "set null",
+  }),
   createdByUserId: varchar("created_by_user_id", { length: 255 }).notNull(),
   assignedUserId: varchar("assigned_user_id", { length: 255 }),
   dueDate: timestamp("due_date"),
-  repeatInterval: taskRepeatEnum("repeat_interval").default('none').notNull(),
-  status: taskStatusEnum("status").default('pending').notNull(),
-  // Odoo Integration Fields
+  repeatInterval: taskRepeatEnum("repeat_interval")
+    .default("none")
+    .notNull(),
+  status: taskStatusEnum("status").default("pending").notNull(),
   odooTaskId: integer("odoo_task_id"),
   needsSync: boolean("needs_sync").default(false).notNull(),
-  syncStatus: syncStatusEnum("sync_status").default('never'),
+  syncStatus: syncStatusEnum("sync_status").default("never"),
   lastSyncAt: timestamp("last_sync_at"),
   syncError: text("sync_error"),
-  // Microsoft 365 Integration Fields
   plannerTaskId: varchar("planner_task_id", { length: 255 }),
   plannerPlanId: varchar("planner_plan_id", { length: 255 }),
   plannerBucketId: varchar("planner_bucket_id", { length: 255 }),
@@ -960,41 +1065,59 @@ export const tarefasRelations = relations(tarefas, ({ one }) => ({
   }),
 }));
 
-export const insertTarefaSchema = createInsertSchema(tarefas).omit({
-  id: true,
-  empresaId: true, // Set by backend from getUserContext
-  createdByUserId: true, // Set by backend from getUserContext
-  assignedUserId: true, // Optional, set by backend
-  createdAt: true,
-  updatedAt: true,
-  odooTaskId: true,
-  needsSync: true,
-  syncStatus: true,
-  lastSyncAt: true,
-  syncError: true,
-  plannerTaskId: true,
-  plannerPlanId: true,
-  plannerBucketId: true,
-  lastPlannerSyncAt: true,
-  todoTaskId: true,
-  lastTodoSyncAt: true,
-  microsoftUserId: true,
-}).extend({
-  descricao: z.string().trim().nullable().optional(),
-  dueDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional().nullable(),
-});
+export const insertTarefaSchema = createInsertSchema(tarefas)
+  .omit({
+    id: true,
+    empresaId: true,
+    createdByUserId: true,
+    assignedUserId: true,
+    createdAt: true,
+    updatedAt: true,
+    odooTaskId: true,
+    needsSync: true,
+    syncStatus: true,
+    lastSyncAt: true,
+    syncError: true,
+    plannerTaskId: true,
+    plannerPlanId: true,
+    plannerBucketId: true,
+    lastPlannerSyncAt: true,
+    todoTaskId: true,
+    lastTodoSyncAt: true,
+    microsoftUserId: true,
+  })
+  .extend({
+    descricao: z.string().trim().nullable().optional(),
+    dueDate: z
+      .union([
+        z.date(),
+        z.string().transform((str) => new Date(str)),
+      ])
+      .optional()
+      .nullable(),
+  });
 
 export type InsertTarefa = z.infer<typeof insertTarefaSchema>;
 export type Tarefa = typeof tarefas.$inferSelect;
 
-// Lembretes (Reminders) table
+// Lembretes
 export const lembretes = pgTable("lembretes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: 'cascade' }), // NOVO
-  userId: varchar("user_id", { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
-  entidadeId: varchar("entidade_id").references(() => entidades.id, { onDelete: 'cascade' }),
-  visitaId: varchar("visita_id").references(() => visitas.id, { onDelete: 'cascade' }),
-  tarefaId: varchar("tarefa_id").references(() => tarefas.id, { onDelete: 'cascade' }),
+  empresaId: varchar("empresa_id")
+    .notNull()
+    .references(() => empresas.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 255 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  entidadeId: varchar("entidade_id").references(() => entidades.id, {
+    onDelete: "cascade",
+  }),
+  visitaId: varchar("visita_id").references(() => visitas.id, {
+    onDelete: "cascade",
+  }),
+  tarefaId: varchar("tarefa_id").references(() => tarefas.id, {
+    onDelete: "cascade",
+  }),
   tipo: lembreteTipoEnum("tipo").notNull(),
   mensagem: text("mensagem").notNull(),
   dataCriacao: timestamp("data_criacao").defaultNow().notNull(),
@@ -1035,38 +1158,50 @@ export const insertLembreteSchema = createInsertSchema(lembretes).omit({
 export type InsertLembrete = z.infer<typeof insertLembreteSchema>;
 export type Lembrete = typeof lembretes.$inferSelect;
 
-// Microsoft 365 Tokens table (per-user OAuth tokens)
+// Microsoft Tokens
 export const microsoftTokens = pgTable("microsoft_tokens", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id", { length: 255 }).notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
-  accessToken: text("access_token").notNull(), // Encrypted
-  refreshToken: text("refresh_token").notNull(), // Encrypted
-  scopes: text("scopes").notNull(), // JSON array of granted scopes
+  userId: varchar("user_id", { length: 255 })
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  scopes: text("scopes").notNull(),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const microsoftTokensRelations = relations(microsoftTokens, ({ one }) => ({
-  user: one(users, {
-    fields: [microsoftTokens.userId],
-    references: [users.id],
+export const microsoftTokensRelations = relations(
+  microsoftTokens,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [microsoftTokens.userId],
+      references: [users.id],
+    }),
   }),
-}));
+);
 
-export const insertMicrosoftTokenSchema = createInsertSchema(microsoftTokens).omit({
+export const insertMicrosoftTokenSchema = createInsertSchema(
+  microsoftTokens,
+).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
 
-export type InsertMicrosoftToken = z.infer<typeof insertMicrosoftTokenSchema>;
+export type InsertMicrosoftToken = z.infer<
+  typeof insertMicrosoftTokenSchema
+>;
 export type MicrosoftToken = typeof microsoftTokens.$inferSelect;
 
-// Microsoft Connections table (user-connected Microsoft accounts)
+// Microsoft Connections
 export const microsoftConnections = pgTable("microsoft_connections", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id", { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id", { length: 255 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   msAccountId: text("ms_account_id").notNull(),
   email: text("email"),
   displayName: text("display_name"),
@@ -1077,26 +1212,35 @@ export const microsoftConnections = pgTable("microsoft_connections", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const microsoftConnectionsRelations = relations(microsoftConnections, ({ one }) => ({
-  user: one(users, {
-    fields: [microsoftConnections.userId],
-    references: [users.id],
+export const microsoftConnectionsRelations = relations(
+  microsoftConnections,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [microsoftConnections.userId],
+      references: [users.id],
+    }),
   }),
-}));
+);
 
-export const insertMicrosoftConnectionSchema = createInsertSchema(microsoftConnections).omit({
+export const insertMicrosoftConnectionSchema = createInsertSchema(
+  microsoftConnections,
+).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
 
-export type InsertMicrosoftConnection = z.infer<typeof insertMicrosoftConnectionSchema>;
+export type InsertMicrosoftConnection = z.infer<
+  typeof insertMicrosoftConnectionSchema
+>;
 export type MicrosoftConnection = typeof microsoftConnections.$inferSelect;
 
-// Google Connections table (user-connected Google accounts)
+// Google Connections
 export const googleConnections = pgTable("google_connections", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id", { length: 255 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 255 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   googleUserId: text("google_user_id").notNull(),
   email: text("email"),
   name: text("name"),
@@ -1104,27 +1248,42 @@ export const googleConnections = pgTable("google_connections", {
   accessToken: text("access_token").notNull(),
   refreshToken: text("refresh_token").notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", {
+    withTimezone: true,
+  })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", {
+    withTimezone: true,
+  })
+    .defaultNow()
+    .notNull(),
 });
 
-export const googleConnectionsRelations = relations(googleConnections, ({ one }) => ({
-  user: one(users, {
-    fields: [googleConnections.userId],
-    references: [users.id],
+export const googleConnectionsRelations = relations(
+  googleConnections,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [googleConnections.userId],
+      references: [users.id],
+    }),
   }),
-}));
+);
 
-export const insertGoogleConnectionSchema = createInsertSchema(googleConnections).omit({
+export const insertGoogleConnectionSchema = createInsertSchema(
+  googleConnections,
+).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
 
-export type InsertGoogleConnection = z.infer<typeof insertGoogleConnectionSchema>;
+export type InsertGoogleConnection = z.infer<
+  typeof insertGoogleConnectionSchema
+>;
 export type GoogleConnection = typeof googleConnections.$inferSelect;
 
-// Odoo Connections table (per-company Odoo credentials / config)
+// Odoo Connections
 export const odooConnections = pgTable("odoo_connections", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   empresaId: varchar("empresa_id", { length: 255 })
@@ -1134,29 +1293,46 @@ export const odooConnections = pgTable("odoo_connections", {
   dbName: varchar("db_name", { length: 255 }).notNull(),
   username: varchar("username", { length: 255 }).notNull(),
   apiKey: text("api_key").notNull(),
-  environment: varchar("environment", { length: 50 }).default("test").notNull(),
+  environment: varchar("environment", { length: 50 })
+    .default("test")
+    .notNull(),
   isActive: boolean("is_active").default(true).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", {
+    withTimezone: true,
+  })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", {
+    withTimezone: true,
+  })
+    .defaultNow()
+    .notNull(),
 });
 
-export const odooConnectionsRelations = relations(odooConnections, ({ one }) => ({
-  empresa: one(empresas, {
-    fields: [odooConnections.empresaId],
-    references: [empresas.id],
+export const odooConnectionsRelations = relations(
+  odooConnections,
+  ({ one }) => ({
+    empresa: one(empresas, {
+      fields: [odooConnections.empresaId],
+      references: [empresas.id],
+    }),
   }),
-}));
+);
 
-export const insertOdooConnectionSchema = createInsertSchema(odooConnections).omit({
+export const insertOdooConnectionSchema = createInsertSchema(
+  odooConnections,
+).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
 
-export type InsertOdooConnection = z.infer<typeof insertOdooConnectionSchema>;
+export type InsertOdooConnection = z.infer<
+  typeof insertOdooConnectionSchema
+>;
 export type OdooConnection = typeof odooConnections.$inferSelect;
 
-// Odoo Contact Requests table (agents requesting access to Odoo contacts/entities)
+// Odoo Contact Requests
 export const odooContactRequests = pgTable("odoo_contact_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   empresaId: varchar("empresa_id")
@@ -1171,43 +1347,52 @@ export const odooContactRequests = pgTable("odoo_contact_requests", {
   entidadeId: varchar("entidade_id").references(() => entidades.id, {
     onDelete: "set null",
   }),
-  tipo: text("tipo").notNull(), // "contacto" or "entidade"
-  mensagem: text("mensagem"), // free text message from user
-  estado: text("estado").notNull().default("pendente"), // "pendente", "em_progresso", "concluido"
+  tipo: text("tipo").notNull(),
+  mensagem: text("mensagem"),
+  estado: text("estado").notNull().default("pendente"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }),
   userSeenAt: timestamp("user_seen_at", { withTimezone: true }),
 });
 
-export const odooContactRequestsRelations = relations(odooContactRequests, ({ one }) => ({
-  empresa: one(empresas, {
-    fields: [odooContactRequests.empresaId],
-    references: [empresas.id],
+export const odooContactRequestsRelations = relations(
+  odooContactRequests,
+  ({ one }) => ({
+    empresa: one(empresas, {
+      fields: [odooContactRequests.empresaId],
+      references: [empresas.id],
+    }),
+    user: one(users, {
+      fields: [odooContactRequests.userId],
+      references: [users.id],
+    }),
+    contacto: one(contactos, {
+      fields: [odooContactRequests.contactoId],
+      references: [contactos.id],
+    }),
+    entidade: one(entidades, {
+      fields: [odooContactRequests.entidadeId],
+      references: [entidades.id],
+    }),
   }),
-  user: one(users, {
-    fields: [odooContactRequests.userId],
-    references: [users.id],
-  }),
-  contacto: one(contactos, {
-    fields: [odooContactRequests.contactoId],
-    references: [contactos.id],
-  }),
-  entidade: one(entidades, {
-    fields: [odooContactRequests.entidadeId],
-    references: [entidades.id],
-  }),
-}));
+);
 
-export const insertOdooContactRequestSchema = createInsertSchema(odooContactRequests).omit({
+export const insertOdooContactRequestSchema = createInsertSchema(
+  odooContactRequests,
+).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
-export type InsertOdooContactRequest = z.infer<typeof insertOdooContactRequestSchema>;
+export type InsertOdooContactRequest = z.infer<
+  typeof insertOdooContactRequestSchema
+>;
 export type OdooContactRequest = typeof odooContactRequests.$inferSelect;
 
-// Extended types for relations
+// Extended types
 export type EmpresaWithRelations = Empresa & {
   users?: User[];
   marcas?: Marca[];

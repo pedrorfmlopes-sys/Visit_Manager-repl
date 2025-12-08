@@ -1,0 +1,175 @@
+================================================================================
+RELATORIO: ESTABILIZACAO DO BACKEND E ROTAS EXPRESS
+================================================================================
+
+Data: 8 Dezembro 2025
+Status: COMPLETO - Servidor RUNNING
+
+================================================================================
+PROBLEMA ORIGINAL
+================================================================================
+
+Erro de runtime:
+  TypeError: Cannot read properties of undefined (reading 'apply')
+  at /home/runner/workspace/node_modules/express/lib/router/index.js:646:15
+  at registerRoutes (server/routes.ts:68:48)
+
+Causa: O ficheiro server/routes.ts tentava montar authRoutes como um Router
+Express, mas authRoutes exportava uma FUNCAO, nao um Router.
+
+================================================================================
+ANALISE DOS MODULOS DE ROTAS
+================================================================================
+
+Ficheiro                              | Exporta       | Contrato
+--------------------------------------|---------------|------------------
+authRoutes.ts                         | FUNCAO        | authRoutes(app)
+crm/entidadesRoutes.ts                | FUNCAO        | registerEntidadesRoutes(app)
+crm/contactosRoutes.ts                | FUNCAO        | contactosRoutes(app)
+crm/visitasRoutes.ts                  | FUNCAO        | visitasRoutes(app)
+crm/tarefasRoutes.ts                  | FUNCAO        | tarefasRoutes(app)
+admin/adminRoutes.ts                  | FUNCAO        | adminRoutes(app)
+admin/marcasRoutes.ts                 | FUNCAO        | marcasRoutes(app)
+odoo/odooContactRequestsRoutes.ts     | ROUTER        | export default router
+uploadsRoutes.ts                      | ROUTER        | export default router
+pdf/pdfRoutes.ts                      | ROUTER        | export default router
+search/searchRoutes.ts                | ROUTER        | export default router
+ai/aiRoutes.ts                        | ROUTER        | export default router
+misc/proximityRoutes.ts               | ROUTER        | export { proximityRouter }
+misc/userSettingsRoutes.ts            | ROUTER        | export { userSettingsRouter }
+
+================================================================================
+FICHEIROS ALTERADOS
+================================================================================
+
+1. server/routes.ts
+   ANTES:
+     - Importava authRoutes como default e usava mountRouter()
+     - Importava entidadesRoutes com nome errado
+     - Usava pdfRoutes, searchRoutes, aiRoutes como funcoes
+
+   DEPOIS:
+     - authRoutes importado como funcao nomeada e chamado como authRoutes(app)
+     - registerEntidadesRoutes importado com nome correto
+     - pdfRoutes, searchRoutes, aiRoutes montados com mountRouter()
+
+   Mudancas especificas:
+     - import { authRoutes } from "./routes/authRoutes"
+     - import { registerEntidadesRoutes } from "./routes/crm/entidadesRoutes"
+     - authRoutes(app)
+     - registerEntidadesRoutes(app)
+     - mountRouter(app, "/api/pdf", pdfRoutes, "pdfRoutes")
+     - mountRouter(app, "/api/search", searchRoutes, "searchRoutes")
+     - mountRouter(app, "/api/ai", aiRoutes, "aiRoutes")
+
+2. server/routes/authRoutes.ts
+   ANTES:
+     - Apenas /api/auth/me endpoint
+
+   DEPOIS:
+     - /api/auth/me e /api/auth/user (alias) ambos funcionam
+     - Handler comum handleGetUser para ambos
+
+   Mudancas especificas:
+     + const handleGetUser = (req, res) => { ... }
+     + app.get("/api/auth/me", handleGetUser)
+     + app.get("/api/auth/user", handleGetUser)
+
+================================================================================
+CONTRATO FINAL DOS MODULOS
+================================================================================
+
+FUNCOES (recebem app: Express):
+  - authRoutes(app)           -> define /api/auth/*
+  - registerEntidadesRoutes(app) -> define /api/entidades/*
+  - contactosRoutes(app)      -> define /api/contactos/*
+  - visitasRoutes(app)        -> define /api/visitas/*
+  - tarefasRoutes(app)        -> define /api/tarefas/*
+  - adminRoutes(app)          -> define /api/admin/*
+  - marcasRoutes(app)         -> define /api/admin/marcas/*
+
+ROUTERS (montados com app.use):
+  - odooContactRequestsRoutes -> /api/odoo/contact-requests/*
+  - uploadsRoutes             -> /api/uploads/*
+  - pdfRoutes                 -> /api/pdf/*
+  - searchRoutes              -> /api/search/*
+  - aiRoutes                  -> /api/ai/*
+  - proximityRouter           -> /api/misc/visitas/proximidade
+  - userSettingsRouter        -> /api/misc/user/settings
+
+================================================================================
+ENDPOINTS DE AUTH
+================================================================================
+
+GET /api/auth/me
+  - Sem sessao: 401 { user: null }
+  - Com sessao: 200 { user: { ... } }
+
+GET /api/auth/user
+  - Alias de /api/auth/me (para compatibilidade frontend)
+
+POST /api/auth/logout
+  - Termina sessao
+
+================================================================================
+TESTES REALIZADOS
+================================================================================
+
+1. npm run build
+   Resultado: SUCESSO
+   Output: built in 30.66s, dist/index.js 229.3kb
+
+2. Servidor arranca
+   Resultado: SUCESSO
+   Log: [routes] ✅ rotas registadas, a criar HTTP server...
+        2:18:25 AM [express] serving on port 5000
+
+3. curl http://localhost:5000/api/auth/me
+   Resultado: 401 {"user":null}
+
+4. curl http://localhost:5000/api/auth/user
+   Resultado: 401 {"user":null}
+
+================================================================================
+ROTAS MONTADAS (LOG DO SERVIDOR)
+================================================================================
+
+[routes] ▶ iniciar registo de rotas
+[routes] ▶ montar Router "odooContactRequestsRoutes" em /odoo/contact-requests
+[routes] ▶ montar Router "uploadsRoutes" em /uploads
+[routes] ▶ montar Router "pdfRoutes" em /api/pdf
+[routes] ▶ montar Router "searchRoutes" em /api/search
+[routes] ▶ montar Router "aiRoutes" em /api/ai
+[routes] ▶ montar Router "proximityRouter" em /api/misc
+[routes] ▶ montar Router "userSettingsRouter" em /api/misc
+[routes] ✅ rotas registadas, a criar HTTP server...
+
+================================================================================
+NOTA SOBRE ERRO LSP
+================================================================================
+
+Existe 1 erro LSP residual no routes.ts relacionado com tipagem do helper
+mountRouter quando usado com ExpressRouter. Este erro NAO afeta o runtime
+porque a funcao isRouter() valida corretamente os tipos em runtime.
+
+O build TypeScript passa sem erros.
+
+================================================================================
+RESUMO
+================================================================================
+
+Ficheiros alterados: 2
+  - server/routes.ts
+  - server/routes/authRoutes.ts
+
+Descricao:
+  1. routes.ts: Corrigido para usar corretamente funcoes vs routers
+  2. authRoutes.ts: Adicionado /api/auth/user como alias de /api/auth/me
+
+Servidor: RUNNING (port 5000)
+Build: OK
+Auth endpoints: /api/auth/me e /api/auth/user funcionam
+
+================================================================================
+FIM DO RELATORIO
+================================================================================

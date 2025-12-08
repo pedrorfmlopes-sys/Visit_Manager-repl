@@ -10,7 +10,7 @@ import {
   visitasMarcas,
   visitasAudio,
   visitasContactos,
-  lembretes,
+  // lembretes,
   odooContactRequests,
   type Empresa,
   type InsertEmpresa,
@@ -33,56 +33,52 @@ import {
   type VisitaWithRelations,
   type TarefaWithRelations,
   type VisitasAudio,
-  type InsertVisitasAudio,
+  // type InsertVisitasAudio,
   type InsertOdooContactRequest,
   type OdooContactRequest,
   insertOdooContactRequestSchema,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, gte, sql, or, and } from "drizzle-orm";
+import { eq, desc, sql, or, and } from "drizzle-orm";
 import { haversineDistance } from "./distanceUtils";
 
-// ============ ENTIDADES RBAC HELPER (STEP 2: Module-level function, no this) ============
+// ============ ENTIDADES RBAC HELPER ============
 function buildEntidadeAccessWhere(
   empresaId: string,
   userId: string,
-  userRole: 'admin' | 'agent'
+  userRole: "admin" | "agent",
 ) {
-  if (userRole === 'admin') {
-    // Admin vê todas as entidades da empresa
+  if (userRole === "admin") {
     return eq(entidades.empresaId, empresaId);
   }
 
-  // Agent: só entidades da empresa em que é criador ou assigned
   return and(
     eq(entidades.empresaId, empresaId),
     or(
       eq(entidades.createdByUserId, userId),
-      eq(entidades.assignedUserId, userId)
-    )
+      eq(entidades.assignedUserId, userId),
+    ),
   );
 }
 
-// ============ CONTACTOS RBAC HELPER (STEP 1: Module-level function, no this) ============
-function buildContactoAccessWhere(
-  empresaId: string,
-  userId: string,
-  userRole: 'admin' | 'agent'
-) {
-  if (userRole === 'admin') {
-    // Admin vê todos os contactos da empresa
-    return eq(contactos.empresaId, empresaId);
-  }
-
-  // Agent: só contactos da empresa em que é criador ou assigned
-  return and(
-    eq(contactos.empresaId, empresaId),
-    or(
-      eq(contactos.createdByUserId, userId),
-      eq(contactos.assignedUserId, userId)
-    )
-  );
-}
+// ============ CONTACTOS RBAC HELPER ============
+// function buildContactoAccessWhere(
+//  empresaId: string,
+//  userId: string,
+//  userRole: "admin" | "agent",
+//) {
+//  if (userRole === "admin") {
+//    return eq(contactos.empresaId, empresaId);
+//  }
+//
+//  return and(
+//    eq(contactos.empresaId, empresaId),
+//    or(
+//      eq(contactos.createdByUserId, userId),
+//      eq(contactos.assignedUserId, userId),
+//  ),
+// );
+// } 
 
 export interface ListContactosParams {
   empresaId: string;
@@ -97,96 +93,289 @@ export interface IStorage {
   createEmpresa(empresa: InsertEmpresa): Promise<Empresa>;
   getAllEmpresas(): Promise<Empresa[]>;
 
-  // User operations (required for Replit Auth)
+  // User operations
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   getAllUsers(): Promise<User[]>;
 
-  // Entidades (Universal Entities) - FASE 2: all filtered by empresaId
-  getEntidades(empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<Entidade[]>;
-  getEntidade(id: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<EntidadeWithRelations | undefined>;
-  findEntidadeByNome(nome: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<Entidade | undefined>;
-  findEntidadeByDomain(domain: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<Entidade | undefined>;
+  // Entidades
+  getEntidades(
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<Entidade[]>;
+  getEntidade(
+    id: string,
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<EntidadeWithRelations | undefined>;
+  findEntidadeByNome(
+    nome: string,
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<Entidade | undefined>;
+  findEntidadeByDomain(
+    domain: string,
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<Entidade | undefined>;
   createEntidade(entidade: InsertEntidade, empresaId: string): Promise<Entidade>;
-  updateEntidade(id: string, entidade: Partial<InsertEntidade>, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<Entidade | undefined>;
-  deleteEntidade(id: string, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void>;
+  updateEntidade(
+    id: string,
+    entidade: Partial<InsertEntidade>,
+    empresaId: string,
+    userId?: string,
+    userRole?: "admin" | "agent",
+  ): Promise<Entidade | undefined>;
+  deleteEntidade(
+    id: string,
+    empresaId: string,
+    userId?: string,
+    userRole?: "admin" | "agent",
+  ): Promise<void>;
   checkEntidadeHasRelations(id: string): Promise<boolean>;
 
-  // Contactos - FASE 2: all filtered by empresaId (STEP 1: refactored with params object)
+  // Contactos
   getContactos(params: ListContactosParams): Promise<ContactoWithRelations[]>;
-  getContacto(id: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<ContactoWithRelations | undefined>;
+  getContacto(
+    id: string,
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<ContactoWithRelations | undefined>;
   createContacto(contacto: InsertContacto, empresaId: string): Promise<Contacto>;
-  updateContacto(id: string, contacto: Partial<InsertContacto>, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<Contacto | undefined>;
-  deleteContacto(id: string, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void>;
+  updateContacto(
+    id: string,
+    contacto: Partial<InsertContacto>,
+    empresaId: string,
+    userId?: string,
+    userRole?: "admin" | "agent",
+  ): Promise<Contacto | undefined>;
+  deleteContacto(
+    id: string,
+    empresaId: string,
+    userId?: string,
+    userRole?: "admin" | "agent",
+  ): Promise<void>;
 
-  // Visitas - FASE 2: all filtered by empresaId
-  getVisitas(empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<VisitaWithRelations[]>;
-  getVisita(id: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<VisitaWithRelations | undefined>;
+  // Visitas
+  getVisitas(
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<VisitaWithRelations[]>;
+  getVisita(
+    id: string,
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<VisitaWithRelations | undefined>;
   createVisita(visita: InsertVisita, empresaId: string): Promise<Visita>;
-  updateVisita(id: string, visita: Partial<Visita>, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<Visita | undefined>;
-  deleteVisita(id: string, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void>;
+  updateVisita(
+    id: string,
+    visita: Partial<Visita>,
+    empresaId: string,
+    userId?: string,
+    userRole?: "admin" | "agent",
+  ): Promise<Visita | undefined>;
+  deleteVisita(
+    id: string,
+    empresaId: string,
+    userId?: string,
+    userRole?: "admin" | "agent",
+  ): Promise<void>;
 
-  // Tarefas - FASE 2: all filtered by empresaId
-  getTarefas(empresaId: string, userId: string, userRole: 'admin' | 'agent', filters?: { status?: string; assignedUserId?: string; entidadeId?: string; visitaId?: string; overdue?: boolean }): Promise<TarefaWithRelations[]>;
-  getTarefa(id: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<TarefaWithRelations | undefined>;
-  createTarefa(tarefa: InsertTarefa, empresaId: string): Promise<Tarefa>;
-  updateTarefa(id: string, tarefa: Partial<InsertTarefa>, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<Tarefa | undefined>;
-  deleteTarefa(id: string, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void>;
-  getTarefasByVisitaId(visitaId: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<TarefaWithRelations[]>;
-  getTarefasByEntidadeId(entidadeId: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<TarefaWithRelations[]>;
-  getTarefasInPeriod(startDate: Date, endDate: Date, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<TarefaWithRelations[]>;
+  // Tarefas
+  getTarefas(
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+    filters?: {
+      status?: string;
+      assignedUserId?: string;
+      entidadeId?: string;
+      visitaId?: string;
+      overdue?: boolean;
+    },
+  ): Promise<TarefaWithRelations[]>;
 
-  // Visitas helpers - FASE 2: all filtered by empresaId
-  getVisitasByEntidade(entidadeId: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<VisitaWithRelations[]>;
-  getVisitasInPeriod(startDate: Date, endDate: Date, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<VisitaWithRelations[]>;
+  getTarefa(
+    id: string,
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<TarefaWithRelations | undefined>;
 
-  // Entidades helpers - FASE 2: all filtered by empresaId
-  getAllEntidades(empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<EntidadeWithRelations[]>;
+  createTarefa(
+    tarefa: InsertTarefa,
+    empresaId: string,
+    createdByUserId: string,
+  ): Promise<Tarefa>;
 
-  // Marcas (by empresa)
+  updateTarefa(
+    id: string,
+    tarefa: Partial<InsertTarefa>,
+    empresaId: string,
+    userId?: string,
+    userRole?: "admin" | "agent",
+  ): Promise<Tarefa | undefined>;
+
+  deleteTarefa(
+    id: string,
+    empresaId: string,
+    userId?: string,
+    userRole?: "admin" | "agent",
+  ): Promise<void>;
+
+  getTarefasByVisitaId(
+    visitaId: string,
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<TarefaWithRelations[]>;
+
+  getTarefasByEntidadeId(
+    entidadeId: string,
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<TarefaWithRelations[]>;
+
+  getTarefasInPeriod(
+    startDate: Date,
+    endDate: Date,
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<TarefaWithRelations[]>;
+
+  // Visitas helpers
+  getVisitasByEntidade(
+    entidadeId: string,
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<VisitaWithRelations[]>;
+  getVisitasInPeriod(
+    startDate: Date,
+    endDate: Date,
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<VisitaWithRelations[]>;
+
+  // Entidades helpers
+  getAllEntidades(
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<EntidadeWithRelations[]>;
+
+  // Marcas
   getMarcasByEmpresa(empresaId: string): Promise<Marca[]>;
   getMarcasByEmpresaAtiva(empresaId: string): Promise<Marca[]>;
   getMarca(id: string): Promise<Marca | undefined>;
   createMarca(marca: InsertMarca): Promise<Marca>;
-  updateMarca(id: string, marca: Partial<InsertMarca>, empresaId: string): Promise<Marca | undefined>;
+  updateMarca(
+    id: string,
+    marca: Partial<InsertMarca>,
+    empresaId: string,
+  ): Promise<Marca | undefined>;
 
-  // FASE 29: Entity Types (Tipos de Entidades) - configurable per company
+  // Entity Types (Tipos de Entidades)
   getEntidadeTipos(empresaId: string): Promise<EntidadeTipo[]>;
   getEntidadeTiposAtivos(empresaId: string): Promise<EntidadeTipo[]>;
   getEntidadeTipo(id: string, empresaId: string): Promise<EntidadeTipo | undefined>;
-  createEntidadeTipo(tipo: InsertEntidadeTipo, empresaId: string): Promise<EntidadeTipo>;
-  updateEntidadeTipo(id: string, tipo: Partial<InsertEntidadeTipo>, empresaId: string): Promise<EntidadeTipo | undefined>;
-  // PASSO 7: Migration function
-  migrateEntidadeTipos(): Promise<{ empresasProcessadas: number; entidadesMigradas: number; tiposCriados: number }>;
+  createEntidadeTipo(
+    tipo: InsertEntidadeTipo,
+    empresaId: string,
+  ): Promise<EntidadeTipo>;
+  updateEntidadeTipo(
+    id: string,
+    tipo: Partial<InsertEntidadeTipo>,
+    empresaId: string,
+  ): Promise<EntidadeTipo | undefined>;
+  migrateEntidadeTipos(): Promise<{
+    empresasProcessadas: number;
+    entidadesMigradas: number;
+    tiposCriados: number;
+  }>;
 
-  // FASE 1: Contactos management for visitas
-  addContactosToVisita(visitaId: string, contactosIds: string[], empresaId: string): Promise<void>;
-  getContactosFromVisita(visitaId: string, empresaId: string): Promise<Array<{ id: string; nome: string; email?: string | null; telefone?: string | null; role?: string | null }>>;
+  // Contactos em visitas
+  addContactosToVisita(
+    visitaId: string,
+    contactosIds: string[],
+    empresaId: string,
+  ): Promise<void>;
+  getContactosFromVisita(
+    visitaId: string,
+    empresaId: string,
+  ): Promise<
+    Array<{
+      id: string;
+      nome: string;
+      email?: string | null;
+      telefone?: string | null;
+      role?: string | null;
+    }>
+  >;
 
-  // FASE 6: Audio management
-  addAudioToVisita(visitaId: string, fileUrl: string, empresaId: string): Promise<VisitasAudio>;
-  getVisitasAudio(visitaId: string, empresaId: string): Promise<VisitasAudio[]>;
+  // Audio
+  addAudioToVisita(
+    visitaId: string,
+    fileUrl: string,
+    empresaId: string,
+  ): Promise<VisitasAudio>;
+  getVisitasAudio(
+    visitaId: string,
+    empresaId: string,
+  ): Promise<VisitasAudio[]>;
   deleteVisitasAudio(audioId: string, empresaId: string): Promise<void>;
-  updateVisitasAudioTranscription(audioId: string, transcricao: string): Promise<VisitasAudio | undefined>;
+  updateVisitasAudioTranscription(
+    audioId: string,
+    transcricao: string,
+  ): Promise<VisitasAudio | undefined>;
 
-  // FASE 14: AI summary management
-  updateVisitaAISummary(visitaId: string, empresaId: string, data: { resumoIA: string; pontosChaveIA: string[]; tarefasSugeridasIA: any[] }): Promise<Visita | undefined>;
+  // AI summary
+  updateVisitaAISummary(
+    visitaId: string,
+    empresaId: string,
+    data: {
+      resumoIA: string;
+      pontosChaveIA: string[];
+      tarefasSugeridasIA: any[];
+    },
+  ): Promise<Visita | undefined>;
 
-  // FASE 3: Empresa & Users management
-  updateEmpresa(id: string, empresa: Partial<InsertEmpresa>): Promise<Empresa | undefined>;
+  // Empresa & Users
+  updateEmpresa(
+    id: string,
+    empresa: Partial<InsertEmpresa>,
+  ): Promise<Empresa | undefined>;
   getUtilizadoresByEmpresa(empresaId: string): Promise<User[]>;
   createUtilizador(userData: UpsertUser): Promise<User>;
-  updateUtilizador(id: string, userData: Partial<UpsertUser>, empresaId: string): Promise<User | undefined>;
+  updateUtilizador(
+    id: string,
+    userData: Partial<UpsertUser>,
+    empresaId: string,
+  ): Promise<User | undefined>;
 
-  // FASE 24: User settings management
+  // User settings
   getUserSettings(userId: string): Promise<User | undefined>;
   updateUserSettings(userId: string, settings: any): Promise<User | undefined>;
 
-  // Legacy Marcas (deprecated - for migration)
+  // Legacy marcas
   getMarcas(): Promise<Marca[]>;
 
-  // Dashboard stats
-  getDashboardStats(userId: string, userRole: 'admin' | 'agent'): Promise<{
+  // Dashboard stats (multi-tenant)
+  getDashboardStats(
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<{
     totalEntidades: number;
     totalContactos: number;
     totalVisitas: number;
@@ -195,12 +384,17 @@ export interface IStorage {
     proximasVisitas: VisitaWithRelations[];
   }>;
 
-  // Analytics
-  getAnalytics(userId: string, userRole: 'admin' | 'agent', filters?: {
-    period?: number; // days
-    agente?: string; // user id
-    tipoEntidade?: string;
-  }): Promise<{
+  // Analytics (multi-tenant)
+  getAnalytics(
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+    filters?: {
+      period?: number;
+      agente?: string;
+      tipoEntidade?: string;
+    },
+  ): Promise<{
     visits: {
       total_visits: number;
       visits_last_7_days: number;
@@ -222,26 +416,64 @@ export interface IStorage {
     entities: {
       entities_by_type: { tipo: string; count: number }[];
       entities_created_last_30_days: number;
-      entities_with_visits_count: { id: string; nome: string; count: number }[];
+      entities_with_visits_count: {
+        id: string;
+        nome: string;
+        count: number;
+      }[];
     };
     brands: {
       brand_frequency: { marca: string; count: number }[];
     };
   }>;
+
+  // Microsoft sync helpers
+  updateTarefaMicrosoftFields(
+    id: string,
+    fields: {
+      plannerTaskId?: string;
+      plannerPlanId?: string;
+      plannerBucketId?: string;
+      lastPlannerSyncAt?: Date;
+      todoTaskId?: string;
+      lastTodoSyncAt?: Date;
+      microsoftUserId?: string;
+    },
+  ): Promise<Tarefa | undefined>;
+  updateVisitaMicrosoftFields(
+    id: string,
+    fields: {
+      outlookEventId?: string;
+      lastCalendarSyncAt?: Date;
+    },
+  ): Promise<Visita | undefined>;
+
+  // Odoo Contact Requests
+  createOdooContactRequest(
+    input: InsertOdooContactRequest,
+  ): Promise<OdooContactRequest>;
+  listOdooContactRequestsByEmpresa(
+    empresaId: string,
+  ): Promise<(OdooContactRequest & { userName?: string | null })[]>;
+  updateOdooContactRequestStatus(
+    empresaId: string,
+    requestId: string,
+    estado: "pendente" | "em_progresso" | "concluido",
+  ): Promise<OdooContactRequest | null>;
 }
 
 export class DatabaseStorage implements IStorage {
   // Empresas
   async getEmpresa(id: string): Promise<Empresa | undefined> {
-    const [empresa] = await db.select().from(empresas).where(eq(empresas.id, id));
+    const [empresa] = await db
+      .select()
+      .from(empresas)
+      .where(eq(empresas.id, id));
     return empresa;
   }
 
   async createEmpresa(empresaData: InsertEmpresa): Promise<Empresa> {
-    const [empresa] = await db
-      .insert(empresas)
-      .values(empresaData)
-      .returning();
+    const [empresa] = await db.insert(empresas).values(empresaData).returning();
     return empresa;
   }
 
@@ -249,7 +481,7 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(empresas).orderBy(empresas.nome);
   }
 
-  // User operations
+  // Users
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
@@ -274,8 +506,12 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(users).orderBy(users.email);
   }
 
-  // Entidades (Universal Entities) - FASE 2: filtered by empresaId
-  async getEntidades(empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<Entidade[]> {
+  // Entidades
+  async getEntidades(
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<Entidade[]> {
     const baseWhere = buildEntidadeAccessWhere(empresaId, userId, userRole);
 
     return db.query.entidades.findMany({
@@ -286,14 +522,17 @@ export class DatabaseStorage implements IStorage {
         createdByUser: true,
         entidadeTipo: true,
       },
-    });
+    }) as unknown as Entidade[];
   }
 
-  async getEntidade(id: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<EntidadeWithRelations | undefined> {
+  async getEntidade(
+    id: string,
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<EntidadeWithRelations | undefined> {
     const baseWhere = buildEntidadeAccessWhere(empresaId, userId, userRole);
     const whereClause = and(eq(entidades.id, id), baseWhere);
-
-    console.log("[storage.getEntidade] called with", { id, empresaId, userId, userRole });
 
     const [entidade] = await db.query.entidades.findMany({
       where: whereClause,
@@ -315,18 +554,20 @@ export class DatabaseStorage implements IStorage {
       },
     });
 
-    console.log("[storage.getEntidade] DB result", { id, empresaId, found: !!entidade });
-
-    return entidade;
+    return entidade as unknown as EntidadeWithRelations | undefined;
   }
 
-  async findEntidadeByNome(nome: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<Entidade | undefined> {
-    // FASE 2: Always include empresaId in where clause
+  async findEntidadeByNome(
+    nome: string,
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<Entidade | undefined> {
     let whereClause;
-    if (userRole === 'admin') {
+    if (userRole === "admin") {
       whereClause = and(
         sql`LOWER(${entidades.nome}) = LOWER(${nome})`,
-        eq(entidades.empresaId, empresaId)
+        eq(entidades.empresaId, empresaId),
       );
     } else {
       whereClause = and(
@@ -334,8 +575,8 @@ export class DatabaseStorage implements IStorage {
         eq(entidades.empresaId, empresaId),
         or(
           eq(entidades.createdByUserId, userId),
-          eq(entidades.assignedUserId, userId)
-        )
+          eq(entidades.assignedUserId, userId),
+        ),
       );
     }
 
@@ -348,13 +589,17 @@ export class DatabaseStorage implements IStorage {
     return entidade;
   }
 
-  async findEntidadeByDomain(domain: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<Entidade | undefined> {
-    // FASE 2: Always include empresaId in where clause
+  async findEntidadeByDomain(
+    domain: string,
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<Entidade | undefined> {
     let whereClause;
-    if (userRole === 'admin') {
+    if (userRole === "admin") {
       whereClause = and(
         sql`LOWER(${entidades.domain}) = LOWER(${domain})`,
-        eq(entidades.empresaId, empresaId)
+        eq(entidades.empresaId, empresaId),
       );
     } else {
       whereClause = and(
@@ -362,8 +607,8 @@ export class DatabaseStorage implements IStorage {
         eq(entidades.empresaId, empresaId),
         or(
           eq(entidades.createdByUserId, userId),
-          eq(entidades.assignedUserId, userId)
-        )
+          eq(entidades.assignedUserId, userId),
+        ),
       );
     }
 
@@ -376,8 +621,10 @@ export class DatabaseStorage implements IStorage {
     return entidade;
   }
 
-  async createEntidade(entidadeData: InsertEntidade, empresaId: string): Promise<Entidade> {
-    // FASE 2: Always set empresaId on insert
+  async createEntidade(
+    entidadeData: InsertEntidade,
+    empresaId: string,
+  ): Promise<Entidade> {
     const [entidade] = await db
       .insert(entidades)
       .values({ ...entidadeData, empresaId, updatedAt: new Date() })
@@ -385,33 +632,30 @@ export class DatabaseStorage implements IStorage {
     return entidade;
   }
 
-  async updateEntidade(id: string, entidadeData: Partial<InsertEntidade>, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<Entidade | undefined> {
-    // FASE 2: Always include empresaId in where clause
-    console.log("[DEBUG ENTIDADE UPDATE] entidadeData recebido:", JSON.stringify(entidadeData, null, 2));
-    console.log("[DEBUG ENTIDADE UPDATE] entidadeTipoId:", entidadeData.entidadeTipoId);
-
-    const whereClause = (userId && userRole === 'agent')
-      ? and(
-          eq(entidades.id, id),
-          eq(entidades.empresaId, empresaId),
-          or(
-            eq(entidades.createdByUserId, userId),
-            eq(entidades.assignedUserId, userId)
+  async updateEntidade(
+    id: string,
+    entidadeData: Partial<InsertEntidade>,
+    empresaId: string,
+    userId?: string,
+    userRole?: "admin" | "agent",
+  ): Promise<Entidade | undefined> {
+    const whereClause =
+      userId && userRole === "agent"
+        ? and(
+            eq(entidades.id, id),
+            eq(entidades.empresaId, empresaId),
+            or(
+              eq(entidades.createdByUserId, userId),
+              eq(entidades.assignedUserId, userId),
+            ),
           )
-        )
-      : and(
-          eq(entidades.id, id),
-          eq(entidades.empresaId, empresaId)
-        );
+        : and(eq(entidades.id, id), eq(entidades.empresaId, empresaId));
 
     const [entidade] = await db
       .update(entidades)
       .set({ ...entidadeData, updatedAt: new Date() })
       .where(whereClause)
       .returning();
-
-    console.log("[DEBUG ENTIDADE UPDATE] entidade gravada na BD:", JSON.stringify(entidade, null, 2));
-    console.log("[DEBUG ENTIDADE UPDATE] entidadeTipoId após update:", entidade?.entidadeTipoId);
 
     return entidade;
   }
@@ -432,33 +676,33 @@ export class DatabaseStorage implements IStorage {
     return relatedContactos.length > 0 || relatedVisitas.length > 0;
   }
 
-  async deleteEntidade(id: string, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void> {
-    // FASE 2: Always include empresaId in where clause
-    const whereClause = (userId && userRole === 'agent')
-      ? and(
-          eq(entidades.id, id),
-          eq(entidades.empresaId, empresaId),
-          or(
-            eq(entidades.createdByUserId, userId),
-            eq(entidades.assignedUserId, userId)
+  async deleteEntidade(
+    id: string,
+    empresaId: string,
+    userId?: string,
+    userRole?: "admin" | "agent",
+  ): Promise<void> {
+    const whereClause =
+      userId && userRole === "agent"
+        ? and(
+            eq(entidades.id, id),
+            eq(entidades.empresaId, empresaId),
+            or(
+              eq(entidades.createdByUserId, userId),
+              eq(entidades.assignedUserId, userId),
+            ),
           )
-        )
-      : and(
-          eq(entidades.id, id),
-          eq(entidades.empresaId, empresaId)
-        );
+        : and(eq(entidades.id, id), eq(entidades.empresaId, empresaId));
 
     await db.delete(entidades).where(whereClause);
   }
 
-  // Contactos - FASE 2: filtered by empresaId (STEP 1: refactored with params object)
+  // Contactos
   async getContactos(params: ListContactosParams): Promise<ContactoWithRelations[]> {
     const { empresaId, assignedUserId, entidadeId } = params;
 
-    // Start with base RBAC where clause (admin role for now - userId not in params)
     let whereClause: any = eq(contactos.empresaId, empresaId);
 
-    // Apply optional filters
     if (entidadeId) {
       whereClause = and(whereClause, eq(contactos.entidadeId, entidadeId));
     }
@@ -467,7 +711,7 @@ export class DatabaseStorage implements IStorage {
       whereClause = and(whereClause, eq(contactos.assignedUserId, assignedUserId));
     }
 
-    return db.query.contactos.findMany({
+    const result = await db.query.contactos.findMany({
       where: whereClause,
       orderBy: desc(contactos.createdAt),
       with: {
@@ -476,15 +720,21 @@ export class DatabaseStorage implements IStorage {
         createdByUser: true,
       },
     });
+
+    return result as unknown as ContactoWithRelations[];
   }
 
-  async getContacto(id: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<ContactoWithRelations | undefined> {
-    // FASE 2: Always include empresaId in where clause
+  async getContacto(
+    id: string,
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<ContactoWithRelations | undefined> {
     let whereClause;
-    if (userRole === 'admin') {
+    if (userRole === "admin") {
       whereClause = and(
         eq(contactos.id, id),
-        eq(contactos.empresaId, empresaId)
+        eq(contactos.empresaId, empresaId),
       );
     } else {
       whereClause = and(
@@ -492,21 +742,25 @@ export class DatabaseStorage implements IStorage {
         eq(contactos.empresaId, empresaId),
         or(
           eq(contactos.createdByUserId, userId),
-          eq(contactos.assignedUserId, userId)
-        )
+          eq(contactos.assignedUserId, userId),
+        ),
       );
     }
 
-    return db.query.contactos.findFirst({
+    const contacto = await db.query.contactos.findFirst({
       where: whereClause,
       with: {
         entidade: true,
       },
     });
+
+    return contacto as unknown as ContactoWithRelations | undefined;
   }
 
-  async createContacto(contacto: InsertContacto, empresaId: string): Promise<Contacto> {
-    // FASE 2: Always set empresaId on insert
+  async createContacto(
+    contacto: InsertContacto,
+    empresaId: string,
+  ): Promise<Contacto> {
     const [newContacto] = await db
       .insert(contactos)
       .values({ ...contacto, empresaId })
@@ -514,21 +768,24 @@ export class DatabaseStorage implements IStorage {
     return newContacto;
   }
 
-  async updateContacto(id: string, contacto: Partial<InsertContacto>, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<Contacto | undefined> {
-    // FASE 2: Always include empresaId in where clause
-    const whereClause = (userId && userRole === 'agent')
-      ? and(
-          eq(contactos.id, id),
-          eq(contactos.empresaId, empresaId),
-          or(
-            eq(contactos.createdByUserId, userId),
-            eq(contactos.assignedUserId, userId)
+  async updateContacto(
+    id: string,
+    contacto: Partial<InsertContacto>,
+    empresaId: string,
+    userId?: string,
+    userRole?: "admin" | "agent",
+  ): Promise<Contacto | undefined> {
+    const whereClause =
+      userId && userRole === "agent"
+        ? and(
+            eq(contactos.id, id),
+            eq(contactos.empresaId, empresaId),
+            or(
+              eq(contactos.createdByUserId, userId),
+              eq(contactos.assignedUserId, userId),
+            ),
           )
-        )
-      : and(
-          eq(contactos.id, id),
-          eq(contactos.empresaId, empresaId)
-        );
+        : and(eq(contactos.id, id), eq(contactos.empresaId, empresaId));
 
     const [updated] = await db
       .update(contactos)
@@ -538,43 +795,48 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async deleteContacto(id: string, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void> {
-    // FASE 2: Always include empresaId in where clause
-    const whereClause = (userId && userRole === 'agent')
-      ? and(
-          eq(contactos.id, id),
-          eq(contactos.empresaId, empresaId),
-          or(
-            eq(contactos.createdByUserId, userId),
-            eq(contactos.assignedUserId, userId)
+  async deleteContacto(
+    id: string,
+    empresaId: string,
+    userId?: string,
+    userRole?: "admin" | "agent",
+  ): Promise<void> {
+    const whereClause =
+      userId && userRole === "agent"
+        ? and(
+            eq(contactos.id, id),
+            eq(contactos.empresaId, empresaId),
+            or(
+              eq(contactos.createdByUserId, userId),
+              eq(contactos.assignedUserId, userId),
+            ),
           )
-        )
-      : and(
-          eq(contactos.id, id),
-          eq(contactos.empresaId, empresaId)
-        );
+        : and(eq(contactos.id, id), eq(contactos.empresaId, empresaId));
 
     await db.delete(contactos).where(whereClause);
   }
 
-  // Visitas - FASE 2: filtered by empresaId
-  async getVisitas(empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<VisitaWithRelations[]> {
-    // Always filter by empresaId; then apply RBAC
+  // Visitas
+  async getVisitas(
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<VisitaWithRelations[]> {
     let whereClause;
-    if (userRole === 'agent') {
+    if (userRole === "agent") {
       whereClause = and(
         eq(visitas.empresaId, empresaId),
         or(
           eq(visitas.createdByUserId, userId),
           eq(visitas.assignedUserId, userId),
-          eq(visitas.userId, userId) // Fallback to legacy userId field for historical data
-        )
+          eq(visitas.userId, userId),
+        ),
       );
     } else {
       whereClause = eq(visitas.empresaId, empresaId);
     }
 
-    return db.query.visitas.findMany({
+    const result = await db.query.visitas.findMany({
       where: whereClause,
       orderBy: desc(visitas.dataVisita),
       with: {
@@ -588,7 +850,6 @@ export class DatabaseStorage implements IStorage {
             marca: true,
           },
         },
-        // FASE 5: Load contactos from junction table for filtering
         contactos: {
           with: {
             contacto: true,
@@ -596,16 +857,19 @@ export class DatabaseStorage implements IStorage {
         },
       },
     });
+
+    return result as unknown as VisitaWithRelations[];
   }
 
-  async getVisita(id: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<VisitaWithRelations | undefined> {
-    // FASE 2: Always include empresaId in where clause
+  async getVisita(
+    id: string,
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<VisitaWithRelations | undefined> {
     let whereClause;
-    if (userRole === 'admin') {
-      whereClause = and(
-        eq(visitas.id, id),
-        eq(visitas.empresaId, empresaId)
-      );
+    if (userRole === "admin") {
+      whereClause = and(eq(visitas.id, id), eq(visitas.empresaId, empresaId));
     } else {
       whereClause = and(
         eq(visitas.id, id),
@@ -613,12 +877,12 @@ export class DatabaseStorage implements IStorage {
         or(
           eq(visitas.createdByUserId, userId),
           eq(visitas.assignedUserId, userId),
-          eq(visitas.userId, userId) // Fallback to legacy userId field for historical data
-        )
+          eq(visitas.userId, userId),
+        ),
       );
     }
 
-    return db.query.visitas.findFirst({
+    const visita = await db.query.visitas.findFirst({
       where: whereClause,
       with: {
         entidade: true,
@@ -631,7 +895,6 @@ export class DatabaseStorage implements IStorage {
             marca: true,
           },
         },
-        // FASE 5: Load contactos from junction table for filtering
         contactos: {
           with: {
             contacto: true,
@@ -639,59 +902,81 @@ export class DatabaseStorage implements IStorage {
         },
       },
     });
+
+    return visita as unknown as VisitaWithRelations | undefined;
   }
 
-  async createVisita(visita: InsertVisita, empresaId: string): Promise<Visita> {
-    // FASE 2: Always set empresaId on insert
-    const [newVisita] = await db
+  async createVisita(
+    visita: InsertVisita,
+    empresaId: string,
+  ): Promise<Visita> {
+    const result = await db
       .insert(visitas)
       .values({ ...visita, empresaId })
       .returning();
+
+    // TS acha que isto pode ser array ou QueryResult => normalizamos:
+    const rows = Array.isArray(result) ? result : result.rows;
+
+    const [newVisita] = rows as Visita[];
     return newVisita;
   }
 
-  // FASE 5: Add marcas to visita
-  async addMarcasToVisita(visitaId: string, marcasIds: string[], empresaId: string): Promise<void> {
+
+  // Marcas em visitas
+  async addMarcasToVisita(
+    visitaId: string,
+    marcasIds: string[],
+    empresaId: string,
+  ): Promise<void> {
     if (!marcasIds || marcasIds.length === 0) return;
 
-    // Delete existing marcas for this visita
     await db.delete(visitasMarcas).where(eq(visitasMarcas.visitaId, visitaId));
 
-    // Insert new marcas
-    if (marcasIds.length > 0) {
-      const marcasData = marcasIds.map(marcaId => ({
-        visitaId,
-        marcaId,
-        empresaId,
-      }));
-      await db.insert(visitasMarcas).values(marcasData);
-    }
+    const marcasData = marcasIds.map((marcaId) => ({
+      visitaId,
+      marcaId,
+      empresaId,
+    }));
+    await db.insert(visitasMarcas).values(marcasData);
   }
 
-  // FASE 1: Add contactos to visita (multiple contacts per visit)
-  async addContactosToVisita(visitaId: string, contactosIds: string[], empresaId: string): Promise<void> {
+  // Contactos em visitas
+  async addContactosToVisita(
+    visitaId: string,
+    contactosIds: string[],
+    empresaId: string,
+  ): Promise<void> {
     if (!contactosIds || contactosIds.length === 0) return;
 
-    // Delete existing contactos for this visita
-    await db.delete(visitasContactos).where(eq(visitasContactos.visitaId, visitaId));
+    await db
+      .delete(visitasContactos)
+      .where(eq(visitasContactos.visitaId, visitaId));
 
-    // Insert new contactos
-    if (contactosIds.length > 0) {
-      const contactosData = contactosIds.map(contactoId => ({
-        visitaId,
-        contactoId,
-        empresaId,
-      }));
-      await db.insert(visitasContactos).values(contactosData);
-    }
+    const contactosData = contactosIds.map((contactoId) => ({
+      visitaId,
+      contactoId,
+      empresaId,
+    }));
+    await db.insert(visitasContactos).values(contactosData);
   }
 
-  // FASE 1: Get contactos for a visita
-  async getContactosFromVisita(visitaId: string, empresaId: string): Promise<Array<{ id: string; nome: string; email?: string | null; telefone?: string | null; role?: string | null }>> {
+  async getContactosFromVisita(
+    visitaId: string,
+    empresaId: string,
+  ): Promise<
+    Array<{
+      id: string;
+      nome: string;
+      email?: string | null;
+      telefone?: string | null;
+      role?: string | null;
+    }>
+  > {
     const records = await db.query.visitasContactos.findMany({
       where: and(
         eq(visitasContactos.visitaId, visitaId),
-        eq(visitasContactos.empresaId, empresaId)
+        eq(visitasContactos.empresaId, empresaId),
       ),
       with: {
         contacto: {
@@ -700,22 +985,26 @@ export class DatabaseStorage implements IStorage {
             nome: true,
             email: true,
             telemovel: true,
-          }
-        }
+          },
+        },
       },
     });
 
-    return records.map(r => ({
-      id: r.contacto.id,
-      nome: r.contacto.nome,
-      email: r.contacto.email || null,
-      telefone: r.contacto.telemovel || null,
-      role: r.role,
+    return records.map((r) => ({
+      id: (r as any).contacto.id,
+      nome: (r as any).contacto.nome,
+      email: (r as any).contacto.email || null,
+      telefone: (r as any).contacto.telemovel || null,
+      role: (r as any).role,
     }));
   }
 
-  // FASE 6: Audio management
-  async addAudioToVisita(visitaId: string, fileUrl: string, empresaId: string): Promise<VisitasAudio> {
+  // Audio
+  async addAudioToVisita(
+    visitaId: string,
+    fileUrl: string,
+    empresaId: string,
+  ): Promise<VisitasAudio> {
     const [newAudio] = await db
       .insert(visitasAudio)
       .values({
@@ -727,26 +1016,34 @@ export class DatabaseStorage implements IStorage {
     return newAudio;
   }
 
-  async getVisitasAudio(visitaId: string, empresaId: string): Promise<VisitasAudio[]> {
+  async getVisitasAudio(
+    visitaId: string,
+    empresaId: string,
+  ): Promise<VisitasAudio[]> {
     return db.query.visitasAudio.findMany({
       where: and(
         eq(visitasAudio.visitaId, visitaId),
-        eq(visitasAudio.empresaId, empresaId)
+        eq(visitasAudio.empresaId, empresaId),
       ),
       orderBy: desc(visitasAudio.createdAt),
     });
   }
 
   async deleteVisitasAudio(audioId: string, empresaId: string): Promise<void> {
-    await db.delete(visitasAudio).where(
-      and(
-        eq(visitasAudio.id, audioId),
-        eq(visitasAudio.empresaId, empresaId)
-      )
-    );
+    await db
+      .delete(visitasAudio)
+      .where(
+        and(
+          eq(visitasAudio.id, audioId),
+          eq(visitasAudio.empresaId, empresaId),
+        ),
+      );
   }
 
-  async updateVisitasAudioTranscription(audioId: string, transcricao: string): Promise<VisitasAudio | undefined> {
+  async updateVisitasAudioTranscription(
+    audioId: string,
+    transcricao: string,
+  ): Promise<VisitasAudio | undefined> {
     const [updated] = await db
       .update(visitasAudio)
       .set({ transcricao })
@@ -755,7 +1052,15 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async updateVisitaAISummary(visitaId: string, empresaId: string, data: { resumoIA: string; pontosChaveIA: string[]; tarefasSugeridasIA: any[] }): Promise<Visita | undefined> {
+  async updateVisitaAISummary(
+    visitaId: string,
+    empresaId: string,
+    data: {
+      resumoIA: string;
+      pontosChaveIA: string[];
+      tarefasSugeridasIA: any[];
+    },
+  ): Promise<Visita | undefined> {
     const [updated] = await db
       .update(visitas)
       .set({
@@ -764,32 +1069,30 @@ export class DatabaseStorage implements IStorage {
         tarefasSugeridasIA: JSON.stringify(data.tarefasSugeridasIA),
         iaLastGeneratedAt: new Date(),
       })
-      .where(
-        and(
-          eq(visitas.id, visitaId),
-          eq(visitas.empresaId, empresaId)
-        )
-      )
+      .where(and(eq(visitas.id, visitaId), eq(visitas.empresaId, empresaId)))
       .returning();
     return updated;
   }
 
-  async updateVisita(id: string, visita: Partial<Visita>, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<Visita | undefined> {
-    // FASE 2: Always include empresaId in where clause
-    const whereClause = (userId && userRole === 'agent')
-      ? and(
-          eq(visitas.id, id),
-          eq(visitas.empresaId, empresaId),
-          or(
-            eq(visitas.createdByUserId, userId),
-            eq(visitas.assignedUserId, userId),
-            eq(visitas.userId, userId) // Fallback to legacy userId field
+  async updateVisita(
+    id: string,
+    visita: Partial<Visita>,
+    empresaId: string,
+    userId?: string,
+    userRole?: "admin" | "agent",
+  ): Promise<Visita | undefined> {
+    const whereClause =
+      userId && userRole === "agent"
+        ? and(
+            eq(visitas.id, id),
+            eq(visitas.empresaId, empresaId),
+            or(
+              eq(visitas.createdByUserId, userId),
+              eq(visitas.assignedUserId, userId),
+              eq(visitas.userId, userId),
+            ),
           )
-        )
-      : and(
-          eq(visitas.id, id),
-          eq(visitas.empresaId, empresaId)
-        );
+        : and(eq(visitas.id, id), eq(visitas.empresaId, empresaId));
 
     const [updated] = await db
       .update(visitas)
@@ -799,42 +1102,52 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async deleteVisita(id: string, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void> {
-    // FASE 2: Always include empresaId in where clause
-    const whereClause = (userId && userRole === 'agent')
-      ? and(
-          eq(visitas.id, id),
-          eq(visitas.empresaId, empresaId),
-          or(
-            eq(visitas.createdByUserId, userId),
-            eq(visitas.assignedUserId, userId),
-            eq(visitas.userId, userId) // Fallback to legacy userId field
+  async deleteVisita(
+    id: string,
+    empresaId: string,
+    userId?: string,
+    userRole?: "admin" | "agent",
+  ): Promise<void> {
+    const whereClause =
+      userId && userRole === "agent"
+        ? and(
+            eq(visitas.id, id),
+            eq(visitas.empresaId, empresaId),
+            or(
+              eq(visitas.createdByUserId, userId),
+              eq(visitas.assignedUserId, userId),
+              eq(visitas.userId, userId),
+            ),
           )
-        )
-      : and(
-          eq(visitas.id, id),
-          eq(visitas.empresaId, empresaId)
-        );
+        : and(eq(visitas.id, id), eq(visitas.empresaId, empresaId));
 
     await db.delete(visitas).where(whereClause);
   }
 
-  // Tarefas (Tasks) - FASE 2: filtered by empresaId
-  async getTarefas(empresaId: string, userId: string, userRole: 'admin' | 'agent', filters?: { status?: string; assignedUserId?: string; entidadeId?: string; visitaId?: string; overdue?: boolean }): Promise<TarefaWithRelations[]> {
-    // Build where clauses for role-based filtering - FASE 2: always include empresaId
+  // Tarefas
+  async getTarefas(
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+    filters?: {
+      status?: string;
+      assignedUserId?: string;
+      entidadeId?: string;
+      visitaId?: string;
+      overdue?: boolean;
+    },
+  ): Promise<TarefaWithRelations[]> {
     const conditions: any[] = [eq(tarefas.empresaId, empresaId)];
 
-    // Role-based access: admin sees all, agent sees only created/assigned
-    if (userRole === 'agent') {
+    if (userRole === "agent") {
       conditions.push(
         or(
           eq(tarefas.createdByUserId, userId),
-          eq(tarefas.assignedUserId, userId)
-        )
+          eq(tarefas.assignedUserId, userId),
+        ),
       );
     }
 
-    // Apply filters
     if (filters?.status) {
       conditions.push(eq(tarefas.status, filters.status as any));
     }
@@ -850,15 +1163,15 @@ export class DatabaseStorage implements IStorage {
     if (filters?.overdue) {
       conditions.push(
         and(
-          eq(tarefas.status, 'pending'),
-          sql`${tarefas.dueDate} < NOW()`
-        )
+          eq(tarefas.status, "pending"),
+          sql`${tarefas.dueDate} < NOW()`,
+        ),
       );
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    return db.query.tarefas.findMany({
+    const result = await db.query.tarefas.findMany({
       where: whereClause,
       orderBy: [desc(tarefas.createdAt)],
       with: {
@@ -868,28 +1181,31 @@ export class DatabaseStorage implements IStorage {
         createdByUser: true,
       },
     });
+
+    return result as unknown as TarefaWithRelations[];
   }
 
-  async getTarefa(id: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<TarefaWithRelations | undefined> {
-    // FASE 2: Always include empresaId in where clause
+  async getTarefa(
+    id: string,
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<TarefaWithRelations | undefined> {
     let whereClause;
-    if (userRole === 'agent') {
+    if (userRole === "agent") {
       whereClause = and(
         eq(tarefas.id, id),
         eq(tarefas.empresaId, empresaId),
         or(
           eq(tarefas.createdByUserId, userId),
-          eq(tarefas.assignedUserId, userId)
-        )
+          eq(tarefas.assignedUserId, userId),
+        ),
       );
     } else {
-      whereClause = and(
-        eq(tarefas.id, id),
-        eq(tarefas.empresaId, empresaId)
-      );
+      whereClause = and(eq(tarefas.id, id), eq(tarefas.empresaId, empresaId));
     }
 
-    return db.query.tarefas.findFirst({
+    const tarefa = await db.query.tarefas.findFirst({
       where: whereClause,
       with: {
         visita: true,
@@ -898,32 +1214,48 @@ export class DatabaseStorage implements IStorage {
         createdByUser: true,
       },
     });
+
+    return tarefa as unknown as TarefaWithRelations | undefined;
   }
 
-  async createTarefa(tarefaData: InsertTarefa, empresaId: string): Promise<Tarefa> {
-    // FASE 2: Always set empresaId on insert
+  async createTarefa(
+    tarefaData: InsertTarefa,
+    empresaId: string,
+    createdByUserId: string,
+  ): Promise<Tarefa> {
     const [tarefa] = await db
       .insert(tarefas)
-      .values({ ...tarefaData, empresaId, updatedAt: new Date() })
+      .values({
+        ...tarefaData,
+        empresaId,
+        createdByUserId,
+        updatedAt: new Date(),
+      })
       .returning();
+
     return tarefa;
   }
 
-  async updateTarefa(id: string, tarefaData: Partial<InsertTarefa>, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<Tarefa | undefined> {
-    // FASE 2: Always include empresaId in where clause
-    const whereClause = (userId && userRole === 'agent')
-      ? and(
-          eq(tarefas.id, id),
-          eq(tarefas.empresaId, empresaId),
-          or(
-            eq(tarefas.createdByUserId, userId),
-            eq(tarefas.assignedUserId, userId)
+
+
+  async updateTarefa(
+    id: string,
+    tarefaData: Partial<InsertTarefa>,
+    empresaId: string,
+    userId?: string,
+    userRole?: "admin" | "agent",
+  ): Promise<Tarefa | undefined> {
+    const whereClause =
+      userId && userRole === "agent"
+        ? and(
+            eq(tarefas.id, id),
+            eq(tarefas.empresaId, empresaId),
+            or(
+              eq(tarefas.createdByUserId, userId),
+              eq(tarefas.assignedUserId, userId),
+            ),
           )
-        )
-      : and(
-          eq(tarefas.id, id),
-          eq(tarefas.empresaId, empresaId)
-        );
+        : and(eq(tarefas.id, id), eq(tarefas.empresaId, empresaId));
 
     const [tarefa] = await db
       .update(tarefas)
@@ -933,161 +1265,204 @@ export class DatabaseStorage implements IStorage {
     return tarefa;
   }
 
-  async deleteTarefa(id: string, empresaId: string, userId?: string, userRole?: 'admin' | 'agent'): Promise<void> {
-    // FASE 2: Always include empresaId in where clause
-    const whereClause = (userId && userRole === 'agent')
-      ? and(
-          eq(tarefas.id, id),
-          eq(tarefas.empresaId, empresaId),
-          or(
-            eq(tarefas.createdByUserId, userId),
-            eq(tarefas.assignedUserId, userId)
+  async deleteTarefa(
+    id: string,
+    empresaId: string,
+    userId?: string,
+    userRole?: "admin" | "agent",
+  ): Promise<void> {
+    const whereClause =
+      userId && userRole === "agent"
+        ? and(
+            eq(tarefas.id, id),
+            eq(tarefas.empresaId, empresaId),
+            or(
+              eq(tarefas.createdByUserId, userId),
+              eq(tarefas.assignedUserId, userId),
+            ),
           )
-        )
-      : and(
-          eq(tarefas.id, id),
-          eq(tarefas.empresaId, empresaId)
-        );
+        : and(eq(tarefas.id, id), eq(tarefas.empresaId, empresaId));
 
     await db.delete(tarefas).where(whereClause);
   }
 
-  async getTarefasByVisitaId(visitaId: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<TarefaWithRelations[]> {
-    // FASE 2: SQL-level filtering with RBAC and empresaId
-    const whereClause = userRole === 'agent'
-      ? and(
-          eq(tarefas.visitaId, visitaId),
-          eq(tarefas.empresaId, empresaId),
-          or(
-            eq(tarefas.createdByUserId, userId),
-            eq(tarefas.assignedUserId, userId)
+  async getTarefasByVisitaId(
+    visitaId: string,
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<TarefaWithRelations[]> {
+    const whereClause =
+      userRole === "agent"
+        ? and(
+            eq(tarefas.visitaId, visitaId),
+            eq(tarefas.empresaId, empresaId),
+            or(
+              eq(tarefas.createdByUserId, userId),
+              eq(tarefas.assignedUserId, userId),
+            ),
           )
-        )
-      : and(
-          eq(tarefas.visitaId, visitaId),
-          eq(tarefas.empresaId, empresaId)
-        );
+        : and(eq(tarefas.visitaId, visitaId), eq(tarefas.empresaId, empresaId));
 
-    const results = await db.select().from(tarefas)
+    const results = await db
+      .select()
+      .from(tarefas)
       .leftJoin(entidades, eq(tarefas.entidadeId, entidades.id))
       .where(whereClause)
       .orderBy(desc(tarefas.createdAt));
 
-    return results.map(row => ({
-      ...row.tarefas,
-      entidade: row.entidades || undefined,
-    }));
+    return results.map((row: any) => ({
+      ...(row.tarefas as any),
+      entidade: (row.entidades as any) || undefined,
+    })) as unknown as TarefaWithRelations[];
   }
 
-  async getTarefasByEntidadeId(entidadeId: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<TarefaWithRelations[]> {
-    // FASE 2: SQL-level filtering with RBAC and empresaId
-    const whereClause = userRole === 'agent'
-      ? and(
-          eq(tarefas.entidadeId, entidadeId),
-          eq(tarefas.empresaId, empresaId),
-          or(
-            eq(tarefas.createdByUserId, userId),
-            eq(tarefas.assignedUserId, userId)
+  async getTarefasByEntidadeId(
+    entidadeId: string,
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<TarefaWithRelations[]> {
+    const whereClause =
+      userRole === "agent"
+        ? and(
+            eq(tarefas.entidadeId, entidadeId),
+            eq(tarefas.empresaId, empresaId),
+            or(
+              eq(tarefas.createdByUserId, userId),
+              eq(tarefas.assignedUserId, userId),
+            ),
           )
-        )
-      : and(
-          eq(tarefas.entidadeId, entidadeId),
-          eq(tarefas.empresaId, empresaId)
-        );
+        : and(
+            eq(tarefas.entidadeId, entidadeId),
+            eq(tarefas.empresaId, empresaId),
+          );
 
-    const results = await db.select().from(tarefas)
+    const results = await db
+      .select()
+      .from(tarefas)
       .leftJoin(entidades, eq(tarefas.entidadeId, entidades.id))
       .where(whereClause)
       .orderBy(desc(tarefas.createdAt));
 
-    return results.map(row => ({
-      ...row.tarefas,
-      entidade: row.entidades || undefined,
-    }));
+    return results.map((row: any) => ({
+      ...(row.tarefas as any),
+      entidade: (row.entidades as any) || undefined,
+    })) as unknown as TarefaWithRelations[];
   }
 
-  async getTarefasInPeriod(startDate: Date, endDate: Date, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<TarefaWithRelations[]> {
-    // FASE 2: SQL-level filtering with RBAC, empresaId and date range
-    const whereClause = userRole === 'agent'
-      ? and(
-          eq(tarefas.empresaId, empresaId),
-          or(
-            eq(tarefas.createdByUserId, userId),
-            eq(tarefas.assignedUserId, userId)
-          ),
-          sql`${tarefas.dueDate} >= ${startDate}`,
-          sql`${tarefas.dueDate} <= ${endDate}`
-        )
-      : and(
-          eq(tarefas.empresaId, empresaId),
-          sql`${tarefas.dueDate} >= ${startDate}`,
-          sql`${tarefas.dueDate} <= ${endDate}`
-        );
+  async getTarefasInPeriod(
+    startDate: Date,
+    endDate: Date,
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<TarefaWithRelations[]> {
+    const whereClause =
+      userRole === "agent"
+        ? and(
+            eq(tarefas.empresaId, empresaId),
+            or(
+              eq(tarefas.createdByUserId, userId),
+              eq(tarefas.assignedUserId, userId),
+            ),
+            sql`${tarefas.dueDate} >= ${startDate}`,
+            sql`${tarefas.dueDate} <= ${endDate}`,
+          )
+        : and(
+            eq(tarefas.empresaId, empresaId),
+            sql`${tarefas.dueDate} >= ${startDate}`,
+            sql`${tarefas.dueDate} <= ${endDate}`,
+          );
 
-    const results = await db.select().from(tarefas)
+    const results = await db
+      .select()
+      .from(tarefas)
       .leftJoin(entidades, eq(tarefas.entidadeId, entidades.id))
       .where(whereClause)
       .orderBy(desc(tarefas.dueDate));
 
-    return results.map(row => ({
-      ...row.tarefas,
-      entidade: row.entidades || undefined,
-    }));
+    return results.map((row: any) => ({
+      ...(row.tarefas as any),
+      entidade: (row.entidades as any) || undefined,
+    })) as unknown as TarefaWithRelations[];
   }
 
-  async getVisitasByEntidade(entidadeId: string, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<VisitaWithRelations[]> {
-    // FASE 2: SQL-level filtering with RBAC and empresaId
-    const whereClause = userRole === 'agent'
-      ? and(
-          eq(visitas.entidadeId, entidadeId),
-          eq(visitas.empresaId, empresaId),
-          eq(visitas.createdByUserId, userId)
-        )
-      : and(
-          eq(visitas.entidadeId, entidadeId),
-          eq(visitas.empresaId, empresaId)
-        );
+  async getVisitasByEntidade(
+    entidadeId: string,
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<VisitaWithRelations[]> {
+    const whereClause =
+      userRole === "agent"
+        ? and(
+            eq(visitas.entidadeId, entidadeId),
+            eq(visitas.empresaId, empresaId),
+            eq(visitas.createdByUserId, userId),
+          )
+        : and(
+            eq(visitas.entidadeId, entidadeId),
+            eq(visitas.empresaId, empresaId),
+          );
 
-    const results = await db.select().from(visitas)
+    const results = await db
+      .select()
+      .from(visitas)
       .leftJoin(entidades, eq(visitas.entidadeId, entidades.id))
       .where(whereClause)
       .orderBy(desc(visitas.dataVisita));
 
-    return results.map(row => ({
-      ...row.visitas,
-      entidade: row.entidades || undefined,
-    }));
+    return results.map((row: any) => ({
+      ...(row.visitas as any),
+      entidade: (row.entidades as any) || undefined,
+    })) as unknown as VisitaWithRelations[];
   }
 
-  async getVisitasInPeriod(startDate: Date, endDate: Date, empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<VisitaWithRelations[]> {
-    // FASE 2: SQL-level filtering with RBAC, empresaId and date range
-    const whereClause = userRole === 'agent'
-      ? and(
-          eq(visitas.empresaId, empresaId),
-          eq(visitas.createdByUserId, userId),
-          sql`${visitas.dataVisita} >= ${startDate}`,
-          sql`${visitas.dataVisita} <= ${endDate}`
-        )
-      : and(
-          eq(visitas.empresaId, empresaId),
-          sql`${visitas.dataVisita} >= ${startDate}`,
-          sql`${visitas.dataVisita} <= ${endDate}`
-        );
+  async getVisitasInPeriod(
+    startDate: Date,
+    endDate: Date,
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<VisitaWithRelations[]> {
+    const whereClause =
+      userRole === "agent"
+        ? and(
+            eq(visitas.empresaId, empresaId),
+            eq(visitas.createdByUserId, userId),
+            sql`${visitas.dataVisita} >= ${startDate}`,
+            sql`${visitas.dataVisita} <= ${endDate}`,
+          )
+        : and(
+            eq(visitas.empresaId, empresaId),
+            sql`${visitas.dataVisita} >= ${startDate}`,
+            sql`${visitas.dataVisita} <= ${endDate}`,
+          );
 
-    const results = await db.select().from(visitas)
+    const results = await db
+      .select()
+      .from(visitas)
       .leftJoin(entidades, eq(visitas.entidadeId, entidades.id))
       .where(whereClause)
       .orderBy(desc(visitas.dataVisita));
 
-    return results.map(row => ({
-      ...row.visitas,
-      entidade: row.entidades || undefined,
-    }));
+    return results.map((row: any) => ({
+      ...(row.visitas as any),
+      entidade: (row.entidades as any) || undefined,
+    })) as unknown as VisitaWithRelations[];
   }
 
-  async getAllEntidades(empresaId: string, userId: string, userRole: 'admin' | 'agent'): Promise<EntidadeWithRelations[]> {
-    // FASE 2: Delegate to getEntidades with empresaId
-    return this.getEntidades(empresaId, userId, userRole);
+  async getAllEntidades(
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ): Promise<EntidadeWithRelations[]> {
+    return (await this.getEntidades(
+      empresaId,
+      userId,
+      userRole,
+    )) as unknown as EntidadeWithRelations[];
   }
 
   async updateTarefaMicrosoftFields(
@@ -1100,7 +1475,7 @@ export class DatabaseStorage implements IStorage {
       todoTaskId?: string;
       lastTodoSyncAt?: Date;
       microsoftUserId?: string;
-    }
+    },
   ): Promise<Tarefa | undefined> {
     const [tarefa] = await db
       .update(tarefas)
@@ -1115,7 +1490,7 @@ export class DatabaseStorage implements IStorage {
     fields: {
       outlookEventId?: string;
       lastCalendarSyncAt?: Date;
-    }
+    },
   ): Promise<Visita | undefined> {
     const [visita] = await db
       .update(visitas)
@@ -1125,102 +1500,117 @@ export class DatabaseStorage implements IStorage {
     return visita;
   }
 
-  // Marcas (by empresa)
+  // Marcas
   async getMarcasByEmpresa(empresaId: string): Promise<Marca[]> {
-    return db.select().from(marcas)
+    return db
+      .select()
+      .from(marcas)
       .where(eq(marcas.empresaId, empresaId))
       .orderBy(marcas.nome);
   }
 
-  // FASE 29: Entity Types CRUD
   async getEntidadeTipos(empresaId: string): Promise<EntidadeTipo[]> {
-    return db.select().from(entidadeTipos)
+    return db
+      .select()
+      .from(entidadeTipos)
       .where(eq(entidadeTipos.empresaId, empresaId))
       .orderBy(entidadeTipos.ordem, entidadeTipos.nome);
   }
 
   async getEntidadeTiposAtivos(empresaId: string): Promise<EntidadeTipo[]> {
-    return db.select().from(entidadeTipos)
-      .where(and(
-        eq(entidadeTipos.empresaId, empresaId),
-        eq(entidadeTipos.ativo, true)
-      ))
+    return db
+      .select()
+      .from(entidadeTipos)
+      .where(
+        and(
+          eq(entidadeTipos.empresaId, empresaId),
+          eq(entidadeTipos.ativo, true),
+        ),
+      )
       .orderBy(entidadeTipos.ordem, entidadeTipos.nome);
   }
 
-  async getEntidadeTipo(id: string, empresaId: string): Promise<EntidadeTipo | undefined> {
-    return db.select().from(entidadeTipos)
-      .where(and(
-        eq(entidadeTipos.id, id),
-        eq(entidadeTipos.empresaId, empresaId)
-      ))
+  async getEntidadeTipo(
+    id: string,
+    empresaId: string,
+  ): Promise<EntidadeTipo | undefined> {
+    return db
+      .select()
+      .from(entidadeTipos)
+      .where(and(eq(entidadeTipos.id, id), eq(entidadeTipos.empresaId, empresaId)))
       .then((res) => res[0]);
   }
 
-  async createEntidadeTipo(tipo: InsertEntidadeTipo, empresaId: string): Promise<EntidadeTipo> {
-    console.log("[DEBUG TIPO ENTIDADE STORAGE] createEntidadeTipo data:", tipo);
-    const result = await db.insert(entidadeTipos)
+  async createEntidadeTipo(
+    tipo: InsertEntidadeTipo,
+    empresaId: string,
+  ): Promise<EntidadeTipo> {
+    const result = await db
+      .insert(entidadeTipos)
       .values({
         ...tipo,
         empresaId,
       })
       .returning();
-    console.log("[DEBUG TIPO ENTIDADE STORAGE] Created tipo icon:", result[0]?.icon);
     return result[0];
   }
 
-  async updateEntidadeTipo(id: string, tipo: Partial<InsertEntidadeTipo>, empresaId: string): Promise<EntidadeTipo | undefined> {
-    console.log("[DEBUG TIPO ENTIDADE STORAGE] updateEntidadeTipo data:", tipo);
-    const result = await db.update(entidadeTipos)
+  async updateEntidadeTipo(
+    id: string,
+    tipo: Partial<InsertEntidadeTipo>,
+    empresaId: string,
+  ): Promise<EntidadeTipo | undefined> {
+    const result = await db
+      .update(entidadeTipos)
       .set(tipo)
-      .where(and(
-        eq(entidadeTipos.id, id),
-        eq(entidadeTipos.empresaId, empresaId)
-      ))
+      .where(and(eq(entidadeTipos.id, id), eq(entidadeTipos.empresaId, empresaId)))
       .returning();
-    console.log("[DEBUG TIPO ENTIDADE STORAGE] Updated tipo icon:", result[0]?.icon);
     return result[0];
   }
 
-  // PASSO 7: Migration - Convert legacy tipoEntidade to entidadeTipoId
-  async migrateEntidadeTipos(): Promise<{ empresasProcessadas: number; entidadesMigradas: number; tiposCriados: number }> {
+  async migrateEntidadeTipos(): Promise<{
+    empresasProcessadas: number;
+    entidadesMigradas: number;
+    tiposCriados: number;
+  }> {
     const empresas_list = await this.getAllEmpresas();
     let totalEntidadesMigradas = 0;
     let totalTiposCriados = 0;
 
     for (const empresa of empresas_list) {
-      // Get all distinct tipoEntidade values for this empresa (ignoring null and empty strings)
       const distinct_tipos = await db
         .select({ tipoEntidade: entidades.tipoEntidade })
         .from(entidades)
-        .where(and(
-          eq(entidades.empresaId, empresa.id),
-          sql`${entidades.tipoEntidade} IS NOT NULL AND ${entidades.tipoEntidade} != ''`
-        ))
-        .distinct();
+        .where(
+          and(
+            eq(entidades.empresaId, empresa.id),
+            sql`${entidades.tipoEntidade} IS NOT NULL AND ${entidades.tipoEntidade} != ''`,
+          ),
+        )
+        .groupBy(entidades.tipoEntidade);
 
       for (const row of distinct_tipos) {
-        const legacyTipo = row.tipoEntidade;
+        const legacyTipo = (row as any).tipoEntidade as string | null;
         if (!legacyTipo) continue;
 
-        // Check if entidade_tipo already exists
         let tipoId = await db
           .select({ id: entidadeTipos.id })
           .from(entidadeTipos)
-          .where(and(
-            eq(entidadeTipos.empresaId, empresa.id),
-            eq(entidadeTipos.nome, legacyTipo)
-          ))
+          .where(
+            and(
+              eq(entidadeTipos.empresaId, empresa.id),
+              eq(entidadeTipos.nome, legacyTipo),
+            ),
+          )
           .then((res) => res[0]?.id);
 
-        // If not, create it
         if (!tipoId) {
           const newTipo = await db
             .insert(entidadeTipos)
             .values({
               empresaId: empresa.id,
               nome: legacyTipo,
-              cor: '#808080', // Default gray color
+              cor: "#808080",
               ativo: true,
               ordem: 0,
             })
@@ -1230,15 +1620,16 @@ export class DatabaseStorage implements IStorage {
           totalTiposCriados++;
         }
 
-        // Update all entidades with this tipoEntidade and null entidadeTipoId to point to the new tipo
         const updateResult = await db
           .update(entidades)
           .set({ entidadeTipoId: tipoId })
-          .where(and(
-            eq(entidades.empresaId, empresa.id),
-            eq(entidades.tipoEntidade, legacyTipo),
-            sql`${entidades.entidadeTipoId} IS NULL`
-          ))
+          .where(
+            and(
+              eq(entidades.empresaId, empresa.id),
+              eq(entidades.tipoEntidade, legacyTipo as any),
+              sql`${entidades.entidadeTipoId} IS NULL`,
+            ),
+          )
           .returning();
 
         totalEntidadesMigradas += updateResult.length;
@@ -1253,7 +1644,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getMarcasByEmpresaAtiva(empresaId: string): Promise<Marca[]> {
-    return db.select().from(marcas)
+    return db
+      .select()
+      .from(marcas)
       .where(and(eq(marcas.empresaId, empresaId), eq(marcas.ativa, true)))
       .orderBy(marcas.nome);
   }
@@ -1264,36 +1657,32 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createMarca(marca: InsertMarca): Promise<Marca> {
-    console.log("[DEBUG STORAGE] createMarca input:", JSON.stringify(marca));
-    try {
-      const result = await db
-        .insert(marcas)
-        .values(marca as any)
-        .returning();
-      console.log("[DEBUG STORAGE] createMarca result array length:", result.length, "data:", JSON.stringify(result[0]));
-      if (!result[0]) {
-        throw new Error("Insert returned empty result - possible constraint violation");
-      }
-      return result[0];
-    } catch (error) {
-      console.error("[ERROR STORAGE] createMarca failed:", error instanceof Error ? error.message : String(error));
-      throw error;
+    const result = await db.insert(marcas).values(marca as any).returning();
+    if (!result[0]) {
+      throw new Error(
+        "Insert returned empty result - possible constraint violation",
+      );
     }
+    return result[0];
   }
 
-  async updateMarca(id: string, marca: Partial<InsertMarca>, empresaId: string): Promise<Marca | undefined> {
-    console.log("[DEBUG STORAGE] updateMarca input:", { id, marca, empresaId });
+  async updateMarca(
+    id: string,
+    marca: Partial<InsertMarca>,
+    empresaId: string,
+  ): Promise<Marca | undefined> {
     const [updated] = await db
       .update(marcas)
       .set({ ...marca, updatedAt: new Date() })
       .where(and(eq(marcas.id, id), eq(marcas.empresaId, empresaId)))
       .returning();
-    console.log("[DEBUG STORAGE] updateMarca result:", updated);
     return updated;
   }
 
-  // FASE 3: Empresa management
-  async updateEmpresa(id: string, empresa: Partial<InsertEmpresa>): Promise<Empresa | undefined> {
+  async updateEmpresa(
+    id: string,
+    empresa: Partial<InsertEmpresa>,
+  ): Promise<Empresa | undefined> {
     const [updated] = await db
       .update(empresas)
       .set({ ...empresa, updatedAt: new Date() })
@@ -1302,22 +1691,24 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  // FASE 3: User management by empresa
   async getUtilizadoresByEmpresa(empresaId: string): Promise<User[]> {
-    return db.select().from(users)
+    return db
+      .select()
+      .from(users)
       .where(eq(users.empresaId, empresaId))
       .orderBy(users.email);
   }
 
   async createUtilizador(userData: UpsertUser): Promise<User> {
-    const [newUser] = await db
-      .insert(users)
-      .values(userData)
-      .returning();
+    const [newUser] = await db.insert(users).values(userData).returning();
     return newUser;
   }
 
-  async updateUtilizador(id: string, userData: Partial<UpsertUser>, empresaId: string): Promise<User | undefined> {
+  async updateUtilizador(
+    id: string,
+    userData: Partial<UpsertUser>,
+    empresaId: string,
+  ): Promise<User | undefined> {
     const [updated] = await db
       .update(users)
       .set({ ...userData, updatedAt: new Date() })
@@ -1326,14 +1717,16 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  // FASE 24: User settings management
   async getUserSettings(userId: string): Promise<User | undefined> {
     return await db.query.users.findFirst({
       where: eq(users.id, userId),
     });
   }
 
-  async updateUserSettings(userId: string, settings: any): Promise<User | undefined> {
+  async updateUserSettings(
+    userId: string,
+    settings: any,
+  ): Promise<User | undefined> {
     const [updated] = await db
       .update(users)
       .set({ userSettings: settings, updatedAt: new Date() })
@@ -1342,48 +1735,49 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  // FASE 26: Get nearby visit suggestions by GPS proximity
-  async getNearbyVisitSuggestions(empresaId: string, lat: number, lng: number, radiusMeters: number = 200): Promise<any> {
-    // Get all entidades for company with coordinates
+  async getNearbyVisitSuggestions(
+    empresaId: string,
+    lat: number,
+    lng: number,
+    radiusMeters: number = 200,
+  ): Promise<any> {
     const entidades_list = await db.query.entidades.findMany({
       where: and(
         eq(entidades.empresaId, empresaId),
         and(
           sql`${entidades.latitude} IS NOT NULL`,
-          sql`${entidades.longitude} IS NOT NULL`
-        )
+          sql`${entidades.longitude} IS NOT NULL`,
+        ),
       ),
       with: {
         visitas: {
           orderBy: desc(visitas.dataVisita),
           limit: 10,
-        }
-      }
+        },
+      },
     });
 
-    // Calculate distances and find nearest entidade within radius
     const entidadesWithDistance = entidades_list
-      .map(e => {
+      .map((e: any) => {
         const elat = parseFloat(e.latitude as any);
         const elng = parseFloat(e.longitude as any);
         const distance = haversineDistance(lat, lng, elat, elng);
         return { ...e, distance };
       })
-      .filter(e => e.distance <= radiusMeters)
+      .filter((e) => e.distance <= radiusMeters)
       .sort((a, b) => a.distance - b.distance);
 
     if (entidadesWithDistance.length === 0) {
       return null;
     }
 
-    const nearestEntidade = entidadesWithDistance[0];
+    const nearestEntidade: any = entidadesWithDistance[0];
     const today = new Date();
     const fiveJointDateAgo = new Date(today);
     fiveJointDateAgo.setDate(fiveJointDateAgo.getDate() - 5);
     const fiveDaysFromNow = new Date(today);
     fiveDaysFromNow.setDate(fiveDaysFromNow.getDate() + 5);
 
-    // Check for scheduled visits within ±5 days
     const agendadaVisita = nearestEntidade.visitas.find((v: any) => {
       const vDate = new Date(v.dataVisita);
       return vDate >= fiveJointDateAgo && vDate <= fiveDaysFromNow;
@@ -1391,22 +1785,24 @@ export class DatabaseStorage implements IStorage {
 
     if (agendadaVisita) {
       return {
-        tipo: 'visita_agendada',
+        tipo: "visita_agendada",
         entidadeId: nearestEntidade.id,
         entidadeNome: nearestEntidade.nome,
         visitaId: agendadaVisita.id,
-        dataVisita: agendadaVisita.dataVisita.toISOString().split('T')[0],
+        dataVisita: agendadaVisita.dataVisita.toISOString().split("T")[0],
         distanciaMetros: Math.round(nearestEntidade.distance),
       };
     }
 
-    // Check for old visits (no recent visit in 60+ days)
     const lastVisita = nearestEntidade.visitas[0];
     if (lastVisita) {
-      const daysSinceLastVisit = Math.floor((today.getTime() - new Date(lastVisita.dataVisita).getTime()) / (1000 * 60 * 60 * 24));
+      const daysSinceLastVisit = Math.floor(
+        (today.getTime() - new Date(lastVisita.dataVisita).getTime()) /
+          (1000 * 60 * 60 * 24),
+      );
       if (daysSinceLastVisit > 60) {
         return {
-          tipo: 'sem_visita_recente',
+          tipo: "sem_visita_recente",
           entidadeId: nearestEntidade.id,
           entidadeNome: nearestEntidade.nome,
           diasDesdeUltimaVisita: daysSinceLastVisit,
@@ -1418,22 +1814,23 @@ export class DatabaseStorage implements IStorage {
     return null;
   }
 
-  // Legacy Marcas (deprecated - for migration purposes)
   async getMarcas(): Promise<Marca[]> {
     return db.select().from(marcas).orderBy(marcas.nome);
   }
 
-  // Dashboard stats - FASE 2: filtered by empresaId
-  async getDashboardStats(empresaId: string, userId: string, userRole: 'admin' | 'agent') {
-    // Build where clause based on role - FASE 2: always include empresaId
+  async getDashboardStats(
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+  ) {
     let visitasWhereClause;
-    if (userRole === 'agent') {
+    if (userRole === "agent") {
       visitasWhereClause = and(
         eq(visitas.empresaId, empresaId),
         or(
           eq(visitas.createdByUserId, userId),
-          eq(visitas.assignedUserId, userId)
-        )
+          eq(visitas.assignedUserId, userId),
+        ),
       );
     } else {
       visitasWhereClause = eq(visitas.empresaId, empresaId);
@@ -1451,50 +1848,57 @@ export class DatabaseStorage implements IStorage {
 
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const visitasEstesMes = allVisitas.filter(v => new Date(v.dataVisita) >= startOfMonth).length;
+    const visitasEstesMes = allVisitas.filter(
+      (v) => new Date(v.dataVisita) >= startOfMonth,
+    ).length;
 
-    // Count entidades based on role - FASE 2: always include empresaId
     let entidadesCount;
-    if (userRole === 'admin') {
-      entidadesCount = await db.select({ count: sql<number>`count(distinct ${entidades.id})` })
+    if (userRole === "admin") {
+      entidadesCount = await db
+        .select({ count: sql<number>`count(distinct ${entidades.id})` })
         .from(entidades)
         .where(eq(entidades.empresaId, empresaId));
     } else {
-      entidadesCount = await db.select({ count: sql<number>`count(distinct ${entidades.id})` })
+      entidadesCount = await db
+        .select({ count: sql<number>`count(distinct ${entidades.id})` })
         .from(entidades)
-        .where(and(
-          eq(entidades.empresaId, empresaId),
-          or(
-            eq(entidades.createdByUserId, userId),
-            eq(entidades.assignedUserId, userId)
-          )
-        ));
+        .where(
+          and(
+            eq(entidades.empresaId, empresaId),
+            or(
+              eq(entidades.createdByUserId, userId),
+              eq(entidades.assignedUserId, userId),
+            ),
+          ),
+        );
     }
     const totalEntidades = Number(entidadesCount[0]?.count || 0);
 
-    // Count contactos based on role - FASE 2: always include empresaId
     let contactosCount;
-    if (userRole === 'admin') {
-      contactosCount = await db.select({ count: sql<number>`count(*)` })
+    if (userRole === "admin") {
+      contactosCount = await db
+        .select({ count: sql<number>`count(*)` })
         .from(contactos)
         .where(eq(contactos.empresaId, empresaId));
     } else {
-      contactosCount = await db.select({ count: sql<number>`count(*)` })
+      contactosCount = await db
+        .select({ count: sql<number>`count(*)` })
         .from(contactos)
-        .where(and(
-          eq(contactos.empresaId, empresaId),
-          or(
-            eq(contactos.createdByUserId, userId),
-            eq(contactos.assignedUserId, userId)
-          )
-        ));
+        .where(
+          and(
+            eq(contactos.empresaId, empresaId),
+            or(
+              eq(contactos.createdByUserId, userId),
+              eq(contactos.assignedUserId, userId),
+            ),
+          ),
+        );
     }
     const totalContactos = Number(contactosCount[0]?.count || 0);
 
-    // Count marca occurrences
     const marcasMap = new Map<string, number>();
-    allVisitas.forEach(visita => {
-      visita.marcasEntregues?.forEach(marca => {
+    (allVisitas as any[]).forEach((visita: any) => {
+      visita.marcasEntregues?.forEach((marca: string) => {
         marcasMap.set(marca, (marcasMap.get(marca) || 0) + 1);
       });
     });
@@ -1504,10 +1908,16 @@ export class DatabaseStorage implements IStorage {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    const proximasVisitas = allVisitas
-      .filter(v => v.proximaVisita && new Date(v.proximaVisita) >= now)
-      .sort((a, b) => new Date(a.proximaVisita!).getTime() - new Date(b.proximaVisita!).getTime())
-      .slice(0, 5);
+    const proximasVisitas = (allVisitas as any[])
+      .filter(
+        (v: any) => v.proximaVisita && new Date(v.proximaVisita) >= now,
+      )
+      .sort(
+        (a: any, b: any) =>
+          new Date(a.proximaVisita!).getTime() -
+          new Date(b.proximaVisita!).getTime(),
+      )
+      .slice(0, 5) as VisitaWithRelations[];
 
     return {
       totalEntidades,
@@ -1519,71 +1929,70 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  // Analytics - FASE 2: filtered by empresaId
-  async getAnalytics(empresaId: string, userId: string, userRole: 'admin' | 'agent', filters?: {
-    period?: number;
-    agente?: string;
-    tipoEntidade?: string;
-  }) {
+  async getAnalytics(
+    empresaId: string,
+    userId: string,
+    userRole: "admin" | "agent",
+    filters?: {
+      period?: number;
+      agente?: string;
+      tipoEntidade?: string;
+    },
+  ) {
     const periodDays = filters?.period || 365;
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - periodDays);
 
-    // Build RBAC where clauses - FASE 2: always include empresaId
-    let visitasWhereClause;
-    let tarefasWhereClause;
-    let entidadesWhereClause;
+    let visitasWhereClause: any;
+    let tarefasWhereClause: any;
+    let entidadesWhereClause: any;
 
-    if (userRole === 'agent') {
-      // Agents see only their created/assigned data
+    if (userRole === "agent") {
       visitasWhereClause = and(
         eq(visitas.empresaId, empresaId),
         or(
           eq(visitas.createdByUserId, userId),
-          eq(visitas.assignedUserId, userId)
-        )
+          eq(visitas.assignedUserId, userId),
+        ),
       );
       tarefasWhereClause = and(
         eq(tarefas.empresaId, empresaId),
         or(
           eq(tarefas.createdByUserId, userId),
-          eq(tarefas.assignedUserId, userId)
-        )
+          eq(tarefas.assignedUserId, userId),
+        ),
       );
       entidadesWhereClause = and(
         eq(entidades.empresaId, empresaId),
         or(
           eq(entidades.createdByUserId, userId),
-          eq(entidades.assignedUserId, userId)
-        )
+          eq(entidades.assignedUserId, userId),
+        ),
       );
     } else {
-      // Admin sees all within company
       visitasWhereClause = eq(visitas.empresaId, empresaId);
       tarefasWhereClause = eq(tarefas.empresaId, empresaId);
       entidadesWhereClause = eq(entidades.empresaId, empresaId);
     }
 
-    // Apply additional filters
-    if (filters?.agente && userRole === 'admin') {
+    if (filters?.agente && userRole === "admin") {
       visitasWhereClause = and(
         eq(visitas.empresaId, empresaId),
         or(
           eq(visitas.createdByUserId, filters.agente),
-          eq(visitas.assignedUserId, filters.agente)
-        )
+          eq(visitas.assignedUserId, filters.agente),
+        ),
       );
       tarefasWhereClause = and(
         eq(tarefas.empresaId, empresaId),
         or(
           eq(tarefas.createdByUserId, filters.agente),
-          eq(tarefas.assignedUserId, filters.agente)
-        )
+          eq(tarefas.assignedUserId, filters.agente),
+        ),
       );
     }
 
-    // Fetch all visitas with relations
-    const allVisitas = await db.query.visitas.findMany({
+    let allVisitas = await db.query.visitas.findMany({
       where: visitasWhereClause,
       with: {
         entidade: true,
@@ -1591,15 +2000,24 @@ export class DatabaseStorage implements IStorage {
       },
     });
 
-    // Filter by entity type if specified
-    let filteredVisitas = allVisitas;
-    if (filters?.tipoEntidade) {
-      filteredVisitas = allVisitas.filter(v => 
-        v.entidade?.tipoEntidade === filters.tipoEntidade
+    allVisitas = allVisitas.filter(
+      (v) => new Date(v.dataVisita) >= cutoffDate,
+    );
+
+    let filteredVisitas = allVisitas as VisitaWithRelations[];
+
+    if (
+      filters &&
+      !Array.isArray(filters) &&
+      'tipoEntidade' in filters &&
+      filters.tipoEntidade
+    ) {
+      filteredVisitas = filteredVisitas.filter(
+        (v) => v.entidade?.tipoEntidade === filters.tipoEntidade,
       );
     }
 
-    // Fetch all tarefas
+
     const allTarefas = await db.query.tarefas.findMany({
       where: tarefasWhereClause,
       with: {
@@ -1608,12 +2026,10 @@ export class DatabaseStorage implements IStorage {
       },
     });
 
-    // Fetch all entidades
     const allEntidades = await db.query.entidades.findMany({
       where: entidadesWhereClause,
     });
 
-    // === VISITS ANALYTICS ===
     const now = new Date();
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -1623,22 +2039,22 @@ export class DatabaseStorage implements IStorage {
     startOfWeek.setDate(startOfWeek.getDate() - 7);
 
     const total_visits = filteredVisitas.length;
-    const visits_last_7_days = filteredVisitas.filter(v => 
-      new Date(v.dataVisita) >= sevenDaysAgo
+    const visits_last_7_days = filteredVisitas.filter(
+      (v) => new Date(v.dataVisita) >= sevenDaysAgo,
     ).length;
-    const visits_last_30_days = filteredVisitas.filter(v => 
-      new Date(v.dataVisita) >= thirtyDaysAgo
+    const visits_last_30_days = filteredVisitas.filter(
+      (v) => new Date(v.dataVisita) >= thirtyDaysAgo,
     ).length;
 
-    // Visits by agent
     const visitsByAgentMap = new Map<string, number>();
     const userCache = new Map<string, User>();
 
-    for (const visita of filteredVisitas) {
-      const agentId = visita.createdByUserId || visita.userId || 'Desconhecido';
+    for (const visita of filteredVisitas as any[]) {
+      const agentId =
+        visita.createdByUserId || visita.userId || "Desconhecido";
       visitsByAgentMap.set(agentId, (visitsByAgentMap.get(agentId) || 0) + 1);
 
-      if (agentId !== 'Desconhecido' && !userCache.has(agentId)) {
+      if (agentId !== "Desconhecido" && !userCache.has(agentId)) {
         const user = await this.getUser(agentId);
         if (user) userCache.set(agentId, user);
       }
@@ -1647,45 +2063,54 @@ export class DatabaseStorage implements IStorage {
     const visits_by_agent = Array.from(visitsByAgentMap.entries())
       .map(([agentId, count]) => {
         const user = userCache.get(agentId);
-        const agentName = user ? `${user.firstName} ${user.lastName}` : 'Desconhecido';
+        const agentName = user
+          ? `${user.firstName} ${user.lastName}`
+          : "Desconhecido";
         return { agent: agentName, count };
       })
       .sort((a, b) => b.count - a.count);
 
-    // Visits by entity type
     const visitsByEntityTypeMap = new Map<string, number>();
-    filteredVisitas.forEach(v => {
-      const tipo = v.entidade?.tipoEntidade || 'Desconhecido';
+    (filteredVisitas as any[]).forEach((v: any) => {
+      const tipo = v.entidade?.tipoEntidade || "Desconhecido";
       visitsByEntityTypeMap.set(tipo, (visitsByEntityTypeMap.get(tipo) || 0) + 1);
     });
 
-    const visits_by_entity_type = Array.from(visitsByEntityTypeMap.entries())
-      .map(([tipo, count]) => ({ tipo, count }))
-      .sort((a, b) => b.count - a.count);
+    const visits_by_entity_type = Array.from(
+      visitsByEntityTypeMap.entries(),
+    ).map(([tipo, count]) => ({ tipo, count }));
 
-    // Visits by month (last 12 months)
     const visitsByMonthMap = new Map<string, number>();
     for (let i = 11; i >= 0; i--) {
       const date = new Date();
       date.setMonth(date.getMonth() - i);
-      const key = date.toLocaleDateString('pt-PT', { year: 'numeric', month: 'short' });
+      const key = date.toLocaleDateString("pt-PT", {
+        year: "numeric",
+        month: "short",
+      });
       visitsByMonthMap.set(key, 0);
     }
 
-    filteredVisitas.forEach(v => {
+    (filteredVisitas as any[]).forEach((v: any) => {
       const date = new Date(v.dataVisita);
-      const key = date.toLocaleDateString('pt-PT', { year: 'numeric', month: 'short' });
+      const key = date.toLocaleDateString("pt-PT", {
+        year: "numeric",
+        month: "short",
+      });
       if (visitsByMonthMap.has(key)) {
         visitsByMonthMap.set(key, (visitsByMonthMap.get(key) || 0) + 1);
       }
     });
 
-    const visits_by_month = Array.from(visitsByMonthMap.entries())
-      .map(([month, count]) => ({ month, count }));
+    const visits_by_month = Array.from(visitsByMonthMap.entries()).map(
+      ([month, count]) => ({ month, count }),
+    );
 
-    // Most visited entities
-    const entityVisitCountMap = new Map<string, { id: string; nome: string; count: number }>();
-    filteredVisitas.forEach(v => {
+    const entityVisitCountMap = new Map<
+      string,
+      { id: string; nome: string; count: number }
+    >();
+    (filteredVisitas as any[]).forEach((v: any) => {
       if (v.entidade) {
         const key = v.entidade.id.toString();
         const existing = entityVisitCountMap.get(key);
@@ -1705,31 +2130,34 @@ export class DatabaseStorage implements IStorage {
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
-    // GPS heatmap
-    const gps_heatmap = filteredVisitas
-      .filter(v => v.latitude && v.longitude)
-      .map(v => ({
-        lat: parseFloat(v.latitude!),
-        lon: parseFloat(v.longitude!),
+    const gps_heatmap = (filteredVisitas as any[])
+      .filter((v: any) => v.latitude && v.longitude)
+      .map((v: any) => ({
+        lat: parseFloat(v.latitude),
+        lon: parseFloat(v.longitude),
         date: new Date(v.dataVisita).toISOString(),
       }));
 
-    // === TASKS ANALYTICS ===
-    const tasks_pending = allTarefas.filter(t => t.status === 'pending').length;
-    const tasks_overdue = allTarefas.filter(t => 
-      t.status === 'pending' && t.dueDate && new Date(t.dueDate) < now
+    const tasks_pending = allTarefas.filter((t) => t.status === "pending").length;
+    const tasks_overdue = allTarefas.filter(
+      (t) =>
+        t.status === "pending" &&
+        t.dueDate &&
+        new Date(t.dueDate) < now,
     ).length;
-    const tasks_completed_this_week = allTarefas.filter(t => 
-      t.status === 'done' && t.updatedAt && new Date(t.updatedAt) >= startOfWeek
+    const tasks_completed_this_week = allTarefas.filter(
+      (t) =>
+        t.status === "done" &&
+        t.updatedAt &&
+        new Date(t.updatedAt) >= startOfWeek,
     ).length;
 
-    // Tasks by agent
     const tasksByAgentMap = new Map<string, number>();
-    for (const tarefa of allTarefas) {
-      const agentId = tarefa.createdByUserId || 'Desconhecido';
+    for (const tarefa of allTarefas as any[]) {
+      const agentId = tarefa.createdByUserId || "Desconhecido";
       tasksByAgentMap.set(agentId, (tasksByAgentMap.get(agentId) || 0) + 1);
 
-      if (agentId !== 'Desconhecido' && !userCache.has(agentId)) {
+      if (agentId !== "Desconhecido" && !userCache.has(agentId)) {
         const user = await this.getUser(agentId);
         if (user) userCache.set(agentId, user);
       }
@@ -1738,35 +2166,39 @@ export class DatabaseStorage implements IStorage {
     const tasks_by_agent = Array.from(tasksByAgentMap.entries())
       .map(([agentId, count]) => {
         const user = userCache.get(agentId);
-        const agentName = user ? `${user.firstName} ${user.lastName}` : 'Desconhecido';
+        const agentName = user
+          ? `${user.firstName} ${user.lastName}`
+          : "Desconhecido";
         return { agent: agentName, count };
       })
       .sort((a, b) => b.count - a.count);
 
-    // Tasks by status
     const tasksByStatusMap = new Map<string, number>();
-    allTarefas.forEach(t => {
-      const status = t.status === 'pending' ? 'Pendente' : 'Concluída';
+    allTarefas.forEach((t) => {
+      const status = t.status === "pending" ? "Pendente" : "Concluída";
       tasksByStatusMap.set(status, (tasksByStatusMap.get(status) || 0) + 1);
     });
 
-    const tasks_by_status = Array.from(tasksByStatusMap.entries())
-      .map(([status, count]) => ({ status, count }));
+    const tasks_by_status = Array.from(tasksByStatusMap.entries()).map(
+      ([status, count]) => ({ status, count }),
+    );
 
-    // Tasks by repeat interval
     const tasksByRepeatMap = new Map<string, number>();
-    allTarefas.forEach(t => {
-      const interval = t.repeatInterval === 'none' ? 'Sem repetição' : t.repeatInterval || 'Sem repetição';
+    allTarefas.forEach((t) => {
+      const interval =
+        t.repeatInterval === "none"
+          ? "Sem repetição"
+          : t.repeatInterval || "Sem repetição";
       tasksByRepeatMap.set(interval, (tasksByRepeatMap.get(interval) || 0) + 1);
     });
 
-    const tasks_by_repeat_interval = Array.from(tasksByRepeatMap.entries())
-      .map(([interval, count]) => ({ interval, count }));
+    const tasks_by_repeat_interval = Array.from(
+      tasksByRepeatMap.entries(),
+    ).map(([interval, count]) => ({ interval, count }));
 
-    // === ENTITIES ANALYTICS ===
     const entityTypeMap = new Map<string, number>();
-    allEntidades.forEach(e => {
-      const tipo = e.tipoEntidade || 'Desconhecido';
+    allEntidades.forEach((e: any) => {
+      const tipo = e.tipoEntidade || "Desconhecido";
       entityTypeMap.set(tipo, (entityTypeMap.get(tipo) || 0) + 1);
     });
 
@@ -1774,17 +2206,19 @@ export class DatabaseStorage implements IStorage {
       .map(([tipo, count]) => ({ tipo, count }))
       .sort((a, b) => b.count - a.count);
 
-    const entities_created_last_30_days = allEntidades.filter(e => 
-      e.createdAt && new Date(e.createdAt) >= thirtyDaysAgo
+    const entities_created_last_30_days = allEntidades.filter(
+      (e) => e.createdAt && new Date(e.createdAt) >= thirtyDaysAgo,
     ).length;
 
     const entities_with_visits_count = most_visited_entities;
 
-    // === BRANDS ANALYTICS ===
     const brandFrequencyMap = new Map<string, number>();
-    filteredVisitas.forEach(v => {
-      v.marcasEntregues?.forEach(marca => {
-        brandFrequencyMap.set(marca, (brandFrequencyMap.get(marca) || 0) + 1);
+    (filteredVisitas as any[]).forEach((v: any) => {
+      v.marcasEntregues?.forEach((marca: string) => {
+        brandFrequencyMap.set(
+          marca,
+          (brandFrequencyMap.get(marca) || 0) + 1,
+        );
       });
     });
 
@@ -1823,12 +2257,44 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  // ============ ODOO CONTACT REQUESTS (11B) ============
-
+  // ODOO CONTACT REQUESTS
   async createOdooContactRequest(
-    input: InsertOdooContactRequest
+    input: InsertOdooContactRequest,
   ): Promise<OdooContactRequest> {
     const data = insertOdooContactRequestSchema.parse(input);
+
+    const filters: any[] = [
+      eq(odooContactRequests.empresaId, data.empresaId),
+      eq(odooContactRequests.tipo, data.tipo),
+      or(
+        eq(odooContactRequests.estado, "pendente"),
+        eq(odooContactRequests.estado, "em_progresso"),
+      ),
+    ];
+
+    if (data.tipo === "contacto" && data.contactoId) {
+      filters.push(eq(odooContactRequests.contactoId, data.contactoId));
+    }
+
+    if (data.tipo === "entidade" && data.entidadeId) {
+      filters.push(eq(odooContactRequests.entidadeId, data.entidadeId));
+    }
+
+    if (filters.length > 3) {
+      const existing = await db
+        .select({ id: odooContactRequests.id })
+        .from(odooContactRequests)
+        .where(and(...filters))
+        .limit(1);
+
+      if (existing.length > 0) {
+        throw new Error(
+          data.tipo === "contacto"
+            ? "Já existe um pedido de CRM pendente ou em progresso para este contacto."
+            : "Já existe um pedido de CRM pendente ou em progresso para esta entidade.",
+        );
+      }
+    }
 
     const [created] = await db
       .insert(odooContactRequests)
@@ -1839,19 +2305,37 @@ export class DatabaseStorage implements IStorage {
   }
 
   async listOdooContactRequestsByEmpresa(
-    empresaId: string
-  ): Promise<OdooContactRequest[]> {
-    return db
-      .select()
+    empresaId: string,
+  ): Promise<(OdooContactRequest & { userName?: string | null })[]> {
+    const rows = await db
+      .select({
+        request: odooContactRequests,
+        user: users,
+      })
       .from(odooContactRequests)
+      .leftJoin(users, eq(odooContactRequests.userId, users.id))
       .where(eq(odooContactRequests.empresaId, empresaId))
       .orderBy(desc(odooContactRequests.createdAt));
+
+    return rows.map(({ request, user }) => {
+      let userName: string | null = null;
+
+      if (user) {
+        const fullName = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
+        userName = fullName || user.email || null;
+      }
+
+      return {
+        ...(request as any),
+        userName,
+      };
+    });
   }
 
   async updateOdooContactRequestStatus(
     empresaId: string,
     requestId: string,
-    estado: "pendente" | "em_progresso" | "concluido"
+    estado: "pendente" | "em_progresso" | "concluido",
   ): Promise<OdooContactRequest | null> {
     const [updated] = await db
       .update(odooContactRequests)
@@ -1859,8 +2343,8 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(odooContactRequests.id, requestId),
-          eq(odooContactRequests.empresaId, empresaId)
-        )
+          eq(odooContactRequests.empresaId, empresaId),
+        ),
       )
       .returning();
 

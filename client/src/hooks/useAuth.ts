@@ -14,7 +14,7 @@ export interface EmpresaAuthInfo {
   theme?: "light-business" | "dark-pro";
   uiSettings?: any;
   crmLeadsEnabled?: boolean;
-  // PROMPT 6: Odoo Contacts RBAC flags
+  // Odoo Contacts RBAC flags
   odooCrmEnabled?: boolean;
   odooContactsFeatureEnabled?: boolean;
   odooContactsAdminEnabled?: boolean;
@@ -29,21 +29,21 @@ export interface AuthUser extends User {
 
 export function useAuth() {
   const { data: user, isLoading } = useQuery<AuthUser>({
-    queryKey: ["/api/auth/user"],
+    // ✅ tem de bater certo com o endpoint do backend
+    queryKey: ["/api/auth/me"],
     retry: false,
   });
 
   const isAdmin = user?.role === "admin";
   const empresa = user?.empresa;
 
-  // PROMPT 7: Calcular flags derivadas para Odoo Contacts
+  // Flags Odoo
   const odooCrmEnabled = empresa?.odooCrmEnabled ?? false;
   const odooContactsFeatureEnabled = empresa?.odooContactsFeatureEnabled ?? false;
   const odooContactsAdminEnabled = empresa?.odooContactsAdminEnabled ?? true;
   const odooContactsAgentsEnabled = empresa?.odooContactsAgentsEnabled ?? false;
   const crmVisitsOdooSyncEnabled = empresa?.crmVisitsOdooSyncEnabled ?? false;
 
-  // PROMPT 7: Derivadas - Permissões RBAC (3-tier)
   const canUseOdooContacts =
     odooCrmEnabled &&
     odooContactsFeatureEnabled &&
@@ -61,7 +61,6 @@ export function useAuth() {
     isAuthenticated: !!user,
     isAdmin,
     empresa,
-    // PROMPT 7: Odoo Contacts derived permissions
     canUseOdooContacts,
     canSyncVisitsWithOdoo,
   };

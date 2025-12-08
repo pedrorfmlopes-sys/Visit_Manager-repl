@@ -6,12 +6,14 @@ import {
   type UserContext as BaseUserContext,
 } from "../authContext";
 
+import { db } from "../db";
+import { contactos } from "@shared/schema";
+import { eq, and, or, desc, type SQL } from "drizzle-orm";
+
 /**
  * No projeto atual tens dois perfis:
  *  - admin
  *  - agent  (utilizador normal)
- *
- * Vamos reutilizar exatamente estes valores.
  */
 export type UserRole = BaseUserContext["userRole"]; // 'admin' | 'agent'
 
@@ -24,10 +26,6 @@ export interface UserContext extends BaseUserContext {
 
 /**
  * Garante que existe contexto autenticado COM empresaId.
- *
- * - Usa req.userContext se o middleware ensureAuthenticated já o tiver carregado.
- * - Senão chama getUserContext(req).
- * - Se não houver empresaId, lança erro 401.
  */
 export async function requireUserContext(req: Request): Promise<UserContext> {
   const existing = (req as any).userContext as BaseUserContext | undefined;
@@ -35,9 +33,7 @@ export async function requireUserContext(req: Request): Promise<UserContext> {
   const base = existing ?? (await getUserContext(req));
 
   if (!base.empresaId) {
-    const error = new Error(
-      "Empresa não encontrada no contexto do utilizador",
-    );
+    const error = new Error("Empresa não encontrada no contexto do utilizador");
     (error as any).status = 401;
     throw error;
   }
@@ -47,9 +43,7 @@ export async function requireUserContext(req: Request): Promise<UserContext> {
     empresaId: base.empresaId,
   };
 
-  // Garante que todas as rotas seguintes usam sempre o mesmo contexto consistente
   (req as any).userContext = ctx;
-
   return ctx;
 }
 
@@ -62,14 +56,10 @@ export function isAdmin(ctx: UserContext): boolean {
 
 /**
  * RBAC para VISITAS:
- *
- *  - Obrigatório ter o mesmo empresaId.
- *  - admin  → pode ver TODAS as visitas da empresa.
- *  - agent  → só pode ver visitas onde é o responsável (userId).
  */
 export function canUserAccessVisit(
   ctx: UserContext,
-  visita: { empresaId: string; userId: string },
+  visita: { empresaId: string; userId: string }
 ): boolean {
   if (visita.empresaId !== ctx.empresaId) return false;
   if (isAdmin(ctx)) return true;
@@ -77,15 +67,55 @@ export function canUserAccessVisit(
 }
 
 /**
- * RBAC base para CONTACTOS:
- *
- *  - Obrigatório ter o mesmo empresaId.
- *  - A regra "apenas contactos associados às minhas visitas"
- *    vai ser garantida nas queries das rotas (join com visitas).
+ * RBAC base para CONTACTOS
  */
 export function canUserAccessContact(
   ctx: UserContext,
-  contacto: { empresaId: string },
+  contacto: { empresaId: string }
 ): boolean {
   return contacto.empresaId === ctx.empresaId;
+}
+
+/**
+ * =====================================================================
+ *  ✔ FUNÇÃO CORRETA — listContactosForUser
+ * =====================================================================
+ */
+export async function listContactosForUser({
+  empresaId,
+  userId,
+  userRole,
+  entidadeId,
+}: {
+  empresaId: string;
+  userId: string;
+  userRole: "admin" | "agent";
+  entidadeId?: string;
+}) {
+  let whereClause: SQL<unknown> = eq(contactos.empresaId, empresaId);
+
+  if (entidadeId) {
+    whereClause = and(whereClause, eq(contactos.entidadeId, entidadeId)) as SQL<unknown>;
+  }
+
+  // Agents só podem ver os seus contactos
+  if (userRole === "agent") {
+    whereClause = and(
+      whereClause,
+      or(
+        eq(contactos.createdByUserId, userId),
+        eq(contactos.assignedUserId, userId)
+      )
+    ) as SQL<unknown>;
+  }
+
+  return db.query.contactos.findMany({
+    where: whereClause,
+    orderBy: desc(contactos.createdAt),
+    with: {
+      entidade: true,
+      assignedUser: true,
+      createdByUser: true,
+    },
+  });
 }

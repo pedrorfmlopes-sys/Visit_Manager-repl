@@ -521,13 +521,19 @@ export default function EntidadeDetail() {
         throw new Error(data.message || `HTTP ${response.status}`);
       }
 
-      queryClient.invalidateQueries({ queryKey: ["/api/entidades", entidadeId] });
-      
+      // refresca entidade em cache
+      queryClient.invalidateQueries({
+        queryKey: ["/api/entidades", entidadeId],
+      });
+
+      // limpa estado do diálogo de pesquisa
       setOdooSearchOpen(false);
       setOdooSearchResults([]);
       setOdooSearchTerm("");
       setOdooSearchError(null);
+      setOdooSearchNotConfigured(false);
 
+      // volta a carregar parceiro
       setTimeout(() => {
         handleFetchOdooPartner();
       }, 100);
@@ -536,13 +542,21 @@ export default function EntidadeDetail() {
         title: "Sucesso",
         description: `Entidade ligada ao parceiro Odoo "${partner.name}"`,
       });
+
+      // 🔁 Tal como no contacto: só redireciona se viemos da lista de pedidos
+      const searchParams = new URLSearchParams(window.location.search);
+      const from = searchParams.get("from");
+      if (from === "odoo-requests") {
+        setLocation("/admin/odoo-contact-requests");
+      }
     } catch (error: any) {
       console.error("[Odoo] Error linking entidade to partner:", error);
       setOdooSearchError(
-        error?.message || "Erro ao ligar a entidade ao parceiro Odoo."
+        error?.message || "Erro ao ligar a entidade ao parceiro Odoo.",
       );
     }
   };
+
 
   const handleUnlinkOdooPartnerFromEntidade = async () => {
     if (!entidade?.id) return;

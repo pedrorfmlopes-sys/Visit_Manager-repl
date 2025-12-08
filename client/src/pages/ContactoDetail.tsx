@@ -1,16 +1,50 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, User, Phone, Mail, Building2, Edit, Share2, MessageCircle, Link as LinkIcon, Copy, FileText, Globe, MapPin, Linkedin, Instagram, Facebook, Sparkles, Trash2, Calendar, Store, AlertCircle, Flag } from "lucide-react";
+import {
+  ArrowLeft,
+  User,
+  Phone,
+  Mail,
+  Building2,
+  Edit,
+  Share2,
+  MessageCircle,
+  Link as LinkIcon,
+  Copy,
+  FileText,
+  Globe,
+  MapPin,
+  Linkedin,
+  Instagram,
+  Facebook,
+  Sparkles,
+  Trash2,
+  Calendar,
+  Store,
+  AlertCircle,
+  Flag,
+} from "lucide-react";
 import { SiX } from "react-icons/si";
 import OdooLogo from "@/assets/crm/odoo.svg";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ShareDialog, useShareActions } from "@/components/ShareDialog";
 import { EmailAIDialog } from "@/components/EmailAIDialog";
@@ -19,10 +53,17 @@ import { formatContactForSharing } from "@/lib/shareFormatters";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { subDays, subMonths, startOfYear, endOfYear, format } from "date-fns";
 import { pt } from "date-fns/locale";
 import type { ContactoWithRelations, VisitaWithRelations } from "@shared/schema";
+import { OdooContactRequestDialogButton } from "@/components/OdooContactRequestDialogButton";
 
 // Type to normalize different response formats from /api/visitas
 type VisitasResponse =
@@ -51,8 +92,10 @@ export default function ContactoDetail() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   // FASE 5: Filter period for visitas
-  const [periodFilter, setPeriodFilter] = useState<"30" | "90" | "180" | "365" | "all">("90");
-  
+  const [periodFilter, setPeriodFilter] = useState<
+    "30" | "90" | "180" | "365" | "all"
+  >("90");
+
   const [odooPartner, setOdooPartner] = useState<OdooPartner | null>(null);
   const [odooPartnerLoading, setOdooPartnerLoading] = useState(false);
   const [odooPartnerError, setOdooPartnerError] = useState<string | null>(null);
@@ -63,8 +106,9 @@ export default function ContactoDetail() {
   const [odooSearchLoading, setOdooSearchLoading] = useState(false);
   const [odooSearchError, setOdooSearchError] = useState<string | null>(null);
   const [odooSearchNotConfigured, setOdooSearchNotConfigured] = useState(false);
-  
-  const { isOnline, shareViaWhatsApp, shareViaEmail, copyToClipboard, copyLink } = useShareActions();
+
+  const { isOnline, shareViaWhatsApp, shareViaEmail, copyToClipboard, copyLink } =
+    useShareActions();
 
   const { empresa, canUseOdooContacts, isAdmin } = useAuth();
   const leadsEnabled =
@@ -76,11 +120,6 @@ export default function ContactoDetail() {
   const odooContactsFeatureEnabled =
     empresa?.odooContactsFeatureEnabled ?? false;
   const noPermissionMsg = empresa?.odooContactsNoPermissionMessage;
-
-  // PROMPT 11D: Odoo Contact Request state
-  const [requestMessage, setRequestMessage] = useState("");
-  const [isSendingRequest, setIsSendingRequest] = useState(false);
-  const [requestFeedback, setRequestFeedback] = useState<string | null>(null);
 
   const { data: contacto, isLoading } = useQuery<ContactoWithRelations>({
     queryKey: ["/api/contactos", contactoId],
@@ -106,39 +145,38 @@ export default function ContactoDetail() {
     }
   };
 
-  const { data: visitasResponse, isLoading: isLoadingVisitas } = useQuery<VisitasResponse>({
-    queryKey: ["/api/visitas", "contacto-visitas", contactoId, periodFilter],
-    enabled: !!contactoId,
-    queryFn: async () => {
-      const { from, to } = getDateRange();
+  const { data: visitasResponse, isLoading: isLoadingVisitas } =
+    useQuery<VisitasResponse>({
+      queryKey: ["/api/visitas", "contacto-visitas", contactoId, periodFilter],
+      enabled: !!contactoId,
+      queryFn: async () => {
+        const { from, to } = getDateRange();
 
-      const params = new URLSearchParams({
-        contactoId: contactoId || "",
-        from: from.toISOString(),
-        to: to.toISOString(),
-      });
+        const params = new URLSearchParams({
+          contactoId: contactoId || "",
+          from: from.toISOString(),
+          to: to.toISOString(),
+        });
 
-      const response = await fetch(`/api/visitas?${params.toString()}`, {
-        credentials: "include",
-      });
+        const response = await fetch(`/api/visitas?${params.toString()}`, {
+          credentials: "include",
+        });
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch visitas");
-      }
+        if (!response.ok) {
+          throw new Error("Failed to fetch visitas");
+        }
 
-      const data = await response.json();
-      console.debug("[DEBUG ContactoDetail] /api/visitas response:", data);
+        const data = await response.json();
+        console.debug("[DEBUG ContactoDetail] /api/visitas response:", data);
 
-      return data;
-    },
-  });
+        return data;
+      },
+    });
 
   // Normalize response to array format
   const visitasDoContacto: VisitaWithRelations[] = Array.isArray(visitasResponse)
     ? visitasResponse
-    : (visitasResponse?.visitas ??
-       (visitasResponse as any)?.items ??
-       []);
+    : visitasResponse?.visitas ?? (visitasResponse as any)?.items ?? [];
 
   // FASE CRM-LEADS-ENT-CONTACTO-STEP1: Load leads for this contacto
   type Lead = {
@@ -152,21 +190,22 @@ export default function ContactoDetail() {
     marcas?: { id: string; nome: string }[] | null;
   };
 
-  type LeadsResponse = 
+  type LeadsResponse =
     | { leads: Lead[] }
     | { success: false; notEnabled?: boolean; message?: string };
 
-  const { data: contactoLeadsData, isLoading: contactoLeadsLoading } = useQuery<LeadsResponse>({
-    queryKey: ["/api/crm/leads", { contactoId: contacto?.id }],
-    enabled: !!contacto?.id && leadsEnabled,
-    queryFn: async () => {
-      const params = new URLSearchParams({ contactoId: contacto!.id });
-      const resp = await fetch(`/api/crm/leads?${params.toString()}`, {
-        credentials: "include",
-      });
-      return resp.json();
-    },
-  });
+  const { data: contactoLeadsData, isLoading: contactoLeadsLoading } =
+    useQuery<LeadsResponse>({
+      queryKey: ["/api/crm/leads", { contactoId: contacto?.id }],
+      enabled: !!contacto?.id && leadsEnabled,
+      queryFn: async () => {
+        const params = new URLSearchParams({ contactoId: contacto!.id });
+        const resp = await fetch(`/api/crm/leads?${params.toString()}`, {
+          credentials: "include",
+        });
+        return resp.json();
+      },
+    });
 
   const contactoLeadsDisabled =
     contactoLeadsData &&
@@ -175,13 +214,15 @@ export default function ContactoDetail() {
     contactoLeadsData.notEnabled === true;
 
   const contactoLeads: Lead[] =
-    contactoLeadsData && "leads" in contactoLeadsData ? contactoLeadsData.leads : [];
+    contactoLeadsData && "leads" in contactoLeadsData
+      ? contactoLeadsData.leads
+      : [];
 
   // Delete contacto mutation
   const deleteContactoMutation = useMutation({
     mutationFn: async () => {
       if (!contactoId) throw new Error("Contacto ID is required");
-      await apiRequest('DELETE', `/api/contactos/${contactoId}`);
+      await apiRequest("DELETE", `/api/contactos/${contactoId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contactos"] });
@@ -226,11 +267,11 @@ export default function ContactoDetail() {
 
   // Helper functions for quick actions
   const cleanPhoneNumber = (phone: string) => {
-    const cleaned = phone.replace(/\D/g, '');
-    if (!cleaned.startsWith('351') && !cleaned.startsWith('+')) {
+    const cleaned = phone.replace(/\D/g, "");
+    if (!cleaned.startsWith("351") && !cleaned.startsWith("+")) {
       return `351${cleaned}`;
     }
-    return cleaned.replace(/^\+/, '');
+    return cleaned.replace(/^\+/, "");
   };
 
   const handlePhoneCall = () => {
@@ -250,7 +291,7 @@ export default function ContactoDetail() {
     }
     if (contacto.telemovel) {
       const cleanNumber = cleanPhoneNumber(contacto.telemovel);
-      window.open(`https://wa.me/${cleanNumber}`, '_blank');
+      window.open(`https://wa.me/${cleanNumber}`, "_blank");
     }
   };
 
@@ -278,7 +319,7 @@ export default function ContactoDetail() {
       return;
     }
     if (contacto.entidade?.website) {
-      window.open(contacto.entidade.website, '_blank');
+      window.open(contacto.entidade.website, "_blank");
     }
   };
 
@@ -292,9 +333,14 @@ export default function ContactoDetail() {
       return;
     }
     if (contacto.entidade?.morada) {
-      const address = `${contacto.entidade.morada}, ${contacto.entidade.cidade || ''} ${contacto.entidade.codigoPostal || ''}`.trim();
+      const address = `${contacto.entidade.morada}, ${
+        contacto.entidade.cidade || ""
+      } ${contacto.entidade.codigoPostal || ""}`.trim();
       const encodedAddress = encodeURIComponent(address);
-      window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, '_blank');
+      window.open(
+        `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`,
+        "_blank",
+      );
     }
   };
 
@@ -307,7 +353,7 @@ export default function ContactoDetail() {
       });
       return;
     }
-    window.open(url, '_blank');
+    window.open(url, "_blank");
   };
 
   const handleFetchOdooPartner = async () => {
@@ -324,10 +370,13 @@ export default function ContactoDetail() {
     setOdooNotConfigured(false);
 
     try {
-      const response = await fetch(`/api/integrations/odoo/partner/${partnerIdNum}`, {
-        method: "GET",
-        credentials: "include",
-      });
+      const response = await fetch(
+        `/api/integrations/odoo/partner/${partnerIdNum}`,
+        {
+          method: "GET",
+          credentials: "include",
+        },
+      );
 
       if (!response.ok) {
         if (response.status === 404) {
@@ -368,10 +417,13 @@ export default function ContactoDetail() {
     setOdooSearchResults([]);
 
     try {
-      const response = await fetch(`/api/integrations/odoo/search-partner?q=${encodeURIComponent(q)}`, {
-        method: "GET",
-        credentials: "include",
-      });
+      const response = await fetch(
+        `/api/integrations/odoo/search-partner?q=${encodeURIComponent(q)}`,
+        {
+          method: "GET",
+          credentials: "include",
+        },
+      );
 
       const data = await response.json();
 
@@ -389,7 +441,7 @@ export default function ContactoDetail() {
     } catch (error: any) {
       console.error("[Odoo] Error searching partners for contacto:", error);
       setOdooSearchError(
-        error?.message || "Erro ao pesquisar parceiros no Odoo."
+        error?.message || "Erro ao pesquisar parceiros no Odoo.",
       );
     } finally {
       setOdooSearchLoading(false);
@@ -400,14 +452,17 @@ export default function ContactoDetail() {
     if (!contacto?.id) return;
 
     try {
-      const response = await fetch(`/api/contactos/${contacto.id}/odoo-link`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `/api/contactos/${contacto.id}/odoo-link`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({ odooPartnerId: partner.id }),
         },
-        credentials: "include",
-        body: JSON.stringify({ odooPartnerId: partner.id }),
-      });
+      );
 
       const data = await response.json();
 
@@ -415,14 +470,19 @@ export default function ContactoDetail() {
         throw new Error(data.message || `HTTP ${response.status}`);
       }
 
-      queryClient.invalidateQueries({ queryKey: ["/api/contactos", contactoId] });
+      // refresca o contacto em cache
+      queryClient.invalidateQueries({
+        queryKey: ["/api/contactos", contactoId],
+      });
 
+      // limpa estado do diálogo de pesquisa
       setOdooSearchOpen(false);
       setOdooSearchResults([]);
       setOdooSearchTerm("");
       setOdooSearchError(null);
       setOdooSearchNotConfigured(false);
 
+      // limpa estado de parceiro actual e volta a carregá-lo
       setOdooPartner(null);
       setOdooNotConfigured(false);
       setOdooPartnerError(null);
@@ -435,26 +495,38 @@ export default function ContactoDetail() {
         title: "Sucesso",
         description: `Contacto ligado ao parceiro Odoo "${partner.name}"`,
       });
+
+      // 🔁 Só redireciona para a lista de pedidos se o detalhe
+      // tiver sido aberto a partir de /admin/odoo-contact-requests
+      const searchParams = new URLSearchParams(window.location.search);
+      const from = searchParams.get("from");
+      if (from === "odoo-requests") {
+        setLocation("/admin/odoo-contact-requests");
+      }
     } catch (error: any) {
       console.error("[Odoo] Error linking contacto to partner:", error);
       setOdooSearchError(
-        error?.message || "Erro ao ligar o contacto ao parceiro Odoo."
+        error?.message || "Erro ao ligar o contacto ao parceiro Odoo.",
       );
     }
   };
+
 
   const handleUnlinkOdooPartnerFromContacto = async () => {
     if (!contacto?.id) return;
 
     try {
-      const response = await fetch(`/api/contactos/${contacto.id}/odoo-link`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `/api/contactos/${contacto.id}/odoo-link`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({ odooPartnerId: null }),
         },
-        credentials: "include",
-        body: JSON.stringify({ odooPartnerId: null }),
-      });
+      );
 
       const data = await response.json();
 
@@ -487,18 +559,20 @@ export default function ContactoDetail() {
     } catch (error: any) {
       console.error("[Odoo] Error unlinking contacto from partner:", error);
       setOdooSearchError(
-        error?.message || "Erro ao remover ligação ao parceiro Odoo."
+        error?.message || "Erro ao remover ligação ao parceiro Odoo.",
       );
       toast({
         title: "Erro",
-        description: error?.message || "Não foi possível remover a ligação ao parceiro Odoo.",
+        description:
+          error?.message ||
+          "Não foi possível remover a ligação ao parceiro Odoo.",
         variant: "destructive",
       });
     }
   };
 
   const shareText = formatContactForSharing(contacto);
-  
+
   const shareOptions = [
     {
       icon: MessageCircle,
@@ -549,14 +623,19 @@ export default function ContactoDetail() {
               <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
                 {contacto.nome}
                 {contacto.odooPartnerId && (
-                  <span className="inline-flex items-center gap-1 text-[11px] rounded-full border px-2 py-0.5 text-muted-foreground" data-testid="chip-odoo-ligado-contacto">
+                  <span
+                    className="inline-flex items-center gap-1 text-[11px] rounded-full border px-2 py-0.5 text-muted-foreground"
+                    data-testid="chip-odoo-ligado-contacto"
+                  >
                     <img src={OdooLogo} alt="Odoo" className="h-3 w-auto" />
                     <span>Ligado ao CRM</span>
                   </span>
                 )}
               </h1>
               {contacto.funcao && (
-                <p className="text-sm text-muted-foreground">{contacto.funcao}</p>
+                <p className="text-sm text-muted-foreground">
+                  {contacto.funcao}
+                </p>
               )}
             </div>
           </div>
@@ -602,7 +681,8 @@ export default function ContactoDetail() {
                 Leads deste contacto
               </CardTitle>
               <CardDescription className="text-xs">
-                Oportunidades associadas a este contacto, a partir de visitas ou outras fontes.
+                Oportunidades associadas a este contacto, a partir de visitas ou
+                outras fontes.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -613,55 +693,70 @@ export default function ContactoDetail() {
               )}
 
               {!contactoLeadsDisabled && contactoLeadsLoading && (
-                <p className="text-sm text-muted-foreground">A carregar leads...</p>
-              )}
-
-              {!contactoLeadsDisabled && !contactoLeadsLoading && contactoLeads.length === 0 && (
                 <p className="text-sm text-muted-foreground">
-                  Ainda não existem leads associados a este contacto.
+                  A carregar leads...
                 </p>
               )}
 
-              {!contactoLeadsDisabled && !contactoLeadsLoading && contactoLeads.length > 0 && (
-                <div className="space-y-2">
-                  {contactoLeads.map((lead) => (
-                    <div
-                      key={lead.id}
-                      className="flex items-center justify-between border rounded-md px-3 py-2 text-sm"
-                      data-testid={`row-lead-contacto-${lead.id}`}
-                    >
-                      <div>
-                        <div className="font-medium">{lead.titulo}</div>
-                        <div className="text-xs text-muted-foreground space-y-1">
-                          {lead.marcas && lead.marcas.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {lead.marcas.slice(0, 2).map((marca) => (
-                                <Badge key={marca.id} variant="secondary" className="text-xs" data-testid={`badge-lead-contacto-marca-${marca.id}`}>
-                                  {marca.nome}
-                                </Badge>
-                              ))}
-                              {lead.marcas.length > 2 && (
-                                <Badge variant="outline" className="text-xs" data-testid={`badge-lead-contacto-marcas-more-${lead.id}`}>
-                                  +{lead.marcas.length - 2}
-                                </Badge>
-                              )}
-                            </div>
-                          )}
-                          <div>Estado: {lead.estado}</div>
+              {!contactoLeadsDisabled &&
+                !contactoLeadsLoading &&
+                contactoLeads.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Ainda não existem leads associados a este contacto.
+                  </p>
+                )}
+
+              {!contactoLeadsDisabled &&
+                !contactoLeadsLoading &&
+                contactoLeads.length > 0 && (
+                  <div className="space-y-2">
+                    {contactoLeads.map((lead) => (
+                      <div
+                        key={lead.id}
+                        className="flex items-center justify-between border rounded-md px-3 py-2 text-sm"
+                        data-testid={`row-lead-contacto-${lead.id}`}
+                      >
+                        <div>
+                          <div className="font-medium">{lead.titulo}</div>
+                          <div className="text-xs text-muted-foreground space-y-1">
+                            {lead.marcas && lead.marcas.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {lead.marcas.slice(0, 2).map((marca) => (
+                                  <Badge
+                                    key={marca.id}
+                                    variant="secondary"
+                                    className="text-xs"
+                                    data-testid={`badge-lead-contacto-marca-${marca.id}`}
+                                  >
+                                    {marca.nome}
+                                  </Badge>
+                                ))}
+                                {lead.marcas.length > 2 && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-xs"
+                                    data-testid={`badge-lead-contacto-marcas-more-${lead.id}`}
+                                  >
+                                    +{lead.marcas.length - 2}
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
+                            <div>Estado: {lead.estado}</div>
+                          </div>
+                        </div>
+                        <div className="text-right text-xs">
+                          {lead.valorPrevisto
+                            ? `${lead.valorPrevisto} ${lead.moeda || "EUR"}`
+                            : "—"}
+                          <div className="text-[10px] text-muted-foreground">
+                            {new Date(lead.createdAt).toLocaleDateString()}
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right text-xs">
-                        {lead.valorPrevisto
-                          ? `${lead.valorPrevisto} ${lead.moeda || "EUR"}`
-                          : "—"}
-                        <div className="text-[10px] text-muted-foreground">
-                          {new Date(lead.createdAt).toLocaleDateString()}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
             </CardContent>
           </Card>
         )}
@@ -679,7 +774,9 @@ export default function ContactoDetail() {
                 <p className="text-sm text-muted-foreground">Entidade</p>
                 <div
                   className="flex items-center gap-2 text-primary hover:underline cursor-pointer font-medium"
-                  onClick={() => setLocation(`/entidades/${contacto.entidade!.id}`)}
+                  onClick={() =>
+                    setLocation(`/entidades/${contacto.entidade!.id}`)
+                  }
                   data-testid="link-entidade"
                 >
                   <Building2 className="h-4 w-4" />
@@ -721,7 +818,10 @@ export default function ContactoDetail() {
                 <Separator />
                 <div>
                   <p className="text-sm text-muted-foreground">Observações</p>
-                  <p className="text-sm whitespace-pre-wrap" data-testid="text-observacoes">
+                  <p
+                    className="text-sm whitespace-pre-wrap"
+                    data-testid="text-observacoes"
+                  >
                     {contacto.observacoes}
                   </p>
                 </div>
@@ -785,7 +885,9 @@ export default function ContactoDetail() {
                 <QuickActionButton
                   icon={Linkedin}
                   label="LinkedIn"
-                  onClick={() => handleSocialLink(contacto.entidade!.linkedinUrl!)}
+                  onClick={() =>
+                    handleSocialLink(contacto.entidade!.linkedinUrl!)
+                  }
                   disabled={!isOnline}
                   testId="button-quick-linkedin"
                 />
@@ -794,7 +896,9 @@ export default function ContactoDetail() {
                 <QuickActionButton
                   icon={Instagram}
                   label="Instagram"
-                  onClick={() => handleSocialLink(contacto.entidade!.instagramUrl!)}
+                  onClick={() =>
+                    handleSocialLink(contacto.entidade!.instagramUrl!)
+                  }
                   disabled={!isOnline}
                   testId="button-quick-instagram"
                 />
@@ -803,7 +907,9 @@ export default function ContactoDetail() {
                 <QuickActionButton
                   icon={Facebook}
                   label="Facebook"
-                  onClick={() => handleSocialLink(contacto.entidade!.facebookUrl!)}
+                  onClick={() =>
+                    handleSocialLink(contacto.entidade!.facebookUrl!)
+                  }
                   disabled={!isOnline}
                   testId="button-quick-facebook"
                 />
@@ -812,7 +918,9 @@ export default function ContactoDetail() {
                 <QuickActionButton
                   icon={SiX}
                   label="X"
-                  onClick={() => handleSocialLink(contacto.entidade!.xUrl!)}
+                  onClick={() =>
+                    handleSocialLink(contacto.entidade!.xUrl!)
+                  }
                   disabled={!isOnline}
                   testId="button-quick-x"
                 />
@@ -838,9 +946,13 @@ export default function ContactoDetail() {
                 Odoo
               </CardTitle>
               {contacto.odooPartnerId ? (
-                <CardDescription>Detalhes do parceiro Odoo associado a este contacto.</CardDescription>
+                <CardDescription>
+                  Detalhes do parceiro Odoo associado a este contacto.
+                </CardDescription>
               ) : (
-                <CardDescription>Integração com parceiros Odoo para este contacto.</CardDescription>
+                <CardDescription>
+                  Integração com parceiros Odoo para este contacto.
+                </CardDescription>
               )}
             </CardHeader>
             <CardContent className="space-y-3">
@@ -850,7 +962,8 @@ export default function ContactoDetail() {
                     Este contacto ainda não está ligado a nenhum parceiro Odoo.
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Podes ligar este contacto a um parceiro Odoo pesquisando por nome ou email.
+                    Podes ligar este contacto a um parceiro Odoo pesquisando por
+                    nome ou email.
                   </p>
                   <div className="mt-3">
                     <Button
@@ -869,8 +982,13 @@ export default function ContactoDetail() {
               ) : (
                 <>
                   <p className="text-sm">
-                    <span className="text-muted-foreground">Ligado ao parceiro Odoo </span>
-                    <span className="font-medium" data-testid="text-odoo-partner-id">
+                    <span className="text-muted-foreground">
+                      Ligado ao parceiro Odoo{" "}
+                    </span>
+                    <span
+                      className="font-medium"
+                      data-testid="text-odoo-partner-id"
+                    >
                       #{contacto.odooPartnerId}
                     </span>
                   </p>
@@ -883,7 +1001,9 @@ export default function ContactoDetail() {
                       disabled={odooPartnerLoading}
                       data-testid="button-odoo-fetch-partner-contacto"
                     >
-                      {odooPartnerLoading ? "A carregar..." : "Ver detalhes do parceiro"}
+                      {odooPartnerLoading
+                        ? "A carregar..."
+                        : "Ver detalhes do parceiro"}
                     </Button>
                     <Button
                       size="sm"
@@ -901,13 +1021,17 @@ export default function ContactoDetail() {
                       <AlertCircle className="h-4 w-4" />
                       <AlertTitle>Integração não configurada</AlertTitle>
                       <AlertDescription>
-                        Integração Odoo ainda não está configurada para esta empresa.
+                        Integração Odoo ainda não está configurada para esta
+                        empresa.
                       </AlertDescription>
                     </Alert>
                   )}
 
                   {odooPartnerError && (
-                    <Alert variant="destructive" data-testid="alert-odoo-error">
+                    <Alert
+                      variant="destructive"
+                      data-testid="alert-odoo-error"
+                    >
                       <AlertCircle className="h-4 w-4" />
                       <AlertTitle>Erro</AlertTitle>
                       <AlertDescription>{odooPartnerError}</AlertDescription>
@@ -918,15 +1042,23 @@ export default function ContactoDetail() {
                     <div className="space-y-3 pt-2 border-t">
                       <div>
                         <p className="text-sm text-muted-foreground">Nome</p>
-                        <p className="font-medium" data-testid="text-odoo-partner-name">
+                        <p
+                          className="font-medium"
+                          data-testid="text-odoo-partner-name"
+                        >
                           {odooPartner.name}
                         </p>
                       </div>
 
                       {odooPartner.email && (
                         <div>
-                          <p className="text-sm text-muted-foreground">Email</p>
-                          <p className="text-sm" data-testid="text-odoo-partner-email">
+                          <p className="text-sm text-muted-foreground">
+                            Email
+                          </p>
+                          <p
+                            className="text-sm"
+                            data-testid="text-odoo-partner-email"
+                          >
                             {odooPartner.email}
                           </p>
                         </div>
@@ -934,9 +1066,16 @@ export default function ContactoDetail() {
 
                       {(odooPartner.phone || odooPartner.mobile) && (
                         <div>
-                          <p className="text-sm text-muted-foreground">Telefone</p>
-                          <p className="text-sm" data-testid="text-odoo-partner-phone">
-                            {[odooPartner.phone, odooPartner.mobile].filter(Boolean).join(" / ")}
+                          <p className="text-sm text-muted-foreground">
+                            Telefone
+                          </p>
+                          <p
+                            className="text-sm"
+                            data-testid="text-odoo-partner-phone"
+                          >
+                            {[odooPartner.phone, odooPartner.mobile]
+                              .filter(Boolean)
+                              .join(" / ")}
                           </p>
                         </div>
                       )}
@@ -944,16 +1083,26 @@ export default function ContactoDetail() {
                       {odooPartner.vat && (
                         <div>
                           <p className="text-sm text-muted-foreground">NIF</p>
-                          <p className="text-sm" data-testid="text-odoo-partner-vat">
+                          <p
+                            className="text-sm"
+                            data-testid="text-odoo-partner-vat"
+                          >
                             {odooPartner.vat}
                           </p>
                         </div>
                       )}
 
-                      {(odooPartner.street || odooPartner.city || odooPartner.country) && (
+                      {(odooPartner.street ||
+                        odooPartner.city ||
+                        odooPartner.country) && (
                         <div>
-                          <p className="text-sm text-muted-foreground">Localização</p>
-                          <p className="text-sm" data-testid="text-odoo-partner-location">
+                          <p className="text-sm text-muted-foreground">
+                            Localização
+                          </p>
+                          <p
+                            className="text-sm"
+                            data-testid="text-odoo-partner-location"
+                          >
                             {[odooPartner.street, odooPartner.city, odooPartner.country]
                               .filter(Boolean)
                               .join(", ")}
@@ -968,7 +1117,7 @@ export default function ContactoDetail() {
           </Card>
         )}
 
-        {/* CASE C: Feature enabled but user has NO permission (and is not admin) - render informational card with custom message */}
+        {/* CASE C: Feature enabled but user has NO permission (and is not admin) - render informational card with custom message + pedido via dialog */}
         {odooContactsFeatureEnabled && !canUseOdooContacts && !isAdmin && (
           <Card>
             <CardHeader>
@@ -977,60 +1126,30 @@ export default function ContactoDetail() {
                 Contactos Odoo
               </CardTitle>
               <CardDescription>
-                A integração de contactos com o Odoo está ativa para esta empresa.
+                A integração de contactos com o Odoo está ativa para esta
+                empresa.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-2" data-testid="text-odoo-no-permission-message">
+            <CardContent className="space-y-3">
+              <p
+                className="text-sm text-muted-foreground"
+                data-testid="text-odoo-no-permission-message"
+              >
                 {noPermissionMsg && noPermissionMsg.trim().length > 0
                   ? noPermissionMsg
                   : "A integração de contactos com o Odoo está ativa para esta empresa, mas esta funcionalidade está reservada ao administrador."}
               </p>
-              <div className="space-y-2 mt-2">
-                <Textarea
-                  value={requestMessage}
-                  onChange={(e) => setRequestMessage(e.target.value)}
-                  placeholder="Opcional: explica ao administrador porque precisas deste contacto no Odoo."
-                  data-testid="textarea-odoo-request-message"
-                />
-                <Button 
-                  onClick={async () => {
-                    if (!contacto?.id) return;
-                    try {
-                      setIsSendingRequest(true);
-                      setRequestFeedback(null);
-                      const res = await fetch("/api/odoo/contact-requests", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          tipo: "contacto",
-                          contactoId: contacto.id,
-                          entidadeId: contacto.entidadeId || null,
-                          mensagem: requestMessage || null,
-                        }),
-                      });
-                      const data = await res.json();
-                      if (!data.success) {
-                        setRequestFeedback(data.message || "Erro ao enviar pedido ao administrador.");
-                        return;
-                      }
-                      setRequestFeedback("Pedido enviado ao administrador com sucesso.");
-                      setRequestMessage("");
-                    } catch (error: any) {
-                      setRequestFeedback(error?.message || "Erro inesperado ao enviar o pedido.");
-                    } finally {
-                      setIsSendingRequest(false);
-                    }
-                  }}
-                  disabled={isSendingRequest}
-                  data-testid="button-odoo-request-create"
-                >
-                  {isSendingRequest ? "A enviar pedido..." : "Pedir criação/ligação no Odoo"}
-                </Button>
-                {requestFeedback && (
-                  <p className="text-xs text-muted-foreground" data-testid="text-odoo-request-feedback">{requestFeedback}</p>
-                )}
-              </div>
+
+              <OdooContactRequestDialogButton
+                contactoId={contacto.id}
+                entidadeId={contacto.entidadeId ?? undefined}
+                contactoNome={contacto.nome}
+                contactoEmail={contacto.email ?? null}
+                contactoTelefone={contacto.telemovel ?? null}
+                entidadeNome={contacto.entidade?.nome ?? null}
+                triggerLabel="Pedir criação/ligação no Odoo"
+                size="sm"
+              />
             </CardContent>
           </Card>
         )}
@@ -1043,7 +1162,11 @@ export default function ContactoDetail() {
                 <Calendar className="h-4 w-4" />
                 Visitas em que participou
               </CardTitle>
-              <Select value={periodFilter} onValueChange={(v: any) => setPeriodFilter(v)} data-testid="select-period-filter">
+              <Select
+                value={periodFilter}
+                onValueChange={(v: any) => setPeriodFilter(v)}
+                data-testid="select-period-filter"
+              >
                 <SelectTrigger className="w-40">
                   <SelectValue />
                 </SelectTrigger>
@@ -1061,7 +1184,10 @@ export default function ContactoDetail() {
             {isLoadingVisitas ? (
               <div className="space-y-2">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-20 bg-muted rounded-md animate-pulse" />
+                  <div
+                    key={i}
+                    className="h-20 bg-muted rounded-md animate-pulse"
+                  />
                 ))}
               </div>
             ) : visitasDoContacto.length > 0 ? (
@@ -1076,18 +1202,27 @@ export default function ContactoDetail() {
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-sm">
-                          {visita.gabinete?.nome || visita.entidade?.nome || "Sem entidade associada"}
+                          {visita.gabinete?.nome ||
+                            visita.entidade?.nome ||
+                            "Sem entidade associada"}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">
-                          {format(new Date(visita.dataVisita), "dd MMM yyyy 'às' HH:mm", { locale: pt })}
+                          {format(
+                            new Date(visita.dataVisita),
+                            "dd MMM yyyy 'às' HH:mm",
+                            { locale: pt },
+                          )}
                         </div>
                         {visita.notas && (
                           <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                            {visita.notas.replace(/<[^>]*>/g, '')}
+                            {visita.notas.replace(/<[^>]*>/g, "")}
                           </div>
                         )}
                       </div>
-                      <Badge variant="outline" className="text-xs ml-2 flex-shrink-0">
+                      <Badge
+                        variant="outline"
+                        className="text-xs ml-2 flex-shrink-0"
+                      >
                         Ver
                       </Badge>
                     </div>
@@ -1123,7 +1258,8 @@ export default function ContactoDetail() {
           <DialogHeader>
             <DialogTitle>Procurar parceiro Odoo</DialogTitle>
             <DialogDescription>
-              Pesquisa por nome ou email para ligar este contacto a um parceiro do Odoo.
+              Pesquisa por nome ou email para ligar este contacto a um parceiro
+              do Odoo.
             </DialogDescription>
           </DialogHeader>
 
@@ -1155,7 +1291,10 @@ export default function ContactoDetail() {
             )}
 
             {odooSearchError && (
-              <Alert variant="destructive" data-testid="alert-odoo-search-error-contacto">
+              <Alert
+                variant="destructive"
+                data-testid="alert-odoo-search-error-contacto"
+              >
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Erro</AlertTitle>
                 <AlertDescription>{odooSearchError}</AlertDescription>
@@ -1163,7 +1302,10 @@ export default function ContactoDetail() {
             )}
 
             {!odooSearchLoading && !odooSearchNotConfigured && (
-              <div className="space-y-2 max-h-64 overflow-auto" data-testid="list-odoo-search-results-contacto">
+              <div
+                className="space-y-2 max-h-64 overflow-auto"
+                data-testid="list-odoo-search-results-contacto"
+              >
                 {odooSearchResults.length === 0 && (
                   <p className="text-sm text-muted-foreground">
                     Sem resultados. Tenta outro termo de pesquisa.
@@ -1186,7 +1328,9 @@ export default function ContactoDetail() {
                     )}
                     {(partner.city || partner.country) && (
                       <p className="text-xs text-muted-foreground">
-                        {[partner.city, partner.country].filter(Boolean).join(", ")}
+                        {[partner.city, partner.country]
+                          .filter(Boolean)
+                          .join(", ")}
                       </p>
                     )}
                   </button>

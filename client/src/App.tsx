@@ -64,28 +64,35 @@ function AdminRoute({ component: Component }: { component: React.ComponentType<a
   return <Component />;
 }
 
-function Router() {
-  const { isAuthenticated, isLoading, isAdmin } = useAuth();
+  function Router() {
+    const { isAuthenticated, isLoading, isAdmin } = useAuth();
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse">
-          <div className="w-16 h-16 bg-primary rounded-2xl"></div>
+    if (isLoading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-pulse">
+            <div className="w-16 h-16 bg-primary rounded-2xl"></div>
+          </div>
         </div>
-      </div>
-    );
-  }
+      );
+    }
 
-  // Não autenticado → só landing
-  if (!isAuthenticated) {
-    return (
-      <Switch>
-        <Route path="/" component={Landing} />
-        <Route component={NotFound} />
-      </Switch>
-    );
-  }
+    // Não autenticado → rotas públicas (login/landing)
+    if (!isAuthenticated) {
+      return (
+        <Switch>
+          {/* página principal de login/landing */}
+          <Route path="/" component={Landing} />
+
+          {/* aliases usados pelo backend / links antigos */}
+          <Route path="/login" component={Landing} />
+          <Route path="/api/login" component={Landing} />
+
+          {/* qualquer outra rota pública desconhecida */}
+          <Route component={NotFound} />
+        </Switch>
+      );
+    }
 
   // Autenticado → layout principal
   return (

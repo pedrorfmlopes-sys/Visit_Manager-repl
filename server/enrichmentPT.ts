@@ -8,13 +8,14 @@ export interface PTEnrichmentInput {
   domain?: string;
   website?: string;
   email?: string;
+  empresaId?: string; // opcional aqui, mas obrigatório em ptIntelligentSearch
 }
 
 export interface FuzzyMatch {
   candidate: string;
   score: number;
   id: string;
-  type: 'entidade' | 'contacto';
+  type: "entidade" | "contacto";
   domain?: string;
   logoUrl?: string;
   website?: string;
@@ -47,39 +48,39 @@ export interface PTWebScanResult {
 export interface PTEnrichmentResult {
   fuzzyMatches: FuzzyMatch[];
   webScanData?: PTWebScanResult;
-  enrichmentSource: 'fuzzy' | 'webscan' | 'combined' | 'none';
+  enrichmentSource: "fuzzy" | "webscan" | "combined" | "none";
 }
 
 function normalizeString(str: string): string {
-  if (!str) return '';
-  
+  if (!str) return "";
+
   return str
     .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^\w\s]/g, ' ')
-    .replace(/\s+/g, ' ')
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
 function jaroWinkler(s1: string, s2: string): number {
   const m1 = s1.length;
   const m2 = s2.length;
-  
+
   if (m1 === 0 && m2 === 0) return 1.0;
   if (m1 === 0 || m2 === 0) return 0.0;
-  
+
   const matchDistance = Math.floor(Math.max(m1, m2) / 2) - 1;
   const s1Matches = new Array(m1).fill(false);
   const s2Matches = new Array(m2).fill(false);
-  
+
   let matches = 0;
   let transpositions = 0;
-  
+
   for (let i = 0; i < m1; i++) {
     const start = Math.max(0, i - matchDistance);
     const end = Math.min(i + matchDistance + 1, m2);
-    
+
     for (let j = start; j < end; j++) {
       if (s2Matches[j]) continue;
       if (s1[i] !== s2[j]) continue;
@@ -89,9 +90,9 @@ function jaroWinkler(s1: string, s2: string): number {
       break;
     }
   }
-  
+
   if (matches === 0) return 0.0;
-  
+
   let k = 0;
   for (let i = 0; i < m1; i++) {
     if (!s1Matches[i]) continue;
@@ -99,106 +100,127 @@ function jaroWinkler(s1: string, s2: string): number {
     if (s1[i] !== s2[k]) transpositions++;
     k++;
   }
-  
-  const jaro = (matches / m1 + matches / m2 + (matches - transpositions / 2) / matches) / 3;
-  
+
+  const jaro =
+    (matches / m1 +
+      matches / m2 +
+      (matches - transpositions / 2) / matches) /
+    3;
+
   let prefix = 0;
   for (let i = 0; i < Math.min(4, m1, m2); i++) {
     if (s1[i] === s2[i]) prefix++;
     else break;
   }
-  
+
   return jaro + prefix * 0.1 * (1 - jaro);
 }
 
 function damerauLevenshtein(s1: string, s2: string): number {
   const m1 = s1.length;
   const m2 = s2.length;
-  
+
   if (m1 === 0) return m2;
   if (m2 === 0) return m1;
-  
+
   const matrix: number[][] = [];
-  
+
   for (let i = 0; i <= m2; i++) {
     matrix[i] = [i];
   }
-  
+
   for (let j = 0; j <= m1; j++) {
     matrix[0][j] = j;
   }
-  
+
   for (let i = 1; i <= m2; i++) {
     for (let j = 1; j <= m1; j++) {
       const cost = s2[i - 1] === s1[j - 1] ? 0 : 1;
-      
+
       matrix[i][j] = Math.min(
         matrix[i - 1][j] + 1,
         matrix[i][j - 1] + 1,
-        matrix[i - 1][j - 1] + cost
+        matrix[i - 1][j - 1] + cost,
       );
-      
-      if (i > 1 && j > 1 && s2[i - 1] === s1[j - 2] && s2[i - 2] === s1[j - 1]) {
-        matrix[i][j] = Math.min(matrix[i][j], matrix[i - 2][j - 2] + cost);
+
+      if (
+        i > 1 &&
+        j > 1 &&
+        s2[i - 1] === s1[j - 2] &&
+        s2[i - 2] === s1[j - 1]
+      ) {
+        matrix[i][j] = Math.min(
+          matrix[i][j],
+          matrix[i - 2][j - 2] + cost,
+        );
       }
     }
   }
-  
+
   const maxLen = Math.max(m1, m2);
   return 1 - matrix[m2][m1] / maxLen;
 }
 
 function metaphonePT(str: string): string {
-  if (!str) return '';
-  
+  if (!str) return "";
+
   let cleaned = normalizeString(str);
-  
+
   cleaned = cleaned
-    .replace(/ph/g, 'f')
-    .replace(/ç/g, 's')
-    .replace(/lh/g, 'l')
-    .replace(/nh/g, 'n')
-    .replace(/ch/g, 'x')
-    .replace(/ss/g, 's')
-    .replace(/rr/g, 'r')
-    .replace(/qu/g, 'k')
-    .replace(/gu/g, 'g')
-    .replace(/[aeiou]/g, '');
-  
+    .replace(/ph/g, "f")
+    .replace(/ç/g, "s")
+    .replace(/lh/g, "l")
+    .replace(/nh/g, "n")
+    .replace(/ch/g, "x")
+    .replace(/ss/g, "s")
+    .replace(/rr/g, "r")
+    .replace(/qu/g, "k")
+    .replace(/gu/g, "g")
+    .replace(/[aeiou]/g, "");
+
   return cleaned.substring(0, 8);
 }
 
-export function calculateFuzzyScore(input: string, candidate: string): number {
+export function calculateFuzzyScore(
+  input: string,
+  candidate: string,
+): number {
   const normalized1 = normalizeString(input);
   const normalized2 = normalizeString(candidate);
-  
+
   const jaroScore = jaroWinkler(normalized1, normalized2);
   const levenScore = damerauLevenshtein(normalized1, normalized2);
-  
+
   const metaphone1 = metaphonePT(input);
   const metaphone2 = metaphonePT(candidate);
   const metaphoneScore = metaphone1 === metaphone2 ? 1.0 : 0.0;
-  
-  const finalScore = 0.50 * jaroScore + 0.30 * levenScore + 0.20 * metaphoneScore;
-  
+
+  const finalScore =
+    0.5 * jaroScore + 0.3 * levenScore + 0.2 * metaphoneScore;
+
   return finalScore;
 }
 
-export function calculateMaxFuzzyScore(variants: string[], candidate: string): number {
+export function calculateMaxFuzzyScore(
+  variants: string[],
+  candidate: string,
+): number {
   let maxScore = 0;
-  
+
   for (const variant of variants) {
     const score = calculateFuzzyScore(variant, candidate);
     maxScore = Math.max(maxScore, score);
   }
-  
+
   return maxScore;
 }
 
-export async function generateIANormalizedVariants(nome: string): Promise<IANormalizerResult> {
+export async function generateIANormalizedVariants(
+  nome: string,
+): Promise<IANormalizerResult> {
   try {
     const openai = getOpenAIClient();
-    
+
     const prompt = `Gera uma lista de variantes normalizadas para o nome de empresa portuguesa: "${nome}"
 
 Regras de normalização:
@@ -214,46 +236,49 @@ Devolve apenas um array JSON de strings:
 ["variante1", "variante2", ...]`;
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: "gpt-4o-mini",
       messages: [
         {
-          role: 'system',
-          content: 'És um normalizador de nomes de empresas portuguesas. Devolve apenas arrays JSON válidos.',
+          role: "system",
+          content:
+            "És um normalizador de nomes de empresas portuguesas. Devolve apenas arrays JSON válidos.",
         },
         {
-          role: 'user',
+          role: "user",
           content: prompt,
         },
       ],
-      response_format: { type: 'json_object' },
+      response_format: { type: "json_object" },
       temperature: 0.3,
       max_tokens: 300,
     });
 
     const content = completion.choices[0]?.message?.content;
     if (!content) {
-      console.warn('[IA-Normalizer] Empty response from OpenAI');
+      console.warn("[IA-Normalizer] Empty response from OpenAI");
       return { variants: [normalizeString(nome)] };
     }
 
     const parsed = JSON.parse(content);
     const variants = parsed.variants || parsed.variantes || [];
-    
+
     if (!Array.isArray(variants) || variants.length === 0) {
       return { variants: [normalizeString(nome)] };
     }
 
     return { variants };
   } catch (error) {
-    console.error('[IA-Normalizer] Error:', error);
+    console.error("[IA-Normalizer] Error:", error);
     return { variants: [normalizeString(nome)] };
   }
 }
 
-export async function ptWebScanFinder(nome: string): Promise<PTWebScanResult> {
+export async function ptWebScanFinder(
+  nome: string,
+): Promise<PTWebScanResult> {
   try {
     const openai = getOpenAIClient();
-    
+
     const prompt = `Pesquisa online empresas portuguesas cujo nome se aproxime de "${nome}".
 
 Devolve um objeto JSON com:
@@ -282,124 +307,155 @@ IMPORTANTE: Separa sempre a morada completa em três campos:
 Apenas inclui campos que conseguires encontrar com certeza. Se não encontrares informação, devolve apenas os campos que tiveres.`;
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: "gpt-4o-mini",
       messages: [
         {
-          role: 'system',
-          content: 'És um assistente de pesquisa de empresas portuguesas. Pesquisa online e devolve dados estruturados em JSON. Só inclui informação verificável.',
+          role: "system",
+          content:
+            "És um assistente de pesquisa de empresas portuguesas. Pesquisa online e devolve dados estruturados em JSON. Só inclui informação verificável.",
         },
         {
-          role: 'user',
+          role: "user",
           content: prompt,
         },
       ],
-      response_format: { type: 'json_object' },
+      response_format: { type: "json_object" },
       temperature: 0.1,
       max_tokens: 600,
     });
 
     const content = completion.choices[0]?.message?.content;
     if (!content) {
-      console.warn('[PT-WebScan] Empty response from OpenAI');
+      console.warn("[PT-WebScan] Empty response from OpenAI");
       return {};
     }
 
     const result = JSON.parse(content) as PTWebScanResult;
-    
-    console.log(`[PT-WebScan] Result for "${nome}":`, JSON.stringify(result, null, 2));
-    
-    if (result.website && !result.website.startsWith('http')) {
+
+    console.log(
+      `[PT-WebScan] Result for "${nome}":`,
+      JSON.stringify(result, null, 2),
+    );
+
+    if (result.website && !result.website.startsWith("http")) {
       result.website = `https://${result.website}`;
     }
-    
+
     return result;
   } catch (error) {
-    console.error('[PT-WebScan] Error:', error);
+    console.error("[PT-WebScan] Error:", error);
     return {};
   }
 }
 
 export async function ptIntelligentSearch(
-  input: PTEnrichmentInput,
+  input: PTEnrichmentInput & { empresaId: string },
   storage: IStorage,
-  userRole: 'admin' | 'agent'
+  userRole: "admin" | "agent",
 ): Promise<PTEnrichmentResult> {
   try {
-    const { nome, userId, existingEntityId } = input;
-    
+    const { nome, userId, existingEntityId, empresaId } = input;
+
     console.log(`[PT-Search] Starting intelligent search for: "${nome}"`);
-    
+
     const normalized = normalizeString(nome);
-    
+
     const allVariants = [normalized];
-    
-    console.log(`[PT-Search] Using ${allVariants.length} normalized variant (IA-Normalizer disabled)`);
-    
-    const allEntidades = await storage.getEntidades(userId, userRole);
-    const allContactos = await storage.getContactos(userId, userRole);
-    
-    console.log(`[PT-Search] Found ${allEntidades.length} entities in database`);
-    console.log(`[PT-Search] First 5 entity names:`, allEntidades.slice(0, 5).map(e => e.nome));
-    
+
+    console.log(
+      `[PT-Search] Using ${allVariants.length} normalized variant (IA-Normalizer disabled)`,
+    );
+
+    // getEntidades(empresaId, userId, userRole)
+    const allEntidades = await storage.getEntidades(
+      empresaId,
+      userId,
+      userRole,
+    );
+
+    // getContactos com ListContactosParams — apenas empresaId
+    const allContactos = await storage.getContactos({
+      empresaId,
+    });
+
+    console.log(
+      `[PT-Search] Found ${allEntidades.length} entities in database`,
+    );
+    console.log(
+      `[PT-Search] First 5 entity names:`,
+      allEntidades.slice(0, 5).map((e: any) => e.nome),
+    );
+
     const fuzzyMatches: FuzzyMatch[] = [];
-    
-    for (const entidade of allEntidades) {
+
+    for (const entidade of allEntidades as any[]) {
       if (existingEntityId && entidade.id === existingEntityId) {
         continue;
       }
-      
+
       const score = calculateMaxFuzzyScore(allVariants, entidade.nome);
-      
-      console.log(`[PT-Search] Comparing "${nome}" with "${entidade.nome}": score=${score.toFixed(3)}`);
-      
-      if (score >= 0.60) {
+
+      console.log(
+        `[PT-Search] Comparing "${nome}" with "${entidade.nome}": score=${score.toFixed(
+          3,
+        )}`,
+      );
+
+      if (score >= 0.6) {
         fuzzyMatches.push({
           candidate: entidade.nome,
           score,
           id: entidade.id,
-          type: 'entidade',
-          domain: entidade.domain || undefined,
-          logoUrl: entidade.logoUrl || undefined,
-          website: entidade.website || undefined,
-          morada: entidade.morada || undefined,
-          telefone: entidade.telefone || undefined,
-          email: entidade.email || undefined,
+          type: "entidade",
+          domain: (entidade as any).domain || undefined,
+          logoUrl: (entidade as any).logoUrl || undefined,
+          website: (entidade as any).website || undefined,
+          morada: (entidade as any).morada || undefined,
+          telefone: (entidade as any).telefone || undefined,
+          email: (entidade as any).email || undefined,
         });
       }
     }
-    
-    for (const contacto of allContactos) {
+
+    for (const contacto of allContactos as any[]) {
       if (contacto.entidade?.nome) {
-        const score = calculateMaxFuzzyScore(allVariants, contacto.entidade.nome);
-        
-        if (score >= 0.60) {
-          const existing = fuzzyMatches.find(m => m.candidate === contacto.entidade!.nome);
+        const score = calculateMaxFuzzyScore(
+          allVariants,
+          contacto.entidade.nome,
+        );
+
+        if (score >= 0.6) {
+          const existing = fuzzyMatches.find(
+            (m) => m.candidate === contacto.entidade!.nome,
+          );
           if (!existing) {
             fuzzyMatches.push({
               candidate: contacto.entidade.nome,
               score,
               id: contacto.id,
-              type: 'contacto',
+              type: "contacto",
               email: contacto.email || undefined,
             });
           }
         }
       }
     }
-    
+
     fuzzyMatches.sort((a, b) => b.score - a.score);
-    
-    console.log(`[PT-Search] Found ${fuzzyMatches.length} fuzzy matches`);
-    
+
+    console.log(
+      `[PT-Search] Found ${fuzzyMatches.length} fuzzy matches`,
+    );
+
     return {
       fuzzyMatches,
-      enrichmentSource: fuzzyMatches.length > 0 ? 'fuzzy' : 'none',
+      enrichmentSource: fuzzyMatches.length > 0 ? "fuzzy" : "none",
     };
   } catch (error) {
-    console.error('[PT-Search] Error:', error);
+    console.error("[PT-Search] Error:", error);
     return {
       fuzzyMatches: [],
-      enrichmentSource: 'none',
+      enrichmentSource: "none",
     };
   }
 }

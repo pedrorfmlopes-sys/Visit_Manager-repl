@@ -1,6 +1,6 @@
 /**
  * FASE 2: Authentication Context Utilities
- * 
+ *
  * Centralized functions for extracting user context (userId, empresaId, role)
  * from Express requests. Used throughout server/routes.ts for RBAC + multi-tenant filtering.
  */
@@ -10,7 +10,7 @@ import { storage } from "./storage";
 export interface UserContext {
   userId: string;
   empresaId?: string;
-  userRole: 'admin' | 'agent';
+  userRole: "admin" | "agent";
 }
 
 /**
@@ -25,8 +25,13 @@ export async function getUserContext(req: any): Promise<UserContext> {
   }
 
   const user = await storage.getUser(userId);
-  const userRole = user?.role || 'agent';
-  const empresaId = user?.empresaId;
+  const userRole: "admin" | "agent" = (user?.role as "admin" | "agent") || "agent";
+
+  // Normalizar null -> undefined para bater certo com o tipo UserContext
+  const empresaId: string | undefined =
+    user?.empresaId === null || user?.empresaId === undefined
+      ? undefined
+      : user.empresaId;
 
   return { userId, userRole, empresaId };
 }
@@ -39,10 +44,10 @@ export async function requireAdmin(req: any, res: any, next: any) {
   try {
     const context = await getUserContext(req);
 
-    if (context.userRole !== 'admin') {
+    if (context.userRole !== "admin") {
       return res.status(403).json({
-        error: 'Access denied',
-        message: 'This action is reserved for administrators'
+        error: "Access denied",
+        message: "This action is reserved for administrators",
       });
     }
 
@@ -51,8 +56,8 @@ export async function requireAdmin(req: any, res: any, next: any) {
     next();
   } catch (error) {
     return res.status(401).json({
-      error: 'Authentication failed',
-      message: 'Unable to verify user authentication'
+      error: "Authentication failed",
+      message: "Unable to verify user authentication",
     });
   }
 }
@@ -68,8 +73,8 @@ export async function ensureAuthenticated(req: any, res: any, next: any) {
     next();
   } catch (error) {
     return res.status(401).json({
-      error: 'Authentication failed',
-      message: 'User not authenticated'
+      error: "Authentication failed",
+      message: "User not authenticated",
     });
   }
 }

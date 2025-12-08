@@ -1,10 +1,14 @@
-import type { Router } from "express";
 import { isAuthenticated } from "../../replitAuth";
 import { getUserContext } from "../../authContext";
 import { odooConnectionsStorage } from "../../storage/odooConnections";
 import { storage } from "../../storage";
 import { insertOdooConnectionSchema } from "@shared/schema";
-import { testOdooConnection, searchOdooPartners, getOdooPartnerById, createOdooLead, assertOdooEnabled } from "../../integrations/odooClient";
+import {
+  searchOdooPartners,
+  getOdooPartnerById,
+  createOdooLead,
+  assertOdooEnabled,
+} from "../../integrations/odooClient";
 import { createLeadForVisita } from "../../integrations/odooLeadsFromVisitas";
 import { assertLeadsEnabled } from "../../integrations/crmLeads";
 import express from "express";
@@ -56,13 +60,18 @@ export function setupOdooRoutes(app: any): void {
         return res.status(400).json({ message: "User has no company assigned" });
       }
 
+      const empresaIdStr: string = empresaId;
+
       const parseResult = insertOdooConnectionSchema.safeParse({
         ...req.body,
-        empresaId,
+        empresaId: empresaIdStr,
       });
 
       if (!parseResult.success) {
-        console.error("Invalid Odoo connection payload:", parseResult.error.flatten());
+        console.error(
+          "Invalid Odoo connection payload:",
+          parseResult.error.flatten()
+        );
         return res.status(400).json({ message: "Invalid Odoo connection data" });
       }
 
@@ -91,9 +100,11 @@ export function setupOdooRoutes(app: any): void {
         return res.status(400).json({ error: "User has no company assigned" });
       }
 
-      await assertOdooEnabled(empresaId);
+      const empresaIdStr: string = empresaId;
 
-      const partners = await searchOdooPartners(empresaId, q);
+      await assertOdooEnabled(empresaIdStr);
+
+      const partners = await searchOdooPartners(empresaIdStr, q);
 
       res.json({
         results: partners,
@@ -131,10 +142,15 @@ export function setupOdooRoutes(app: any): void {
       }
 
       const { empresaId } = await getUserContext(req);
+      if (!empresaId) {
+        return res.status(400).json({ error: "User has no company assigned" });
+      }
 
-      await assertOdooEnabled(empresaId);
+      const empresaIdStr: string = empresaId;
 
-      const partner = await getOdooPartnerById(empresaId, partnerId);
+      await assertOdooEnabled(empresaIdStr);
+
+      const partner = await getOdooPartnerById(empresaIdStr, partnerId);
 
       if (!partner) {
         return res.status(404).json({ error: "Partner not found" });
@@ -168,56 +184,66 @@ export function setupOdooRoutes(app: any): void {
 
   // POST /api/integrations/odoo/visitas/:id/create-lead
   // Cria uma lead no Odoo a partir de uma visita
-  router.post("/visitas/:id/create-lead", isAuthenticated, async (req: any, res) => {
-    try {
-      const { empresaId } = await getUserContext(req);
-      if (!empresaId) {
-        return res.status(400).json({ error: "User has no company assigned" });
-      }
+  router.post(
+    "/visitas/:id/create-lead",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { empresaId } = await getUserContext(req);
+        if (!empresaId) {
+          return res.status(400).json({ error: "User has no company assigned" });
+        }
 
-      await assertLeadsEnabled(empresaId);
-      await assertOdooEnabled(empresaId);
+        const empresaIdStr: string = empresaId;
 
-      const visitaId = String(req.params.id);
+        await assertLeadsEnabled(empresaIdStr);
+        await assertOdooEnabled(empresaIdStr);
 
-      const result = await createLeadForVisita(empresaId, visitaId);
+        const visitaId = String(req.params.id);
 
-      return res.json({
-        success: true,
-        visitaId: result.visitaId,
-        leadId: result.leadId,
-      });
-    } catch (error: any) {
-      if (error?.message === "ODOO_NOT_ENABLED" || error?.code === "ODOO_NOT_ENABLED") {
-        return res.status(200).json({
+        const result = await createLeadForVisita(empresaIdStr, visitaId);
+
+        return res.json({
+          success: true,
+          visitaId: result.visitaId,
+          leadId: result.leadId,
+        });
+      } catch (error: any) {
+        if (
+          error?.message === "ODOO_NOT_ENABLED" ||
+          error?.code === "ODOO_NOT_ENABLED"
+        ) {
+          return res.status(200).json({
+            success: false,
+            notEnabled: true,
+            message:
+              "Integração Odoo não está ativa para esta empresa.",
+          });
+        }
+
+        if (error?.message === "VISITA_NOT_FOUND") {
+          return res.status(404).json({
+            success: false,
+            error: "Visita not found",
+          });
+        }
+
+        if (error?.message === "ODOO_NOT_CONFIGURED") {
+          return res.status(200).json({
+            success: false,
+            notConfigured: true,
+          });
+        }
+
+        console.error("[Odoo] create-lead-from-visita error:", error);
+        return res.status(500).json({
           success: false,
-          notEnabled: true,
-          message: "Integração Odoo não está ativa para esta empresa.",
+          error: "Odoo create lead from visita error",
+          message: error?.message ?? "Unknown error",
         });
       }
-
-      if (error?.message === "VISITA_NOT_FOUND") {
-        return res.status(404).json({
-          success: false,
-          error: "Visita not found",
-        });
-      }
-
-      if (error?.message === "ODOO_NOT_CONFIGURED") {
-        return res.status(200).json({
-          success: false,
-          notConfigured: true,
-        });
-      }
-
-      console.error("[Odoo] create-lead-from-visita error:", error);
-      return res.status(500).json({
-        success: false,
-        error: "Odoo create lead from visita error",
-        message: error?.message ?? "Unknown error",
-      });
     }
-  });
+  );
 
   // POST /api/integrations/odoo/test-create-lead
   // Cria uma lead de teste no Odoo
@@ -227,6 +253,8 @@ export function setupOdooRoutes(app: any): void {
       if (!empresaId) {
         return res.status(400).json({ error: "User has no company assigned" });
       }
+
+      const empresaIdStr: string = empresaId;
 
       const {
         name,
@@ -243,14 +271,13 @@ export function setupOdooRoutes(app: any): void {
       };
 
       const leadName =
-        name?.trim() ||
-        "Visit Manager – Lead de teste";
+        name?.trim() || "Visit Manager – Lead de teste";
 
       const leadDescription =
         description?.trim() ||
         "Lead de teste enviada pela aplicação Visit Manager (endpoint /test-create-lead).";
 
-      const result = await createOdooLead(empresaId, {
+      const result = await createOdooLead(empresaIdStr, {
         name: leadName,
         contactName: contactName?.trim() || null,
         email: email?.trim() || null,
@@ -284,28 +311,34 @@ export function setupOdooRoutes(app: any): void {
   // Sincroniza uma visita com Odoo criando/atualizando uma lead (se crmVisitsOdooSyncEnabled = true)
   router.post("/visitas/:id/sync", isAuthenticated, async (req: any, res) => {
     try {
-      const { empresaId, userId } = await getUserContext(req);
+      const { empresaId } = await getUserContext(req);
       const visitaId = req.params.id;
 
       if (!empresaId) {
-        return res.status(400).json({ success: false, message: "Utilizador sem empresa associada." });
+        return res.status(400).json({
+          success: false,
+          message: "Utilizador sem empresa associada.",
+        });
       }
 
+      const empresaIdStr: string = empresaId;
+
       // Verifica se a integração Odoo está ativa para a empresa
-      await assertOdooEnabled(empresaId);
+      await assertOdooEnabled(empresaIdStr);
 
       // Verifica se a sync de visitas está ativa nas flags da empresa
-      const empresa = await storage.getEmpresa(empresaId);
+      const empresa = await storage.getEmpresa(empresaIdStr);
       if (!(empresa as any)?.crmVisitsOdooSyncEnabled) {
         return res.status(200).json({
           success: false,
           notEnabled: true,
-          message: "Sincronização de visitas com o Odoo está desativada para esta empresa.",
+          message:
+            "Sincronização de visitas com o Odoo está desativada para esta empresa.",
         });
       }
 
       // Usa a função existente para criar/atualizar lead Odoo a partir da visita
-      const result = await createLeadForVisita(empresaId, visitaId);
+      const result = await createLeadForVisita(empresaIdStr, visitaId);
 
       return res.json({
         success: true,
@@ -319,10 +352,15 @@ export function setupOdooRoutes(app: any): void {
         });
       }
 
-      console.error("[Odoo] Erro ao sincronizar visita com Odoo:", error);
+      console.error(
+        "[Odoo] Erro ao sincronizar visita com Odoo:",
+        error
+      );
       return res.status(500).json({
         success: false,
-        message: error?.message ?? "Erro ao sincronizar visita com Odoo.",
+        message:
+          error?.message ??
+          "Erro ao sincronizar visita com Odoo.",
       });
     }
   });
