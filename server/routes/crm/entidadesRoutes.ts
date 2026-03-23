@@ -216,6 +216,54 @@ router.get(
 );
 
 // ==========================================================
+// GET /api/crm/entidades/search
+// (usado pelos componentes SearchSelects no frontend)
+// ==========================================================
+router.get(
+  "/api/crm/entidades/search",
+  isAuthenticated,
+  async (req: Request, res: Response) => {
+    try {
+      const { empresaId, userId, userRole } = await getUserContext(req);
+
+      if (!empresaId) {
+        return res
+          .status(400)
+          .json({ message: "User has no company assigned" });
+      }
+
+      const q = ((req.query.q as string) || "").toLowerCase();
+
+      const entidades = await storage.getEntidades(
+        empresaId,
+        userId,
+        userRole,
+      );
+
+      const results = (entidades || [])
+        .filter((e: any) => (e.nome || "").toLowerCase().includes(q))
+        .sort((a: any, b: any) => (a.nome || "").localeCompare(b.nome || ""))
+        .slice(0, 20)
+        .map((e: any) => ({
+          id: e.id,
+          label: e.nome,
+          extraInfo: e.cidade || e.nif || undefined,
+          data: {
+            cidade: e.cidade,
+            nif: e.nif,
+          },
+        }));
+
+      res.json(results);
+    } catch (error) {
+      console.error("Error searching entidades:", error);
+      res.status(500).json({ message: "Failed to search entidades" });
+    }
+  },
+);
+
+
+// ==========================================================
 // Export para o agregador de rotas
 // ==========================================================
 

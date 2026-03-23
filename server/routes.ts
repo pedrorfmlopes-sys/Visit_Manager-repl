@@ -10,6 +10,12 @@ import { registerEntidadesRoutes } from "./routes/crm/entidadesRoutes";
 import { contactosRoutes } from "./routes/crm/contactosRoutes";
 import { visitasRoutes } from "./routes/crm/visitasRoutes";
 import { tarefasRoutes } from "./routes/crm/tarefasRoutes";
+import { dashboardRoutes } from "./routes/crm/dashboardRoutes";
+import { marcasCrmRoutes } from "./routes/crm/marcasRoutes";
+import { leadsAiRoutes } from "./routes/crm/leadsAiRoutes";
+import { leadsRoutes } from "./routes/crm/leadsRoutes";
+import { registerCrmLeadsRoutes } from "./routes/crmLeads";
+
 
 // -------- Admin --------
 import { adminRoutes } from "./routes/admin/adminRoutes";
@@ -78,6 +84,11 @@ export default async function registerRoutes(app: Express) {
   registerModule("contactosRoutes", contactosRoutes, app);
   registerModule("visitasRoutes", visitasRoutes, app);
   registerModule("tarefasRoutes", tarefasRoutes, app);
+  registerModule("dashboardRoutes", dashboardRoutes, app); 
+  registerModule("marcasCrmRoutes", marcasCrmRoutes, app);
+  registerModule("leadsAiRoutes", leadsAiRoutes, app);
+  registerModule("leadsRoutes", leadsRoutes, app);
+  registerModule("registerCrmLeadsRoutes", registerCrmLeadsRoutes, app);
 
   // Admin
   registerModule("adminRoutes", adminRoutes, app);

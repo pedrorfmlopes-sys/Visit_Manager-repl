@@ -42,6 +42,39 @@ async function getUserContext(req: any) {
 
 export function visitasRoutes(app: express.Express) {
   // =====================================================
+  // GET /api/visitas/:id — Detalhe JSON
+  // =====================================================
+  app.get("/api/visitas/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { empresaId, userId, userRole } = await getUserContext(req);
+
+      if (!empresaId || !userId || !userRole) {
+        return res
+          .status(400)
+          .json({ message: "Contexto de utilizador/empresa em falta" });
+      }
+
+      const visita = await storage.getVisita(
+        req.params.id,
+        empresaId,
+        userId,
+        userRole,
+      );
+
+      if (!visita) {
+        return res.status(404).json({ message: "Visita not found" });
+      }
+
+      return res.json(visita);
+    } catch (error) {
+      console.error("Error fetching visita detail:", error);
+      return res
+        .status(500)
+        .json({ message: "Failed to fetch visita detail" });
+    }
+  });
+
+  // =====================================================
   // GET /api/visitas/:id/pdf — PDF normal
   // =====================================================
   app.get("/api/visitas/:id/pdf", isAuthenticated, async (req: any, res) => {
@@ -52,18 +85,14 @@ export function visitasRoutes(app: express.Express) {
         req.params.id,
         empresaId,
         userId,
-        userRole
+        userRole,
       );
       if (!visita)
         return res.status(404).json({ message: "Visita not found" });
 
-      const tarefas = await storage.getTarefas(
-        empresaId,
-        userId,
-        userRole
-      );
+      const tarefas = await storage.getTarefas(empresaId, userId, userRole);
       const visitaTarefas = tarefas.filter(
-        (t: any) => t.visitaId === req.params.id
+        (t: any) => t.visitaId === req.params.id,
       );
 
       const { generateVisitaPDF } = await import("../../pdfGenerator");
@@ -75,13 +104,13 @@ export function visitasRoutes(app: express.Express) {
         .split("T")[0];
       const fileName = `Visita-${entidadeNome.replace(
         /\s/g,
-        "-"
+        "-",
       )}-${dataVisita}.pdf`;
 
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="${fileName}"`
+        `attachment; filename="${fileName}"`,
       );
       res.send(Buffer.from(pdfBuffer));
     } catch (error) {
@@ -101,7 +130,7 @@ export function visitasRoutes(app: express.Express) {
         req.params.id,
         empresaId,
         userId,
-        userRole
+        userRole,
       );
       if (!visita)
         return res.status(404).json({ message: "Visita not found" });
@@ -115,7 +144,7 @@ export function visitasRoutes(app: express.Express) {
       res.setHeader("Content-Type", "text/calendar");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="${fileName}"`
+        `attachment; filename="${fileName}"`,
       );
       res.send(content);
     } catch (error) {
@@ -140,7 +169,7 @@ export function visitasRoutes(app: express.Express) {
           req.params.id,
           empresaId,
           userId,
-          userRole
+          userRole,
         );
         if (!visita)
           return res.status(404).json({ message: "Visita not found" });
@@ -153,7 +182,7 @@ export function visitasRoutes(app: express.Express) {
         const audioRecord = await storage.addAudioToVisita(
           req.params.id,
           fileUrl,
-          empresaId
+          empresaId,
         );
 
         res.json(audioRecord);
@@ -161,7 +190,7 @@ export function visitasRoutes(app: express.Express) {
         console.error("Error uploading audio:", error);
         res.status(500).json({ message: "Failed to upload audio" });
       }
-    }
+    },
   );
 
   // Listar audios
@@ -172,7 +201,7 @@ export function visitasRoutes(app: express.Express) {
         req.params.id,
         empresaId,
         userId,
-        userRole
+        userRole,
       );
       if (!visita)
         return res.status(404).json({ message: "Visita not found" });
@@ -197,7 +226,7 @@ export function visitasRoutes(app: express.Express) {
           req.params.id,
           empresaId,
           userId,
-          userRole
+          userRole,
         );
         if (!visita)
           return res.status(404).json({ message: "Visita not found" });
@@ -209,7 +238,7 @@ export function visitasRoutes(app: express.Express) {
         console.error("Error deleting audio:", error);
         res.status(500).json({ message: "Failed to delete audio" });
       }
-    }
+    },
   );
 
   // Transcrever audio
@@ -224,7 +253,7 @@ export function visitasRoutes(app: express.Express) {
           req.params.id,
           empresaId,
           userId,
-          userRole
+          userRole,
         );
         if (!visita)
           return res.status(404).json({ message: "Visita not found" });
@@ -238,7 +267,7 @@ export function visitasRoutes(app: express.Express) {
 
         const all = await storage.getVisitasAudio(req.params.id, empresaId);
         const audioRecord = all.find(
-          (a: any) => a.id === req.params.audioId
+          (a: any) => a.id === req.params.audioId,
         );
 
         if (!audioRecord?.fileUrl) {
@@ -264,7 +293,7 @@ export function visitasRoutes(app: express.Express) {
 
         const updated = await storage.updateVisitasAudioTranscription(
           req.params.audioId,
-          (transcription as any).text ?? String(transcription ?? "")
+          (transcription as any).text ?? String(transcription ?? ""),
         );
 
         res.json(updated);
@@ -272,8 +301,102 @@ export function visitasRoutes(app: express.Express) {
         console.error("Error transcribing audio:", error);
         res.status(500).json({ message: "Failed to transcribe audio" });
       }
-    }
+    },
   );
+
+  // =====================================================
+  // GET /api/visitas — Listar visitas com filtros
+  // =====================================================
+  app.get("/api/visitas", isAuthenticated, async (req: any, res) => {
+    try {
+      const { empresaId, userId, userRole } = await getUserContext(req);
+
+      if (!empresaId || !userId || !userRole) {
+        return res
+          .status(400)
+          .json({ message: "Contexto de utilizador/empresa em falta" });
+      }
+
+      const scope = userRole === "admin" ? "admin" : "agent";
+
+      const {
+        entidadeId,
+        contactoId,
+        dataInicio,
+        dataFim,
+        from,
+        to,
+        status,
+      } = req.query as {
+        entidadeId?: string;
+        contactoId?: string;
+        dataInicio?: string;
+        dataFim?: string;
+        from?: string;
+        to?: string;
+        status?: string;
+      };
+
+      // Carregar visitas do storage (já com relações e respeitando scope)
+      let visitas =
+        ((await storage.getVisitas(
+          empresaId,
+          userId,
+          scope,
+        )) as any[]) || [];
+
+      // Filtro por entidade
+      if (entidadeId) {
+        visitas = visitas.filter(
+          (v: any) => v.entidadeId && v.entidadeId === entidadeId,
+        );
+      }
+
+      // Filtro por contacto
+      if (contactoId) {
+        visitas = visitas.filter(
+          (v: any) => v.contactoId && v.contactoId === contactoId,
+        );
+      }
+
+      // Filtro por data (from/to + dataInicio/dataFim)
+      const fromParam = from || dataInicio;
+      const toParam = to || dataFim;
+
+      if (fromParam || toParam) {
+        const fromDate = fromParam ? new Date(fromParam) : undefined;
+        const toDate = toParam ? new Date(toParam) : undefined;
+
+        visitas = visitas.filter((v: any) => {
+          const rawDate =
+            v.dataVisita ??
+            v.data ??
+            v.dataVisitaInicio ??
+            v.createdAt ??
+            v.updatedAt;
+
+          if (!rawDate) return false;
+          const d = new Date(rawDate);
+          if (Number.isNaN(d.getTime())) return false;
+          if (fromDate && d < fromDate) return false;
+          if (toDate && d > toDate) return false;
+          return true;
+        });
+      }
+
+      // Filtro por status (se usado no futuro)
+      if (status) {
+        visitas = visitas.filter(
+          (v: any) => v.status && v.status === status,
+        );
+      }
+
+      return res.json(visitas);
+    } catch (error) {
+      console.error("Error in GET /api/visitas:", error);
+      return res.status(500).json({ message: "Failed to list visitas" });
+    }
+  });
 
   // =====================================================
   // POST /api/visitas — Criar nova visita
@@ -356,13 +479,13 @@ export function visitasRoutes(app: express.Express) {
 
         if (files?.media) {
           visitaData.mediaUrls = files.media.map(
-            (f: any) => `/uploads/${f.filename}`
+            (f: any) => `/uploads/${f.filename}`,
           );
         }
 
         const visita = await storage.createVisita(
           visitaData as any,
-          empresaId
+          empresaId,
         );
 
         if (req.body.marcasIds) {
@@ -382,7 +505,7 @@ export function visitasRoutes(app: express.Express) {
             await storage.addContactosToVisita(
               visita.id,
               ids,
-              empresaId
+              empresaId,
             );
           } catch {}
         }
@@ -392,7 +515,7 @@ export function visitasRoutes(app: express.Express) {
             visita.id,
             empresaId,
             userId,
-            userRole
+            userRole,
           );
 
           if (full) {
@@ -415,7 +538,7 @@ export function visitasRoutes(app: express.Express) {
               } as any,
               empresaId,
               userId,
-              userRole
+              userRole,
             );
 
             const user = await storage.getUser(userId);
@@ -445,7 +568,7 @@ export function visitasRoutes(app: express.Express) {
         console.error("Error creating visita:", error);
         res.status(500).json({ message: "Failed to create visita" });
       }
-    }
+    },
   );
 
   // =====================================================
@@ -497,7 +620,7 @@ export function visitasRoutes(app: express.Express) {
         updates,
         empresaId,
         userId,
-        userRole
+        userRole,
       );
 
       if (!updated) {
@@ -533,7 +656,7 @@ export function visitasRoutes(app: express.Express) {
         req.params.id,
         empresaId,
         userId,
-        userRole
+        userRole,
       );
 
       res.json({ message: "Visita deleted" });
@@ -556,23 +679,17 @@ export function visitasRoutes(app: express.Express) {
         const q = ((req.query.q as string) || "").toLowerCase();
         const entidadeId = req.query.entidadeId as string | undefined;
 
-        let visitas = await storage.getVisitas(
-          empresaId,
-          userId,
-          userRole
-        );
+        let visitas = await storage.getVisitas(empresaId, userId, userRole);
 
         if (entidadeId) {
-          visitas = visitas.filter(
-            (v: any) => v.entidadeId === entidadeId
-          );
+          visitas = visitas.filter((v: any) => v.entidadeId === entidadeId);
         }
 
         const results = visitas
           .filter(
             (v: any) =>
               (v.notas || "").toLowerCase().includes(q) ||
-              (v.entidade?.nome || "").toLowerCase().includes(q)
+              (v.entidade?.nome || "").toLowerCase().includes(q),
           )
           .slice(0, 20)
           .map((v: any) => ({
@@ -589,7 +706,7 @@ export function visitasRoutes(app: express.Express) {
         console.error("Error searching visitas:", error);
         res.status(500).json({ message: "Failed to search visitas" });
       }
-    }
+    },
   );
 
   // =====================================================
@@ -611,7 +728,7 @@ export function visitasRoutes(app: express.Express) {
           empresaId,
           lat,
           lng,
-          200
+          200,
         );
 
         res.json({ sugestao });
@@ -619,6 +736,6 @@ export function visitasRoutes(app: express.Express) {
         console.error("Error getting nearby suggestions:", error);
         res.status(500).json({ message: "Failed to get nearby suggestions" });
       }
-    }
+    },
   );
 }
