@@ -1,0 +1,15 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Odoo logo: simple circular design -->
+  <defs>
+    <linearGradient id="odooGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#875a7b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#714b6a;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Main circle background -->
+  <circle cx="50" cy="50" r="48" fill="url(#odooGradient)" />
+  <!-- Inner lighter circle -->
+  <circle cx="50" cy="50" r="40" fill="#a87ba8" opacity="0.3" />
+  <!-- Odoo text simplified -->
+  <text x="50" y="60" font-size="28" font-weight="bold" text-anchor="middle" fill="white" font-family="Arial, sans-serif">OD</text>
+</svg>

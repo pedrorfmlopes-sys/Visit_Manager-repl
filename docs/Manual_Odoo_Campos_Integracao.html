@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="pt">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Manual Odoo - Campos de Integracao</title>
+    <style>
+      :root {
+        --ink: #15202b;
+        --muted: #5b6773;
+        --line: #d8dee5;
+        --panel: #f5f8fb;
+        --brand: #0f766e;
+        --brand-soft: #dcfce7;
+        --accent: #0ea5e9;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 32px 28px 56px;
+        color: var(--ink);
+        font-family: "Segoe UI", Arial, sans-serif;
+        line-height: 1.45;
+        background: white;
+      }
+
+      h1, h2, h3 {
+        margin: 0 0 12px;
+        line-height: 1.15;
+      }
+
+      h1 {
+        font-size: 28px;
+      }
+
+      h2 {
+        margin-top: 28px;
+        font-size: 20px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid var(--line);
+      }
+
+      h3 {
+        margin-top: 20px;
+        font-size: 16px;
+      }
+
+      p, li {
+        font-size: 12px;
+      }
+
+      .lead {
+        font-size: 14px;
+        color: var(--muted);
+        max-width: 920px;
+      }
+
+      .callout {
+        margin: 18px 0;
+        padding: 14px 16px;
+        background: var(--brand-soft);
+        border-left: 5px solid var(--brand);
+        border-radius: 8px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 12px 0 18px;
+      }
+
+      th, td {
+        border: 1px solid var(--line);
+        padding: 8px 10px;
+        vertical-align: top;
+        text-align: left;
+        font-size: 11px;
+      }
+
+      th {
+        background: #eef4f8;
+      }
+
+      code {
+        padding: 1px 4px;
+        background: #eef2ff;
+        border-radius: 4px;
+        font-family: Consolas, monospace;
+        font-size: 11px;
+      }
+
+      .small {
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .section-break {
+        page-break-before: always;
+      }
+
+      ul, ol {
+        margin: 8px 0 12px 18px;
+        padding: 0;
+      }
+
+      .pill {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: #e0f2fe;
+        color: #075985;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        margin-right: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Manual Odoo - Campos Necessarios para Integracao com a App</h1>
+    <p class="lead">
+      Este manual define os campos que devem existir no Odoo para suportar integracao
+      bidirecional com a app em <strong>Leads</strong>, <strong>Projetos</strong>,
+      <strong>Tarefas de Projeto</strong> e <strong>Helpdesk</strong>. O objetivo e
+      garantir auditoria, pesquisa, rastreabilidade, sincronizacao de estado e
+      referencia coerente entre os dois sistemas.
+    </p>
+
+    <div class="callout">
+      <strong>Regra base:</strong> o Odoo continua a ser o sistema oficial para pipeline,
+      numeracao e objetos ERP/CRM. A app continua a ser o sistema operacional de campo.
+      Os dois lados devem guardar <strong>IDs tecnicos</strong> e <strong>referencias humanas</strong>.
+    </div>
+
+    <h2>1. Objetivos da Estrutura</h2>
+    <ul>
+      <li>Guardar no Odoo quem criou o registo na app.</li>
+      <li>Guardar na app quem criou o registo no Odoo.</li>
+      <li>Refletir contadores ou referencias humanas do Odoo na app para pesquisa e ordenacao.</li>
+      <li>Permitir origem mista: registo nascido na app ou registo nascido no Odoo.</li>
+      <li>Preparar conflitos de sincronizacao sem perder auditoria.</li>
+    </ul>
+
+    <h2>2. Convencao Recomendada de Campos Custom no Odoo</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Prefixo</h3>
+        <p>Usar sempre prefixo <code>x_app_</code> para distinguir campos da integracao.</p>
+      </div>
+      <div class="card">
+        <h3>Modelo</h3>
+        <p>Aplicar em <code>crm.lead</code>, <code>project.project</code>, <code>project.task</code> e <code>helpdesk.ticket</code>.</p>
+      </div>
+      <div class="card">
+        <h3>IDs tecnicos</h3>
+        <p>Guardar sempre o ID do registo da app em texto. Nunca usar numero humano como chave tecnica.</p>
+      </div>
+      <div class="card">
+        <h3>Referencias humanas</h3>
+        <p>Guardar tambem refs/contadores para pesquisa rapida, emails e validacao manual.</p>
+      </div>
+    </div>
+
+    <h2>3. Campos Base Recomendados em Todos os Modelos</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Campo Odoo</th>
+          <th>Tipo</th>
+          <th>Obrig.</th>
+          <th>Uso</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>x_app_record_id</code></td>
+          <td>Char</td>
+          <td>Sim</td>
+          <td>ID tecnico do registo na app.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_record_ref</code></td>
+          <td>Char</td>
+          <td>Recomendado</td>
+          <td>Referencia humana da app, se existir.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_origin</code></td>
+          <td>Selection</td>
+          <td>Sim</td>
+          <td><code>app</code> ou <code>odoo</code>.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_created_by_user_id</code></td>
+          <td>Char</td>
+          <td>Sim</td>
+          <td>ID do utilizador da app que criou o registo.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_created_by_user_name</code></td>
+          <td>Char</td>
+          <td>Sim</td>
+          <td>Nome do utilizador da app que criou o registo.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_created_by_user_email</code></td>
+          <td>Char</td>
+          <td>Opcional</td>
+          <td>Email do utilizador da app para auditoria.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_company_id</code></td>
+          <td>Char</td>
+          <td>Sim</td>
+          <td>ID tecnico da empresa/tenant da app.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_company_name</code></td>
+          <td>Char</td>
+          <td>Sim</td>
+          <td>Nome da empresa/tenant da app.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_last_sync_at</code></td>
+          <td>Datetime</td>
+          <td>Recomendado</td>
+          <td>Momento da ultima sincronizacao bem-sucedida.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_sync_status</code></td>
+          <td>Selection</td>
+          <td>Recomendado</td>
+          <td><code>never</code>, <code>synced</code>, <code>pending</code>, <code>error</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2 class="section-break">4. Campos Especificos por Modelo</h2>
+    <p><span class="pill">Leads</span><span class="pill">crm.lead</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Campo Odoo</th>
+          <th>Tipo</th>
+          <th>Uso</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>x_app_lead_id</code></td>
+          <td>Char</td>
+          <td>ID tecnico da lead na app. Se preferires, pode reutilizar <code>x_app_record_id</code>.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_lead_ref</code></td>
+          <td>Char</td>
+          <td>Referencia humana da lead na app.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_assigned_user_id</code></td>
+          <td>Char</td>
+          <td>ID do utilizador da app responsavel pela lead.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_assigned_user_name</code></td>
+          <td>Char</td>
+          <td>Nome do utilizador da app responsavel pela lead.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_visit_context</code></td>
+          <td>Text</td>
+          <td>Contexto operacional da app, se a lead nasceu de visita.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_internal_notes</code></td>
+          <td>Text</td>
+          <td>Notas internas vindas da app, sem substituir chatter do Odoo.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><span class="pill">Projetos</span><span class="pill">project.project</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Campo Odoo</th>
+          <th>Tipo</th>
+          <th>Uso</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>x_app_project_id</code></td>
+          <td>Char</td>
+          <td>ID tecnico do projeto na app.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_project_ref</code></td>
+          <td>Char</td>
+          <td>Referencia humana do projeto na app.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_entity_id</code></td>
+          <td>Char</td>
+          <td>ID da entidade/cliente na app associada ao projeto.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_entity_name</code></td>
+          <td>Char</td>
+          <td>Nome da entidade/cliente da app.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_project_type</code></td>
+          <td>Char</td>
+          <td>Categoria ou tipo funcional usado na app.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><span class="pill">Tarefas</span><span class="pill">project.task</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Campo Odoo</th>
+          <th>Tipo</th>
+          <th>Uso</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>x_app_task_id</code></td>
+          <td>Char</td>
+          <td>ID tecnico da task na app.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_task_ref</code></td>
+          <td>Char</td>
+          <td>Referencia humana da task na app.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_parent_project_id</code></td>
+          <td>Char</td>
+          <td>ID do projeto pai na app.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_due_source</code></td>
+          <td>Selection</td>
+          <td>Origem da data limite: <code>app</code> ou <code>odoo</code>.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_operation_notes</code></td>
+          <td>Text</td>
+          <td>Notas operacionais da app.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><span class="pill">Helpdesk</span><span class="pill">helpdesk.ticket</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Campo Odoo</th>
+          <th>Tipo</th>
+          <th>Uso</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>x_app_ticket_id</code></td>
+          <td>Char</td>
+          <td>ID tecnico do ticket na app.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_ticket_ref</code></td>
+          <td>Char</td>
+          <td>Referencia humana do ticket na app.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_issue_type</code></td>
+          <td>Char</td>
+          <td>Tipo funcional do ticket/issue na app.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_reported_by_name</code></td>
+          <td>Char</td>
+          <td>Nome de quem reportou na app.</td>
+        </tr>
+        <tr>
+          <td><code>x_app_reported_by_email</code></td>
+          <td>Char</td>
+          <td>Email de quem reportou na app.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>5. Campos que a App Tambem Deve Guardar Localmente</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Objeto local</th>
+          <th>Campos minimos recomendados</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Lead</td>
+          <td><code>odooLeadId</code>, <code>odooLeadRef</code>, <code>odooCreatedById</code>, <code>odooCreatedByName</code>, <code>originSystem</code>, <code>lastSyncAt</code>, <code>syncStatus</code></td>
+        </tr>
+        <tr>
+          <td>Projeto</td>
+          <td><code>odooProjectId</code>, <code>odooProjectRef</code>, <code>odooCreatedById</code>, <code>odooCreatedByName</code>, <code>originSystem</code>, <code>lastSyncAt</code>, <code>syncStatus</code></td>
+        </tr>
+        <tr>
+          <td>Task</td>
+          <td><code>odooTaskId</code>, <code>odooTaskRef</code>, <code>odooCreatedById</code>, <code>odooCreatedByName</code>, <code>originSystem</code>, <code>lastSyncAt</code>, <code>syncStatus</code></td>
+        </tr>
+        <tr>
+          <td>Helpdesk</td>
+          <td><code>odooTicketId</code>, <code>odooTicketRef</code>, <code>odooCreatedById</code>, <code>odooCreatedByName</code>, <code>originSystem</code>, <code>lastSyncAt</code>, <code>syncStatus</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>6. Matriz de Autoridade por Campo</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Tipo de campo</th>
+          <th>Sistema que manda</th>
+          <th>Nota</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Contador/ref comercial</td>
+          <td>Odoo</td>
+          <td>Refletir na app para pesquisa e ordenacao.</td>
+        </tr>
+        <tr>
+          <td>Pipeline/etapa comercial</td>
+          <td>Odoo</td>
+          <td>Especialmente em <code>crm.lead</code>.</td>
+        </tr>
+        <tr>
+          <td>Contexto operacional, visitas, notas internas</td>
+          <td>App</td>
+          <td>Guardar opcionalmente espelho no Odoo, sem perder autoria.</td>
+        </tr>
+        <tr>
+          <td>Criador do registo</td>
+          <td>Ambos</td>
+          <td>Guardar criador da app e criador do Odoo em campos separados.</td>
+        </tr>
+        <tr>
+          <td>ID tecnico cruzado</td>
+          <td>Ambos</td>
+          <td>Nunca usar contador humano como chave tecnica.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2 class="section-break">7. Como Criar os Campos no Odoo</h2>
+    <h3>Opcao A - Odoo Studio</h3>
+    <ol>
+      <li>Entrar no modelo pretendido: Leads, Projetos, Tarefas ou Helpdesk.</li>
+      <li>Abrir o <strong>Studio</strong>.</li>
+      <li>Criar os campos custom com os nomes tecnicos indicados acima.</li>
+      <li>Para campos de estado, usar <strong>Selection</strong>.</li>
+      <li>Para notas grandes, usar <strong>Text</strong>.</li>
+      <li>Para datas de sync, usar <strong>Datetime</strong>.</li>
+      <li>Guardar e publicar.</li>
+    </ol>
+
+    <h3>Opcao B - Technical / Fields</h3>
+    <ol>
+      <li>Ativar modo developer no Odoo.</li>
+      <li>Ir a <strong>Settings &gt; Technical &gt; Database Structure &gt; Fields</strong>.</li>
+      <li>Criar campo novo no modelo correspondente.</li>
+      <li>Usar sempre nomes tecnicos <code>x_app_...</code>.</li>
+      <li>Confirmar visibilidade nos formularios e listas relevantes.</li>
+    </ol>
+
+    <h2>8. Modelos Odoo a Usar</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Dominio da app</th>
+          <th>Modelo Odoo</th>
+          <th>Observacao</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Leads / Oportunidades</td>
+          <td><code>crm.lead</code></td>
+          <td>Modelo principal para pipeline comercial.</td>
+        </tr>
+        <tr>
+          <td>Projetos</td>
+          <td><code>project.project</code></td>
+          <td>Projeto pai.</td>
+        </tr>
+        <tr>
+          <td>Tarefas</td>
+          <td><code>project.task</code></td>
+          <td>Task operacional ou de projeto.</td>
+        </tr>
+        <tr>
+          <td>Helpdesk / Tickets</td>
+          <td><code>helpdesk.ticket</code></td>
+          <td>Se o modulo Helpdesk estiver instalado.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>9. Campos Minimos a Criar Ja</h2>
+    <div class="callout">
+      Se quiseres comecar de forma pragmatica, cria primeiro estes 8 campos em todos os modelos:
+      <br />
+      <code>x_app_record_id</code>,
+      <code>x_app_origin</code>,
+      <code>x_app_created_by_user_id</code>,
+      <code>x_app_created_by_user_name</code>,
+      <code>x_app_company_id</code>,
+      <code>x_app_company_name</code>,
+      <code>x_app_last_sync_at</code>,
+      <code>x_app_sync_status</code>.
+    </div>
+
+    <h2>10. Recomendacao Final</h2>
+    <p>
+      Para a tua app, a melhor abordagem e:
+    </p>
+    <ul>
+      <li>Odoo manda nos contadores, etapas e referencias comerciais.</li>
+      <li>A app manda no contexto operacional, atividade de campo e notas internas.</li>
+      <li>Ambos guardam ID tecnico cruzado, origem e autoria.</li>
+      <li>As referencias humanas do Odoo devem entrar na app para pesquisa futura.</li>
+    </ul>
+
+    <p class="small">
+      Documento preparado para implementacao da integracao entre a app Visitas Comerciais e Odoo.
+      Data: 25-03-2026.
+    </p>
+  </body>
+</html>

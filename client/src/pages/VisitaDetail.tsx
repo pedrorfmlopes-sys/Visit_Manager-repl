@@ -1,0 +1,2737 @@
+import { useState, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRoute, useLocation } from "wouter";
+import DOMPurify from 'dompurify';
+import { ArrowLeft, ArrowRight, Calendar, Download, MapPin, Clock, User, Building2, FileText, Share2, CheckCircle2, MessageCircle, Link as LinkIcon, Copy, Mail, Sparkles, Bell, Volume2, Trash2, Loader2, Mic, Plus, X, Edit, AlertTriangle, Users, Flag, Cloud, ExternalLink } from "lucide-react";
+import type { Marca } from "@shared/schema";
+import { format, addDays } from "date-fns";
+import { pt } from "date-fns/locale";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useToast } from "@/hooks/use-toast";
+import type { VisitaWithRelations, Tarefa, InsertTarefa, InsertVisita, Lembrete, VisitasAudio } from "@shared/schema";
+import { downloadNextVisitICS } from "@/lib/calendarExport";
+import { LocationPreview } from "@/components/LocationPreview";
+import { TarefaCard } from "@/components/TarefaCard";
+import { ShareDialog, useShareActions } from "@/components/ShareDialog";
+import { EmailAIDialog } from "@/components/EmailAIDialog";
+import { UpdateVisitStatusDialog } from "@/components/UpdateVisitStatusDialog";
+import { formatVisitForSharing } from "@/lib/shareFormatters";
+import { useCurrentUser, useAllUsers } from "@/hooks/use-user-context";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useAuth } from "@/hooks/useAuth";
+import { apiRequest } from "@/lib/queryClient";
+import { isBefore, startOfDay } from "date-fns";
+import { syncManager } from "@/lib/syncManager";
+import { insertTarefaSchema } from "@shared/schema";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { Contacto } from "@shared/schema";
+
+interface SuggestedItem {
+  titulo: string;
+  descricao: string;
+  prioridade: 'alta' | 'normal' | 'baixa';
+  prazo_sugerido_dias: number;
+  tipo: 'tarefa' | 'agendamento';
+}
+
+export default function VisitaDetail() {
+  const [, params] = useRoute("/visitas/:id");
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const visitaId = params?.id;
+  const { data: allUsers = [] } = useAllUsers();
+  const requestedReturnTo = new URLSearchParams(window.location.search).get(
+    "returnTo",
+  );
+  const returnTo =
+    requestedReturnTo?.startsWith("/") ? requestedReturnTo : null;
+  const backTarget = returnTo || "/visitas";
+  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [pdfProDialogOpen, setPdfProDialogOpen] = useState(false);
+  const [suggestedTaskToCreate, setSuggestedTaskToCreate] = useState<SuggestedItem | null>(null);
+  const [appointmentDialogOpen, setAppointmentDialogOpen] = useState(false);
+  const [appointmentTitle, setAppointmentTitle] = useState("");
+  const [appointmentDate, setAppointmentDate] = useState<Date | null>(null);
+  const [createdTaskId, setCreatedTaskId] = useState<string | null>(null);
+  const [createdAppointmentId, setCreatedAppointmentId] = useState<string | null>(null);
+  const [localProximaVisita, setLocalProximaVisita] = useState<Date | null>(null);
+  const [createdSuggestedMap, setCreatedSuggestedMap] = useState<Map<string, { type: 'tarefa' | 'agendamento', status?: string, date?: Date, id?: string }>>(new Map());
+  const [pdfProOptions, setPdfProOptions] = useState({
+    includePhotos: true,
+    includeTasks: true,
+    includeIA: true,
+    includeCharts: true,
+    type: 'interno' as 'interno' | 'cliente'
+  });
+  const [updateStatusDialogOpen, setUpdateStatusDialogOpen] = useState(false);
+  // FASE 4: Edit contactos presentes
+  const [editContactosDialogOpen, setEditContactosDialogOpen] = useState(false);
+  const [editContactosSearch, setEditContactosSearch] = useState("");
+  const [selectedContactosEdit, setSelectedContactosEdit] = useState<string[]>([]);
+  // Odoo Lead Integration
+  const [odooLeadCreating, setOdooLeadCreating] = useState(false);
+  const [odooLeadError, setOdooLeadError] = useState<string | null>(null);
+  const [odooLeadNotConfigured, setOdooLeadNotConfigured] = useState(false);
+  // PROMPT 9B: States para Odoo Visita Sync
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const { data: currentUser } = useCurrentUser();
+  const isAdmin = useIsAdmin();
+
+  const { canSyncVisitsWithOdoo, canUseLeads } = useAuth();
+  const leadsEnabled = canUseLeads;
+  
+  // FASE CRM-LEADS-VISITA-STEP1: Leads section state (comentado - usar FASE-LEADS-NEW-01)
+  // const [leadDialogOpen, setLeadDialogOpen] = useState(false);
+  // const [leadSaving, setLeadSaving] = useState(false);
+  // const [leadMarcasSearch, setLeadMarcasSearch] = useState("");
+  // const [leadForm, setLeadForm] = useState({
+  //   titulo: "",
+  //   marcasIds: [] as string[],
+  //   estado: "novo",
+  //   valorPrevisto: "",
+  // });
+  
+  const { isOnline, shareViaWhatsApp, shareViaEmail, copyToClipboard, copyLink } = useShareActions();
+
+  const { data: visita, isLoading } = useQuery<VisitaWithRelations>({
+    queryKey: ["/api/visitas", visitaId],
+    enabled: !!visitaId,
+  });
+
+  const { data: microsoftStatus } = useQuery<{ authenticated: boolean; connected?: boolean; oauthConfigured?: boolean }>({
+    queryKey: ["/api/microsoft/auth/status"],
+  });
+
+  // FASE 15: Load visitasPosteriores separately
+  const { data: visitasPosteriores = [] } = useQuery<VisitaWithRelations[]>({
+    queryKey: ["/api/visitas", visitaId, "posteriores"],
+    enabled: !!visitaId,
+  });
+
+  // Enrich visita with visitasPosteriores
+  const visitaWithPosteriores = visita ? { ...visita, visitasPosteriores } : undefined;
+
+  // Delete visita mutation
+  const deleteVisitaMutation = useMutation({
+    mutationFn: async () => {
+      if (!visitaId) throw new Error("Visita ID is required");
+      await apiRequest('DELETE', `/api/visitas/${visitaId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
+      toast({
+        title: "Sucesso",
+        description: "Visita eliminada com sucesso",
+      });
+      setLocation(backTarget);
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Falha ao eliminar visita",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // FASE 15: Delete scheduled appointment (clear proximaVisita)
+  const deleteScheduledAppointmentMutation = useMutation({
+    mutationFn: async () => {
+      if (!visitaId) throw new Error("Visita ID is required");
+      await apiRequest('PATCH', `/api/visitas/${visitaId}`, { proximaVisita: null });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
+      setLocalProximaVisita(null);
+      toast({
+        title: "Sucesso",
+        description: "Agendamento removido com sucesso",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Falha ao remover agendamento",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // FASE 4: Edit contactos presentes mutation
+  const editContactosMutation = useMutation({
+    mutationFn: async (contactosIds: string[]) => {
+      if (!visitaId) throw new Error("Visita ID is required");
+      await apiRequest('PATCH', `/api/visitas/${visitaId}`, { contactosIds });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
+      setEditContactosDialogOpen(false);
+      toast({
+        title: "Sucesso",
+        description: "Contactos atualizados com sucesso",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Falha ao atualizar contactos",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const { data: tarefas = [] } = useQuery<Tarefa[]>({
+    queryKey: ["/api/tarefas"],
+    select: (data) => data.filter((t) => t.visitaId === visitaId),
+  });
+
+  // FASE CRM-LEADS-VISITA-STEP1: Load leads for this visit
+  type Lead = {
+    id: string;
+    titulo: string;
+    marca: string | null;
+    estado: string;
+    valorPrevisto: string | null;
+    moeda: string | null;
+    createdAt: string;
+    marcas?: Marca[] | null;
+  };
+  
+  type LeadsResponse = 
+    | { leads: Lead[] }
+    | { success: false; notEnabled?: boolean; message?: string };
+
+  const { data: leadsData, isLoading: leadsLoading } = useQuery<LeadsResponse>({
+    queryKey: ["/api/crm/leads", { visitaId: visita?.id }],
+    enabled: !!visita?.id && leadsEnabled,
+    queryFn: async () => {
+      const params = new URLSearchParams({ visitaId: visita!.id });
+      const resp = await fetch(`/api/crm/leads?${params.toString()}`, {
+        credentials: "include",
+      });
+      return resp.json();
+    },
+  });
+
+  const leadsDisabled =
+    leadsData &&
+    "success" in leadsData &&
+    leadsData.success === false &&
+    leadsData.notEnabled === true;
+
+  const leads: Lead[] =
+    leadsData && "leads" in leadsData ? leadsData.leads : [];
+
+  const { data: allLembretes } = useQuery<Lembrete[]>({
+    queryKey: ['/api/lembretes'],
+  });
+
+  // FASE 6: Audio clips
+  const { data: audioClips = [] } = useQuery<VisitasAudio[]>({
+    queryKey: ["/api/visitas", visitaId, "audio"],
+    enabled: !!visitaId,
+  });
+
+  // FASE 4: Fetch all contactos
+  const { data: allContactos = [] } = useQuery<Contacto[]>({
+    queryKey: ["/api/contactos"],
+  });
+
+  // FASE LEADS-EXT-02: Fetch marcas for lead creation
+  const { data: marcas = [] } = useQuery<Marca[]>({
+    queryKey: ["/api/marcas", "onlyAtivas"],
+    queryFn: async () => {
+      const response = await fetch("/api/marcas?onlyAtivas=true", {
+        credentials: "include"
+      });
+      if (!response.ok) throw new Error("Failed to fetch marcas");
+      return response.json();
+    },
+    enabled: !!visita?.id,
+  });
+
+  const visitReminders = allLembretes?.filter(l => 
+    l.entidadeId === visita?.entidadeId || l.visitaId === visitaId
+  ) || [];
+
+  const deleteAudioMutation = useMutation({
+    mutationFn: async (audioId: string) => {
+      const response = await fetch(`/api/visitas/${visitaId}/audio/${audioId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to delete audio');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId, "audio"] });
+      toast({ title: "Áudio removido", description: "O clip de áudio foi removido com sucesso." });
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Falha ao remover áudio.", variant: "destructive" });
+    },
+  });
+
+  const transcribeMutation = useMutation({
+    mutationFn: async (audioId: string) => {
+      const response = await fetch(`/api/visitas/${visitaId}/audio/${audioId}/transcrever`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to transcribe audio');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId, "audio"] });
+      toast({ title: "Sucesso", description: "Áudio transcrito com sucesso!" });
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Falha na transcrição.", variant: "destructive" });
+    },
+  });
+
+  // FASE-LEADS-NEW-03: Navigate to lead creation form with context (entidadeId + contactoId)
+  const handleNovoLeadVisita = () => {
+    if (!visita?.id || !visita.entidadeId) {
+      toast({
+        title: "Erro",
+        description: "Esta visita não tem contexto suficiente para criar um lead. Garante que está associada a uma entidade e pelo menos a um contacto.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // FASE-LEADS-NEW-03: Get contactoId from visita context
+    const contactoIdFromVisita: string | null =
+      visita?.contacto?.id ||
+      (Array.isArray(visita?.contactosPresentes) && visita.contactosPresentes[0]?.id) ||
+      null;
+
+    if (!contactoIdFromVisita) {
+      toast({
+        title: "Erro",
+        description: "Esta visita não tem contexto suficiente para criar um lead. Garante que está associada a uma entidade e pelo menos a um contacto.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const returnTo = `/visitas/${visita.id}`;
+    const url = `/admin/leads/new?visitaId=${visita.id}&entidadeId=${visita.entidadeId}&contactoId=${contactoIdFromVisita}&returnTo=${encodeURIComponent(returnTo)}`;
+    setLocation(url);
+  };
+
+  // FASE CRM-LEADS-VISITA-STEP1: Create CRM lead from visita (COMENTADO - usar FASE-LEADS-NEW-01)
+  // const handleCreateLeadFromVisita = async () => {
+  //   ... (handler comentado - ver history para detalhes)
+  // };
+
+  // Odoo Lead: Create lead from visita
+  const handleCreateOdooLeadForVisita = async () => {
+    if (!visita?.id) return;
+
+    setOdooLeadCreating(true);
+    setOdooLeadError(null);
+    setOdooLeadNotConfigured(false);
+
+    try {
+      const response = await fetch(
+        `/api/integrations/odoo/visitas/${visita.id}/create-lead`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || data.success === false) {
+        throw new Error(data.message || `HTTP ${response.status}`);
+      }
+
+      if (data.notConfigured) {
+        setOdooLeadNotConfigured(true);
+        return;
+      }
+
+      // Atualizar visita localmente
+      if (visita) {
+        visita.odooLeadId = String(data.leadId);
+      }
+
+      // Invalidar React Query cache
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
+
+      toast({
+        title: "Lead criada no Odoo",
+        description: `Lead #${data.leadId} criada a partir desta visita.`,
+      });
+    } catch (error: any) {
+      console.error("[Odoo] Error creating lead from visita:", error);
+      setOdooLeadError(
+        error?.message || "Erro ao criar lead no Odoo."
+      );
+      toast({
+        title: "Erro ao criar lead",
+        description: error?.message || "Não foi possível criar a lead no Odoo.",
+        variant: "destructive",
+      });
+    } finally {
+      setOdooLeadCreating(false);
+    }
+  };
+
+  // PROMPT 9B: Handler para sincronizar visita com Odoo
+  const handleSyncWithOdoo = async () => {
+    if (!visita?.id) return;
+
+    try {
+      setIsSyncing(true);
+      setSyncMessage(null);
+
+      const res = await fetch(`/api/integrations/odoo/visitas/${visita.id}/sync`, {
+        method: "POST",
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        if (data.notEnabled) {
+          setSyncMessage("A sincronização de visitas com o Odoo está desativada para esta empresa.");
+        } else if (data.notConfigured) {
+          setSyncMessage("A integração Odoo não está configurada. Verifica as definições em /admin/empresa.");
+        } else {
+          setSyncMessage(data.message || "Erro ao sincronizar com o Odoo.");
+        }
+        return;
+      }
+
+      setSyncMessage("Visita sincronizada com sucesso com o Odoo.");
+      // Refetch visita para ver odooLeadId atualizado
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
+    } catch (error: any) {
+      setSyncMessage(error?.message || "Erro inesperado na sincronização com o Odoo.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // FASE 14: AI Summary mutation
+  const generateAISummaryMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/visitas/${visitaId}/ia-resumo`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to generate AI summary');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
+      toast({ title: "Sucesso", description: "Resumo IA gerado com sucesso!" });
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Falha ao gerar resumo IA.", variant: "destructive" });
+    },
+  });
+
+  // FASE 7: Audio recording
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [supportsRecording, setSupportsRecording] = useState(
+    typeof navigator !== 'undefined' && 
+    (navigator.mediaDevices?.getUserMedia !== undefined || (navigator as any).getUserMedia !== undefined) &&
+    typeof MediaRecorder !== 'undefined'
+  );
+
+  const uploadRecordedAudio = async (blob: Blob) => {
+    if (!visitaId) return;
+    try {
+      const file = new File([blob], `visita-${visitaId}-${Date.now()}.webm`, { type: 'audio/webm' });
+      const formData = new FormData();
+      formData.append('audio', file);
+      
+      const response = await fetch(`/api/visitas/${visitaId}/audio`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      
+      if (!response.ok) throw new Error('Failed to upload audio');
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId, "audio"] });
+      toast({ title: "Sucesso", description: "Áudio gravado e enviado!" });
+    } catch (error) {
+      toast({ title: "Erro", description: "Falha ao enviar áudio.", variant: "destructive" });
+    }
+  };
+
+  const startRecording = async () => {
+    if (!supportsRecording) {
+      toast({ title: "Erro", description: "Gravação de áudio não suportada neste dispositivo.", variant: "destructive" });
+      return;
+    }
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      
+      mediaRecorder.ondataavailable = (e) => {
+        audioChunksRef.current.push(e.data);
+      };
+      
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        stream.getTracks().forEach(track => track.stop());
+        await uploadRecordedAudio(audioBlob);
+      };
+      
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      
+      if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime(t => t + 1);
+      }, 1000);
+    } catch (error) {
+      toast({ title: "Erro", description: "Permissão de microfone negada ou indisponível.", variant: "destructive" });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
+    }
+  };
+
+  const tomorrow = addDays(new Date(), 1);
+  
+  const form = useForm<InsertTarefa>({
+    resolver: zodResolver(insertTarefaSchema),
+    defaultValues: {
+      titulo: visita ? `Follow-up visita — ${visita.gabinete?.nome || visita.entidade?.nome || ""}` : "",
+      descricao: visita?.notas || "",
+      visitaId: visitaId,
+      entidadeId: visita?.entidadeId || visita?.gabineteId || undefined,
+      dueDate: tomorrow,
+      repeatInterval: "none",
+      status: "pending",
+    },
+  });
+
+  const createTaskMutation = useMutation({
+    mutationFn: async (data: InsertTarefa) => {
+      const normalizedDueDate =
+        data.dueDate instanceof Date
+          ? data.dueDate
+          : data.dueDate
+            ? new Date(data.dueDate)
+            : undefined;
+
+      const cleanedData = {
+        ...data,
+        entidadeId: data.entidadeId || undefined,
+        visitaId: data.visitaId || undefined,
+        dueDate: normalizedDueDate,
+      };
+      const response = await apiRequest("POST", "/api/tarefas", cleanedData);
+      return response.json();
+    },
+    onSuccess: async (createdTask: any) => {
+      // FASE 21: Link created task to suggestion
+      if (suggestedTaskToCreate && visitaId && createdTask?.id && visita?.tarefasSugeridasIA) {
+        try {
+          const suggestions = typeof visita.tarefasSugeridasIA === 'string' 
+            ? JSON.parse(visita.tarefasSugeridasIA) 
+            : visita.tarefasSugeridasIA;
+          
+          const updated = suggestions.map((s: any) =>
+            s.titulo === suggestedTaskToCreate.titulo ? { ...s, tarefaId: createdTask.id } : s
+          );
+          
+          await apiRequest("PATCH", `/api/visitas/${visitaId}`, {
+            tarefasSugeridasIA: JSON.stringify(updated),
+          });
+        } catch (err) {
+          console.error('Failed to link task to suggestion:', err);
+        }
+      }
+      
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/tarefas"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] }),
+      ]);
+      
+      // Register in created suggestions map
+      if (suggestedTaskToCreate) {
+        const key = `${suggestedTaskToCreate.titulo}`;
+        setCreatedSuggestedMap(prev => new Map(prev).set(key, { type: 'tarefa', status: 'pending', id: createdTask?.id }));
+      }
+      
+      toast({
+        title: "Sucesso",
+        description: "Tarefa criada com sucesso",
+      });
+      setIsTaskDialogOpen(false);
+      form.reset();
+    },
+    onError: async (error: Error, data) => {
+      const isNetworkError = error.message.includes('fetch') || !navigator.onLine;
+      
+      if (isNetworkError) {
+        await syncManager.queueTarefaCreation(data);
+        toast({
+          title: "Tarefa guardada",
+          description: "Será sincronizada automaticamente quando voltar online.",
+        });
+        setIsTaskDialogOpen(false);
+        form.reset();
+        return;
+      }
+      
+      toast({
+        title: "Erro",
+        description: "Falha ao criar tarefa",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreateTask = () => {
+    form.reset({
+      titulo: `Follow-up visita — ${visita?.gabinete?.nome || visita?.entidade?.nome || ""}`,
+      descricao: visita?.notas || "",
+      visitaId: visitaId,
+      entidadeId: visita?.entidadeId || visita?.gabineteId || undefined,
+      dueDate: tomorrow,
+      repeatInterval: "none",
+      status: "pending",
+    });
+    setSuggestedTaskToCreate(null);
+    setIsTaskDialogOpen(true);
+  };
+
+  const handleCreateSuggestedTask = (suggestedItem: SuggestedItem) => {
+    const dueDate = addDays(new Date(), suggestedItem.prazo_sugerido_dias);
+    // FASE 18: Add reference note to task description
+    const descriptionWithReference = `${suggestedItem.descricao}\n\n(Criada a partir de sugestão IA da visita)`;
+    form.reset({
+      titulo: suggestedItem.titulo,
+      descricao: descriptionWithReference,
+      visitaId: visitaId,
+      entidadeId: visita?.entidadeId || visita?.gabineteId || undefined,
+      dueDate: dueDate,
+      repeatInterval: "none",
+      status: "pending",
+    });
+    setSuggestedTaskToCreate(suggestedItem);
+    setIsTaskDialogOpen(true);
+  };
+
+  const handleCreateSuggestedAppointment = (suggestedItem: SuggestedItem) => {
+    const entityName = visita?.entidade?.nome || visita?.gabinete?.nome || "";
+    const proposedTitle = `${suggestedItem.titulo} — ${entityName}`;
+    const suggestedDate = addDays(new Date(), suggestedItem.prazo_sugerido_dias);
+    setAppointmentTitle(proposedTitle);
+    setAppointmentDate(suggestedDate as Date);
+    setSuggestedTaskToCreate(suggestedItem);
+    setAppointmentDialogOpen(true);
+  };
+
+  const createAppointmentMutation = useMutation({
+    mutationFn: async () => {
+      if (!suggestedTaskToCreate || !appointmentDate || !visitaId) throw new Error('No appointment data');
+      
+      // Update the current visit with the next appointment date
+      const response = await apiRequest("PATCH", `/api/visitas/${visitaId}`, {
+        proximaVisita: appointmentDate,
+      });
+      return response;
+    },
+    onSuccess: async (response: any) => {
+      console.log("🎯 Appointment mutation success! Response:", response);
+      
+      // FASE 21: Link appointment to suggestion
+      if (suggestedTaskToCreate && visitaId && visita?.tarefasSugeridasIA) {
+        try {
+          const suggestions = typeof visita.tarefasSugeridasIA === 'string' 
+            ? JSON.parse(visita.tarefasSugeridasIA) 
+            : visita.tarefasSugeridasIA;
+          
+          const updated = suggestions.map((s: any) =>
+            s.titulo === suggestedTaskToCreate.titulo ? { ...s, visitaId: visitaId, dataAgendada: appointmentDate } : s
+          );
+          
+          await apiRequest("PATCH", `/api/visitas/${visitaId}`, {
+            tarefasSugeridasIA: JSON.stringify(updated),
+          });
+        } catch (err) {
+          console.error('Failed to link appointment to suggestion:', err);
+        }
+      }
+      
+      // Update local state immediately to show card
+      if (appointmentDate) {
+        setLocalProximaVisita(appointmentDate);
+      }
+      
+      if (visitaId) setCreatedAppointmentId(visitaId);
+      
+      // Invalidate and refetch all visits
+      await queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
+      
+      if (visitaId) {
+        // Force complete refetch to ensure proximaVisita is updated
+        console.log("🔄 Refetching visit with ID:", visitaId);
+        await queryClient.refetchQueries({ 
+          queryKey: ["/api/visitas", visitaId],
+          type: "active"
+        });
+      }
+      
+      // Register in created suggestions map
+      if (suggestedTaskToCreate && appointmentDate) {
+        const key = `${suggestedTaskToCreate.titulo}`;
+        setCreatedSuggestedMap(prev => new Map(prev).set(key, { type: 'agendamento', date: appointmentDate }));
+      }
+      
+      toast({
+        title: "Sucesso",
+        description: "Próxima visita agendada com sucesso",
+      });
+      setAppointmentDialogOpen(false);
+      setSuggestedTaskToCreate(null);
+      setAppointmentTitle("");
+      setAppointmentDate(null);
+      setTimeout(() => setCreatedAppointmentId(null), 3000);
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Falha ao agendar próxima visita",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmitTask = (data: InsertTarefa) => {
+    createTaskMutation.mutate(data);
+  };
+
+
+  const handleExportNextVisit = () => {
+    if (visita?.gabinete && visita.proximaVisita) {
+      downloadNextVisitICS(visita.gabinete, visita.contacto || undefined, new Date(visita.proximaVisita));
+      toast({
+        title: "Exportado",
+        description: "Próxima visita exportada para calendário!",
+      });
+    }
+  };
+
+
+  const handleExportPDF = async () => {
+    if (!visita) return;
+
+    if (!isOnline) {
+      toast({
+        title: "Offline",
+        description: "A exportação PDF só está disponível quando estiver online.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/visitas/${visitaId}/pdf`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF');
+      }
+
+      // Get the blob from the response
+      const blob = await response.blob();
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      
+      // Get filename from Content-Disposition header or use default
+      const contentDisposition = response.headers.get('Content-Disposition');
+      const fileName = contentDisposition
+        ? contentDisposition.split('filename=')[1]?.replace(/"/g, '')
+        : `Visita-${visita.gabinete?.nome || visita.entidade?.nome || visita.id}-${format(new Date(visita.dataVisita), 'yyyy-MM-dd')}.pdf`;
+      
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Exportado",
+        description: "Relatório PDF descarregado com sucesso!",
+      });
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao gerar PDF. Por favor, tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleExportPDFPro = async () => {
+    if (!visita) return;
+
+    if (!isOnline) {
+      toast({
+        title: "Offline",
+        description: "A exportação PDF PRO só está disponível quando estiver online.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const queryParams = new URLSearchParams({
+        includePhotos: pdfProOptions.includePhotos.toString(),
+        includeTasks: pdfProOptions.includeTasks.toString(),
+        includeIA: pdfProOptions.includeIA.toString(),
+        includeCharts: pdfProOptions.includeCharts.toString(),
+        type: pdfProOptions.type
+      });
+
+      const response = await fetch(`/api/pdf/visita/${visitaId}/pro?${queryParams}`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF PRO');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      
+      const fileName = `Visita-PRO-${visita.gabinete?.nome || visita.entidade?.nome || visita.id}-${format(new Date(visita.dataVisita), 'yyyy-MM-dd')}.pdf`;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Exportado",
+        description: "Relatório PDF PRO descarregado com sucesso!",
+      });
+      setPdfProDialogOpen(false);
+    } catch (error) {
+      console.error('Error downloading PDF PRO:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao gerar PDF PRO. Por favor, tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAddToCalendar = async () => {
+    if (!visita) return;
+
+    if (!isOnline) {
+      toast({
+        title: "Offline",
+        description: "A adição ao calendário só está disponível quando estiver online.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/visitas/${visitaId}/ics`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        if (response.status === 403) {
+          toast({
+            title: "Acesso Negado",
+            description: "Não tem permissão para exportar esta visita.",
+            variant: "destructive",
+          });
+          return;
+        }
+        throw new Error('Failed to generate calendar file');
+      }
+
+      // Get the ICS content
+      const blob = await response.blob();
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      
+      // Get filename from Content-Disposition header or use default
+      const contentDisposition = response.headers.get('Content-Disposition');
+      const fileName = contentDisposition
+        ? contentDisposition.split('filename=')[1]?.replace(/"/g, '')
+        : `Visita-${visita.gabinete?.nome || visita.entidade?.nome || visita.id}-${format(new Date(visita.dataVisita), 'yyyy-MM-dd')}.ics`;
+      
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Adicionado ao Calendário",
+        description: "Ficheiro .ics descarregado! Abra-o para adicionar ao seu calendário.",
+      });
+    } catch (error) {
+      console.error('Error downloading ICS:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao gerar ficheiro de calendário. Por favor, tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const exportToOutlookMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/microsoft/calendar/export/${visitaId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      const json = await response.json();
+      if (!response.ok || json.success === false) {
+        throw new Error(json.message || `HTTP ${response.status}`);
+      }
+      return json;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/visitas", visitaId] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
+      toast({
+        title: "Sucesso",
+        description: visita?.outlookEventId
+          ? "Evento Outlook atualizado com sucesso."
+          : "Visita exportada para o Outlook Calendar.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro Microsoft",
+        description: error?.message || "Não foi possível exportar esta visita para o Outlook.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleExportToOutlook = () => {
+    if (!visita) return;
+    if (!microsoftStatus?.authenticated) {
+      toast({
+        title: "Autenticação Microsoft necessária",
+        description: "Ligue primeiro a sua conta Microsoft para exportar esta visita para o Outlook.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    exportToOutlookMutation.mutate();
+  };
+
+  const handleShare = () => {
+    setShareDialogOpen(true);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">A carregar visita...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!visita) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground">Visita não encontrada</p>
+          <Button onClick={() => setLocation("/visitas")} className="mt-4">
+            Voltar às visitas
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const gpsLocation = visita.latitude && visita.longitude
+    ? {
+        latitude: visita.latitude,
+        longitude: visita.longitude,
+        accuracy: visita.locationAccuracy || "0",
+        timestamp: new Date(visita.createdAt || Date.now()).getTime(),
+      }
+    : null;
+
+  return (
+    <div className="min-h-screen bg-background pb-20">
+      <header className="sticky top-0 z-10 bg-card border-b border-card-border px-4 py-4">
+        <div className="flex items-center justify-between max-w-4xl mx-auto">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setLocation(backTarget)}
+              data-testid="button-voltar"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-xl font-semibold text-foreground">Detalhes da Visita</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleExportPDF}
+                  disabled={!isOnline || !visita}
+                  data-testid="button-export-pdf-header"
+                >
+                  <Download className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              {!isOnline && (
+                <TooltipContent>
+                  <p>Export só disponível online</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleShare}
+              data-testid="button-share"
+            >
+              <Share2 className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                const search = new URLSearchParams();
+                if (returnTo) search.set("returnTo", returnTo);
+                const suffix = search.toString()
+                  ? `?${search.toString()}`
+                  : "";
+                setLocation(`/visitas/${visitaId}/editar${suffix}`);
+              }}
+              data-testid="button-editar"
+            >
+              <Edit className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => deleteVisitaMutation.mutate()}
+              disabled={deleteVisitaMutation.isPending}
+              data-testid="button-deletar"
+            >
+              <Trash2 className="h-5 w-5 text-destructive" />
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-4xl mx-auto px-4 py-6 space-y-4">
+        {/* Reminder Banner */}
+        {visitReminders.length > 0 && (
+          <Alert data-testid="alert-visit-reminders">
+            <Bell className="h-4 w-4" />
+            <AlertTitle>Existem lembretes pendentes</AlertTitle>
+            <AlertDescription className="flex items-center justify-between gap-2">
+              <span>
+                {visitReminders.length === 1 
+                  ? 'Existe um lembrete pendente para esta entidade.' 
+                  : `Existem ${visitReminders.length} lembretes pendentes para esta entidade.`}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setLocation('/lembretes')}
+                data-testid="button-view-reminders"
+              >
+                Ver Lembretes
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-start justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-primary" />
+                  {visita.gabinete?.nome}
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  {visita.gabinete?.morada}
+                </CardDescription>
+              </div>
+              <Badge variant="secondary">
+                {format(new Date(visita.dataVisita), "dd MMM yyyy", { locale: pt })}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              {format(new Date(visita.dataVisita), "HH:mm", { locale: pt })}
+            </div>
+            
+            {visita.contacto && (
+              <div className="flex items-center gap-2 text-sm">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">{visita.contacto.nome}</span>
+                {visita.contacto.funcao && (
+                  <Badge variant="outline" className="text-xs">{visita.contacto.funcao}</Badge>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {visita.notas && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Notas da Visita</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {visita.notas.includes('<') ? (
+                <div 
+                  className="prose prose-sm dark:prose-invert max-w-none text-sm"
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(visita.notas) }}
+                  data-testid="notas-formatted"
+                />
+              ) : (
+                <p className="text-sm text-foreground whitespace-pre-wrap">{visita.notas}</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {visita.resumoIa && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="h-4 w-4 text-primary" />
+                Resumo da IA
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-foreground whitespace-pre-wrap">{visita.resumoIa}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {visita.transcricaoAudio && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Transcrição de Áudio</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                {visita.transcricaoAudio}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {visita.marcasEntregues && visita.marcasEntregues.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Marcas Entregues</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {visita.marcasEntregues.map((marca: string, idx: number) => (
+                  <Badge key={idx} variant="secondary">{marca}</Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* FASE 5: Marcas Faladas */}
+        {(visita as any).marcas && (visita as any).marcas.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Marcas Faladas Nesta Visita</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {(visita as any).marcas.map((visitaMarca: any) => (
+                  <Badge key={visitaMarca.id} variant="default">
+                    {visitaMarca.marca.nome}
+                  </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* FASE 4: Contactos Presentes */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Contactos Presentes
+              </CardTitle>
+              {isAdmin && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedContactosEdit(visita?.contactosPresentes?.map((c: any) => c.id) || []);
+                    setEditContactosSearch("");
+                    setEditContactosDialogOpen(true);
+                  }}
+                  data-testid="button-edit-contactos"
+                >
+                  <Edit className="h-3 w-3 mr-1" />
+                  Editar
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {visita?.contactosPresentes && visita.contactosPresentes.length > 0 ? (
+              <div className="space-y-3">
+                {visita.contactosPresentes.map((contacto: any) => (
+                  <div key={contacto.id} className="p-3 border rounded-md bg-muted/30">
+                    <div className="font-medium text-sm">{contacto.nome}</div>
+                    {contacto.funcao && <div className="text-xs text-muted-foreground">{contacto.funcao}</div>}
+                    {contacto.email && <div className="text-xs text-muted-foreground">{contacto.email}</div>}
+                    {contacto.telefone && <div className="text-xs text-muted-foreground">{contacto.telefone}</div>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Nenhum contacto associado a esta visita</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Dialog para editar contactos presentes */}
+        <Dialog open={editContactosDialogOpen} onOpenChange={setEditContactosDialogOpen}>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Contactos Presentes</DialogTitle>
+            </DialogHeader>
+            
+            {visita && (
+              <div className="space-y-4">
+                <div className="p-3 border rounded-md bg-muted/30">
+                  <p className="text-sm font-medium">Entidade: {visita.gabinete?.nome || visita.entidade?.nome}</p>
+                </div>
+
+                <div className="space-y-3">
+                  <Label htmlFor="search-contactos">Pesquisar Contactos</Label>
+                  <Input
+                    id="search-contactos"
+                    placeholder="Pesquisar por nome..."
+                    value={editContactosSearch}
+                    onChange={(e) => setEditContactosSearch(e.target.value)}
+                    data-testid="input-edit-contactos-search"
+                  />
+                </div>
+
+                <div className="space-y-2 max-h-64 overflow-y-auto border rounded-md p-3">
+                  {allContactos
+                    .filter(c => c.entidadeId === visita.entidadeId)
+                    .filter(c => c.nome.toLowerCase().includes(editContactosSearch.toLowerCase()))
+                    .map((contacto) => (
+                      <div key={contacto.id} className="flex items-center gap-2 p-2 hover:bg-muted rounded">
+                        <Checkbox
+                          id={`contacto-${contacto.id}`}
+                          checked={selectedContactosEdit.includes(contacto.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedContactosEdit([...selectedContactosEdit, contacto.id]);
+                            } else {
+                              setSelectedContactosEdit(selectedContactosEdit.filter(id => id !== contacto.id));
+                            }
+                          }}
+                          data-testid={`checkbox-contacto-${contacto.id}`}
+                        />
+                        <Label htmlFor={`contacto-${contacto.id}`} className="flex-1 cursor-pointer">
+                          <div className="font-medium text-sm">{contacto.nome}</div>
+                          {contacto.funcao && <div className="text-xs text-muted-foreground">{contacto.funcao}</div>}
+                        </Label>
+                      </div>
+                    ))}
+                </div>
+
+                {selectedContactosEdit.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-xs">Selecionados ({selectedContactosEdit.length}):</Label>
+                    <div className="flex flex-wrap gap-1">
+                      {allContactos
+                        .filter(c => selectedContactosEdit.includes(c.id))
+                        .map((c) => (
+                          <Badge key={c.id} variant="secondary" className="text-xs">
+                            {c.nome}
+                          </Badge>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-2 justify-end pt-4">
+                  <Button variant="outline" onClick={() => setEditContactosDialogOpen(false)} data-testid="button-cancel-edit-contactos">
+                    Cancelar
+                  </Button>
+                  <Button onClick={() => editContactosMutation.mutate(selectedContactosEdit)} disabled={editContactosMutation.isPending} data-testid="button-save-edit-contactos">
+                    {editContactosMutation.isPending ? "A guardar..." : "Guardar"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* FASE 6: Áudio da Visita */}
+        {audioClips.length > 0 || supportsRecording ? (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Volume2 className="h-4 w-4" />
+                  Áudio da Visita
+                </CardTitle>
+                {supportsRecording && (
+                  <Button
+                    variant={isRecording ? "destructive" : "outline"}
+                    size="sm"
+                    onClick={isRecording ? stopRecording : startRecording}
+                    data-testid="button-record-audio"
+                  >
+                    <Mic className="h-3 w-3 mr-1" />
+                    {isRecording ? `Parar (${recordingTime}s)` : "Gravar"}
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isRecording && (
+                <div className="mb-3 p-3 bg-destructive/10 border border-destructive rounded-md flex items-center gap-2">
+                  <div className="h-2 w-2 bg-red-500 rounded-full animate-pulse" />
+                  <p className="text-sm text-destructive font-medium">A gravar... {recordingTime}s</p>
+                </div>
+              )}
+              {audioClips.length > 0 && (
+              <div className="space-y-3">
+                {audioClips.map((clip) => (
+                  <div key={clip.id} className="p-3 border rounded-md bg-muted/30">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <a
+                        href={clip.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-2"
+                        data-testid={`link-audio-${clip.id}`}
+                      >
+                        <Volume2 className="h-3 w-3" />
+                        Ouvir
+                      </a>
+                      <div className="flex items-center gap-2">
+                        {!clip.transcricao && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => transcribeMutation.mutate(clip.id)}
+                            disabled={transcribeMutation.isPending}
+                            data-testid={`button-transcribe-${clip.id}`}
+                          >
+                            {transcribeMutation.isPending ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Sparkles className="h-3 w-3" />
+                            )}
+                            <span className="ml-1 text-xs">Transcrever</span>
+                          </Button>
+                        )}
+                        {clip.transcricao && (
+                          <Badge variant="secondary" className="text-xs">Transcrito</Badge>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => deleteAudioMutation.mutate(clip.id)}
+                          disabled={deleteAudioMutation.isPending}
+                          data-testid={`button-delete-audio-${clip.id}`}
+                          className="h-7 w-7"
+                        >
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                    {clip.transcricao && (
+                      <div className="text-xs text-muted-foreground p-2 bg-background rounded">
+                        <p className="font-medium mb-1">Transcrição:</p>
+                        <p className="whitespace-pre-wrap">{clip.transcricao}</p>
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {clip.createdAt && new Date(clip.createdAt).toLocaleDateString('pt-PT')}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              )}
+              {audioClips.length === 0 && !isRecording && supportsRecording && (
+                <p className="text-sm text-muted-foreground">Nenhum áudio ainda. Clica em "Gravar" para começar!</p>
+              )}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {/* FASE 14: AI Summary, Key Points and Suggested Tasks */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Análise IA da Visita
+              </CardTitle>
+              {!visita.resumoIa && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => generateAISummaryMutation.mutate()}
+                  disabled={generateAISummaryMutation.isPending}
+                  data-testid="button-generate-ai-summary"
+                >
+                  {generateAISummaryMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      Gerando...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      Gerar Resumo
+                    </>
+                  )}
+                </Button>
+              )}
+              {visita.resumoIa && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => generateAISummaryMutation.mutate()}
+                  disabled={generateAISummaryMutation.isPending}
+                  data-testid="button-regenerate-ai-summary"
+                  title="Atualizar análise IA"
+                >
+                  {generateAISummaryMutation.isPending ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3 w-3" />
+                  )}
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {visita.resumoIa ? (
+              <>
+                {/* Resumo IA */}
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">Resumo Executivo</p>
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{visita.resumoIa}</p>
+                </div>
+
+                {/* Pontos-Chave */}
+                {visita.pontosChaveIA && visita.pontosChaveIA.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium text-foreground mb-2">Pontos-Chave</p>
+                    <ul className="space-y-1">
+                      {(typeof visita.pontosChaveIA === 'string' 
+                        ? JSON.parse(visita.pontosChaveIA) 
+                        : visita.pontosChaveIA
+                      ).map((ponto: string, idx: number) => (
+                        <li key={idx} className="text-sm text-foreground flex gap-2">
+                          <span className="text-primary font-bold">•</span>
+                          <span>{ponto}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Sugestões de Tarefas e Agendamentos */}
+                {visita.tarefasSugeridasIA && (() => {
+                  const parsed = typeof visita.tarefasSugeridasIA === 'string' 
+                    ? JSON.parse(visita.tarefasSugeridasIA) 
+                    : visita.tarefasSugeridasIA;
+                  return Array.isArray(parsed) && parsed.length > 0;
+                })() && (
+                  <>
+                    {/* Tarefas Sugeridas */}
+                    {((typeof visita.tarefasSugeridasIA === 'string' 
+                      ? JSON.parse(visita.tarefasSugeridasIA) 
+                      : visita.tarefasSugeridasIA
+                    ).filter((t: any) => t.tipo === 'tarefa')).length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium text-foreground mb-2">Tarefas Sugeridas</p>
+                        <div className="space-y-2">
+                          {(typeof visita.tarefasSugeridasIA === 'string' 
+                            ? JSON.parse(visita.tarefasSugeridasIA) 
+                            : visita.tarefasSugeridasIA
+                          ).filter((t: any) => t.tipo === 'tarefa').map((tarefa: any, idx: number) => (
+                            <div key={`tarefa-${idx}`} className="p-3 bg-muted/30 rounded-md border border-muted space-y-2">
+                              <div className="flex items-start gap-2 justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-sm font-medium text-foreground">{tarefa.titulo}</span>
+                                    <Badge 
+                                      variant="outline" 
+                                      className="text-xs"
+                                      data-testid={`badge-priority-${tarefa.prioridade}-${idx}`}
+                                    >
+                                      {tarefa.prioridade === 'alta' && 'Alta'}
+                                      {tarefa.prioridade === 'normal' && 'Normal'}
+                                      {tarefa.prioridade === 'baixa' && 'Baixa'}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mb-1">{tarefa.descricao}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Prazo sugerido: {tarefa.prazo_sugerido_dias} dias
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {tarefa.tarefaId ? (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => setLocation(`/tarefas/${tarefa.tarefaId}`)}
+                                    className="flex-1"
+                                    data-testid={`button-view-suggested-task-${idx}`}
+                                  >
+                                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                                    Ver Tarefa
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleCreateSuggestedTask(tarefa)}
+                                    className="flex-1"
+                                    disabled={!!createdSuggestedMap.get(`${tarefa.titulo}`)}
+                                    data-testid={`button-create-suggested-task-${idx}`}
+                                  >
+                                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                                    Criar Tarefa
+                                  </Button>
+                                )}
+                                {createdSuggestedMap.get(`${tarefa.titulo}`)?.type === 'tarefa' && (
+                                  <Badge variant="outline" className="text-xs whitespace-nowrap">
+                                    {createdSuggestedMap.get(`${tarefa.titulo}`)?.status}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Agendamentos Sugeridos */}
+                    {((typeof visita.tarefasSugeridasIA === 'string' 
+                      ? JSON.parse(visita.tarefasSugeridasIA) 
+                      : visita.tarefasSugeridasIA
+                    ).filter((t: any) => t.tipo === 'agendamento')).length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium text-foreground mb-2">Agendamentos Sugeridos</p>
+                        <div className="space-y-2">
+                          {(typeof visita.tarefasSugeridasIA === 'string' 
+                            ? JSON.parse(visita.tarefasSugeridasIA) 
+                            : visita.tarefasSugeridasIA
+                          ).filter((t: any) => t.tipo === 'agendamento').map((agendamento: any, idx: number) => (
+                            <div key={`agendamento-${idx}`} className="p-3 bg-muted/30 rounded-md border border-muted space-y-2">
+                              <div className="flex items-start gap-2 justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-sm font-medium text-foreground">{agendamento.titulo}</span>
+                                    <Badge 
+                                      variant="outline" 
+                                      className="text-xs"
+                                      data-testid={`badge-priority-agendamento-${agendamento.prioridade}-${idx}`}
+                                    >
+                                      {agendamento.prioridade === 'alta' && 'Alta'}
+                                      {agendamento.prioridade === 'normal' && 'Normal'}
+                                      {agendamento.prioridade === 'baixa' && 'Baixa'}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mb-1">{agendamento.descricao}</p>
+                                  {agendamento.dataAgendada ? (
+                                    <p className="text-xs text-muted-foreground font-medium">
+                                      Agendado para: {format(new Date(agendamento.dataAgendada), "PPP", { locale: pt })}
+                                    </p>
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground">
+                                      Data sugerida: {format(addDays(new Date(), agendamento.prazo_sugerido_dias), "PPP", { locale: pt })}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {agendamento.dataAgendada ? (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => setLocation(`/visitas`)}
+                                    className="flex-1"
+                                    data-testid={`button-view-suggested-appointment-${idx}`}
+                                  >
+                                    <Calendar className="h-3 w-3 mr-1" />
+                                    Ver Agendamento
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleCreateSuggestedAppointment(agendamento)}
+                                    className="flex-1"
+                                    disabled={!!createdSuggestedMap.get(`${agendamento.titulo}`)}
+                                    data-testid={`button-schedule-suggested-appointment-${idx}`}
+                                  >
+                                    <Calendar className="h-3 w-3 mr-1" />
+                                    Agendar Visita
+                                  </Button>
+                                )}
+                                {createdSuggestedMap.get(`${agendamento.titulo}`)?.type === 'agendamento' && (
+                                  <Badge variant="outline" className="text-xs whitespace-nowrap">
+                                    {createdSuggestedMap.get(`${agendamento.titulo}`)?.date 
+                                      ? format(new Date(createdSuggestedMap.get(`${agendamento.titulo}`)!.date!), "dd/MM", { locale: pt })
+                                      : 'Agendado'}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-6">
+                <p className="text-sm text-muted-foreground mb-3">
+                  Clique em "Gerar Resumo" para analisar automaticamente esta visita com IA
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  A análise incluirá: resumo executivo, pontos-chave e tarefas de follow-up sugeridas
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* FASE 20: Próxima Visita Agendada - Never disappears, just changes state */}
+        {(visita?.proximaVisita || localProximaVisita || visita?.proximaVisitaStatus) && (
+          <Card>
+            {/* STATE 1: AGENDADA (default) */}
+            {(!visita?.proximaVisitaStatus || visita.proximaVisitaStatus === 'agendada') && (visita?.proximaVisita || localProximaVisita) && (
+              <>
+                <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-primary" />
+                    Próxima Visita Agendada
+                    {visita?.proximaVisita && isBefore(new Date(visita.proximaVisita), startOfDay(new Date())) && (
+                      <Badge variant="destructive" className="ml-2 text-xs" data-testid="badge-overdue-appointment">
+                        <AlertTriangle className="h-3 w-3 mr-1" />
+                        Em Atraso
+                      </Badge>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <p className="text-sm font-medium">
+                      {(localProximaVisita || visita?.proximaVisita) && format(new Date(localProximaVisita || visita.proximaVisita!), "PPP 'às' HH:mm", { locale: pt })}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Agendada a partir de sugestão IA
+                    </p>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const proximaVisitaDate = visita?.proximaVisita || localProximaVisita;
+                        if (visita?.gabinete && proximaVisitaDate) {
+                          downloadNextVisitICS(visita.gabinete, visita.contacto || undefined, new Date(proximaVisitaDate));
+                          toast({
+                            title: "Exportado",
+                            description: "Próxima visita exportada para calendário!",
+                          });
+                        }
+                      }}
+                      data-testid="button-export-proxima"
+                    >
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Adicionar ao Calendário
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => setUpdateStatusDialogOpen(true)}
+                      data-testid="button-update-visit-status"
+                    >
+                      Atualizar Estado
+                    </Button>
+                  </div>
+                </CardContent>
+              </>
+            )}
+
+            {/* STATE 2: REALIZADA */}
+            {visita?.proximaVisitaStatus === 'realizada' && (
+              <>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-success" />
+                    Visita Marcada como Realizada
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Data:</p>
+                    <p className="text-sm font-medium">
+                      {visita.proximaVisitaStatusData 
+                        ? format(new Date(visita.proximaVisitaStatusData), "PPP 'às' HH:mm", { locale: pt })
+                        : "Data não registada"
+                      }
+                    </p>
+                  </div>
+                  {visita.visitaAnteriorId && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2">Ligada à visita anterior:</p>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => setLocation(`/visitas/${visita.visitaAnteriorId}`)}
+                        className="w-full"
+                        data-testid="button-goto-linked-visita"
+                      >
+                        <ArrowRight className="h-4 w-4 mr-2" />
+                        Ver Visita
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </>
+            )}
+
+            {/* STATE 3: CANCELADA */}
+            {visita?.proximaVisitaStatus === 'cancelada' && (
+              <>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <X className="h-4 w-4 text-destructive" />
+                    Agendamento Cancelado
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Cancelado em:</p>
+                    <p className="text-sm font-medium">
+                      {visita.proximaVisitaStatusData 
+                        ? format(new Date(visita.proximaVisitaStatusData), "PPP 'às' HH:mm", { locale: pt })
+                        : "Data não registada"
+                      }
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Podes criar um novo agendamento quando necessário.
+                  </p>
+                </CardContent>
+              </>
+            )}
+
+            {/* STATE 4: SEGUIMENTO_CRIADO */}
+            {visita?.proximaVisitaStatus === 'seguimento_criado' && visitaWithPosteriores?.visitasPosteriores && visitaWithPosteriores.visitasPosteriores.length > 0 && (
+              <>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-success" />
+                    Follow-up Criado
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Criado em:</p>
+                    <p className="text-sm font-medium">
+                      {visita.proximaVisitaStatusData 
+                        ? format(new Date(visita.proximaVisitaStatusData), "PPP 'às' HH:mm", { locale: pt })
+                        : "Data não registada"
+                      }
+                    </p>
+                  </div>
+                  <div className="pt-2">
+                    {visitaWithPosteriores.visitasPosteriores.map((visitaPosterior: VisitaWithRelations) => (
+                      <Button
+                        key={visitaPosterior.id}
+                        variant="default"
+                        size="sm"
+                        onClick={() => setLocation(`/visitas/${visitaPosterior.id}`)}
+                        className="w-full"
+                        data-testid={`button-goto-follow-up-${visitaPosterior.id}`}
+                      >
+                        <ArrowRight className="h-4 w-4 mr-2" />
+                        Abrir Follow-up
+                      </Button>
+                    ))}
+                  </div>
+                </CardContent>
+              </>
+            )}
+          </Card>
+        )}
+
+        {/* FASE 15: Visita Posterior (seguimento realizado) - Shows visit created from this appointment */}
+        {visitaWithPosteriores?.visitasPosteriores && visitaWithPosteriores.visitasPosteriores.length > 0 && (
+          <Card className="bg-success/5 border-success/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-success" />
+                Visita de Seguimento Realizada
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Agendamento marcado como realizado. Nova visita criada:
+              </p>
+              {visitaWithPosteriores.visitasPosteriores.map((visitaPosterior: VisitaWithRelations) => (
+                <div key={visitaPosterior.id} className="space-y-2 p-3 bg-background rounded-md border border-border">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Entidade:</p>
+                    <p className="font-medium">{visitaPosterior.gabinete?.nome || visitaPosterior.entidade?.nome || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Data:</p>
+                    <p className="font-medium">{format(new Date(visitaPosterior.dataVisita), "PPP", { locale: pt })}</p>
+                  </div>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => setLocation(`/visitas/${visitaPosterior.id}`)}
+                    className="w-full"
+                    data-testid={`button-goto-visita-posterior-${visitaPosterior.id}`}
+                  >
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                    Ir para a Visita
+                  </Button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* FASE 15: GPS Location - Hidden by default, can be enabled in admin settings */}
+        {gpsLocation && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-primary" />
+                Localização GPS
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <LocationPreview
+                location={gpsLocation}
+                error={null}
+                isLoading={false}
+                onRequestLocation={() => {}}
+                showMap={true}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-primary" />
+                Tarefas desta Visita
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCreateTask}
+                data-testid="button-criar-tarefa"
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Criar Tarefa
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {tarefas.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Nenhuma tarefa criada para esta visita
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {tarefas.map((tarefa) => (
+                  <TarefaCard key={tarefa.id} tarefa={tarefa} />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Separator />
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                onClick={handleAddToCalendar}
+                disabled={!isOnline || !visita}
+                data-testid="button-add-to-calendar"
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Adicionar ao Calendário
+              </Button>
+            </TooltipTrigger>
+            {!isOnline && (
+              <TooltipContent>
+                <p>A adição ao calendário só está disponível quando estiver online.</p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+          <Button
+            variant="outline"
+            onClick={handleExportToOutlook}
+            disabled={!isOnline || !visita || exportToOutlookMutation.isPending}
+            data-testid="button-export-outlook"
+          >
+            <Cloud className="h-4 w-4 mr-2" />
+            {exportToOutlookMutation.isPending ? "A exportar..." : visita?.outlookEventId ? "Atualizar Outlook" : "Exportar Outlook"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleExportPDF}
+            disabled={!isOnline || !visita}
+            data-testid="button-export-pdf"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Exportar PDF
+          </Button>
+          <Button
+            variant="default"
+            onClick={() => setPdfProDialogOpen(true)}
+            disabled={!isOnline || !visita}
+            data-testid="button-export-pdf-pro"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            PDF PRO
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setEmailDialogOpen(true)}
+            data-testid="button-generate-email"
+          >
+            <Sparkles className="h-4 w-4 mr-2" />
+            Gerar Email
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleShare}
+            data-testid="button-share-link"
+          >
+            <Share2 className="h-4 w-4 mr-2" />
+            Partilhar Link
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => {
+              if (confirm("Tem a certeza que deseja eliminar esta visita?")) {
+                deleteVisitaMutation.mutate();
+              }
+            }}
+            disabled={deleteVisitaMutation.isPending}
+            data-testid="button-delete-visita"
+          >
+            {deleteVisitaMutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                A eliminar...
+              </>
+            ) : (
+              <>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Eliminar Visita
+              </>
+            )}
+          </Button>
+        </div>
+      </main>
+
+      <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Criar Tarefa</DialogTitle>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmitTask)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="titulo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Título *</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Título da tarefa" data-testid="input-titulo" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="descricao"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Descrição</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        value={field.value || ""}
+                        placeholder="Descrição detalhada da tarefa"
+                        rows={4}
+                        data-testid="input-descricao"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Estado *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-status">
+                          <SelectValue placeholder="Selecione o estado" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="pending">Pendente</SelectItem>
+                        <SelectItem value="done">Concluída</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="dueDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Data de Vencimento</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="datetime-local"
+                        {...field}
+                        value={field.value ? new Date(field.value).toISOString().slice(0, 16) : ""}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          field.onChange(value ? new Date(value) : undefined);
+                        }}
+                        data-testid="input-due-date"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsTaskDialogOpen(false)}
+                  data-testid="button-cancel"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createTaskMutation.isPending || (!isOnline && !navigator.onLine)}
+                  data-testid="button-save"
+                >
+                  {createTaskMutation.isPending ? "A guardar..." : "Criar Tarefa"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={appointmentDialogOpen} onOpenChange={setAppointmentDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Agendar Visita</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="mb-2 block">Título da Visita</Label>
+              <Input
+                value={appointmentTitle}
+                onChange={(e) => setAppointmentTitle(e.target.value)}
+                placeholder="Título da visita agendada"
+                data-testid="input-appointment-title"
+              />
+            </div>
+            <div>
+              <Label className="mb-2 block">Data da Visita</Label>
+              <Input
+                type="datetime-local"
+                value={appointmentDate ? new Date(appointmentDate).toISOString().slice(0, 16) : ""}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setAppointmentDate(value ? new Date(value) : null);
+                }}
+                data-testid="input-appointment-date"
+              />
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {suggestedTaskToCreate && (
+                <>
+                  <p className="mb-2">
+                    Data sugerida: {format(addDays(new Date(), suggestedTaskToCreate.prazo_sugerido_dias), "PPP", { locale: pt })}
+                  </p>
+                  <p>
+                    Descrição: {suggestedTaskToCreate.descricao}
+                  </p>
+                </>
+              )}
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setAppointmentDialogOpen(false);
+                  setSuggestedTaskToCreate(null);
+                  setAppointmentTitle("");
+                  setAppointmentDate(null);
+                }}
+                data-testid="button-cancel-appointment"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => {
+                  console.log("❌ Button clicked! appointmentDate:", appointmentDate, "title:", appointmentTitle);
+                  console.log("✅ Calling createAppointmentMutation.mutate()");
+                  createAppointmentMutation.mutate();
+                }}
+                disabled={createAppointmentMutation.isPending || !appointmentTitle.trim() || !appointmentDate}
+                data-testid="button-confirm-appointment"
+              >
+                {createAppointmentMutation.isPending ? "A agendar..." : "Agendar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <UpdateVisitStatusDialog
+        open={updateStatusDialogOpen}
+        onOpenChange={setUpdateStatusDialogOpen}
+        visita={visita}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/visitas"] });
+          setLocalProximaVisita(null);
+        }}
+      />
+
+      <ShareDialog
+        open={shareDialogOpen}
+        onOpenChange={setShareDialogOpen}
+        title="Partilhar Visita"
+        description={`Partilhar detalhes da visita a ${visita?.gabinete?.nome || visita?.entidade?.nome || ""}`}
+        options={[
+          {
+            icon: MessageCircle,
+            label: "Enviar por WhatsApp",
+            action: () => shareViaWhatsApp(formatVisitForSharing(visita)),
+            disabled: !isOnline,
+          },
+          {
+            icon: Mail,
+            label: "Enviar por Email",
+            action: () => shareViaEmail(formatVisitForSharing(visita), `Visita - ${visita?.gabinete?.nome || visita?.entidade?.nome || ""}`),
+            disabled: !isOnline,
+          },
+          {
+            icon: Download,
+            label: "Exportar PDF",
+            action: handleExportPDF,
+            disabled: !isOnline,
+          },
+          {
+            icon: LinkIcon,
+            label: "Copiar Link",
+            action: () => copyLink(`/visitas/${visita?.id}`),
+          },
+          {
+            icon: FileText,
+            label: "Copiar Visita (texto)",
+            action: () => copyToClipboard(formatVisitForSharing(visita), "Visita copiada!"),
+          },
+        ]}
+      />
+
+      <EmailAIDialog
+        open={emailDialogOpen}
+        onOpenChange={setEmailDialogOpen}
+        visitaId={visitaId}
+        defaultTemplate="followup_pos_visita"
+      />
+
+      {/* FASE CRM-LEADS-VISITA-STEP1: CRM Leads Section */}
+      {visita && leadsEnabled && (
+        <Card data-testid="card-leads-visita" className="mt-6">
+          <CardHeader className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Flag className="w-4 h-4" />
+                Leads desta visita
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Oportunidades associadas a esta visita (0..N leads).
+              </CardDescription>
+            </div>
+
+            {!leadsDisabled && (
+              <Button
+                size="sm"
+                onClick={handleNovoLeadVisita}
+                disabled={leadsLoading}
+                data-testid="button-add-lead-from-visita"
+              >
+                Adicionar lead
+              </Button>
+            )}
+          </CardHeader>
+
+          <CardContent>
+            {leadsDisabled && (
+              <p className="text-xs text-amber-600">
+                O módulo de Leads CRM está desativado para esta empresa.
+              </p>
+            )}
+
+            {!leadsDisabled && leadsLoading && (
+              <p className="text-sm text-muted-foreground">A carregar leads...</p>
+            )}
+
+            {!leadsDisabled && !leadsLoading && leads.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Ainda não existem leads associados a esta visita.
+              </p>
+            )}
+
+            {!leadsDisabled && !leadsLoading && leads.length > 0 && (
+              <div className="space-y-2">
+                {leads.map((lead) => (
+                  <div
+                    key={lead.id}
+                    className="flex items-center justify-between border rounded-md px-3 py-2 text-sm"
+                    data-testid={`row-lead-visita-${lead.id}`}
+                  >
+                    <div>
+                      <div className="font-medium">{lead.titulo}</div>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        {lead.marcas && lead.marcas.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {lead.marcas.slice(0, 2).map((marca: Marca) => (
+                              <Badge key={marca.id} variant="secondary" className="text-xs" data-testid={`badge-lead-visita-marca-${marca.id}`}>
+                                {marca.nome}
+                              </Badge>
+                            ))}
+                            {lead.marcas.length > 2 && (
+                              <Badge variant="outline" className="text-xs" data-testid={`badge-lead-visita-marcas-more-${lead.id}`}>
+                                +{lead.marcas.length - 2}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                        <div>Estado: {lead.estado}</div>
+                      </div>
+                    </div>
+                    <div className="text-right text-xs">
+                      {lead.valorPrevisto
+                        ? `${lead.valorPrevisto} ${lead.moeda || "EUR"}`
+                        : "—"}
+                      <div className="text-[10px] text-muted-foreground">
+                        {new Date(lead.createdAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* FASE CRM-LEADS-VISITA-STEP1: Create Lead Dialog (COMENTADO - usar FASE-LEADS-NEW-01) */}
+      {/* <Dialog open={leadDialogOpen} onOpenChange={setLeadDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Novo lead desta visita</DialogTitle>
+            <DialogDescription>
+              Cria uma oportunidade ligada a esta visita, entidade e contacto.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 mt-2">
+            <div className="space-y-1">
+              <Label htmlFor="lead-titulo">Título</Label>
+              <Input
+                id="lead-titulo"
+                value={leadForm.titulo}
+                onChange={(e) =>
+                  setLeadForm((f) => ({ ...f, titulo: e.target.value }))
+                }
+                placeholder="Ex.: Projeto Moradia X – Ritmonio"
+                data-testid="input-lead-titulo"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label>Marcas</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between"
+                    data-testid="button-lead-marcas-dropdown"
+                  >
+                    {leadForm.marcasIds?.length
+                      ? `${leadForm.marcasIds.length} marca${leadForm.marcasIds.length === 1 ? "" : "s"} selecionada${leadForm.marcasIds.length === 1 ? "" : "s"}`
+                      : "Seleciona uma ou mais marcas"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" side="bottom" align="start">
+                  <div className="p-3 border-b">
+                    <Input
+                      placeholder="Pesquisar marcas..."
+                      value={leadMarcasSearch}
+                      onChange={(e) => setLeadMarcasSearch(e.target.value)}
+                      className="h-8"
+                      data-testid="input-lead-marcas-search"
+                    />
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {marcas.filter((marca) =>
+                      marca.nome
+                        .toLowerCase()
+                        .includes(leadMarcasSearch.toLowerCase()),
+                    ).length === 0 ? (
+                      <div className="px-3 py-2 text-sm text-muted-foreground">
+                        Nenhuma marca encontrada
+                      </div>
+                    ) : (
+                      marcas
+                        .filter((marca) =>
+                          marca.nome.toLowerCase().includes(leadMarcasSearch.toLowerCase())
+                        )
+                        .map((marca) => {
+                          const isSelected = leadForm.marcasIds?.includes(marca.id);
+                          return (
+                            <div
+                              key={marca.id}
+                              className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted"
+                              onClick={() => {
+                                const newIds = isSelected
+                                  ? (leadForm.marcasIds || []).filter((id) => id !== marca.id)
+                                  : [...(leadForm.marcasIds || []), marca.id];
+                                setLeadForm((f) => ({ ...f, marcasIds: newIds }));
+                              }}
+                              data-testid={`button-lead-marca-${marca.id}`}
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => {}}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <span className="text-sm">{marca.nome}</span>
+                            </div>
+                          );
+                        })
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="lead-estado">Estado</Label>
+              <select
+                id="lead-estado"
+                className="border rounded px-2 py-1 text-sm w-full bg-background"
+                value={leadForm.estado}
+                onChange={(e) =>
+                  setLeadForm((f) => ({ ...f, estado: e.target.value }))
+                }
+                data-testid="select-lead-estado"
+              >
+                <option value="novo">Novo</option>
+                <option value="em_analise">Em análise</option>
+                <option value="proposta_enviada">Proposta enviada</option>
+                <option value="ganho">Ganho</option>
+                <option value="perdido">Perdido</option>
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="lead-valor">Valor previsto</Label>
+              <Input
+                id="lead-valor"
+                type="number"
+                min="0"
+                step="0.01"
+                value={leadForm.valorPrevisto}
+                onChange={(e) =>
+                  setLeadForm((f) => ({ ...f, valorPrevisto: e.target.value }))
+                }
+                placeholder="Opcional"
+                data-testid="input-lead-valor"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="mt-4">
+            <Button
+              variant="ghost"
+              onClick={() => setLeadDialogOpen(false)}
+              type="button"
+              data-testid="button-cancel-lead"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleCreateLeadFromVisita}
+              disabled={leadSaving || !leadForm.titulo.trim()}
+              type="button"
+              data-testid="button-create-lead-dialog"
+            >
+              {leadSaving ? "A criar..." : "Criar lead"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog> */}
+
+      {/* Odoo Integration */}
+      {visita && leadsEnabled && (
+        <Card data-testid="card-odoo-lead" className="mt-6">
+          <CardHeader>
+            <CardTitle>Odoo</CardTitle>
+            <CardDescription>
+              Integração com leads do Odoo para esta visita.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {/* Caso ainda não exista lead no Odoo */}
+            {!visita.odooLeadId && (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Esta visita ainda não tem nenhuma lead criada no Odoo.
+                </p>
+
+                {odooLeadNotConfigured && (
+                  <p className="text-xs text-amber-600">
+                    Integração Odoo ainda não está configurada para esta empresa.
+                  </p>
+                )}
+
+                {odooLeadError && (
+                  <p className="text-xs text-red-600">
+                    {odooLeadError}
+                  </p>
+                )}
+
+                <Button
+                  size="sm"
+                  onClick={handleCreateOdooLeadForVisita}
+                  disabled={odooLeadCreating}
+                  data-testid="button-odoo-create-lead-from-visita"
+                >
+                  {odooLeadCreating ? "A criar..." : "Criar lead no Odoo"}
+                </Button>
+              </>
+            )}
+
+            {/* Caso já exista lead no Odoo */}
+            {visita.odooLeadId && (
+              <div className="space-y-2">
+                <p className="text-sm">
+                  Esta visita está ligada à lead Odoo <span className="font-medium">#{visita.odooLeadId}</span>.
+                </p>
+
+                {odooLeadError && (
+                  <p className="text-xs text-red-600">
+                    {odooLeadError}
+                  </p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* PROMPT 9B: Odoo Visita Sync Card - Renderiza se canSyncVisitsWithOdoo = true */}
+      {canSyncVisitsWithOdoo && (
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle>Odoo – Sincronização da visita</CardTitle>
+            <CardDescription>
+              Enviar ou atualizar esta visita no Odoo como lead/oportunidade.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={handleSyncWithOdoo} disabled={isSyncing} data-testid="button-sync-visita-odoo">
+              {isSyncing ? "A sincronizar..." : "Sincronizar com o Odoo"}
+            </Button>
+            {syncMessage && (
+              <p className="mt-2 text-sm text-muted-foreground" data-testid="text-sync-message">
+                {syncMessage}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Activity Log */}
+      {visita && (
+        <Card data-testid="card-activity-log" className="mt-6">
+          <CardHeader>
+            <CardTitle className="text-lg">Histórico desta Visita</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            {visita.createdByUserId && (
+              <div className="flex gap-2">
+                <div className="text-muted-foreground">•</div>
+                <div>
+                  {(() => {
+                    const creator = allUsers.find(u => u.id === visita.createdByUserId);
+                    const displayName = creator 
+                      ? (creator.firstName && creator.lastName ? `${creator.firstName} ${creator.lastName}` : creator.email)
+                      : "Utilizador desconhecido";
+                    return (
+                      <p className="text-foreground">Criada por <span className="font-medium">{displayName}</span></p>
+                    );
+                  })()}
+                  <p className="text-xs text-muted-foreground">{visita.dataVisita ? format(new Date(visita.dataVisita), "PPp", { locale: pt }) : "Data desconhecida"}</p>
+                </div>
+              </div>
+            )}
+            {visita.visitaAnteriorId && (
+              <div className="flex gap-2">
+                <div className="text-muted-foreground">•</div>
+                <div>
+                  <p className="text-foreground">Follow-up de visita anterior</p>
+                  <p className="text-xs text-muted-foreground">ID: {visita.visitaAnteriorId}</p>
+                </div>
+              </div>
+            )}
+            {visita.proximaVisita && (
+              <div className="flex gap-2">
+                <div className="text-muted-foreground">•</div>
+                <div>
+                  <p className="text-foreground">Próxima visita agendada para</p>
+                  <p className="text-xs text-muted-foreground">{format(new Date(visita.proximaVisita), "PPp", { locale: pt })}</p>
+                </div>
+              </div>
+            )}
+            {visita.tarefas && visita.tarefas.length > 0 && (
+              <>
+                <Separator className="my-2" />
+                <div>
+                  <p className="font-medium text-foreground mb-2">Tarefas Relacionadas:</p>
+                  <div className="space-y-1 ml-4">
+                    {visita.tarefas.map((tarefa: any) => (
+                      <div key={tarefa.id} className="text-xs">
+                        <p className="text-foreground">{tarefa.descricao}</p>
+                        <p className="text-muted-foreground">
+                          {tarefa.status === 'done' ? '✓ Concluída' : '○ Pendente'} 
+                          {tarefa.dueDate && ` · Vence ${format(new Date(tarefa.dueDate), "d MMM", { locale: pt })}`}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Dialog open={pdfProDialogOpen} onOpenChange={setPdfProDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Exportar PDF PRO</DialogTitle>
+            <CardDescription>Configure as opções do relatório profissional</CardDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="pdf-photos" className="flex flex-col gap-1">
+                <span>Incluir Fotos</span>
+                <span className="text-sm text-muted-foreground">Adicionar imagens ao relatório</span>
+              </Label>
+              <Switch
+                id="pdf-photos"
+                checked={pdfProOptions.includePhotos}
+                onCheckedChange={(checked) => setPdfProOptions(prev => ({ ...prev, includePhotos: checked }))}
+                data-testid="switch-pdf-photos"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="pdf-tasks" className="flex flex-col gap-1">
+                <span>Incluir Tarefas</span>
+                <span className="text-sm text-muted-foreground">Listar tarefas relacionadas</span>
+              </Label>
+              <Switch
+                id="pdf-tasks"
+                checked={pdfProOptions.includeTasks}
+                onCheckedChange={(checked) => setPdfProOptions(prev => ({ ...prev, includeTasks: checked }))}
+                data-testid="switch-pdf-tasks"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="pdf-ia" className="flex flex-col gap-1">
+                <span>Resumo IA</span>
+                <span className="text-sm text-muted-foreground">Gerar sumário inteligente</span>
+              </Label>
+              <Switch
+                id="pdf-ia"
+                checked={pdfProOptions.includeIA}
+                onCheckedChange={(checked) => setPdfProOptions(prev => ({ ...prev, includeIA: checked }))}
+                data-testid="switch-pdf-ia"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="pdf-charts" className="flex flex-col gap-1">
+                <span>Gráficos</span>
+                <span className="text-sm text-muted-foreground">Incluir visualizações</span>
+              </Label>
+              <Switch
+                id="pdf-charts"
+                checked={pdfProOptions.includeCharts}
+                onCheckedChange={(checked) => setPdfProOptions(prev => ({ ...prev, includeCharts: checked }))}
+                data-testid="switch-pdf-charts"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pdf-type">Tipo de Relatório</Label>
+              <Select 
+                value={pdfProOptions.type} 
+                onValueChange={(value: 'interno' | 'cliente') => setPdfProOptions(prev => ({ ...prev, type: value }))}
+              >
+                <SelectTrigger id="pdf-type" data-testid="select-pdf-type">
+                  <SelectValue placeholder="Selecione o tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="interno">Interno (completo)</SelectItem>
+                  <SelectItem value="cliente">Cliente (simplificado)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setPdfProDialogOpen(false)}
+              data-testid="button-pdf-pro-cancel"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleExportPDFPro}
+              data-testid="button-pdf-pro-export"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Exportar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+    </div>
+  );
+}

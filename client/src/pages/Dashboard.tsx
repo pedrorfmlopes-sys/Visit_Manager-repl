@@ -1,0 +1,662 @@
+import { useQuery } from "@tanstack/react-query";
+import { useLocation, Link } from "wouter";
+import {
+  Building2,
+  Users,
+  FileText,
+  Package,
+  Calendar,
+  LogOut,
+  BarChart,
+  Link2,
+  Download,
+  Lightbulb,
+  X,
+  Loader2,
+} from "lucide-react";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardDescription,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import { format } from "date-fns";
+import { pt } from "date-fns/locale";
+import { useAuth } from "@/hooks/useAuth";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useToast } from "@/hooks/use-toast";
+import { AlertRibbon } from "@/components/AlertRibbon";
+import { DashboardInsightsCard } from "@/components/DashboardInsightsCard";
+import { useState } from "react";
+import { apiRequest } from "@/lib/queryClient";
+import type { VisitaWithRelations } from "@shared/schema";
+
+interface DashboardStats {
+  totalEntidades: number;
+  totalContactos: number;
+  totalVisitas: number;
+  visitasEstesMes: number;
+  marcasMaisEntregues: { marca: string; count: number }[];
+  proximasVisitas: VisitaWithRelations[];
+}
+
+type MyOdooRequest = {
+  id: string;
+  estado: "pendente" | "em_progresso" | "concluido";
+  createdAt: string;
+  tipo: "contacto" | "entidade";
+  mensagem: string | null;
+  userSeenAt: string | null;
+};
+
+export default function Dashboard() {
+  const { user, canUseOdooContacts, hasOdooContactsFeature } = useAuth();
+  const [, setLocation] = useLocation();
+  const isAdmin = useIsAdmin();
+  const { toast } = useToast();
+  const [showDashboardTip, setShowDashboardTip] = useState(true);
+
+  // Feature flags da empresa (incluídos em /api/me)
+  const empresa = (user as any)?.empresa as any | undefined;
+  const odooContactsNoPermissionMessage =
+    empresa?.odooContactsNoPermissionMessage ?? null;
+
+  // Agora isto significa: "pode criar novos pedidos"
+  const canCreateOdooRequests = canUseOdooContacts;
+
+  const { data: stats, isLoading } = useQuery<DashboardStats>({
+    queryKey: ["/api/dashboard"],
+  });
+
+  // ⚠️ SEMPRE carregamos os pedidos do próprio utilizador,
+  // independentemente de poder ou não criar novos pedidos.
+  const {
+    data: myOdooRequestsRaw,
+    isLoading: myOdooRequestsLoading,
+    isError: myOdooRequestsError,
+  } = useQuery({
+    queryKey: ["/api/odoo/contact-requests/my"],
+    retry: false,
+    enabled: hasOdooContactsFeature,
+    queryFn: async () => {
+      const res = await fetch("/api/odoo/contact-requests/my", {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        throw new Error("Failed to fetch my Odoo requests");
+      }
+      const json = await res.json();
+      // Devolvemos o que vier; tratamos mais abaixo
+      return json;
+    },
+  });
+
+  // 👉 A partir daqui garantimos SEMPRE um array de pedidos
+  const myOdooRequestsArray: MyOdooRequest[] = Array.isArray(
+    myOdooRequestsRaw as any
+  )
+    ? (myOdooRequestsRaw as any)
+    : (myOdooRequestsRaw as any)?.data &&
+      Array.isArray((myOdooRequestsRaw as any).data)
+    ? ((myOdooRequestsRaw as any).data as MyOdooRequest[])
+    : [];
+
+  const myPending = myOdooRequestsArray.filter(
+    (r) => r.estado === "pendente"
+  ).length;
+
+  const myInProgress = myOdooRequestsArray.filter(
+    (r) => r.estado === "em_progresso"
+  ).length;
+
+  // Concluídos "por ver": estado concluído + userSeenAt null
+  const myDone = myOdooRequestsArray.filter(
+    (r) => r.estado === "concluido" && !r.userSeenAt
+  ).length;
+
+  const myTotal = myOdooRequestsArray.length;
+
+
+  const handleDismissDashboardTip = async () => {
+    try {
+      await apiRequest("PATCH", "/api/user/settings", {
+        userSettings: {
+          onboarding: { seenDashboardTips: true },
+        },
+      });
+      setShowDashboardTip(false);
+      localStorage.setItem("seenDashboardTips", "true");
+    } catch (error) {
+      console.error("Error updating settings:", error);
+    }
+  };
+
+  const handleLogout = () => {
+    window.location.href = "/api/logout";
+  };
+
+  const handleDownloadPerformancePro = async (
+    period: "week" | "month",
+    scope: "agent" | "empresa"
+  ) => {
+    try {
+      const response = await fetch(
+        `/api/pdf/performance-pro?period=${period}&scope=${scope}`,
+        {
+          method: "GET",
+          credentials: "include",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to generate report");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const fileName = `Relatorio-PRO-${
+        period === "month" ? "Mensal" : "Semanal"
+      }-${scope === "empresa" ? "Empresa" : "Pessoal"}-${
+        new Date().toISOString().split("T")[0]
+      }.pdf`;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Relatório PRO Exportado",
+        description: "PDF descarregado com sucesso!",
+      });
+    } catch (error) {
+      console.error("Error downloading PRO report:", error);
+      toast({
+        title: "Erro",
+        description: "Falha ao gerar relatório PRO. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownloadReport = async (
+    reportType: "monthly" | "weekly",
+    scope: "agent" | "company"
+  ) => {
+    try {
+      const response = await fetch(
+        `/api/pdf/reports/${reportType}/${scope}`,
+        {
+          method: "GET",
+          credentials: "include",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to generate report");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const fileName = `Relatorio-${
+        reportType === "monthly" ? "Mensal" : "Semanal"
+      }-${scope === "company" ? "Empresa" : "Pessoal"}-${
+        new Date().toISOString().split("T")[0]
+      }.pdf`;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Relatório Exportado",
+        description: "PDF descarregado com sucesso!",
+      });
+    } catch (error) {
+      console.error("Error downloading report:", error);
+      toast({
+        title: "Erro",
+        description: "Falha ao gerar relatório. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return (
+    <>
+      <div className="min-h-screen bg-background pb-20">
+        <header className="sticky top-0 z-10 bg-card border-b border-card-border px-4 py-4">
+          <div className="flex items-center justify-between max-w-2xl mx-auto">
+            <div>
+              <h1 className="text-xl font-semibold text-foreground">
+                Dashboard
+              </h1>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Olá, {user?.firstName || user?.email}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setLocation("/analytics")}
+                data-testid="button-analytics"
+              >
+                <BarChart className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleLogout}
+                data-testid="button-logout"
+              >
+                <LogOut className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        {/* Alert Ribbon - between title and KPI cards */}
+        <AlertRibbon />
+
+        <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+          {/* Onboarding Tip */}
+          {showDashboardTip &&
+            !localStorage.getItem("seenDashboardTips") && (
+              <Card className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30">
+                <CardContent className="pt-6 flex items-start gap-3">
+                  <Lightbulb className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
+                      Dica: Aqui encontras um resumo do teu dia. Usa os filtros
+                      e os relatórios PDF/PRO para acompanhar o teu
+                      desempenho.
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleDismissDashboardTip}
+                    className="flex-shrink-0"
+                    data-testid="button-dismiss-dashboard-tip"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+          {isLoading ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <Skeleton key={i} className="h-24 rounded-lg" />
+                ))}
+              </div>
+            </>
+          ) : stats ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <Card className="p-4 text-center space-y-2">
+                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mx-auto">
+                    <Building2 className="h-5 w-5 text-primary" />
+                  </div>
+                  <p
+                    className="text-2xl font-bold text-foreground"
+                    data-testid="stat-entidades"
+                  >
+                    {stats.totalEntidades}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Entidades</p>
+                </Card>
+
+                <Card className="p-4 text-center space-y-2">
+                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mx-auto">
+                    <Users className="h-5 w-5 text-primary" />
+                  </div>
+                  <p
+                    className="text-2xl font-bold text-foreground"
+                    data-testid="stat-contactos"
+                  >
+                    {stats.totalContactos}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Contactos</p>
+                </Card>
+
+                <Card className="p-4 text-center space-y-2">
+                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mx-auto">
+                    <FileText className="h-5 w-5 text-primary" />
+                  </div>
+                  <p
+                    className="text-2xl font-bold text-foreground"
+                    data-testid="stat-visitas"
+                  >
+                    {stats.totalVisitas}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Visitas Total
+                  </p>
+                </Card>
+
+                <Card className="p-4 text-center space-y-2">
+                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mx-auto">
+                    <Calendar className="h-5 w-5 text-primary" />
+                  </div>
+                  <p
+                    className="text-2xl font-bold text-foreground"
+                    data-testid="stat-visitas-mes"
+                  >
+                    {stats.visitasEstesMes}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Este Mês</p>
+                </Card>
+              </div>
+
+              {hasOdooContactsFeature && (
+                <Link href="/me/odoo-requests">
+                <Card className="cursor-pointer hover:bg-muted transition p-4">
+                  <CardHeader className="p-0 mb-3">
+                    <CardTitle className="text-lg">
+                      Pedidos / Aprovações
+                    </CardTitle>
+                    <CardDescription>
+                      Resumo dos pedidos para criação/ligação no CRM.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {myOdooRequestsLoading ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>A carregar pedidos...</span>
+                      </div>
+                    ) : myOdooRequestsError ? (
+                      <p className="text-sm text-destructive">
+                        Erro ao carregar os teus pedidos.
+                      </p>
+                    ) : (
+                      <div className="space-y-1">
+                        <p className="text-2xl font-bold">{myTotal}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Total de pedidos feitos por ti
+                        </p>
+                        <p className="text-sm mt-2">
+                          Pendentes:{" "}
+                          <span className="font-semibold">{myPending}</span>
+                        </p>
+                        <p className="text-sm">
+                          Em progresso:{" "}
+                          <span className="font-semibold">
+                            {myInProgress}
+                          </span>
+                        </p>
+                        <p className="text-sm">
+                          Concluídos (por ver):{" "}
+                          <span className="font-semibold">{myDone}</span>
+                        </p>
+
+                        {!canCreateOdooRequests && (
+                          <p className="text-xs text-muted-foreground mt-3">
+                            {odooContactsNoPermissionMessage ||
+                              "Para criar novos contactos ou pedidos, deves contactar o administrador da tua empresa."}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+                </Link>
+              )}
+
+              <Card
+                className="p-4 hover-elevate cursor-pointer"
+                onClick={() => setLocation("/integracoes/microsoft")}
+                data-testid="card-microsoft-integration"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                    <Link2 className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-foreground">
+                      Integração Microsoft 365
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Ligue ao Microsoft To Do e Outlook Calendar
+                    </p>
+                  </div>
+                  <div className="text-muted-foreground">→</div>
+                </div>
+              </Card>
+
+              {stats.marcasMaisEntregues.length > 0 && (
+                <div>
+                  <h2 className="text-lg font-semibold text-foreground mb-3">
+                    Marcas Mais Entregues
+                  </h2>
+                  <Card className="p-4">
+                    <div className="space-y-3">
+                      {stats.marcasMaisEntregues
+                        .slice(0, 5)
+                        .map((item, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center justify-between"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 bg-primary/10 rounded-md flex items-center justify-center">
+                                <Package className="h-4 w-4 text-primary" />
+                              </div>
+                              <span className="text-sm font-medium text-foreground">
+                                {item.marca}
+                              </span>
+                            </div>
+                            <span className="text-sm text-muted-foreground">
+                              {item.count}x
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </Card>
+                </div>
+              )}
+
+              {stats.proximasVisitas.length > 0 && (
+                <div>
+                  <h2 className="text-lg font-semibold text-foreground mb-3">
+                    Próximas Visitas
+                  </h2>
+                  <div className="space-y-2">
+                    {stats.proximasVisitas.map((visita) => (
+                      <Card key={visita.id} className="p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            <p className="font-medium text-foreground">
+                              {visita.gabinete?.nome}
+                            </p>
+                            {visita.contacto && (
+                              <p className="text-sm text-muted-foreground">
+                                {visita.contacto.nome}
+                              </p>
+                            )}
+                          </div>
+                          {visita.proximaVisita && (
+                            <div className="text-right">
+                              <p className="text-sm font-medium text-primary">
+                                {format(new Date(visita.proximaVisita), "d MMM", {
+                                  locale: pt,
+                                })}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* IA Insights */}
+              <DashboardInsightsCard />
+
+              {/* PDF Reports - FINAL */}
+              <Card
+                data-testid="card-reports"
+                className="border-primary/30 bg-primary/5"
+              >
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Download className="h-5 w-5 text-primary" />
+                    Exportar Relatórios PDF
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+                      Relatórios Padrão
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button
+                        variant="default"
+                        onClick={() =>
+                          handleDownloadReport("monthly", "agent")
+                        }
+                        data-testid="button-report-monthly-agent"
+                        className="w-full"
+                        size="sm"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Mensal
+                      </Button>
+                      <Button
+                        variant="default"
+                        onClick={() =>
+                          handleDownloadReport("weekly", "agent")
+                        }
+                        data-testid="button-report-weekly-agent"
+                        className="w-full"
+                        size="sm"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Semanal
+                      </Button>
+                    </div>
+                  </div>
+                  <Separator />
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+                      Relatórios PRO (com IA)
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          handleDownloadPerformancePro("month", "agent")
+                        }
+                        data-testid="button-report-pro-monthly"
+                        className="w-full"
+                        size="sm"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        PRO Mensal
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          handleDownloadPerformancePro("week", "agent")
+                        }
+                        data-testid="button-report-pro-weekly"
+                        className="w-full"
+                        size="sm"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        PRO Semanal
+                      </Button>
+                    </div>
+                  </div>
+                  {isAdmin && (
+                    <>
+                      <Separator />
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+                            Empresa (Admin) - Padrão
+                          </p>
+                          <div className="grid grid-cols-2 gap-3">
+                            <Button
+                              variant="outline"
+                              onClick={() =>
+                                handleDownloadReport("monthly", "company")
+                              }
+                              data-testid="button-report-monthly-company"
+                              className="w-full"
+                              size="sm"
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              Mensal
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() =>
+                                handleDownloadReport("weekly", "company")
+                              }
+                              data-testid="button-report-weekly-company"
+                              className="w-full"
+                              size="sm"
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              Semanal
+                            </Button>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+                            Empresa (Admin) - PRO
+                          </p>
+                          <div className="grid grid-cols-2 gap-3">
+                            <Button
+                              variant="outline"
+                              onClick={() =>
+                                handleDownloadPerformancePro("month", "empresa")
+                              }
+                              data-testid="button-report-pro-monthly-empresa"
+                              className="w-full"
+                              size="sm"
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              PRO Mensal
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() =>
+                                handleDownloadPerformancePro("week", "empresa")
+                              }
+                              data-testid="button-report-pro-weekly-empresa"
+                              className="w-full"
+                              size="sm"
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              PRO Semanal
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          ) : null}
+        </main>
+      </div>
+    </>
+  );
+}
