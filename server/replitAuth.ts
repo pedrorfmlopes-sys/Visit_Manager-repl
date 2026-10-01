@@ -7,7 +7,8 @@ import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
-import { db } from "./db";
+import { db, pool } from "./db";
+import { databaseSchema } from './databaseConfig';
 import { users as usersTable, empresas as empresasTable } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { getSocialAuthMethods, setupSocialAuth } from "./socialAuth";
@@ -37,9 +38,10 @@ export function getSession() {
   const isProduction = process.env.NODE_ENV === "production";
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
+    pool,
+    schemaName: databaseSchema(),
     createTableIfMissing: false,
-    ttl: sessionTtl,
+    ttl: Math.floor(sessionTtl / 1000),
     tableName: "sessions",
   });
   return session({

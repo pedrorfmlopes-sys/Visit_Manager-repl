@@ -12,7 +12,7 @@ async function tableExists(tableName: string) {
       select exists (
         select 1
         from information_schema.tables
-        where table_schema = 'public' and table_name = $1
+        where table_schema = current_schema() and table_name = $1
       ) as exists
     `,
     [tableName],
@@ -27,7 +27,7 @@ async function columnExists(tableName: string, columnName: string) {
       select exists (
         select 1
         from information_schema.columns
-        where table_schema = 'public'
+        where table_schema = current_schema()
           and table_name = $1
           and column_name = $2
       ) as exists
@@ -121,7 +121,7 @@ async function ensureLegacyEmpresaCompatibility() {
         if not exists (
           select 1
           from information_schema.table_constraints
-          where table_schema = 'public'
+          where table_schema = current_schema()
             and table_name = '${tableName}'
             and constraint_name = '${constraintName}'
         ) then

@@ -20,6 +20,7 @@ import { BrandLogo } from "@/components/BrandLogo";
 import { useQuery } from "@tanstack/react-query";
 
 const sidebarItems = [
+  { path: "/admin/invoice-integration", icon: Building2, label: "Projetos e InvoiceStudio" },
   { path: "/", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/entidades", icon: Building2, label: "Entidades" },
   { path: "/contactos", icon: Users, label: "Contactos" },

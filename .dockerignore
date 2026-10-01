@@ -1,0 +1,8 @@
+node_modules
+.git
+.env*
+uploads
+manual_visit_manager
+attached_assets
+dist
+*.log

@@ -28,6 +28,7 @@ import entidadeTiposRoutes from "./routes/admin/entidadeTiposRoutes";
 // -------- Odoo (Router) --------
 import odooContactRequestsRoutes from "./routes/odoo/odooContactRequestsRoutes";
 import { setupOdooRoutes } from "./routes/integrations/odoo";
+import { setupInvoiceStudio } from "./integrations/invoiceStudio";
 import { setupGoogleRoutes } from "./routes/integrations/google";
 import { setupMicrosoftRoutes } from "./routes/integrations/microsoft";
 
@@ -118,6 +119,7 @@ export default async function registerRoutes(app: Express) {
   registerModule("setupGoogleRoutes", setupGoogleRoutes as any, app);
   registerModule("setupMicrosoftRoutes", setupMicrosoftRoutes as any, app);
   registerModule("setupOdooRoutes", setupOdooRoutes as any, app);
+  registerModule("setupInvoiceStudio", setupInvoiceStudio, app);
 
   // Routers montados com prefixos /api/...
   mountRouter(

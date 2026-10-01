@@ -53,6 +53,7 @@ const MicrosoftIntegration = lazy(() => import("@/pages/MicrosoftIntegration"));
 const AgentMore = lazy(() => import("@/pages/AgentMore"));
 const Perfil = lazy(() => import("@/pages/Perfil"));
 const Planeamento = lazy(() => import("@/pages/Planeamento"));
+const InvoiceIntegration = lazy(() => import("@/pages/InvoiceIntegration"));
 
 function LegacyRedirect({ to }: { to: string }) {
   const [, setLocation] = useLocation();
@@ -186,6 +187,7 @@ function ModuleAdminRoute({
     <MainLayout>
       <Suspense fallback={<RouteLoader />}>
       <Switch>
+        <Route path="/admin/invoice-integration"><AdminRoute component={InvoiceIntegration} /></Route>
         {/* Dashboard: admin vs agente */}
         <Route path="/" component={isAdmin ? AdminDashboard : Dashboard} />
 

@@ -19,6 +19,7 @@ const MIGRATION_FILES = [
   "0009_add-odoo-lead-followers.sql",
   "0010_add-entity-research.sql",
   "0011_add-chatter-publishing.sql",
+  "0012_invoice-integration.sql",
 ];
 
 function quoteIdentifier(value: string) {

@@ -15,6 +15,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+export * from './invoiceSchema';
 
 // ============================================
 // FASE SS-01: Search Result Types
