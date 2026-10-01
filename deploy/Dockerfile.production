@@ -12,6 +12,7 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/package.json ./package.json
 COPY deploy/supabase-ca.crt ./deploy/supabase-ca.crt
+COPY deploy/restoreUploads.mjs ./deploy/restoreUploads.mjs
 ENV NODE_ENV=production PORT=10000
 EXPOSE 10000
-CMD ["node","dist/index.js"]
+CMD ["sh","-c","node deploy/restoreUploads.mjs && exec node dist/index.js"]
