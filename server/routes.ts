@@ -29,6 +29,7 @@ import entidadeTiposRoutes from "./routes/admin/entidadeTiposRoutes";
 import odooContactRequestsRoutes from "./routes/odoo/odooContactRequestsRoutes";
 import { setupOdooRoutes } from "./routes/integrations/odoo";
 import { setupInvoiceStudio } from "./integrations/invoiceStudio";
+import { registerContactAccessRoutes } from './routes/crm/contactAccessRoutes';
 import { setupGoogleRoutes } from "./routes/integrations/google";
 import { setupMicrosoftRoutes } from "./routes/integrations/microsoft";
 
@@ -82,9 +83,11 @@ function mountRouter(
 
 export default async function registerRoutes(app: Express) {
   console.log("[routes] ▶ iniciar registo de rotas");
+  app.use('/api',(_req,res,next)=>{res.setHeader('X-Contact-Access-Policy',process.env.CONTACT_ACCESS_V2==='true'?'restricted':'legacy');next();});
 
   // Auth
   registerModule("authRoutes", authRoutes, app);
+  await registerContactAccessRoutes(app);
 
   // CRM
   registerModule("registerEntidadesRoutes", registerEntidadesRoutes, app);

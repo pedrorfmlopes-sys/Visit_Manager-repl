@@ -393,7 +393,7 @@ router.post(
   isAuthenticated,
   async (req: Request, res: Response) => {
     try {
-      const { empresaId, userId } = await getUserContext(req);
+      const { empresaId, userId, userRole } = await getUserContext(req);
 
       if (!empresaId) {
         return res
@@ -404,7 +404,7 @@ router.post(
       await assertTenantReferences(empresaId, {
         entidadeTipoId: req.body.entidadeTipoId,
         assignedUserId: req.body.assignedUserId,
-      });
+      }, {userId,userRole});
       const { selectedOdooPartnerId, validatedVatStatus, ...submittedData } = req.body;
       let linkedOdooPartnerId: string | undefined;
       if (selectedOdooPartnerId !== undefined && selectedOdooPartnerId !== null) {
@@ -432,7 +432,8 @@ router.post(
       const newEntidade = await storage.createEntidade(entidadeData, empresaId);
 
       res.json(newEntidade);
-    } catch (error) {
+    } catch (error:any) {
+      if(error.code==='CONTACT_ACCESS_PENDING')return res.status(202).json({state:'pending',requestId:error.requestId,message:error.message});
       console.error("Error creating entidade:", error);
       res.status(400).json({ message: "Failed to create entidade" });
     }
@@ -459,7 +460,7 @@ router.patch(
       await assertTenantReferences(empresaId, {
         entidadeTipoId: req.body.entidadeTipoId,
         assignedUserId: req.body.assignedUserId,
-      });
+      }, {userId,userRole});
       const existingEntidade = await storage.getEntidade(
         id,
         empresaId,

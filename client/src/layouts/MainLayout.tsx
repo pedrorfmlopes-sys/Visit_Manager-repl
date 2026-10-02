@@ -4,6 +4,7 @@ import { AdminTopBar } from "@/components/AdminTopBar";
 import { BottomNav } from "@/components/BottomNav";
 import { TabletNavRail } from "@/components/TabletNavRail";
 import { useViewportMode } from "@/hooks/use-mobile";
+import {ContactAccessNotice} from '@/components/ContactAccessNotice';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -27,6 +28,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           className="flex-1 overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-0"
           data-testid="app-main-content"
         >
+          <ContactAccessNotice />
           {children}
         </main>
       </div>

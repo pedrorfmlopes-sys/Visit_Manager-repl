@@ -1,5 +1,5 @@
 import { offlineStorage, type PendingSyncItem } from './offlineStorage';
-import { apiRequest } from './queryClient';
+import { apiRequest, canCacheServerCopies } from './queryClient';
 
 class SyncManager {
   private isSyncing = false;
@@ -113,6 +113,12 @@ class SyncManager {
         const response = await apiRequest('POST', endpoint, data);
         const createdItem = await response.json();
         
+        if(response.status===202 && createdItem.state==='pending') {
+          if(tempId && type==='entidade')await offlineStorage.deleteEntidade(tempId);
+          if(tempId && type==='contacto')await offlineStorage.deleteContacto(tempId);
+          // The request is safely stored on the server; never retry it as a new contact.
+          break;
+        }
         // Replace temporary item with real item in local storage
         if (tempId && createdItem.id) {
           await offlineStorage.init();
@@ -120,19 +126,19 @@ class SyncManager {
           // Remove temp item and save real item
           if (type === 'visita') {
             await offlineStorage.deleteVisita(tempId);
-            await offlineStorage.saveVisita(createdItem);
+            if(canCacheServerCopies())await offlineStorage.saveVisita(createdItem);
           } else if (type === 'entidade') {
             await offlineStorage.deleteEntidade(tempId);
-            await offlineStorage.saveEntidade(createdItem);
+            if(canCacheServerCopies())await offlineStorage.saveEntidade(createdItem);
           } else if (type === 'gabinete') {
             await offlineStorage.deleteGabinete(tempId);
-            await offlineStorage.saveGabinete(createdItem);
+            if(canCacheServerCopies())await offlineStorage.saveGabinete(createdItem);
           } else if (type === 'contacto') {
             await offlineStorage.deleteContacto(tempId);
-            await offlineStorage.saveContacto(createdItem);
+            if(canCacheServerCopies())await offlineStorage.saveContacto(createdItem);
           } else if (type === 'tarefa') {
             await offlineStorage.deleteTarefa(tempId);
-            await offlineStorage.saveTarefa(createdItem);
+            if(canCacheServerCopies())await offlineStorage.saveTarefa(createdItem);
           }
         }
         break;

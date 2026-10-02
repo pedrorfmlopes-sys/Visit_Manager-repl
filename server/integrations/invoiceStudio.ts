@@ -2,10 +2,38 @@ import crypto from 'node:crypto';
 import type { Express } from 'express';
 import { Router } from 'express';
 import { pool } from '../db';
+import { ContactAccessService } from '../contactAccessService';
+import { ensureAuthenticated } from '../authContext';
 import { requireAdmin } from '../authContext';
 import { encryptSecret, decryptSecret } from '../secretCrypto';
 import { z } from 'zod';
 import { assertEmpresaModuleEnabled } from '../modules';
+import {directorySnapshot,importInvoiceDirectory} from '../invoiceDirectoryImport';
+import {beginContactOperation,contactMaintenanceEnabled} from '../contactMaintenance';
+
+const importPreviews=new Map<string,{company:string;user:string;expires:number;fingerprint:string;source:string}>();
+async function sourceIdentity(company:string) {
+  const config=await connection(company),status=await remote(company,'status');
+  const identity=z.object({connectionId:z.string().min(1),organizationId:z.string().min(1),workspaceId:z.string().min(1)}).parse(status.sourceIdentity);
+  return JSON.stringify({origin:origin(config.base_url),...identity});
+}
+async function readDirectory(company:string) {
+  const snapshot:Record<string,any[]>={entities:[],contacts:[],assignments:[]};
+  for(const kind of Object.keys(snapshot)) {
+    let after='';
+    for(;;) {
+      const page=await remote(company,'directory-export',{kind,after});
+      if(!Array.isArray(page.items) || page.kind!==kind) throw error('Resposta de contactos inválida.',502);
+      snapshot[kind].push(...page.items);
+      if(snapshot[kind].length>100000) throw error('O diretório excede o limite de importação.',413);
+      if(page.next===null) break;
+      if(typeof page.next!=='string' || page.next<=after) throw error('Paginação de contactos inválida.',502);
+      after=page.next;
+    }
+  }
+  return directorySnapshot.parse(snapshot);
+}
+const directoryFingerprint=(value:unknown)=>crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
 const query = async (sql: string, args: any[] = []) => (await pool.query(sql, args)).rows as any[];
 const error = (message: string, status = 400) => Object.assign(new Error(message), { status });
@@ -35,7 +63,9 @@ async function remote(company: string, path: string, body?: any) {
 }
 const running = new Set<string>();
 export async function deliverInvoiceJob(company: string, id: string) {
+  if(contactMaintenanceEnabled())throw error('VisitManager em manutenção.',503);
   if (running.has(company)) throw error('Existe uma sincronização em curso.', 409);
+  const complete=beginContactOperation();
   running.add(company);
   try {
     await connection(company);
@@ -55,7 +85,7 @@ export async function deliverInvoiceJob(company: string, id: string) {
       await query('UPDATE invoice_jobs SET state=$2,error=$3,updated_at=now() WHERE id=$1',[id,state,e.status ? e.message : 'Ligação indisponível. Podes repetir o envio.']);
       throw error(e.status ? e.message : 'Ligação indisponível. O envio ficou guardado.',e.status || 503);
     }
-  } finally { running.delete(company); }
+  } finally { running.delete(company);complete(); }
 }
 async function enqueue(company:string, kind:string, sourceId:string, data:any) {
   const id = crypto.randomUUID();
@@ -64,13 +94,41 @@ async function enqueue(company:string, kind:string, sourceId:string, data:any) {
 }
 const projectInput = z.object({name:z.string().trim().min(1).max(300), reference:z.string().max(200).default(''),address:z.string().max(1000).default(''),description:z.string().max(10000).default(''),status:z.enum(['active','completed','archived']).default('active'),participants:z.array(z.object({entityId:z.string(),name:z.string().max(300),role:z.enum(['owner','architect','installer','customer','contractor','other'])})).max(100).default([])});
 export function setupInvoiceStudio(app:Express) {
+  // Contact-scoped reads are separate from the administrator integration routes.
+  // Caller-supplied source identities/contact IDs are never forwarded to Clean.
+  if(process.env.CONTACT_ACCESS_V2==='true') app.get('/api/contact-access/invoice-projects',ensureAuthenticated,async(req:any,res)=>{
+    try {
+      const context=req.userContext,company=context.empresaId;
+      if(!company)throw error('Empresa obrigatória.',403);
+      const stored=(await query('SELECT identity FROM invoice_directory_sources WHERE empresa_id=$1',[company]))[0];
+      if(!stored || stored.identity!==await sourceIdentity(company))throw error('Importa primeiro os contactos desta origem.',409);
+      const access=new ContactAccessService(pool);
+      const allowedLocal=new Set((await Promise.all([access.list(context.userId,'entity'),access.list(context.userId,'person')])).flat().map(r=>r.id));
+      const mappings=await query("SELECT kind,source_id,local_id FROM invoice_directory_records WHERE empresa_id=$1 AND status='active'",[company]);
+      const selected=mappings.filter(r=>allowedLocal.has(r.local_id));
+      const body:any={contacts:selected.map(r=>({kind:r.kind,id:r.source_id}))};
+      if(req.query.projectId)body.projectId=z.string().max(300).parse(req.query.projectId);
+      if(req.query.download){body.download=z.string().max(300).parse(req.query.download);body.objectType=z.enum(['document','attachment']).parse(req.query.objectType);}
+      const result=await remote(company,'contact-projects',body);
+      // Recheck after network I/O, including role/active state, before releasing bytes.
+      for(const mapping of selected)if(!await access.allowed(context.userId,mapping.kind,mapping.local_id))throw error('As permissões mudaram. Atualiza a página.',409);
+      res.setHeader('Cache-Control','private, no-store');
+      if(body.download) {
+        const file=z.object({base64:z.string().max(28*1024*1024),mediaType:z.string(),originalName:z.string()}).parse(result);
+        if(!['application/pdf','image/png','image/jpeg'].includes(file.mediaType))throw error('Formato indisponível.',415);
+        res.setHeader('Content-Type',file.mediaType);res.setHeader('Content-Disposition',"attachment; filename*=UTF-8''"+encodeURIComponent(file.originalName));
+        res.setHeader('X-Content-Type-Options','nosniff');return res.send(Buffer.from(file.base64,'base64'));
+      }
+      res.json(result);
+    }catch(e:any){res.status(e instanceof z.ZodError ? 400 : e.status || 500).json({message:e.status?e.message:'Não foi possível consultar os projetos.'});}
+  });
   const router = Router();
   router.use(requireAdmin);
   router.use((req:any,res,next)=>{if(!req.userContext?.empresaId)return res.status(403).json({message:'Empresa obrigatória.'});next();});
   const route = (method:'get'|'post'|'put',path:string,fn:(req:any,company:string)=>Promise<any>)=>router[method](path,async(req:any,res)=>{try{res.json(await fn(req,req.userContext.empresaId));}catch(e:any){res.status(e instanceof z.ZodError ? 400 : e.status || 500).json({message:e instanceof z.ZodError ? 'Dados inválidos.' : e.status ? e.message:'Não foi possível concluir a operação.'});}});
   route('get','/settings',async(_req,c)=>{
     const row=(await query('SELECT enabled,base_url,public_url,auto_sync,token_encrypted FROM invoice_connections WHERE empresa_id=$1',[c]))[0];
-    return {companyId:c,enabled:row?.enabled || false,baseUrl:row?.base_url || '',publicUrl:row?.public_url || '',autoSync:row?.auto_sync || false,hasToken:!!row?.token_encrypted};
+    return {companyId:c,enabled:row?.enabled || false,baseUrl:row?.base_url || '',publicUrl:row?.public_url || '',autoSync:row?.auto_sync || false,hasToken:!!row?.token_encrypted,contactAccessAvailable:process.env.CONTACT_ACCESS_V2==='true'};
   });
   route('put','/settings',async(req,c)=>{
     const body=z.object({enabled:z.boolean(),baseUrl:z.string(),publicUrl:z.string(),token:z.string().max(256).optional(),autoSync:z.boolean().default(false)}).parse(req.body);
@@ -84,6 +142,24 @@ export function setupInvoiceStudio(app:Express) {
       ON CONFLICT(empresa_id) DO UPDATE SET enabled=excluded.enabled,base_url=excluded.base_url,public_url=excluded.public_url,token_encrypted=excluded.token_encrypted,auto_sync=excluded.auto_sync,updated_at=now()`,[c,body.enabled,baseUrl,publicUrl,token,body.autoSync]);return {ok:true};
   });
   route('post','/test',async(_req,c)=>remote(c,'status'));
+  route('post','/directory-import/preview',async(req,c)=>{
+    if(process.env.CONTACT_ACCESS_V2!=='true')throw error('Importação ainda indisponível.',404);
+    importPreviews.forEach((value,key)=>{if(value.expires<Date.now())importPreviews.delete(key);});
+    const source=await sourceIdentity(c),data=await readDirectory(c),previewId=crypto.randomUUID();
+    importPreviews.set(previewId,{company:c,user:req.userContext.userId,expires:Date.now()+15*60000,fingerprint:directoryFingerprint(data),source});
+    return {previewId,entities:data.entities.length,contacts:data.contacts.length,assignments:data.assignments.length};
+  });
+  route('post','/directory-import/apply',async(req,c)=>{
+    if(process.env.CONTACT_ACCESS_V2!=='true')throw error('Importação ainda indisponível.',404);
+    const id=z.string().uuid().parse(req.body.previewId),preview=importPreviews.get(id);
+    if(!preview || preview.company!==c || preview.user!==req.userContext.userId || preview.expires<Date.now())throw error('Volta a preparar a importação.',409);
+    importPreviews.delete(id);
+    const source=await sourceIdentity(c);
+    if(source!==preview.source)throw error('A origem mudou. Revê uma nova importação.',409);
+    const data=await readDirectory(c);
+    if(directoryFingerprint(data)!==preview.fingerprint)throw error('Os contactos no InvoiceStudio mudaram. Revê uma nova pré-visualização.',409);
+    return importInvoiceDirectory(pool,c,data,source);
+  });
   route('get','/jobs',async(_req,c)=>({items:await query('SELECT id,kind,source_id,state,attempts,error,created_at FROM invoice_jobs WHERE empresa_id=$1 ORDER BY created_at DESC LIMIT 100',[c])}));
   route('post','/jobs/:id/retry',async(req,c)=>deliverInvoiceJob(c,req.params.id));
   route('post','/jobs/:id/cancel',async(req,c)=>{
@@ -137,12 +213,13 @@ export function setupInvoiceStudio(app:Express) {
   app.use('/api/integrations/invoice-studio',router);
   let working=false;
   const timer=setInterval(async()=>{
-    if(working)return;working=true;
+    if(working || contactMaintenanceEnabled())return;working=true;
+    const complete=beginContactOperation();
     try{
       await query("UPDATE invoice_jobs SET state='pending',error='Envio interrompido; aguarda nova tentativa.' WHERE state='sending' AND updated_at<now()-interval '5 minutes'");
       const jobs=await query(`SELECT j.id,j.empresa_id FROM invoice_jobs j JOIN invoice_connections c ON c.empresa_id=j.empresa_id WHERE c.enabled AND c.auto_sync AND j.state='pending' AND j.attempts<5 AND j.updated_at < now()-interval '1 minute' ORDER BY j.created_at LIMIT 10`);
       for(const j of jobs)await deliverInvoiceJob(j.empresa_id,j.id).catch(()=>{});
-    }catch{}finally{working=false;}
+    }catch{}finally{working=false;complete();}
   },60000);timer.unref();
 }
 async function project(company:string,id:string){const row=(await query('SELECT * FROM commercial_projects WHERE empresa_id=$1 AND id=$2',[company,id]))[0];if(!row)throw error('Projeto não encontrado.',404);return row;}

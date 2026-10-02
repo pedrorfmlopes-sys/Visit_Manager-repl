@@ -1,6 +1,17 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { offlineStorage } from "./offlineStorage";
 
+// A cold/offline client cannot establish that old grants remain valid.
+let serverCopiesAllowed=false;
+let clearedServerCopies=false;
+export const canCacheServerCopies=()=>serverCopiesAllowed;
+async function observeAccessPolicy(response:Response) {
+  serverCopiesAllowed=response.headers.get('X-Contact-Access-Policy')==='legacy';
+  if(!serverCopiesAllowed && !clearedServerCopies) {
+    await offlineStorage.clearServerCopies();clearedServerCopies=true;
+  }
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -9,6 +20,7 @@ async function throwIfResNotOk(res: Response) {
 }
 
 async function getOfflineData(endpoint: string): Promise<any> {
+  if(!serverCopiesAllowed)return null;
   await offlineStorage.init();
   
   // Extract ID from detail endpoints like /api/visitas/123
@@ -55,6 +67,7 @@ export async function apiRequest(
   });
 
   await throwIfResNotOk(res);
+  await observeAccessPolicy(res);
   return res;
 }
 
@@ -70,6 +83,7 @@ export const getQueryFn: <T>(options: {
       const res = await fetch(endpoint, {
         credentials: "include",
       });
+      await observeAccessPolicy(res);
 
       if (unauthorizedBehavior === "returnNull" && res.status === 401) {
         return null;
@@ -79,7 +93,7 @@ export const getQueryFn: <T>(options: {
       const data = await res.json();
       
       // Cache successful responses in IndexedDB (both lists and individual items)
-      if (navigator.onLine) {
+      if (navigator.onLine && serverCopiesAllowed) {
         await offlineStorage.init();
         
         if (endpoint.includes("/api/visitas")) {
@@ -137,12 +151,16 @@ export const queryClient = new QueryClient({
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
-      refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      refetchOnWindowFocus: true,
+      staleTime: 0,
       retry: false,
     },
     mutations: {
       retry: false,
     },
   },
+});
+
+if(typeof window!=='undefined')window.addEventListener('offline',()=>{
+  if(!serverCopiesAllowed)void queryClient.resetQueries({predicate:query=>String(query.queryKey[0]).startsWith('/api/') && query.queryKey[0]!=='/api/auth/me'});
 });

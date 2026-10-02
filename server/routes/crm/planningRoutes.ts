@@ -127,7 +127,7 @@ export function planningRoutes(app: express.Express) {
         if (userRole === "admin" && parsed.data.assignedUserId) {
           await assertTenantReferences(empresaId, {
             assignedUserId: parsed.data.assignedUserId,
-          });
+          }, {userId,userRole});
         }
 
         const scheduledAt = parsed.data.scheduledAt

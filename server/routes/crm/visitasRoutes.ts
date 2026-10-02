@@ -536,7 +536,7 @@ export function visitasRoutes(app: express.Express) {
           visitaAnteriorId: req.body.visitaAnteriorId,
           contactosIds,
           marcasIds,
-        });
+        }, {userId,userRole});
 
         const visitaData = {
           entidadeId: req.body.entidadeId || null,
@@ -676,7 +676,7 @@ export function visitasRoutes(app: express.Express) {
         visitaAnteriorId: req.body.visitaAnteriorId,
         contactosIds,
         marcasIds,
-      });
+      }, {userId,userRole});
 
       const updates: any = {};
 

@@ -1,5 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { db } from "./db";
+import { db, pool } from "./db";
+import {ContactAccessService} from './contactAccessService';
+import {contactRecordBoundary} from './contactRecordBoundary';
 import {
   contactos,
   entidadeTipos,
@@ -45,6 +47,7 @@ function assertComplete(
 export async function assertTenantReferences(
   empresaId: string,
   references: TenantReferences,
+  actor?: {userId:string;userRole:string},
 ) {
   const entityIds = uniqueIds([references.entidadeId]);
   const contactIds = uniqueIds([
@@ -58,6 +61,18 @@ export async function assertTenantReferences(
   const userIds = uniqueIds([references.assignedUserId]);
   const entityTypeIds = uniqueIds([references.entidadeTipoId]);
   const brandIds = uniqueIds(references.marcasIds ?? []);
+
+  if(process.env.CONTACT_ACCESS_V2==='true') {
+    if(!actor)throw new TenantValidationError('Contexto de autorização em falta.');
+    const access=new ContactAccessService(pool);
+    for(const id of entityIds)if(!await access.allowed(actor.userId,'entity',id))throw new TenantValidationError('Registo indisponível.');
+    for(const id of contactIds)if(!await access.allowed(actor.userId,'person',id))throw new TenantValidationError('Registo indisponível.');
+    if(visitIds.length) {
+      const allowed=await contactRecordBoundary(empresaId,actor.userId,actor.userRole);
+      const records=await db.select().from(visitas).where(and(eq(visitas.empresaId,empresaId),inArray(visitas.id,visitIds)));
+      if(records.some(record=>!allowed(record)))throw new TenantValidationError('Registo indisponível.');
+    }
+  }
 
   const [
     existingEntities,
