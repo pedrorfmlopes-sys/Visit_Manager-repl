@@ -103,15 +103,20 @@ export function setupInvoiceStudio(app:Express) {
       const stored=(await query('SELECT identity FROM invoice_directory_sources WHERE empresa_id=$1',[company]))[0];
       if(!stored || stored.identity!==await sourceIdentity(company))throw error('Importa primeiro os contactos desta origem.',409);
       const access=new ContactAccessService(pool);
-      const allowedLocal=new Set((await Promise.all([access.list(context.userId,'entity'),access.list(context.userId,'person')])).flat().map(r=>r.id));
+      const allowedContacts=async()=>{
+        const [entities,people]=await Promise.all([access.list(context.userId,'entity'),access.list(context.userId,'person')]);
+        return new Set([...entities.map(r=>'entity:'+r.id),...people.map(r=>'person:'+r.id)]);
+      };
+      const allowedLocal=await allowedContacts();
       const mappings=await query("SELECT kind,source_id,local_id FROM invoice_directory_records WHERE empresa_id=$1 AND status='active'",[company]);
-      const selected=mappings.filter(r=>allowedLocal.has(r.local_id));
+      const selected=mappings.filter(r=>allowedLocal.has(r.kind+':'+r.local_id));
       const body:any={contacts:selected.map(r=>({kind:r.kind,id:r.source_id}))};
       if(req.query.projectId)body.projectId=z.string().max(300).parse(req.query.projectId);
       if(req.query.download){body.download=z.string().max(300).parse(req.query.download);body.objectType=z.enum(['document','attachment']).parse(req.query.objectType);}
       const result=await remote(company,'contact-projects',body);
       // Recheck after network I/O, including role/active state, before releasing bytes.
-      for(const mapping of selected)if(!await access.allowed(context.userId,mapping.kind,mapping.local_id))throw error('As permissões mudaram. Atualiza a página.',409);
+      const freshAllowed=await allowedContacts();
+      if(selected.some(mapping=>!freshAllowed.has(mapping.kind+':'+mapping.local_id)))throw error('As permissões mudaram. Atualiza a página.',409);
       res.setHeader('Cache-Control','private, no-store');
       if(body.download) {
         const file=z.object({base64:z.string().max(28*1024*1024),mediaType:z.string(),originalName:z.string()}).parse(result);
