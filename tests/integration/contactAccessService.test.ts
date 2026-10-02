@@ -7,7 +7,7 @@ import {importInvoiceDirectory} from '../../server/invoiceDirectoryImport';
 
 test('contact review: concurrent duplicates, approval, refusal, distinct identity, revocation and tenant isolation',async()=>{
   const url=process.env.CONTACT_ACCESS_TEST_DATABASE_URL;
-  assert.ok(url && new URL(url).hostname==='db','Only the isolated Docker lab database is allowed');
+  assert.ok(url && (new URL(url).hostname==='db' || (process.env.CI==='true' && new URL(url).hostname==='127.0.0.1' && new URL(url).pathname==='/visit_manager_test')),'Only the isolated Docker/CI database is allowed');
   const schema='access_test_'+crypto.randomBytes(8).toString('hex');
   const setup=new pg.Pool({connectionString:url});
   const pool=new pg.Pool({connectionString:url,options:'-c search_path='+schema});

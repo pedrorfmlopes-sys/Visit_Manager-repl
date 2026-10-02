@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import {resetVisitTestData} from '../../server/contactDataReset';
 test('business reset previews, rejects changed data, preserves accounts/configuration, rehearses rollback and refuses unknown dependencies',async()=>{
  const url=process.env.CONTACT_ACCESS_TEST_DATABASE_URL;
- assert.ok(url && new URL(url).hostname==='db','Isolated Docker database required');
+ assert.ok(url && (new URL(url).hostname==='db' || (process.env.CI==='true' && new URL(url).hostname==='127.0.0.1' && new URL(url).pathname==='/visit_manager_test')),'Isolated Docker/CI database required');
  const schema='reset_test_'+crypto.randomBytes(8).toString('hex'),pool=new pg.Pool({connectionString:url});
  try {
   await pool.query(`CREATE SCHEMA ${schema}; CREATE TABLE ${schema}.empresas(id text PRIMARY KEY,license text);
