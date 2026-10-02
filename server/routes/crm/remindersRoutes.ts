@@ -5,12 +5,13 @@ import { getUserContext } from "../../authContext";
 import { db } from "../../db";
 import { lembretes } from "@shared/schema";
 import { generateAllReminders, resolveReminder, snoozeReminder } from "../../reminders";
+import {contactRecordBoundary} from "../../contactRecordBoundary";
 import { storage } from "../../storage";
 
 export function remindersRoutes(app: Express) {
   app.get("/api/lembretes", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const { userId, empresaId } = await getUserContext(req as any);
+      const { userId, empresaId, userRole } = await getUserContext(req as any);
 
       if (!userId || !empresaId) {
         return res.status(400).json({ message: "Contexto de utilizador/empresa em falta" });
@@ -39,7 +40,8 @@ export function remindersRoutes(app: Express) {
         orderBy: [asc(lembretes.dataVencimento), asc(lembretes.dataCriacao)],
       });
 
-      res.json(items);
+      const allowed=await contactRecordBoundary(empresaId,userId,userRole);
+      res.json(items.filter(allowed));
     } catch (error) {
       console.error("[remindersRoutes] Erro ao carregar lembretes:", error);
       res.status(500).json({ message: "Erro ao carregar lembretes" });
@@ -48,7 +50,7 @@ export function remindersRoutes(app: Express) {
 
   app.post("/api/lembretes/snooze", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const { userId, empresaId } = await getUserContext(req as any);
+      const { userId, empresaId, userRole } = await getUserContext(req as any);
       const { reminderId, duration } = (req as any).body ?? {};
 
       if (!userId || !empresaId || !reminderId || !duration) {
@@ -67,7 +69,8 @@ export function remindersRoutes(app: Express) {
         )
         .limit(1);
 
-      if (!item) {
+      const allowed=await contactRecordBoundary(empresaId,userId,userRole);
+      if (!item || !allowed(item)) {
         return res.status(404).json({ message: "Lembrete não encontrado" });
       }
 
@@ -81,7 +84,7 @@ export function remindersRoutes(app: Express) {
 
   app.post("/api/lembretes/resolve", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const { userId, empresaId } = await getUserContext(req as any);
+      const { userId, empresaId, userRole } = await getUserContext(req as any);
       const { reminderId } = (req as any).body ?? {};
 
       if (!userId || !empresaId || !reminderId) {
@@ -100,7 +103,8 @@ export function remindersRoutes(app: Express) {
         )
         .limit(1);
 
-      if (!item) {
+      const allowed=await contactRecordBoundary(empresaId,userId,userRole);
+      if (!item || !allowed(item)) {
         return res.status(404).json({ message: "Lembrete não encontrado" });
       }
 

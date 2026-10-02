@@ -115,17 +115,18 @@ export default function ContactoForm() {
 
   const createMutation = useMutation({
     mutationFn: async (data: InsertContacto) => {
-      await apiRequest("POST", "/api/contactos", data);
+      const response=await apiRequest("POST", "/api/contactos", data);
+      return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/contactos"] });
       queryClient.invalidateQueries({ queryKey: ["/api/entidades"] });
       queryClient.refetchQueries({ queryKey: ["/api/entidades"] });
       toast({
         title: "Sucesso",
-        description: "Contacto criado com sucesso",
+        description: result.state==='pending' ? 'Pedido enviado aos administradores para análise.' : "Contacto criado com sucesso",
       });
-      setLocation("/contactos");
+      setLocation(result.state==='pending' ? '/contact-access' : "/contactos");
     },
     onError: async (error: Error, data) => {
       // Check if it's a network error (offline)

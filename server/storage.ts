@@ -38,9 +38,14 @@ import {
   type OdooContactRequest,
   insertOdooContactRequestSchema,
 } from "@shared/schema";
-import { db } from "./db";
+import { db,pool } from "./db";
+import {drizzle} from 'drizzle-orm/node-postgres';
+import {getTableColumns} from 'drizzle-orm';
+import {ContactAccessService} from './contactAccessService';
 import { eq, desc, sql, or, and, inArray, ne, isNull } from "drizzle-orm";
 import { haversineDistance } from "./distanceUtils";
+import {contactAccessWhere} from './contactAccessSql';
+import {contactRecordBoundary} from './contactRecordBoundary';
 
 // ============ ENTIDADES RBAC HELPER ============
 function buildEntidadeAccessWhere(
@@ -48,6 +53,7 @@ function buildEntidadeAccessWhere(
   userId: string,
   userRole: "admin" | "agent",
 ) {
+  if(process.env.CONTACT_ACCESS_V2==='true')return contactAccessWhere('entity',empresaId,userId,userRole);
   if (userRole === "admin") {
     return eq(entidades.empresaId, empresaId);
   }
@@ -523,8 +529,8 @@ export class DatabaseStorage implements IStorage {
       where: baseWhere,
       orderBy: desc(entidades.createdAt),
       with: {
-        assignedUser: true,
-        createdByUser: true,
+        assignedUser: {columns:{id:true,firstName:true,lastName:true}},
+        createdByUser: {columns:{id:true,firstName:true,lastName:true}},
         entidadeTipo: true,
       },
     }) as unknown as Entidade[];
@@ -542,8 +548,8 @@ export class DatabaseStorage implements IStorage {
     const [entidade] = await db.query.entidades.findMany({
       where: whereClause,
       with: {
-        contactos: true,
-        visitas: {
+        contactos: process.env.CONTACT_ACCESS_V2==='true' ? undefined : true,
+        visitas: process.env.CONTACT_ACCESS_V2==='true' && userRole!=='admin' ? undefined : {
           orderBy: desc(visitas.dataVisita),
           limit: 10,
           with: {
@@ -559,6 +565,11 @@ export class DatabaseStorage implements IStorage {
       },
     });
 
+    if(entidade && process.env.CONTACT_ACCESS_V2==='true') {
+      const people=await db.query.contactos.findMany({where:and(contactAccessWhere('person',empresaId,userId,userRole),or(eq(contactos.entidadeId,id),
+        sql`EXISTS(SELECT 1 FROM invoice_directory_assignments a WHERE a.empresa_id=${empresaId} AND a.entity_id=${id} AND a.contact_id=${contactos.id} AND a.status='active')`))});
+      return {...entidade,contactos:people} as unknown as EntidadeWithRelations;
+    }
     return entidade as unknown as EntidadeWithRelations | undefined;
   }
 
@@ -588,7 +599,7 @@ export class DatabaseStorage implements IStorage {
     const [entidade] = await db
       .select()
       .from(entidades)
-      .where(whereClause)
+      .where(and(whereClause,contactAccessWhere('entity',empresaId,userId,userRole)))
       .limit(1);
 
     return entidade;
@@ -620,7 +631,7 @@ export class DatabaseStorage implements IStorage {
     const [entidade] = await db
       .select()
       .from(entidades)
-      .where(whereClause)
+      .where(and(whereClause,contactAccessWhere('entity',empresaId,userId,userRole)))
       .limit(1);
 
     return entidade;
@@ -630,6 +641,23 @@ export class DatabaseStorage implements IStorage {
     entidadeData: InsertEntidade,
     empresaId: string,
   ): Promise<Entidade> {
+    if(process.env.CONTACT_ACCESS_V2==='true') {
+      const actorId=entidadeData.createdByUserId;
+      const actor=actorId ? await this.getUser(actorId) : null;
+      if(!actor?.ativo || actor.empresaId!==empresaId)throw Object.assign(Error('Utilizador não autorizado.'),{status:403});
+      const columns=getTableColumns(entidades);
+      const values=Object.fromEntries(Object.entries(entidadeData).filter(([key])=>key in columns && !['id','empresaId','createdByUserId','assignedUserId','createdAt','updatedAt'].includes(key)));
+      const result=await new ContactAccessService(pool).submit(actor.id,{kind:'entity',name:entidadeData.nome,email:entidadeData.email || '',entityTypeId:entidadeData.entidadeTipoId || null,proximityAlertsEnabled:entidadeData.proximityAlertsEnabled || false,
+        phone:entidadeData.telefone || '',taxId:entidadeData.nif || '',countryCode:entidadeData.countryCode || 'PT',notes:entidadeData.notas || '',details:Object.fromEntries(Object.entries(values).filter(([key,value])=>['tipoEntidade','morada','cidade','codigoPostal','website','latitude','longitude','logoUrl','domain','industry','descricao','linkedinUrl','facebookUrl','twitterUrl','instagramUrl','xUrl'].includes(key) && (value===null || typeof value==='string')))},
+        entidadeData.assignedUserId || undefined,async(client,id)=>{
+          const updated=await drizzle(client).update(entidades).set(values).where(and(eq(entidades.id,id),eq(entidades.empresaId,empresaId))).returning();
+          if(!updated.length)throw Error('Contexto de empresa alterado.');
+        });
+      if(result.state==='pending')throw Object.assign(Error('Pedido enviado aos administradores para análise.'),{code:'CONTACT_ACCESS_PENDING',requestId:result.requestId});
+      const created=await this.getEntidade(result.id!,empresaId,actor.id,actor.role);
+      if(!created)throw Error('Não foi possível consultar a entidade criada.');
+      return created;
+    }
     const [entidade] = await db
       .insert(entidades)
       .values({ ...entidadeData, empresaId, updatedAt: new Date() })
@@ -721,8 +749,8 @@ export class DatabaseStorage implements IStorage {
       orderBy: desc(contactos.createdAt),
       with: {
         entidade: true,
-        assignedUser: true,
-        createdByUser: true,
+        assignedUser: {columns:{id:true,firstName:true,lastName:true}},
+        createdByUser: {columns:{id:true,firstName:true,lastName:true}},
       },
     });
 
@@ -736,6 +764,9 @@ export class DatabaseStorage implements IStorage {
     userRole: "admin" | "agent",
   ): Promise<ContactoWithRelations | undefined> {
     let whereClause;
+    if(process.env.CONTACT_ACCESS_V2==='true') {
+      whereClause=and(eq(contactos.id,id),contactAccessWhere('person',empresaId,userId,userRole));
+    } else
     if (userRole === "admin") {
       whereClause = and(
         eq(contactos.id, id),
@@ -755,7 +786,7 @@ export class DatabaseStorage implements IStorage {
     const contacto = await db.query.contactos.findFirst({
       where: whereClause,
       with: {
-        entidade: true,
+        entidade: process.env.CONTACT_ACCESS_V2!=='true' || userRole==='admin' ? true : undefined,
       },
     });
 
@@ -847,9 +878,9 @@ export class DatabaseStorage implements IStorage {
       with: {
         entidade: true,
         contacto: true,
-        user: true,
-        assignedUser: true,
-        createdByUser: true,
+        user: {columns:{id:true,firstName:true,lastName:true}},
+        assignedUser: {columns:{id:true,firstName:true,lastName:true}},
+        createdByUser: {columns:{id:true,firstName:true,lastName:true}},
         marcas: {
           with: {
             marca: true,
@@ -863,7 +894,8 @@ export class DatabaseStorage implements IStorage {
       },
     });
 
-    return result as unknown as VisitaWithRelations[];
+    const allowed=await contactRecordBoundary(empresaId,userId,userRole);
+    return result.filter(allowed) as unknown as VisitaWithRelations[];
   }
 
   async getVisita(
@@ -892,9 +924,9 @@ export class DatabaseStorage implements IStorage {
       with: {
         entidade: true,
         contacto: true,
-        user: true,
-        assignedUser: true,
-        createdByUser: true,
+        user: {columns:{id:true,firstName:true,lastName:true}},
+        assignedUser: {columns:{id:true,firstName:true,lastName:true}},
+        createdByUser: {columns:{id:true,firstName:true,lastName:true}},
         marcas: {
           with: {
             marca: true,
@@ -908,7 +940,8 @@ export class DatabaseStorage implements IStorage {
       },
     });
 
-    return visita as unknown as VisitaWithRelations | undefined;
+    const allowed=await contactRecordBoundary(empresaId,userId,userRole);
+    return visita && allowed(visita) ? visita as unknown as VisitaWithRelations : undefined;
   }
 
   async createVisita(
@@ -1182,12 +1215,13 @@ export class DatabaseStorage implements IStorage {
       with: {
         visita: true,
         entidade: true,
-        assignedUser: true,
-        createdByUser: true,
+        assignedUser: {columns:{id:true,firstName:true,lastName:true}},
+        createdByUser: {columns:{id:true,firstName:true,lastName:true}},
       },
     });
 
-    return result as unknown as TarefaWithRelations[];
+    const allowed=await contactRecordBoundary(empresaId,userId,userRole);
+    return result.filter(allowed) as unknown as TarefaWithRelations[];
   }
 
   async getTarefa(
@@ -1215,12 +1249,13 @@ export class DatabaseStorage implements IStorage {
       with: {
         visita: true,
         entidade: true,
-        assignedUser: true,
-        createdByUser: true,
+        assignedUser: {columns:{id:true,firstName:true,lastName:true}},
+        createdByUser: {columns:{id:true,firstName:true,lastName:true}},
       },
     });
 
-    return tarefa as unknown as TarefaWithRelations | undefined;
+    const allowed=await contactRecordBoundary(empresaId,userId,userRole);
+    return tarefa && allowed(tarefa) ? tarefa as unknown as TarefaWithRelations : undefined;
   }
 
   async createTarefa(
@@ -1316,10 +1351,11 @@ export class DatabaseStorage implements IStorage {
       .where(whereClause)
       .orderBy(desc(tarefas.createdAt));
 
+    const allowed=await contactRecordBoundary(empresaId,userId,userRole);
     return results.map((row: any) => ({
       ...(row.tarefas as any),
       entidade: (row.entidades as any) || undefined,
-    })) as unknown as TarefaWithRelations[];
+    })).filter(allowed) as unknown as TarefaWithRelations[];
   }
 
   async getTarefasByEntidadeId(
@@ -1350,10 +1386,11 @@ export class DatabaseStorage implements IStorage {
       .where(whereClause)
       .orderBy(desc(tarefas.createdAt));
 
+    const allowed=await contactRecordBoundary(empresaId,userId,userRole);
     return results.map((row: any) => ({
       ...(row.tarefas as any),
       entidade: (row.entidades as any) || undefined,
-    })) as unknown as TarefaWithRelations[];
+    })).filter(allowed) as unknown as TarefaWithRelations[];
   }
 
   async getTarefasInPeriod(
@@ -1387,10 +1424,11 @@ export class DatabaseStorage implements IStorage {
       .where(whereClause)
       .orderBy(desc(tarefas.dueDate));
 
+    const allowed=await contactRecordBoundary(empresaId,userId,userRole);
     return results.map((row: any) => ({
       ...(row.tarefas as any),
       entidade: (row.entidades as any) || undefined,
-    })) as unknown as TarefaWithRelations[];
+    })).filter(allowed) as unknown as TarefaWithRelations[];
   }
 
   async getUnplannedTarefas(
@@ -1419,10 +1457,11 @@ export class DatabaseStorage implements IStorage {
       .where(whereClause)
       .orderBy(desc(tarefas.createdAt));
 
+    const allowed=await contactRecordBoundary(empresaId,userId,userRole);
     return results.map((row: any) => ({
       ...(row.tarefas as any),
       entidade: (row.entidades as any) || undefined,
-    })) as unknown as TarefaWithRelations[];
+    })).filter(allowed) as unknown as TarefaWithRelations[];
   }
 
   async getVisitasByEntidade(
@@ -1450,10 +1489,11 @@ export class DatabaseStorage implements IStorage {
       .where(whereClause)
       .orderBy(desc(visitas.dataVisita));
 
+    const allowed=await contactRecordBoundary(empresaId,userId,userRole);
     return results.map((row: any) => ({
       ...(row.visitas as any),
       entidade: (row.entidades as any) || undefined,
-    })) as unknown as VisitaWithRelations[];
+    })).filter(allowed) as unknown as VisitaWithRelations[];
   }
 
   async getVisitasInPeriod(
@@ -1488,10 +1528,11 @@ export class DatabaseStorage implements IStorage {
       .where(whereClause)
       .orderBy(desc(visitas.dataVisita));
 
+    const allowed=await contactRecordBoundary(empresaId,userId,userRole);
     return results.map((row: any) => ({
       ...(row.visitas as any),
       entidade: (row.entidades as any) || undefined,
-    })) as unknown as VisitaWithRelations[];
+    })).filter(allowed) as unknown as VisitaWithRelations[];
   }
 
   async getAllEntidades(
@@ -1786,9 +1827,10 @@ export class DatabaseStorage implements IStorage {
       inactivityDays?: number;
     } = {},
   ): Promise<any> {
+    const allowed=await contactRecordBoundary(empresaId,options.userId || '',options.userRole || 'agent');
     const entidades_list = await db.query.entidades.findMany({
       where: and(
-        eq(entidades.empresaId, empresaId),
+        contactAccessWhere('entity',empresaId,options.userId || '',options.userRole || 'agent'),
         and(
           sql`${entidades.latitude} IS NOT NULL`,
           sql`${entidades.longitude} IS NOT NULL`,
@@ -1808,6 +1850,7 @@ export class DatabaseStorage implements IStorage {
       },
     });
 
+    for(const entity of entidades_list)entity.visitas=entity.visitas.filter(allowed);
     const allWithDistance = entidades_list
       .filter(
         (entity: any) =>
@@ -1858,7 +1901,7 @@ export class DatabaseStorage implements IStorage {
       );
     const tasksByEntity = new Map<string, typeof overdueTasks>();
     for (const task of overdueTasks) {
-      if (!task.entidadeId) continue;
+      if (!task.entidadeId || !allowed(task)) continue;
       tasksByEntity.set(task.entidadeId, [
         ...(tasksByEntity.get(task.entidadeId) ?? []),
         task,
@@ -1968,7 +2011,7 @@ export class DatabaseStorage implements IStorage {
       visitasWhereClause = eq(visitas.empresaId, empresaId);
     }
 
-    const allVisitas = await db.query.visitas.findMany({
+    let allVisitas = await db.query.visitas.findMany({
       where: visitasWhereClause,
       with: {
         entidade: true,
@@ -1976,6 +2019,8 @@ export class DatabaseStorage implements IStorage {
       },
     });
 
+    const allowed=await contactRecordBoundary(empresaId,userId,userRole);
+    allVisitas=allVisitas.filter(allowed);
     const totalVisitas = allVisitas.length;
 
     const now = new Date();
@@ -2004,6 +2049,7 @@ export class DatabaseStorage implements IStorage {
           ),
         );
     }
+    if(process.env.CONTACT_ACCESS_V2==='true')entidadesCount=await db.select({count:sql<number>`count(*)`}).from(entidades).where(contactAccessWhere('entity',empresaId,userId,userRole));
     const totalEntidades = Number(entidadesCount[0]?.count || 0);
 
     let contactosCount;
@@ -2026,6 +2072,7 @@ export class DatabaseStorage implements IStorage {
           ),
         );
     }
+    if(process.env.CONTACT_ACCESS_V2==='true')contactosCount=await db.select({count:sql<number>`count(*)`}).from(contactos).where(contactAccessWhere('person',empresaId,userId,userRole));
     const totalContactos = Number(contactosCount[0]?.count || 0);
 
     const marcasMap = new Map<string, number>();
@@ -2136,7 +2183,8 @@ export class DatabaseStorage implements IStorage {
       (v) => new Date(v.dataVisita) >= cutoffDate,
     );
 
-    let filteredVisitas = allVisitas as VisitaWithRelations[];
+    const allowed=await contactRecordBoundary(empresaId,userId,userRole);
+    let filteredVisitas = allVisitas.filter(allowed) as VisitaWithRelations[];
 
     if (
       filters &&
@@ -2150,7 +2198,7 @@ export class DatabaseStorage implements IStorage {
     }
 
 
-    const allTarefas = await db.query.tarefas.findMany({
+    let allTarefas = await db.query.tarefas.findMany({
       where: tarefasWhereClause,
       with: {
         entidade: true,
@@ -2158,8 +2206,9 @@ export class DatabaseStorage implements IStorage {
       },
     });
 
+    allTarefas=allTarefas.filter(allowed);
     const allEntidades = await db.query.entidades.findMany({
-      where: entidadesWhereClause,
+      where: and(entidadesWhereClause,contactAccessWhere('entity',empresaId,userId,userRole)),
     });
 
     const now = new Date();

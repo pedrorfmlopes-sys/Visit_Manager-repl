@@ -1022,7 +1022,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
             visitaId: updateData.visitaId as string | null,
             contactosIds: proposedContactIds ?? [],
             marcasIds: proposedBrandIds ?? [],
-          });
+          }, context);
           if (proposedBrandIds) {
             const brandRows = proposedBrandIds.length
               ? await db.query.marcas.findMany({
@@ -1287,7 +1287,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         assignedUserId: responsavelUserId,
         contactosIds: Array.isArray(contactosIds) ? contactosIds : [],
         marcasIds: Array.isArray(marcasIds) ? marcasIds : [],
-      });
+      }, context);
 
       // Validate with schema
       const validation = insertLeadSchema.safeParse({
@@ -1525,7 +1525,7 @@ export function registerCrmLeadsRoutes(app: express.Express) {
         assignedUserId: responsavelUserId,
         contactosIds: Array.isArray(contactosIds) ? contactosIds : [],
         marcasIds: Array.isArray(marcasIds) ? marcasIds : [],
-      });
+      }, context);
 
       if (typeof titulo === "string") updateData.titulo = titulo;
       if (typeof entidadeId === "string" || entidadeId === null) {

@@ -10,12 +10,14 @@ import { ensureDatabaseCompatibility } from "./bootstrapDb";
 import { pool } from "./db";
 import { validateRuntimeConfig } from "./runtimeConfig";
 import { securityHeaders } from "./securityMiddleware";
+import {contactMaintenanceMiddleware,contactMaintenanceStatus} from './contactMaintenance';
 
 const app = express();
 validateRuntimeConfig();
 app.set("trust proxy", 1);
 app.disable("x-powered-by");
 app.use(securityHeaders);
+app.use(contactMaintenanceMiddleware);
 
 declare module "http" {
   interface IncomingMessage {
@@ -58,7 +60,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   app.get("/api/ready", async (_req, res) => {
     try {
       await pool.query("select 1");
-      res.json({ status: "ready" });
+      res.setHeader('Cache-Control','no-store');
+      res.json({ status: "ready",...contactMaintenanceStatus() });
     } catch (error) {
       console.error("[health] Database readiness check failed:", error);
       res.status(503).json({ status: "unavailable" });

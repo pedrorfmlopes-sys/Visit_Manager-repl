@@ -356,15 +356,16 @@ export default function EntidadeForm() {
       console.log('[EntidadeForm] Creating with data:', data);
       console.log('[EntidadeForm] logoUrl value:', data.logoUrl);
       console.log('[EntidadeForm] domain value:', data.domain);
-      await apiRequest("POST", "/api/entidades", data);
+        const response=await apiRequest("POST", "/api/entidades", data);
+        return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/entidades"] });
       toast({
         title: "Sucesso",
-        description: "Entidade criada com sucesso",
+        description: result.state==='pending' ? 'Pedido enviado aos administradores para análise.' : "Entidade criada com sucesso",
       });
-      setLocation("/entidades");
+      setLocation(result.state==='pending' ? '/contact-access' : "/entidades");
     },
     onError: async (error: Error, data) => {
       const isNetworkError = error.message.includes('fetch') || 

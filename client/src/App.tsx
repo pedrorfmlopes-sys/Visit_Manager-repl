@@ -54,6 +54,7 @@ const AgentMore = lazy(() => import("@/pages/AgentMore"));
 const Perfil = lazy(() => import("@/pages/Perfil"));
 const Planeamento = lazy(() => import("@/pages/Planeamento"));
 const InvoiceIntegration = lazy(() => import("@/pages/InvoiceIntegration"));
+const ContactAccess = lazy(() => import('@/pages/ContactAccess'));
 
 function LegacyRedirect({ to }: { to: string }) {
   const [, setLocation] = useLocation();
@@ -188,6 +189,7 @@ function ModuleAdminRoute({
       <Suspense fallback={<RouteLoader />}>
       <Switch>
         <Route path="/admin/invoice-integration"><AdminRoute component={InvoiceIntegration} /></Route>
+        <Route path="/contact-access" component={ContactAccess} />
         {/* Dashboard: admin vs agente */}
         <Route path="/" component={isAdmin ? AdminDashboard : Dashboard} />
 

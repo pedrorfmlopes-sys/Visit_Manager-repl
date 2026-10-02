@@ -137,13 +137,13 @@ export function tarefasRoutes(app: express.Express) {
   // ============================================================
   app.post("/api/tarefas", isAuthenticated, async (req: any, res) => {
     try {
-      const { userId, empresaId } = await getUserContext(req);
+      const { userId, empresaId, userRole } = await getUserContext(req);
       const body = req.body || {};
       await assertTenantReferences(empresaId!, {
         entidadeId: body.entidadeId,
         visitaId: body.visitaId,
         assignedUserId: body.assignedUserId,
-      });
+      }, {userId,userRole});
 
       // Normalização básica dos campos (sem Zod, para não depender de ficheiros que não existem)
       const cleaned: any = {
@@ -177,7 +177,7 @@ export function tarefasRoutes(app: express.Express) {
         entidadeId: body.entidadeId,
         visitaId: body.visitaId,
         assignedUserId: body.assignedUserId,
-      });
+      }, {userId,userRole});
 
       const cleaned: any = {
         ...body,

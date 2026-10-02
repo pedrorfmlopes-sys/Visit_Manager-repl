@@ -9,6 +9,7 @@ import {
 import { db } from "../db";
 import { contactos } from "@shared/schema";
 import { eq, and, or, desc, type SQL } from "drizzle-orm";
+import {contactAccessWhere} from '../contactAccessSql';
 
 /**
  * No projeto atual tens dois perfis:
@@ -67,16 +68,6 @@ export function canUserAccessVisit(
 }
 
 /**
- * RBAC base para CONTACTOS
- */
-export function canUserAccessContact(
-  ctx: UserContext,
-  contacto: { empresaId: string }
-): boolean {
-  return contacto.empresaId === ctx.empresaId;
-}
-
-/**
  * =====================================================================
  *  ✔ FUNÇÃO CORRETA — listContactosForUser
  * =====================================================================
@@ -109,13 +100,18 @@ export async function listContactosForUser({
     ) as SQL<unknown>;
   }
 
+  if(process.env.CONTACT_ACCESS_V2==='true') {
+    whereClause=contactAccessWhere('person',empresaId,userId,userRole) as SQL<unknown>;
+    if(entidadeId)whereClause=and(whereClause,eq(contactos.entidadeId,entidadeId)) as SQL<unknown>;
+  }
+
   return db.query.contactos.findMany({
     where: whereClause,
     orderBy: desc(contactos.createdAt),
     with: {
-      entidade: true,
-      assignedUser: true,
-      createdByUser: true,
+      entidade: process.env.CONTACT_ACCESS_V2!=='true' || userRole==='admin' ? true : undefined,
+      assignedUser: {columns:{id:true,firstName:true,lastName:true}},
+      createdByUser: {columns:{id:true,firstName:true,lastName:true}},
     },
   });
 }

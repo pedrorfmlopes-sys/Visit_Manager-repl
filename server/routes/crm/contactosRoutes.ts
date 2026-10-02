@@ -12,7 +12,8 @@ import {
   groupDuplicateContacts,
   mergeContacts,
 } from "../../contactManagement";
-import { db } from "../../db";
+import { db,pool } from "../../db";
+import {ContactAccessService} from '../../contactAccessService';
 import { contactos as contactosTable } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
@@ -103,11 +104,18 @@ export function contactosRoutes(app: express.Express) {
 
   app.post("/api/contactos", isAuthenticated, async (req: any, res) => {
     try {
-      const { empresaId, userId } = await getUserContext(req);
+      const { empresaId, userId,userRole } = await getUserContext(req);
+      if(process.env.CONTACT_ACCESS_V2==='true') {
+        const service=new ContactAccessService(pool);
+        const result=await service.submit(userId,{kind:'person',name:req.body.nome,email:req.body.email || '',phone:req.body.telemovel || '',
+          jobTitle:req.body.funcao || '',notes:req.body.observacoes || '',entityId:req.body.entidadeId || null,details:req.body.fotoUrl?{fotoUrl:req.body.fotoUrl}:{}},userRole==='admin'?req.body.assignedUserId:undefined);
+        if(result.state==='pending')return res.status(202).json({...result,message:'Pedido enviado aos administradores para análise.'});
+        return res.status(201).json(await storage.getContacto(result.id!,empresaId,userId,userRole));
+      }
       await assertTenantReferences(empresaId, {
         entidadeId: req.body.entidadeId,
         assignedUserId: req.body.assignedUserId,
-      });
+      }, {userId,userRole});
 
       const result = await createContactoIfUnique(
         {
@@ -143,7 +151,7 @@ export function contactosRoutes(app: express.Express) {
       await assertTenantReferences(empresaId, {
         entidadeId: req.body.entidadeId,
         assignedUserId: req.body.assignedUserId,
-      });
+      }, {userId,userRole});
       const updates = { ...req.body };
       delete updates.id;
       delete updates.empresaId;
@@ -157,6 +165,7 @@ export function contactosRoutes(app: express.Express) {
         excludeId: req.params.id,
       });
       if (duplicate) {
+        if(process.env.CONTACT_ACCESS_V2==='true' && userRole!=='admin')return res.status(409).json({code:'CONTACT_REVIEW_REQUIRED',message:'Esta alteração precisa de revisão por um administrador.'});
         return res.status(409).json({
           code: "CONTACT_DUPLICATE",
           message: contactDuplicateMessage(duplicate),

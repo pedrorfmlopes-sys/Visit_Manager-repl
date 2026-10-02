@@ -11,6 +11,7 @@ export default function InvoiceIntegration(){
  const [options,setOptions]=useState<any>({entities:[],leads:[],visits:[],tasks:[]});
  const [selected,setSelected]=useState<any>(null),[form,setForm]=useState({...blank}),[message,setMessage]=useState(''),[busy,setBusy]=useState(false);
  const [entityId,setEntityId]=useState(''),[role,setRole]=useState('architect'),[leadId,setLeadId]=useState(''),[remoteId,setRemoteId]=useState('');
+ const [importPreview,setImportPreview]=useState<any>(null);
  const [links,setLinks]=useState<any[]>([]),[objectType,setObjectType]=useState('visit'),[objectId,setObjectId]=useState('');
  async function load(){const [s,p,j,o]=await Promise.all([api('settings'),api('projects'),api('jobs'),api('options')]);setSettings({...s,token:''});setProjects(p.items);setJobs(j.items);setOptions(o);}
  useEffect(()=>{load().catch(e=>setMessage(e.message));},[]);
@@ -30,6 +31,10 @@ export default function InvoiceIntegration(){
  <div className="flex gap-2"><Button disabled={busy} onClick={()=>action(()=>api('settings',settings,'PUT'),'Configuração guardada.')}>Guardar ligação</Button><Button variant="outline" disabled={busy || !settings.enabled} onClick={()=>action(()=>api('test',{}),'Ligação validada.')}>Testar ligação</Button>{settings.publicUrl&&<a href={settings.publicUrl} target="_blank" rel="noreferrer">Abrir InvoiceStudio</a>}</div>
  </CardContent></Card>
  <Card><CardHeader><CardTitle>Entidades e contactos</CardTitle></CardHeader><CardContent className="space-y-3">
+ {settings.contactAccessAvailable && <><p>Importar os contactos do InvoiceStudio mantém os dados originais e as autorizações existentes. Os novos contactos ficam inicialmente disponíveis apenas aos administradores.</p>
+ <Button variant="outline" disabled={busy || !settings.enabled} onClick={()=>action(async()=>setImportPreview(await api('directory-import/preview',{})),'Pré-visualização preparada.')}>Preparar importação do InvoiceStudio</Button>
+ {importPreview && <div><p>{importPreview.entities} entidades, {importPreview.contacts} pessoas e {importPreview.assignments} associações.</p><Button disabled={busy} onClick={()=>action(async()=>{await api('directory-import/apply',{previewId:importPreview.previewId});setImportPreview(null);},'Contactos importados.')}>Confirmar importação</Button></div>}
+ <p><Link href="/contact-access">Gerir contactos e autorizações</Link></p></>}
  <select className="w-full border rounded p-2" aria-label="Entidade" value={entityId} onChange={e=>setEntityId(e.target.value)}><option value="">Selecionar entidade</option>{options.entities.map((e:any)=><option key={e.id} value={e.id}>{e.nome}</option>)}</select>
  <p>Envia a entidade selecionada e os seus contactos. Correspondências existentes ou alterações locais ficam para revisão.</p>
  <Button disabled={busy || !entityId || !settings.enabled} onClick={()=>action(()=>send('directory',{entityIds:[entityId]}),'Entidade e contactos enviados.')}>Enviar entidade e contactos</Button>

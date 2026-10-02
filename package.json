@@ -81,10 +81,11 @@
     "lucide-react": "^0.453.0",
     "memoizee": "^0.4.17",
     "multer": "^2.0.2",
-    "nodemailer": "^9.0.3",
+    "nodemailer": "^10.0.13",
     "openai": "^6.9.0",
     "openid-client": "^6.8.1",
     "passport": "^0.7.0",
+    "pg": "^8.22.0",
     "qr-scanner": "^1.4.2",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
@@ -98,8 +99,7 @@
     "vaul": "^1.1.2",
     "wouter": "^3.3.5",
     "ws": "^8.18.0",
-    "zod": "^3.24.2",
-    "pg": "^8.22.0"
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

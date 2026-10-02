@@ -1,4 +1,5 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq,inArray } from "drizzle-orm";
+import {contactRecordBoundary} from './contactRecordBoundary';
 import { db } from "./db";
 import {
   leadApprovalRequests,
@@ -85,9 +86,10 @@ export async function assertLeadAccess(
       eq(leads.id, leadId),
       eq(leads.empresaId, context.empresaId),
     ),
-    columns: { id: true, odooLeadId: true },
+    columns: { id: true, odooLeadId: true,empresaId:true,entidadeId:true,contactoId:true,visitaId:true },
   });
-  if (!lead) {
+  const allowed=await contactRecordBoundary(context.empresaId,context.userId,context.userRole);
+  if (!lead || !allowed(lead)) {
     const error = new Error("Lead não encontrado.");
     (error as any).status = 404;
     throw error;
@@ -111,6 +113,11 @@ export async function getAccessibleLeadIds(context: LeadActorContext) {
         eq(leadFollowers.userId, context.userId),
       ),
     );
+  if(process.env.CONTACT_ACCESS_V2==='true' && rows.length) {
+    const allowed=await contactRecordBoundary(context.empresaId,context.userId,context.userRole);
+    const records=await db.query.leads.findMany({where:and(eq(leads.empresaId,context.empresaId),inArray(leads.id,rows.map(row=>row.leadId)))});
+    return records.filter(allowed).map(row=>row.id);
+  }
   return rows.map((row) => row.leadId);
 }
 

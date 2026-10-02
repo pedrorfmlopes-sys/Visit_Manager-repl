@@ -73,6 +73,18 @@ class OfflineStorage {
     return this.db!;
   }
 
+  async clearServerCopies(): Promise<void> {
+    const db=await this.ensureDB();
+    const stores=['visits','entidades','contactos','gabinetes','tarefas'].filter(name=>db.objectStoreNames.contains(name));
+    if(!stores.length)return;
+    const tx=db.transaction(stores,'readwrite');
+    for(const name of stores) {
+      const request=tx.objectStore(name).openCursor();
+      request.onsuccess=()=>{const cursor=request.result;if(!cursor)return;if(!String(cursor.key).startsWith('temp-'))cursor.delete();cursor.continue();};
+    }
+    await new Promise<void>((resolve,reject)=>{tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});
+  }
+
   async saveVisita(visita: Visita): Promise<void> {
     const db = await this.ensureDB();
     const tx = db.transaction('visits', 'readwrite');
